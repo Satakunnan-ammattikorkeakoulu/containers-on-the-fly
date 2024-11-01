@@ -178,11 +178,8 @@ def stopDockerContainer(reservationId: str):
       reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
       if reservation == None: return False
 
-      # Can use reservation.reservedContainer.containerDockerId to target the docker container
-      #print("STOPPING CONTAINER:")
-      #print(ORMObjectToDict(reservation))
-      #print(ORMObjectToDict(reservation.reservedContainer))
-      stop_container(reservation.reservedContainer.containerDockerName)
+      if (reservation.status == "started"):
+        stop_container(reservation.reservedContainer.containerDockerName)
       reservation.status = "stopped"
       reservation.reservedContainer.stoppedAt = timeNow()
       session.commit()
@@ -267,7 +264,7 @@ def getReservationsRequiringStop(computerId : int):
   with Session() as session:
     reservations = session.query(Reservation).filter(
       Reservation.computerId == computerId,
-      Reservation.status == "started",
+      Reservation.status.in_(["started", "reserved"]),
       Reservation.endDate < timeNow()
     )
     return reservations

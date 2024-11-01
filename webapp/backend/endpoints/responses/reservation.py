@@ -341,13 +341,13 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
 def cancelReservation(userId : int, reservationId: str):
   # Check that user owns the given reservation and it can be found
   # Admins can cancel any reservation
+  # print("Starting to cancel reservation: " + reservationId)
   with Session() as session:
+    reservation = None
     if IsAdmin(userId) == False:
       reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
-      if reservation is None: return Response(False, "No reservation found for this user.")
-  
-  with Session() as session:
-    reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
+    else:
+      reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
     if reservation is None: return Response(False, "No reservation found.")
 
     reservation.endDate = datetime.datetime.now(datetime.timezone.utc)

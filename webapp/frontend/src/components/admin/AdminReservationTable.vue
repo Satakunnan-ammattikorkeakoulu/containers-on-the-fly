@@ -11,6 +11,10 @@
       <template v-slot:item.status="{item}">
         <v-chip :color="getStatusColor(item.status)">{{item.status}}</v-chip>
       </template>
+      <!-- Reservation ID -->
+      <template v-slot:item.reservationid="{item}">
+        {{ item.reservationId }}
+      </template>
       <!-- Reserve date -->
       <template v-slot:item.createdAt="{item}">
         {{ parseTime(item.createdAt) }}
@@ -26,6 +30,10 @@
       <!-- User -->
       <template v-slot:item.userEmail="{item}">
         {{ item.userEmail }} <small>(id: {{ item.userId }})</small>
+      </template>
+      <!-- Server -->
+      <template v-slot:item.server="{item}">
+        {{item.computerId }}
       </template>
       <!-- Resources -->
       <template v-slot:item.resources="{item}">
@@ -78,10 +86,12 @@
             sortable: false,
             value: 'status',
           },
+          { text: 'Reservation ID', value: 'reservationid' },
           { text: 'User', value: 'userEmail' },
           { text: 'Reserved', value: 'createdAt' },
           { text: 'Starts', value: 'startDate' },
           { text: 'Ends', value: 'endDate' },
+          { text: 'Server ID', value: 'server' },
           { text: 'Resources', value: 'resources' },
           { text: 'Container Image', value: 'containerImage' },
           { text: 'Ports', value: 'ports' },

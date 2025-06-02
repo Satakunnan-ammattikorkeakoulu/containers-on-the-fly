@@ -39,15 +39,16 @@ def get_available_port():
       if port not in portsInUse:
         availablePorts.append(port)
   
-  # Try to bind to a random available port 5 times
+  # Try to bind to a random available port 50 times
   i = 0
-  retries = 5
+  retries = 50
   while i < retries:
     randPort = random.choice(availablePorts)
     if is_port_in_use(randPort) == False:
        return randPort
     i += 1
 
+  print("ERROR: Did not find a random port to bind to after 50 attempts. Randomly giving one out.")
   return random.choice(availablePorts)
 
 import re
@@ -176,11 +177,8 @@ def stopDockerContainer(reservationId: str):
       reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
       if reservation == None: return False
 
-      # Can use reservation.reservedContainer.containerDockerId to target the docker container
-      #print("STOPPING CONTAINER:")
-      #print(ORMObjectToDict(reservation))
-      #print(ORMObjectToDict(reservation.reservedContainer))
-      stop_container(reservation.reservedContainer.containerDockerName)
+      if (reservation.status == "started"):
+        stop_container(reservation.reservedContainer.containerDockerName)
       reservation.status = "stopped"
       reservation.reservedContainer.stoppedAt = timeNow()
       session.commit()
@@ -257,7 +255,7 @@ def getReservationsRequiringStop(computerId : int):
   with Session() as session:
     reservations = session.query(Reservation).filter(
       Reservation.computerId == computerId,
-      Reservation.status == "started",
+      Reservation.status.in_(["started", "reserved"]),
       Reservation.endDate < timeNow()
     )
     return reservations
@@ -336,3 +334,25 @@ def getComputerId(computerName: str):
     print(e)
     return None
   
+def getRunningReservedDockerContainers():
+  '''
+  Finds all Docker containers with name starting with "reservation-".
+  Basically all reservations that are physically running on this computer.
+  '''
+  running_containers = docker.ps()
+
+  # Filter containers whose names start with "reservation-"
+  reservation_containers = [
+  container for container in running_containers
+    if container.name.startswith("reservation-")
+  ]
+
+  return reservation_containers
+
+def stopOrphanDockerContainer(containerName):
+  if not containerName: return
+  try:
+    stop_container(containerName)
+  except Exception as e:
+    print("Error stopping orphan container:")
+    print(e)

@@ -56,7 +56,15 @@ def start_container(pars):
         if "image_version" not in pars: pars["image_version"] = "latest"
         if "interactive" not in pars: pars["interactive"] = True
         if "remove" not in pars: pars["remove"] = True
-        if "shm_size" not in pars: pars["shm_size"] = "1g"
+
+        # can this lead to oum? we need to test so if weird shit is happening, look in to this:
+        # we add that as half of the ram size, if this seems to work, remove this shm_size from docker.settings.
+
+        mem_value = int(float((pars["memory"][:-1])))
+        unit = pars["memory"][-1]
+        shm_value = f"{mem_value // 2}{unit}"
+        pars["shm_size"] = shm_value
+
         if "password" not in pars: pars["password"] = create_password()
 
         container_name = pars['name']
@@ -84,13 +92,6 @@ def start_container(pars):
                 else:
                     volumes.append((mount["mountLocation"], f"/home/{pars['username']}/{mount['containerFolderName']}"))
 
-        # EXTRA: Do not commit this. Adds shared volume for Toni, Juuso, Eetu.
-        try:
-            roboai_ids = [4, 18, 19, 112]
-            if pars['dbUserId'] in roboai_ids:
-                volumes.append(("/home/aiserver/roboai_green", f"/home/{pars['username']}/roboai_green"))
-        except Exception as e:
-            print(e)
         
         #testing ram disk
         mount_path = "/home/user/ram_disk"
@@ -116,9 +117,9 @@ def start_container(pars):
             # If it would be removed, restarting or crashing a container would fully destroy it immediately.
             remove = False,
             # Looks every time if there is newer image in local registery
-            pull='always'
+            pull='always',
 
-            #user=user
+            #user="1002:130"
         )
         #print("The running container: ", cont)
         #print("=== Stop printing running container")
@@ -133,7 +134,7 @@ def start_container(pars):
         non_critical_errors = ""
         #This will check if the user has config.bash in config folder. If yes, then this config.bash will be executed, before container is given to user
         if os.path.exists(f'{pars["localMountFolderPath"]}/config/config.bash'):
-            docker.execute(container=container_name, command=["/bin/bash","-c", "/home/user/persistent/config/config.bash"], user="root")
+            docker.execute(container=container_name, command=["/bin/bash","-c", "timeout 60 /home/user/persistent/config/config.bash"], user="root")
     except Exception as e:
         print(f"Something went wrong when running users config.bash in  {container_name}. This is not critical, most likely user error")
         print(e)

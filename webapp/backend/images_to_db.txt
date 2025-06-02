@@ -1,4 +1,0 @@
-yolor,Ubuntu_20_04_with_Yolor,Ubuntu_20_04_with_Yolor,SSH,22,jupyter,8888,
-tensorflow2_9_0_jupyterlab,tensorflow2_9_0_jupyterlab,tensorflow2_9_0_jupyterlab,SSH,22,jupyter,8888,
-tensorflow2_9_0_jupyterlab2,tensorflow2_9_0_jupyterlab2,tensorflow2_9_0_jupyterlab2,SSH,22,jupyter,8888,
-tensorflow2_9_0_jupyterlab3,tensorflow2_9_0_jupyterlab3,tensorflow2_9_0_jupyterlab3,SSH,22,jupyter,8888,

@@ -5,6 +5,7 @@ from endpoints.adminRoutes import adminUsers, adminUserWhitelists, adminUserStor
 from settings import settings
 from helpers.auth import HashPassword
 from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, UserStorage, Container
+import base64
 
 router = APIRouter()
 router.include_router(user.router)
@@ -24,11 +25,10 @@ router.include_router(adminReservations.router)
 
 if settings.app["production"] == True:
   print("Running server in production mode")
-
-# Add test data if running in development mode
-if settings.app["production"] == False:
+else:
   print("Running server in development mode")
 
+if settings.app["addTestDataInDevelopment"]:
   with Session() as session:
     # Admin role
     adminRole = session.query(Role).filter( Role.name == "admin" ).first()
@@ -40,14 +40,14 @@ if settings.app["production"] == False:
       session.commit()
     
     # Admin user
-    adminUser = session.query(User).filter( User.email == "aiserveradmin@samk.fi" ).first()
+    adminUser = session.query(User).filter( User.email == "admin@foo.com" ).first()
     if adminUser is None:
-      print("Creating test data: admin user with email aiserveradmin@samk.fi")
+      print("Creating test data: admin user with email admin@foo.com")
       hash = HashPassword("test")
       adminUser = User(
-        email = "aiserveradmin@samk.fi",
-        password = hash["hashedPassword"],
-        passwordSalt = hash["salt"]
+        email = "admin@foo.com",
+        password = base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
+        passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
       )
       adminRole = session.query(Role).filter( Role.name == "admin" ).first()
       adminUser.roles.append(adminRole)
@@ -56,41 +56,41 @@ if settings.app["production"] == False:
       session.commit()
     
     # Normal User
-    normalUser = session.query(User).filter( User.email == "aiserveruser@samk.fi" ).first()
+    normalUser = session.query(User).filter( User.email == "user@foo.com" ).first()
     if normalUser is None:
-      print("Creating test data: normal user with email aiserveruser@samk.fi")
+      print("Creating test data: normal user with email user@foo.com")
       hash = HashPassword("test")
       normalUser = User(
-        email = "aiserveruser@samk.fi",
-        password = hash["hashedPassword"],
-        passwordSalt = hash["salt"]
+        email = "user@foo.com",
+        password = base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
+        passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
       )
       normalUser.userStorage.append(UserStorage( maxSpace = "5000", maxSpaceFormat = "mb" ))
       session.add(normalUser)
       session.commit()
 
     # Computer
-    computer = session.query(Computer).filter( Computer.name == "aiserver" ).first()
+    computer = session.query(Computer).filter( Computer.name == "server1" ).first()
     if computer is None:
-      print("Creating test data: computer named aiserver")
-      computer = Computer( name = "aiserver", ip = "localhost", public = True )
+      print("Creating test data: computer named server1")
+      computer = Computer( name = "server1", ip = settings.app["serverIp"], public = True )
       session.add(computer)
       session.commit()
 
     # Hardware Specs for computer
-    computer = session.query(Computer).filter( Computer.name == "aiserver" ).first()
+    computer = session.query(Computer).filter( Computer.name == "server1" ).first()
     if len(computer.hardwareSpecs) == 0:
       print("Creating test data: hardware specs for a computer")
       computer.hardwareSpecs.append(HardwareSpec(
         type = "gpus",
-        maximumAmount = 6,
+        maximumAmount = 0,
         # Only this will have effect on GPUS to set how many can be reserved, individual GPUs are then individually set as described below
-        maximumAmountForUser = 2,
+        maximumAmountForUser = 1,
         defaultAmountForUser = 0,
         minimumAmount = 0,
         format = "GPUs",
       ))
-      computer.hardwareSpecs.append(HardwareSpec(
+      '''computer.hardwareSpecs.append(HardwareSpec(
         type = "gpu",
         maximumAmount = 1,        # Keep as 1
         maximumAmountForUser = 1, # Keep as 1
@@ -107,19 +107,19 @@ if settings.app["production"] == False:
         minimumAmount = 0,        # Keep as 0
         internalId = "1", # Nvidia / cuda ID of the device
         format = "NVIDIA RTX A5000 24GB",
-      ))
+      ))'''
       computer.hardwareSpecs.append(HardwareSpec(
         type = "ram",
-        maximumAmount = 500,
-        maximumAmountForUser = 50,
+        maximumAmount = 10,
+        maximumAmountForUser = 10,
         defaultAmountForUser = 1,
-        minimumAmount = 2,
+        minimumAmount = 1,
         format = "GB",
       ))
       computer.hardwareSpecs.append(HardwareSpec(
         type = "cpus",
-        maximumAmount = 80,
-        maximumAmountForUser = 10,
+        maximumAmount = 5,
+        maximumAmountForUser = 5,
         defaultAmountForUser = 1,
         minimumAmount = 1,
         format = "CPUs",
@@ -127,22 +127,18 @@ if settings.app["production"] == False:
       session.commit()
 
     # Container
-    container = session.query(Container).filter( Container.imageName == "tensorflow" ).first()
+    container = session.query(Container).filter( Container.imageName == "ubuntu-base" ).first()
     if container is None:
-      print("Creating test data: container with imageName tensorflow")
+      print("Creating test data: container with imageName ubuntu-base")
       container = Container(
         public = True,
-        imageName = "tensorflow",
-        name = "Ubuntu 20.04 with Tensorflow",
-        description = "Ubuntu 20.04 with Tensorflow"
+        imageName = "ubuntu-base",
+        name = "Ubuntu Base Image",
+        description = "Ubuntu Base Image"
       )
       container.containerPorts.append(ContainerPort(
         serviceName = "SSH",
         port = 22
-      ))
-      container.containerPorts.append(ContainerPort(
-        serviceName = "Jupyter Lab",
-        port = 8080
       ))
       session.add(container)
       session.commit()

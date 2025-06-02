@@ -1,0 +1,51 @@
+####
+# BASE CONFIGURATIONS - DO NOT EDIT
+# The configurations below sets the default configurations for this image to work with the containers on the fly project.
+# Version 1
+####
+
+# Use an official Ubuntu 22.04 base image
+FROM ubuntu:22.04
+#FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+
+# Update the package list and install necessary packages
+RUN apt-get update && \
+    apt-get install -y \
+    passwd \
+    sudo \
+    openssh-server \
+    zip \
+    htop \
+    screen \
+    libgl1-mesa-glx \
+    python3-pip
+    
+# Create a user with username 'user'
+# When spinning up a new container from this image, the password will be randomly set for the user by the docker utility.
+RUN useradd -rm -d /home/user -s /bin/bash -g root -G sudo -u 1000 user
+RUN echo 'user:password' | chpasswd
+
+# Configure SSH server to listen on port 22 and allow root login
+RUN sed -i 's/#Port 22/Port 22/' /etc/ssh/sshd_config && \
+    sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    mkdir /var/run/sshd
+# Start SSH
+RUN service ssh start
+
+# Change the default user working directory
+USER user
+WORKDIR /home/user
+
+USER root
+
+# Open port 22 (SSH)
+EXPOSE 22
+
+# Set the default command to run in the container
+CMD ["/bin/bash","-c", "/usr/sbin/sshd -D ;"]
+
+####
+# YOUR OWN MODIFICATIONS BELOW
+# You can write your own extra instructions below for the image.
+# Copy this file to some other location to not lose your changes if updating the repository later with the git pull command.
+####

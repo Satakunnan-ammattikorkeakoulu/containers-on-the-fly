@@ -93,9 +93,6 @@ def startDockerContainer(reservationId: str):
         "outsidePort": outsidePort
       })
 
-    userEmailParsed = removeSpecialCharacters(reservation.user.email)
-    mountLocation = f'{settings.docker["mountLocation"]}/{userEmailParsed}'
-
     # Create the GPUs string to be passed to Docker
     gpusString = ""
     # Loop through all hwSpecs and find the reserved GPU internal IDs (Nvidia / cuda IDs), if any
@@ -120,10 +117,15 @@ def startDockerContainer(reservationId: str):
       "memory": f"{hwSpecs['ram']['amount']}g",
       "shm_size": settings.docker["shm_size"],
       "ports": portsForContainer,
-      "localMountFolderPath": mountLocation,
       "password": sshPassword,
       "dbUserId": reservation.userId
     }
+
+    if settings.docker.get("userMountLocation"):
+      userEmailParsed = removeSpecialCharacters(reservation.user.email)
+      userMountLocation = f'{settings.docker["userMountLocation"]}/{userEmailParsed}'
+      details["localMountFolderPath"] = userMountLocation
+
     cont_was_started = False
     #print(details)
 
@@ -184,6 +186,14 @@ def stopDockerContainer(reservationId: str):
       session.commit()
   except Exception as e:
     print("Error stopping server:")
+    print(e)
+
+def stopOrphanDockerContainer(containerName):
+  if not containerName: return
+  try:
+    stop_container(containerName)
+  except Exception as e:
+    print("Error stopping orphan container:")
     print(e)
 
 def restartDockerContainer(reservationId: str):
@@ -333,7 +343,7 @@ def getComputerId(computerName: str):
     print(f"Something went wrong getting computer ID for name: {computerName}. Error:")
     print(e)
     return None
-  
+
 def getRunningReservedDockerContainers():
   '''
   Finds all Docker containers with name starting with "reservation-".
@@ -348,11 +358,3 @@ def getRunningReservedDockerContainers():
   ]
 
   return reservation_containers
-
-def stopOrphanDockerContainer(containerName):
-  if not containerName: return
-  try:
-    stop_container(containerName)
-  except Exception as e:
-    print("Error stopping orphan container:")
-    print(e)

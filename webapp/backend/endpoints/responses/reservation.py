@@ -341,7 +341,7 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
 def cancelReservation(userId : int, reservationId: str):
   # Check that user owns the given reservation and it can be found
   # Admins can cancel any reservation
-  print("Starting to cancel reservation: " + reservationId)
+  # print("Starting to cancel reservation: " + reservationId)
   with Session() as session:
     reservation = None
     if IsAdmin(userId) == False:

@@ -5,6 +5,9 @@ from settings import settings
 
 def send_email(to, mail_subject, mail_body):
 
+    if "sendEmail" not in settings.email or settings.email["sendEmail"] is False:
+        return
+
     if "emailAddress" not in settings.email or "smtpPassword" not in settings.email or "smtpAddress" not in settings.email or "smtpPort" not in settings.email:
         print("Email settings are not set in the settings file. Email not sent.")
         return

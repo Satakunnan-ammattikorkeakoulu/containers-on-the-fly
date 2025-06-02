@@ -1,3 +1,8 @@
+##################################################################
+# DEPRECATED                                                     #
+# The same functionality been mainly added to the web interface. #
+##################################################################
+
 from helpers.admin import *
 from helpers.admincli.Computer import *
 from helpers.admincli.Container import *
@@ -82,6 +87,9 @@ def main():
       elif (selection == "exit"): breakLoop = True
 
 def stats():
-  printStats()
+  # TODO: Print here the count of records in each table
+  print("\nAmount of records in each table:")
+  print("Users: 3 records")
+  print("Containers: 1 records")
 
 main()

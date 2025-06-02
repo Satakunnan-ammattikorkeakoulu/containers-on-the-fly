@@ -5,6 +5,8 @@ from helpers.auth import CreateLoginToken, HashPassword, IsCorrectPassword, Chec
 from fastapi import HTTPException, status
 from datetime import datetime
 from logger import log
+import hashlib
+import base64
 
 def login(username, password):
   '''
@@ -42,7 +44,7 @@ def login(username, password):
       # Check that the password is correct (only for password logins)
       if (loginType == "password" and (user.password == "" or user.password is None)):
         raise HTTPException(status_code=400, detail="User password was not set yet. Please set the password first to login.")
-      if loginType == "password" and IsCorrectPassword(user.passwordSalt, user.password, password) == False:
+      if loginType == "password" and IsCorrectPassword(base64.b64decode(user.passwordSalt), base64.b64decode(user.password), password) == False:
         raise HTTPException(status_code=400, detail="Incorrect password.")
 
       # Create login token and return it

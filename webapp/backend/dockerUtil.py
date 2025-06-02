@@ -24,6 +24,7 @@ def main():
       sleep(10)
     # Run this larger cleanup below every 60 seconds (1 minute)
     stopOrphanContainerReservations()
+    
 
 def stopOrphanContainerReservations():
   '''
@@ -37,7 +38,7 @@ def stopOrphanContainerReservations():
     # Get all containers marked as started in the database
     reservations = getRunningReservations(computerId)
     for reservation in reservations:
-      print(reservation.reservedContainer.containerDockerName)
+      print(reservation.reservedContainer.containerDockerId)
     
     # Get all Docker container reservations (container name starting with "reservation-"") really running on this computer
     docker_reservation_containers = getRunningReservedDockerContainers()
@@ -51,9 +52,8 @@ def stopOrphanContainerReservations():
         if is_running:
           pass
         else:
-          # Container not marked as started in the database - stop it
-          stopOrphanDockerContainer(container.name)
           print("Container Docker reservation not synchronized with database! Reservation ID: " + str(reservation.reservationId) + " and container name: " + container.name)
+          stopOrphanDockerContainer(container.name)
   except Exception as e:
     print("Error stopping (cleaning up) orphan containers:")
     print(e)

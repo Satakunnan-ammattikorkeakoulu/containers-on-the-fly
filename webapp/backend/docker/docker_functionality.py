@@ -6,6 +6,7 @@ from settings import settings
 from python_on_whales.exceptions import NoSuchContainer
 import os
 import shutil
+import traceback
 
 def start_container(pars):
     """
@@ -47,7 +48,6 @@ def start_container(pars):
         if "cpus" not in pars: raise Exception("Missing parameter: cpus")
         if "memory" not in pars: raise Exception("Missing parameter: memory")
         if "ports" not in pars: raise Exception("Missing parameter: ports")
-        if "localMountFolderPath" not in pars: raise Exception("Missing parameter: localMountFolderPath")
         if "dbUserId" not in pars: raise Exception("Missing parameter: dbUserId")
 
         if "gpus" not in pars: pars["gpus"] = None
@@ -75,16 +75,18 @@ def start_container(pars):
         if pars["gpus"] != None:
             gpus = f'"{pars["gpus"]}"'
 
-        # Create directory for mounting if it does not exist
-        if not os.path.isdir(pars["localMountFolderPath"]):
-            os.makedirs(pars["localMountFolderPath"], exist_ok=True)
-        # Set correct owner and group for the mount folder
-        shutil.chown(pars["localMountFolderPath"], user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
-        # Set correct file permissions for the mount folder
-        os.chmod(pars["localMountFolderPath"], 0o777)
-
         # Add volumes and mounts
-        volumes = [(pars['localMountFolderPath'], f"/home/{pars['username']}/persistent")]
+        volumes = []
+        if pars.get("localMountFolderPath"):
+            # Create directory for mounting if it does not exist
+            if not os.path.isdir(pars["localMountFolderPath"]):
+                os.makedirs(pars["localMountFolderPath"], exist_ok=True)
+            # Set correct owner and group for the mount folder
+            shutil.chown(pars["localMountFolderPath"], user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
+            # Set correct file permissions for the mount folder
+            os.chmod(pars["localMountFolderPath"], 0o777)
+            volumes.append(pars['localMountFolderPath'], f"/home/{pars['username']}/persistent")
+            volumes = [(pars['localMountFolderPath'], f"/home/{pars['username']}/persistent")]
         if "extraMounts" in settings.docker and len(settings.docker["extraMounts"]) > 0:
             for mount in settings.docker["extraMounts"]:
                 if mount["readOnly"]:
@@ -132,6 +134,8 @@ def start_container(pars):
     except Exception as e:
         print(f"Something went wrong starting container {container_name}. Trying to stop the container. Error:")
         print(e)
+        print("Stack trace:")
+        print(traceback.format_exc())
         stop_container(container_name)
         return False, "", "", e, None
 

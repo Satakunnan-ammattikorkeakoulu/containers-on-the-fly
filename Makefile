@@ -66,7 +66,7 @@ setup-main-server: check-os-ubuntu verify-all-config-files-exist apply-firewall-
 	@./scripts/install_webserver_dependencies.bash
 	$(PIP) install -r webapp/backend/requirements.txt
 	# Need to run the next command without sudo, as otherwise the node_modules folder created would be owned by root
-	cd webapp/frontend && sudo -u $(shell who am i | awk '{print $$1}') npm install
+	cd webapp/frontend && sudo -u $(shell whoami) npm install
 
 	@echo "\n$(GREEN)The main server has been setup.\n"
 	@echo "NEXT STEPS:"
@@ -95,7 +95,7 @@ setup-docker-utility: ## Setups the Docker utility. The Docker utility will star
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
 	@$(PIP) install -r webapp/backend/requirements.txt
-	@usermod -aG docker $(shell who am i | awk '{print $$1}')
+	@usermod -aG docker $(shell whoami')
 	@echo "\n$(GREEN)The Docker utility has been setup.\n"
 	@echo "NEXT STEPS:"
 	@echo "1. Run command $(BOLD)pm2 startup$(RESET)$(GREEN) and copy/paste the command to your terminal."

@@ -87,8 +87,6 @@ def start_container(pars):
             os.chmod(pars["localMountFolderPath"], 0o777)
             volumes.append((pars['localMountFolderPath'], f"/home/{pars['username']}/persistent"))
             #volumes = [(pars['localMountFolderPath'], f"/home/{pars['username']}/persistent")]
-            volumes.append((pars['localMountFolderPath'], f"/home/{pars['username']}/persistent"))
-            #volumes = [(pars['localMountFolderPath'], f"/home/{pars['username']}/persistent")]
         if "extraMounts" in settings.docker and len(settings.docker["extraMounts"]) > 0:
             for mount in settings.docker["extraMounts"]:
                 if mount["readOnly"]:
@@ -187,6 +185,7 @@ def restart_container(container_name):
         docker.restart(container_name)
     except Exception as e:
         print(f"Could not restart container: {container_name}")
+        traceback.print_exc()
         pass
 
 def get_email_container_started(image, ip, ports, password, includeEmailDetails, non_critical_errors, endDate = None):

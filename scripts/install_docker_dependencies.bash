@@ -20,11 +20,28 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "Running with sudo privileges."
+sudo add-apt-repository ppa:graphics-drivers/ppa
 
 # Update and install initial packages
 sudo apt update
+sudo rm /etc/apt/sources.list.d/nvidia-*.list
+sudo apt-get purge '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*'
+
+# libnvidia-container key
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+  gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/nvidia-container.gpg > /dev/null
+# nvidia-container-runtime key
+curl -fsSL https://nvidia.github.io/nvidia-container-runtime/gpgkey | \
+  gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/nvidia-container-runtime.gpg > /dev/null
+# nvidia-docker key
+curl -fsSL https://nvidia.github.io/nvidia-docker/gpgkey | \
+  gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/nvidia-docker.gpg > /dev/null
+
+sudo add-apt-repository ppa:graphics-drivers/ppa
+sudo apt update
+
 sudo apt install -y python3-pip libsasl2-dev libldap2-dev libssl-dev
-sudo ubuntu-drivers install nvidia:535-server
+sudo ubuntu-drivers install nvidia:570-server
 
 # Add Docker's official GPG key if it's not already added
 if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
@@ -62,9 +79,7 @@ if ! command -v pm2 > /dev/null; then
 fi
 
 # Install Nvidia Docker Runtime
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo tee /etc/apt/trusted.gpg.d/nvidia.gpg > /dev/null
-curl -fsSL https://nvidia.github.io/nvidia-container-runtime/gpgkey | sudo tee /etc/apt/trusted.gpg.d/nvidia-container-runtime.gpg > /dev/null
-curl -fsSL https://nvidia.github.io/nvidia-docker/gpgkey | sudo tee /etc/apt/trusted.gpg.d/nvidia-docker.gpg > /dev/null
+
 
 sudo apt-get update
 sudo apt-get install -y nvidia-docker2

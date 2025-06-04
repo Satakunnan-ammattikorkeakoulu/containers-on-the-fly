@@ -35,5 +35,5 @@ if __name__ == '__main__':
     reload = True
     if production == True: logLevel = "critical"
     if production == True: reload = False
-    uvicorn.run("main:app", host="127.0.0.1", port=int(settings.app["port"]), log_level=logLevel, reload=reload)
+    uvicorn.run("main:app", host="0.0.0.0", port=int(settings.app["port"]), log_level=logLevel, reload=reload)
     print("running")

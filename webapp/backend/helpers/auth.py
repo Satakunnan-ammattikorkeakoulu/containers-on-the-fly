@@ -142,7 +142,7 @@ def GetLDAPUser(username, password):
   useWhitelisting = settings.login["useWhitelist"]
   # Disable certificate checks
   ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
-  l = ldap.initialize(set["url"])
+  l = ldap.initialize(set["ldap_url"])
   l.set_option(ldap.OPT_NETWORK_TIMEOUT, 6)
   l.set_option(ldap.OPT_TIMEOUT, 6)
   l.set_option(ldap.OPT_REFERRALS, ldap.OPT_OFF)

@@ -121,7 +121,7 @@ After copying the files, make configurations to the files. The files to configur
 After the configurations are ready, set up the docker utility with:
 
 ```bash
-make setup-docker-utility
+sudo make setup-docker-utility
 ```
 
 #### Start Docker Utility

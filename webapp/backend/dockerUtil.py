@@ -98,7 +98,7 @@ def restartCrashedServers():
         if containerState.state.status == "exited":
           restartDockerContainer(reservation.reservationId)
       except Exception as e:
-        print(f"Error restarting a container:")
+        print(f"Error restarting a crashed container:")
         print(e)
         pass
       

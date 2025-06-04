@@ -177,6 +177,27 @@ After copying the files, make configurations to the files. The files to configur
 - `user_config/frontend_settings.js`: Settings for the frontend of the web interface. Might not require any extra configurations.
 - `user_config/nginx_settings.conf`: Contains the configurations for the Nginx proxy server. Does not require any extra configurations.
 
+##### LDPA Setup
+
+If you wish to use LDAP for the login, then configure the LDAP in the `user_config/backend_settings.json` file with these settings:
+
+```json
+    "login": {
+      ... previous settings
+      "ldap": {
+        "ldap_url": "ldaps://your-ldap-server-address",
+        "usernameFormat": "{username}@ad.local",
+        "passwordFormat": "{password}",
+        "ldapDomain": "dc=ad,dc=local",
+        "searchMethod": "(sAMAccountName={username})",
+        "accountField": "sAMAccountName",
+        "emailField": "mail"
+      }
+    },
+```
+
+Make sure to set your settings in those configurations. It is trying to authenticate with the `mail` field coming from the LDAP in that case.
+
 ##### Start the Servers
 
 After the setup is complete, run the main server dependencies with:

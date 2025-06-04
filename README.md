@@ -54,7 +54,7 @@ Note that this step is only required to be followed if you have multiple (physic
 
 After the main server has been installed, it is possible to create more Ubuntu 22.04 servers in which the **container server** can run and from which container reservations can be made. If you wish to expand the main server with additional container servers, then in another servers you need to:
 1. Create fresh Ubuntu 22.04 server to be used with additional container server
-2. Run command ``make allow-container-server IP=CONTAINER_SERVER_IP`` in the main server to allow connection from the container server to the main server
+2. Run command ``sudo make allow-container-server IP=CONTAINER_SERVER_IP`` in the main server to allow connection from the container server to the main server
 3. Add the computer through the main server admin web interface (Computers -> Create new Computer). Make a note of the name that you set for the computer as you need to configure this in your settings file.
 4. [Install the Container Server](#automatic-installation-container-server) in the new server
 

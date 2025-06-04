@@ -95,7 +95,7 @@ setup-docker-utility: ## Setups the Docker utility. The Docker utility will star
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
 	@$(PIP) install -r webapp/backend/requirements.txt
-	@usermod -aG docker $(shell whoami')
+	@usermod -aG docker $(SUDO_USER)
 	@echo "\n$(GREEN)The Docker utility has been setup.\n"
 	@echo "NEXT STEPS:"
 	@echo "1. Run command $(BOLD)pm2 startup$(RESET)$(GREEN) and copy/paste the command to your terminal."

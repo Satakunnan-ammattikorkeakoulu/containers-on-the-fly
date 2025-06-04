@@ -160,6 +160,13 @@ def startDockerContainer(reservationId: str):
       session.commit()
     else:
       # Set error message to database
+      print("Error starting container!")
+      print("Critical errors:")
+      if errors:
+        print(errors)
+      print("Non-critical errors:")
+      if non_critical_errors:
+        print(non_critical_errors)
       reservation.status = "error"
       reservation.reservedContainer.containerDockerErrorMessage = str(errors)
       session.commit()

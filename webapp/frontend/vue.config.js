@@ -4,6 +4,7 @@ module.exports = defineConfig({
     'vuetify'
   ],
   devServer: {
-    allowedHosts: "all"
+    allowedHosts: "all",
+    webSocketServer: false
   }
 })

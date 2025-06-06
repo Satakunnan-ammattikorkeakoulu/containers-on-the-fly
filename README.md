@@ -36,7 +36,7 @@ If you wish to install the **main server** which contains the web interface, dat
 4. [Install the Container Server](#automatic-installation-container-server)
 5. [Create reservable containers (images)](#creating-reservable-containers)
 
-Default admin and a regular user accounts are added to the system automatically, if the backend setting addTestDataInDevelopment is set to true (true by default). The accounts are as follows:
+Default admin and a regular user accounts are added to the system automatically, if the backend setting `addTestDataInDevelopment` is set to true (true by default). The accounts are as follows:
 
 ```
 username: admin@foo.com
@@ -48,6 +48,15 @@ username: user@foo.com
 password: test
 ```
 
+#### Settings or Application Updates
+
+If you change any setting files in the ``user_config/`` folder or run ``git pull`` to update the application, just run these commands again to apply the settings and to restart the servers in the main server:
+
+```
+make start-main-server
+make start-docker-utility
+```
+
 ### Installing Additional Container Servers
 
 Note that this step is only required to be followed if you have multiple (physical) servers and want reservations to be made from multiple different servers.
@@ -57,6 +66,14 @@ After the main server has been installed, it is possible to create more Ubuntu 2
 2. Run command ``sudo make allow-container-server IP=CONTAINER_SERVER_IP`` in the main server to allow connection from the container server to the main server
 3. Add the computer through the main server admin web interface (Computers -> Create new Computer). Make a note of the name that you set for the computer as you need to configure this in your settings file.
 4. [Install the Container Server](#automatic-installation-container-server) in the new server
+
+#### Settings or Application Updates
+
+If you change any setting files in the ``user_config/`` folder or run ``git pull`` to update the application, just run this command again to apply the settings and to restart the servers in the container server:
+
+```
+make start-docker-utility
+```
 
 ### Automatic Installation: Main Server
 

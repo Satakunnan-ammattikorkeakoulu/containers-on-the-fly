@@ -16,13 +16,7 @@ BOLD=\033[1m
 RED=\033[0;31m
 RESET=\033[0m
 
-# Helper function to install pip packages with fallback for PEP 668
-define pip_install_with_fallback
-	@echo "Installing Python requirements..."
-	@$(PIP) install -r $(1) || \
-	(echo "Standard pip install failed, trying with --break-system-packages..." && \
-	$(PIP) install -r $(1) --break-system-packages)
-endef
+
 
 help:
 	$(info Make tool for the containers on the fly project.)
@@ -72,7 +66,7 @@ merge-settings: # Merges the settings file into frontend and backend settings.
 setup-main-server: check-os-ubuntu verify-all-config-files-exist apply-firewall-rules ## Installs and configures all dependencies for main server. Only works on Ubuntu Linux. If using any other operating system, then refer to the readme documentation for manual steps. Call 'make start-main-server' after setup.
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
-	$(call pip_install_with_fallback,webapp/backend/requirements.txt)
+	$(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
 	# Need to run the next command without sudo, as otherwise the node_modules folder created would be owned by root
 	cd webapp/frontend && sudo -u $(shell whoami) npm install
 
@@ -102,7 +96,7 @@ setup-docker-utility: ## Setups the Docker utility. The Docker utility will star
 	fi
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
-	$(call pip_install_with_fallback,webapp/backend/requirements.txt)
+	$(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
 	@usermod -aG docker $(SUDO_USER)
 	@echo "\n$(GREEN)The Docker utility has been setup.\n"
 	@echo "NEXT STEPS:"

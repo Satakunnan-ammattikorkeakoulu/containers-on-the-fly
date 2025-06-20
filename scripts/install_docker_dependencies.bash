@@ -20,12 +20,12 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "Running with sudo privileges."
-sudo add-apt-repository ppa:graphics-drivers/ppa
+sudo add-apt-repository ppa:graphics-drivers/ppa -y
 
 # Update and install initial packages
 sudo apt update
 sudo rm /etc/apt/sources.list.d/nvidia-*.list
-sudo apt-get purge '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*'
+sudo apt-get purge -y '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*'
 
 # libnvidia-container key
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
@@ -37,7 +37,6 @@ curl -fsSL https://nvidia.github.io/nvidia-container-runtime/gpgkey | \
 curl -fsSL https://nvidia.github.io/nvidia-docker/gpgkey | \
   gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/nvidia-docker.gpg > /dev/null
 
-sudo add-apt-repository ppa:graphics-drivers/ppa
 sudo apt update
 
 sudo apt install -y python3-pip libsasl2-dev libldap2-dev libssl-dev

@@ -66,7 +66,7 @@ merge-settings: # Merges the settings file into frontend and backend settings.
 setup-main-server: check-os-ubuntu verify-all-config-files-exist apply-firewall-rules ## Installs and configures all dependencies for main server. Only works on Ubuntu Linux. If using any other operating system, then refer to the readme documentation for manual steps. Call 'make start-main-server' after setup.
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
-	$(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
+	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
 	# Fix ownership of frontend directory first to avoid permission issues
 	@chown -R $${SUDO_USER:-$(shell whoami)}:$${SUDO_USER:-$(shell whoami)} webapp/frontend/ 2>/dev/null || true
 	# Install frontend dependencies as the original user
@@ -98,8 +98,8 @@ setup-docker-utility: ## Setups the Docker utility. The Docker utility will star
 	fi
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
-	$(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
-	@usermod -aG docker $(SUDO_USER)
+	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
+	@usermod -aG docker $${SUDO_USER:-$(shell whoami)}
 	@echo "\n$(GREEN)The Docker utility has been setup.\n"
 	@echo "NEXT STEPS:"
 	@echo "1. Run command $(BOLD)pm2 startup$(RESET)$(GREEN) and copy/paste the command to your terminal."

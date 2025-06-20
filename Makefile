@@ -67,8 +67,10 @@ setup-main-server: check-os-ubuntu verify-all-config-files-exist apply-firewall-
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
 	$(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
-	# Need to run the next command without sudo, as otherwise the node_modules folder created would be owned by root
-	cd webapp/frontend && sudo -u $(shell whoami) npm install
+	# Fix ownership of frontend directory first to avoid permission issues
+	@chown -R $${SUDO_USER:-$(shell whoami)}:$${SUDO_USER:-$(shell whoami)} webapp/frontend/ 2>/dev/null || true
+	# Install frontend dependencies as the original user
+	cd webapp/frontend && sudo -u $${SUDO_USER:-$(shell whoami)} npm install
 
 	@echo "\n$(GREEN)The main server has been setup.\n"
 	@echo "NEXT STEPS:"

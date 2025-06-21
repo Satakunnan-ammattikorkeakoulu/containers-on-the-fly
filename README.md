@@ -30,7 +30,7 @@ The installation is split into two parts: **main server** and **container server
 
 If you wish to install the **main server** which contains the web interface, database, local docker registry, then follow these steps:
 
-1. Create fresh Ubuntu 22.04 server
+1. Create a fresh Ubuntu 24.04 server (NOTE! It is required to use Ubuntu version 24.04)
 2. Enable all connections to that server. This means that if you have some external firewall (like Azure firewall) before your server, you should allow all connections from that firewall to your main server. The main server will automatically configure the UFW firewall and handle the firewall tasks.
 3. [Install the Main Server](#automatic-installation-main-server)
 4. [Install the Container Server](#automatic-installation-container-server)
@@ -61,8 +61,8 @@ make start-docker-utility
 
 Note that this step is only required to be followed if you have multiple (physical) servers and want reservations to be made from multiple different servers.
 
-After the main server has been installed, it is possible to create more Ubuntu 22.04 servers in which the **container server** can run and from which container reservations can be made. If you wish to expand the main server with additional container servers, then in another servers you need to:
-1. Create fresh Ubuntu 22.04 server to be used with additional container server
+After the main server has been installed, it is possible to create more Ubuntu 24.04 servers in which the **container server** can run and from which container reservations can be made. If you wish to expand the main server with additional container servers, then in another servers you need to:
+1. Create fresh Ubuntu 24.04 server to be used with additional container server (Note! Ubuntu version 24.04 is required to be used)
 2. Run command ``sudo make allow-container-server IP=CONTAINER_SERVER_IP`` in the main server to allow connection from the container server to the main server
 3. Add the computer through the main server admin web interface (Computers -> Create new Computer). Make a note of the name that you set for the computer as you need to configure this in your settings file.
 4. [Install the Container Server](#automatic-installation-container-server) in the new server
@@ -77,7 +77,7 @@ make start-docker-utility
 
 ### Automatic Installation: Main Server
 
-> Heads up! The automatic installation script for the **main server** only works with Ubuntu Linux 22.04. It is HIGHLY RECOMMENDED to use a fresh Ubuntu installation, due to various software being installed and configured. For any other operating system, the installation procedure is required to be [conducted manually](#manual-installation-main-server).
+> Heads up! The automatic installation script for the **main server** only works with Ubuntu Linux 24.04. It is HIGHLY RECOMMENDED to use a fresh Ubuntu installation, due to various software being installed and configured. For any other operating system, the installation procedure is required to be conducted manually (#manual-installation-main-server).
 
 Before proceeding, make sure you are logged in as the user with which you want to setup the Main Server. The user should have sudo permissions. For example: `containeruser`. Root user is not recommended to be used.
 

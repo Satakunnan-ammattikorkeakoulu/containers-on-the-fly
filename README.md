@@ -83,6 +83,14 @@ Before proceeding, make sure you are logged in as the user with which you want t
 
 The installation procedure of the Main Server (web servers, database, local Docker registry, setting up firewall) is as follows:
 
+#### Open Ports
+
+Suppose you have an external firewall in front of your server (for example, you have the server hosted on an Azure VM, Google Cloud VM, Amazon VM, or any other hardware firewall in front of your server). In that case, you need to open these ports at least to be allowed into the server:
+
+- `5000` (TCP/HTTP, for Docker Registry on the main server)
+- `80` and `443` for HTTP / HTTPS connection to the server web interface
+- `2000-3000` (default) or the range of ports from which you want to host the reserved servers, which can be configured in the settings file. These services can be any, usually SSH, but could be HTTP, HTTPS, etc...
+
 #### Copy Configurations
 
 Copy the settings files from `user_config/examples` to `user_config` folder. If you do not require an SSL certificate (your web interface is accessed using the HTTP protocol), then copy the `nginx_settings.conf` file. If you plan to use an SSL certificate (your web server will be accessed using the HTTPS protocol) then copy the file `nginx_settings_ssl.conf`.

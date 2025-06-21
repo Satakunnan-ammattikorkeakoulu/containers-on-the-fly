@@ -16,14 +16,22 @@
 SERVER_IP_ADDRESS="YOUR_IP_HERE"
 
 # The full address to your web server which you can access from the browser.
-# For example: "http://127.0.0.1", or "https://mycoolserver.com", or "http://4.512.512.712"
+# Should match your HTTPS setting below:
+# - If ENABLE_AUTO_HTTPS=true:  use "https://yourdomain.com"
+# - If ENABLE_AUTO_HTTPS=false: use "http://localhost" or "http://192.168.1.100"
 # This is only used in the main server. You can leave it as empty on the container server.
 SERVER_WEB_ADDRESS="http://127.0.0.1"
 
-# The domain name for nginx configuration (without http://)
-# For example: "yourdomain.com", "127.0.0.1", or "4.512.512.712"
+# Domain or IP address for your server (without http://)
+# Examples: "yourdomain.com", "localhost", "192.168.1.100"
 # This is only used in the main server. You can leave it as empty on the container server.
 SERVER_DOMAIN="yourdomain.com"
+
+# Enable automatic HTTPS with Let's Encrypt certificates
+# true  = Production setup with real domain name (automatic HTTPS + SSL certificates)
+# false = Local development or IP-based access (HTTP only, no SSL)
+# Set to true only if you have a real domain name that resolves to this server set in SERVER_DOMAIN
+ENABLE_AUTO_HTTPS=false
 
 # Name of your application (displayed in the web interface)
 APP_NAME="Containers on the Fly"

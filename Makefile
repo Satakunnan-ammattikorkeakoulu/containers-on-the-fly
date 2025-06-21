@@ -62,8 +62,9 @@ setup-main-server: check-os-ubuntu verify-config-file-exists apply-settings appl
 	@echo "1. Run command $(BOLD)pm2 startup$(RESET)$(GREEN) and copy/paste the command to your terminal."
 	@echo "2. Restart the machine for all the changes to take effect.$(RESET)\n"
 
-start-main-server: verify-config-file-exists apply-settings ## Starts all the main server services or restarts them if started. Nginx is used to create a reverse proxy. pm2 process manager is used to run the frontend and backend.
-	@systemctl reload nginx
+start-main-server: verify-config-file-exists apply-settings ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend.
+	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile
+	@sudo systemctl reload caddy
 	@cd webapp/frontend && pm2 restart frontend 2>/dev/null || pm2 start "npm run production" --name frontend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@cd webapp/backend && pm2 restart backend 2>/dev/null || pm2 start "$(PYTHON) main.py" --name backend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save

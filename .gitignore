@@ -10,6 +10,6 @@ webapp/backend/.vscode/
 .env
 **/*.db
 mounts/
-user_config/nginx_settings.conf
+user_config/Caddyfile
 user_config/settings
 webapp/backend/docker/local_overrides.py

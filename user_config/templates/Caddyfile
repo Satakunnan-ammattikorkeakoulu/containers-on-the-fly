@@ -1,0 +1,23 @@
+{{CADDY_SITE_BLOCK}} {
+	# API routes
+	handle /api* {
+		reverse_proxy localhost:{{BACKEND_PORT}}
+	}
+	
+	# Frontend routes
+	handle {
+		reverse_proxy localhost:{{FRONTEND_PORT}}
+	}
+	
+	# Security headers{{CADDY_SECURITY_HEADERS}}
+	header {
+		# Prevent MIME sniffing
+		X-Content-Type-Options nosniff
+		# Enable XSS protection
+		X-XSS-Protection "1; mode=block"
+		# Clickjacking protection
+		X-Frame-Options DENY
+		# Hide server info
+		-Server{{CADDY_HSTS_HEADER}}
+	}
+} 

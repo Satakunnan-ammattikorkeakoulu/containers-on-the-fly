@@ -62,6 +62,7 @@ class SettingsApplier:
                 
         # Process derived settings
         self._process_derived_settings()
+        self._process_caddy_settings()
         print(f"Loaded {len(self.settings)} settings")
         
     def _process_derived_settings(self):
@@ -80,7 +81,7 @@ class SettingsApplier:
         # Convert boolean strings to proper JSON boolean values
         bool_settings = [
             'USE_WHITELIST', 'DATABASE_DEBUG', 'ADD_TEST_DATA', 
-            'ENABLE_EMAIL_NOTIFICATIONS'
+            'ENABLE_EMAIL_NOTIFICATIONS', 'ENABLE_AUTO_HTTPS'
         ]
         
         for setting in bool_settings:
@@ -107,6 +108,24 @@ class SettingsApplier:
                 except ValueError:
                     print(f"Warning: {setting} should be numeric, got: {self.settings[setting]}")
                     
+    def _process_caddy_settings(self):
+        """Process Caddy-specific settings based on HTTPS configuration."""
+        enable_https = self.settings.get('ENABLE_AUTO_HTTPS', 'false').lower() == 'true'
+        domain = self.settings.get('SERVER_DOMAIN', 'localhost')
+        
+        if enable_https:
+            # HTTPS mode - automatic certificates
+            self.settings['CADDY_SITE_BLOCK'] = domain
+            self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode)"
+            self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
+            print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
+        else:
+            # HTTP mode - no automatic certificates
+            self.settings['CADDY_SITE_BLOCK'] = f"http://{domain}"
+            self.settings['CADDY_SECURITY_HEADERS'] = " (HTTP mode)"
+            self.settings['CADDY_HSTS_HEADER'] = ""
+            print(f"Caddy mode: HTTP only for '{domain}' (no SSL certificates)")
+                    
     def apply_templates(self):
         """Apply settings to all template files."""
         if not self.templates_dir.exists():
@@ -117,7 +136,7 @@ class SettingsApplier:
         template_mappings = {
             'backend_settings.json': self.base_dir / "webapp" / "backend" / "settings.json",
             'frontend_settings.js': self.base_dir / "webapp" / "frontend" / "src" / "AppSettings.js",
-            'nginx_settings.conf': self.output_dir / "nginx_settings.conf"  # Only nginx stays in user_config
+            'Caddyfile': self.output_dir / "Caddyfile"  # Only Caddyfile stays in user_config
         }
         
         for template_file, output_path in template_mappings.items():
@@ -205,7 +224,7 @@ class SettingsApplier:
             print(f"Generated files:")
             print(f"  - Backend settings: webapp/backend/settings.json")
             print(f"  - Frontend settings: webapp/frontend/src/AppSettings.js")  
-            print(f"  - Nginx config: user_config/nginx_settings.conf")
+            print(f"  - Caddy config: user_config/Caddyfile")
             
         except Exception as e:
             print(f"\n❌ Error applying settings: {e}")

@@ -28,86 +28,87 @@ sudo apt update
 sudo apt --assume-yes install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev
 sudo apt --assume-yes install python3-ldap
 
-# Function to check if Nginx is installed
-check_nginx_installed() {
-    if dpkg -l | grep -q nginx; then
-        echo "Nginx is already installed."
+# Function to check if Caddy is installed
+check_caddy_installed() {
+    if command -v caddy >/dev/null 2>&1; then
+        echo -e "${GREEN}Caddy is already installed.${RESET}"
         return 0
     else
-        echo "Nginx is not installed."
+        echo "Caddy is not installed."
         return 1
     fi
 }
 
-# Function to install Nginx
-install_nginx() {
-    echo "Updating package list..."
+# Function to install Caddy
+install_caddy() {
+    echo "Installing Caddy..."
     
-    echo "Installing Nginx..."
-    apt install -y nginx
+    # Install Caddy from official repository
+    sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+    sudo apt update
+    sudo apt install -y caddy
 
     if [ $? -eq 0 ]; then
-        echo "Nginx installed successfully."
+        echo -e "${GREEN}Caddy installed successfully.${RESET}"
     else
-        echo -e "${RED}Failed to install Nginx.${RESET}"
+        echo -e "${RED}Failed to install Caddy.${RESET}"
         exit 1
     fi
 }
 
-# Check if Nginx is installed
-check_nginx_installed
+# Check if Caddy is installed
+check_caddy_installed
 if [ $? -ne 0 ]; then
-    install_nginx
+    install_caddy
 fi
 
-CUSTOM_CONF="$CURRENT_DIR/user_config/nginx_settings.conf"
+CADDYFILE_PATH="$CURRENT_DIR/user_config/Caddyfile"
 
-# Add custom configuration to nginx.conf if not already present
-NGINX_CONF="/etc/nginx/nginx.conf"
-if ! grep -q "include $CUSTOM_CONF;" $NGINX_CONF; then
-    echo "Adding custom configuration to Nginx main configuration..."
-    sudo sed -i "/http {/a \\    include $CUSTOM_CONF;" $NGINX_CONF
+# Copy Caddyfile to standard location
+if [ -f "$CADDYFILE_PATH" ]; then
+    sudo cp "$CADDYFILE_PATH" /etc/caddy/Caddyfile
+    echo -e "${GREEN}Caddyfile copied to /etc/caddy/Caddyfile${RESET}"
 else
-    echo -e "${GREEN}Custom configuration is already included in Nginx main configuration.${RESET}"
-fi
-
-# Disable the default site
-if [ -L /etc/nginx/sites-enabled/default ]; then
-    sudo rm /etc/nginx/sites-enabled/default
-    echo -e "${GREEN}Default nginx site configuration disabled.${RESET}"
-fi
-
-# Test and reload Nginx
-nginx -t
-if [ $? -eq 0 ]; then
-    systemctl reload nginx
-    echo -e "${GREEN}Nginx configuration seems to be fine.${RESET}"
-else
-    echo -e "${RED}Nginx configuration test failed. Please check the configuration.${RESET}"
+    echo -e "${RED}Caddyfile not found at $CADDYFILE_PATH. Please ensure apply-settings has been run.${RESET}"
     exit 1
 fi
 
-# Ensure Nginx starts on boot and start Nginx
-systemctl enable nginx
-systemctl start nginx
+# Set proper permissions for Caddyfile
+sudo chown root:root /etc/caddy/Caddyfile
+sudo chmod 644 /etc/caddy/Caddyfile
+
+# Test Caddy configuration
+sudo caddy validate --config /etc/caddy/Caddyfile
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}Nginx is now running and enabled to start on boot.${RESET}"
+    echo -e "${GREEN}Caddy configuration is valid.${RESET}"
 else
-    echo -e "${RED}Failed to start Nginx.${RESET}"
+    echo -e "${RED}Caddy configuration test failed. Please check the configuration.${RESET}"
     exit 1
 fi
 
-# Check if Nginx is active and enabled
-if systemctl is-active --quiet nginx; then
-    echo -e "${GREEN}Nginx is active.${RESET}"
+# Ensure Caddy starts on boot and start Caddy
+sudo systemctl enable caddy
+sudo systemctl start caddy
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}Caddy is now running and enabled to start on boot.${RESET}"
 else
-    echo -e "${RED}Nginx is not running.${RESET}"
+    echo -e "${RED}Failed to start Caddy.${RESET}"
+    exit 1
 fi
 
-if systemctl is-enabled --quiet nginx; then
-    echo -e "${GREEN}Nginx is enabled to start on boot.${RESET}"
+# Check if Caddy is active and enabled
+if systemctl is-active --quiet caddy; then
+    echo -e "${GREEN}Caddy is active.${RESET}"
 else
-    echo -e "${RED}Nginx is not enabled to start on boot.${RESET}"
+    echo -e "${RED}Caddy is not running.${RESET}"
+fi
+
+if systemctl is-enabled --quiet caddy; then
+    echo -e "${GREEN}Caddy is enabled to start on boot.${RESET}"
+else
+    echo -e "${RED}Caddy is not enabled to start on boot.${RESET}"
 fi
 
 # Check if MariaDB is installed

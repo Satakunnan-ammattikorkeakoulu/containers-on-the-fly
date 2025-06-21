@@ -1,0 +1,164 @@
+#!/bin/bash
+
+###############################################################################
+# CONTAINERS ON THE FLY - MAIN CONFIGURATION FILE
+# 
+# Copy this file to 'settings' (remove _example suffix) and edit the values
+# according to your setup requirements.
+###############################################################################
+
+###
+# MAIN CONFIGURATIONS
+# THESE ARE ALL MANDATORY TO BE SET
+###
+
+# The IP address of this server.
+SERVER_IP_ADDRESS="YOUR_IP_HERE"
+
+# The full address to your web server which you can access from the browser.
+# For example: "http://127.0.0.1", or "https://mycoolserver.com", or "http://4.512.512.712"
+# This is only used in the main server. You can leave it as empty on the container server.
+SERVER_WEB_ADDRESS="http://127.0.0.1"
+
+# The domain name for nginx configuration (without http://)
+# For example: "yourdomain.com", "127.0.0.1", or "4.512.512.712"
+# This is only used in the main server. You can leave it as empty on the container server.
+SERVER_DOMAIN="yourdomain.com"
+
+# Name of your application (displayed in the web interface)
+APP_NAME="Containers on the Fly"
+
+# Minimum and maximum duration (in hours) for a container reservation.
+# Default: minimum 5, maximum 72
+# For example, with the default settings, user needs to reserve the container for at least 5 hours 
+# but can reserve it for a maximum of 72 hours.
+RESERVATION_MIN_DURATION=5
+RESERVATION_MAX_DURATION=72
+
+# Database user password.
+# IMPORTANT: Change this to something more secure before beginning the setup / installation.
+MARIADB_DB_USER_PASSWORD="password"
+
+# Timezone in TZ format, view all available timezones from here: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+TIMEZONE="Europe/Helsinki"
+
+
+###
+# EVERYTHING BELOW IS OPTIONAL
+###
+
+
+###
+# DATABASE CONFIGURATIONS
+# 
+# While installing, these configurations are used to configure the installed MariaDB database.
+# While starting the servers or docker utility, these configurations are used to connect to the database.
+# You can leave the default options here, but be sure to change the password.
+###
+
+# MariaDB server address. Leave it as "localhost" if running the database on the current computer.
+# Otherwise, specify the IP address or domain of another server here.
+MARIADB_SERVER_ADDRESS="localhost"
+
+# Name of the database to use.
+MARIADB_DB_NAME="containerfly"
+
+# User in the database to use.
+MARIADB_DB_USER="containerflyuser"
+
+###
+# EMAIL CONFIGURATION
+###
+
+# Email address which is shown for support contacts
+CONTACT_EMAIL="support@foo.com"
+
+# SMTP settings for sending notification emails (optional)
+# Set ENABLE_EMAIL_NOTIFICATIONS to true to enable email notifications
+ENABLE_EMAIL_NOTIFICATIONS=false
+SMTP_SERVER="smtp.office365.com"
+SMTP_PORT=587
+SMTP_USERNAME="email@test.com"
+SMTP_PASSWORD="abc123"
+
+###
+# DOCKER CONFIGURATIONS
+###
+
+# In what address is the Docker registry (local Docker image distribution) running.
+# If this is your main server, then just leave the default value and port here.
+# Otherwise, if this is a separate container server, then insert the IP and port of the main server here. 
+# For example: "51.115.104.42" and 5000.
+DOCKER_REGISTRY_ADDRESS=$SERVER_IP_ADDRESS
+
+# Docker registry port (change only if you know what you are doing)
+DOCKER_REGISTRY_PORT=5000
+
+# This is the port range from which reserved containers can be accessed through.
+# When user reserves a container and the container is being started, a random available port is selected from this range.
+DOCKER_RESERVATION_PORT_RANGE_START=2000
+DOCKER_RESERVATION_PORT_RANGE_END=3000
+
+# Name / ID of the server.
+# This is used by the backend docker utility to start the reserved docker container in the correct server.
+# This should be the same as specified in the database for the computer as a name.
+# 
+# If you are just creating your main server, then leave this as the default value "server1"
+# If you are creating another container server, then you can change this value to something else, like "server2"
+DOCKER_SERVER_NAME="server1"
+
+# Additionally, if you want your users to persistently store files and folders,
+# you can specify here the full path in the host operating system where the files are stored at.
+# Each user will have a folder in this location for saving persistent data, with the user's email (special characters removed) as the folder name.
+# For example: "/home/containerfly/persistent_mounts"
+# It could then store user test@foo.com data as: "/home/containerfly/persistent_mounts/test_foo_com/"
+DOCKER_USER_MOUNT_LOCATION=""
+
+# User in the host system who will own the mounted folder. This needs to exist.
+# Default value: "root"
+DOCKER_MOUNT_USER="root"
+
+# Group in the host system who will own the mounted folder.
+# Default value: "docker"
+DOCKER_MOUNT_GROUP="docker"
+
+###
+# AUTHENTICATION SETTINGS
+###
+
+# Authentication method: "password" or "ldap"
+# If "password", logins are executed directly with email and password combination
+# If "ldap", logins are done against an (external) LDAP server
+LOGIN_TYPE="password"
+
+# If enabled, user email will need to be found in Whitelist table in the server to login.
+USE_WHITELIST=false
+
+# Minutes how long the user is logged in until logged out automatically
+SESSION_TIMEOUT_MINUTES=1440
+
+###
+# ADVANCED SETTINGS
+###
+
+# Can be used to set an additional port for the backend that the frontend connects to when making API calls from the browser.
+# Useful when the backend is running in development environment port (like 8000)
+BACKEND_ADDITIONAL_PORT=""
+
+# Backend application port (leave default unless you know what you're doing)
+BACKEND_PORT=8000
+
+# Frontend development port (leave default unless you know what you're doing)
+FRONTEND_PORT=8080
+
+# Set to true to enable debug printing for database operations
+DATABASE_DEBUG=false
+
+# Set to true to add test data when the server starts (development only)
+ADD_TEST_DATA=true
+
+# Docker container shared memory size (e.g., "1g")
+DOCKER_SHM_SIZE="1g"
+
+# Optional text added to the beginning of notification emails
+EMAIL_GENERAL_TEXT="" 

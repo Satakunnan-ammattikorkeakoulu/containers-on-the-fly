@@ -1,0 +1,49 @@
+{
+    "app": {
+      "name": "{{APP_NAME}}",
+      "url": "{{SERVER_WEB_ADDRESS}}",
+      "serverIp": "{{SERVER_IP_ADDRESS}}",
+      "clientUrl": "{{SERVER_WEB_ADDRESS}}:{{FRONTEND_PORT}}",
+      "timezone": "{{TIMEZONE}}",
+      "logoUrl": "/static/logos/logo.png",
+      "port": {{BACKEND_PORT}},
+      "production": true,
+      "addTestDataInDevelopment": {{ADD_TEST_DATA}}
+    },
+    "reservation": {
+      "minimumDuration": {{RESERVATION_MIN_DURATION}},
+      "maximumDuration": {{RESERVATION_MAX_DURATION}}
+    },
+    "login": {
+      "loginType": "{{LOGIN_TYPE}}",
+      "useWhitelist": {{USE_WHITELIST}}
+    },
+    "session": {
+      "timeoutMinutes": {{SESSION_TIMEOUT_MINUTES}}
+    },
+    "database": {
+      "engineUri": "{{DATABASE_URI}}",
+      "debugPrinting": {{DATABASE_DEBUG}}
+    },
+    "docker": {
+      "registryAddress": "{{DOCKER_REGISTRY_ADDRESS}}:{{DOCKER_REGISTRY_PORT}}",
+      "serverName": "{{DOCKER_SERVER_NAME}}",
+      "userMountLocation": "{{DOCKER_USER_MOUNT_LOCATION}}",
+      "mountUser": "{{DOCKER_MOUNT_USER}}",
+      "mountGroup": "{{DOCKER_MOUNT_GROUP}}",
+      "port_range_start": {{DOCKER_RESERVATION_PORT_RANGE_START}},
+      "port_range_end": {{DOCKER_RESERVATION_PORT_RANGE_END}},
+      "enabled": true,
+      "shm_size": "{{DOCKER_SHM_SIZE}}",
+      "sendEmail": {{ENABLE_EMAIL_NOTIFICATIONS}},
+      "generalText": "{{EMAIL_GENERAL_TEXT}}"
+    },
+    "email": {
+      "sendEmail": {{ENABLE_EMAIL_NOTIFICATIONS}},
+      "smtpAddress": "{{SMTP_SERVER}}",
+      "smtpPort": {{SMTP_PORT}},
+      "emailAddress": "{{SMTP_USERNAME}}",
+      "smtpPassword": "{{SMTP_PASSWORD}}",
+      "helpEmailAddress": "{{CONTACT_EMAIL}}"
+    }
+  } 

@@ -12,6 +12,9 @@
 # THESE ARE ALL MANDATORY TO BE SET
 ###
 
+# Name of your application (displayed in the web interface)
+APP_NAME="Containers on the Fly"
+
 # The IP address of this server.
 SERVER_IP_ADDRESS="YOUR_IP_HERE"
 
@@ -25,9 +28,6 @@ MAIN_SERVER_WEB_HOST="YOUR_IP_OR_DOMAIN_HERE"
 # Set to true if you have a real domain name, false for local/IP-based access
 MAIN_SERVER_WEB_HTTPS=false
 
-# Name of your application (displayed in the web interface)
-APP_NAME="Containers on the Fly"
-
 # Minimum and maximum duration (in hours) for a container reservation.
 # Default: minimum 5, maximum 72
 # For example, with the default settings, user needs to reserve the container for at least 5 hours 
@@ -40,7 +40,7 @@ TIMEZONE="Europe/Helsinki"
 
 
 ###
-# EVERYTHING BELOW IS OPTIONAL
+# EVERYTHING BELOW IS OPTIONAL (AT LEAST FOR THE MAIN SERVER)
 ###
 
 

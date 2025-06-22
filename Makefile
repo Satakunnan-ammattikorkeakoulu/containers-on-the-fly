@@ -28,19 +28,93 @@ apply-firewall-rules: # Applies ufw firewall rules to the server
 	@chmod +x scripts/apply_firewall_rules.bash
 	@./scripts/apply_firewall_rules.bash
 
+interactive-settings-creation: # Creates settings file interactively if it doesn't exist or prompts for continuation if it exists
+	@if [ ! -e $(CONFIG_SETTINGS) ]; then \
+		echo "$(GREEN)$(BOLD)Welcome to Containers on the Fly Main Server Setup!$(RESET)"; \
+		echo ""; \
+		echo "We're starting the installation process for your main server."; \
+		echo "Since this is your first time running the setup"; \
+		echo "(there was no user_config/settings file)"; \
+		echo "we'll ask you for some mandatory configuration settings to get your server up and running."; \
+		echo ""; \
+		echo "$(BOLD)Let's configure your Containers on the Fly Main Server:$(RESET)"; \
+		echo ""; \
+		\
+		DETERMINED_IP=$$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo ""); \
+		if [ -n "$$DETERMINED_IP" ]; then \
+			echo -n "IP address of this server (leave as empty to use the default $(GREEN)$$DETERMINED_IP$(RESET)): "; \
+		else \
+			echo -n "IP address of this server: "; \
+		fi; \
+		read SERVER_IP; \
+		if [ -z "$$SERVER_IP" ] && [ -n "$$DETERMINED_IP" ]; then \
+			SERVER_IP=$$DETERMINED_IP; \
+		fi; \
+		\
+		echo ""; \
+		echo "Web address of this server (with http or https)"; \
+		echo "For example, \"http://127.0.0.1\" or \"https://mydomain.com\" or \"http://4.512.512.512\""; \
+		echo -n ": "; \
+		read WEB_ADDRESS; \
+		\
+		if echo "$$WEB_ADDRESS" | grep -q "^https://"; then \
+			ENABLE_HTTPS="true"; \
+		else \
+			ENABLE_HTTPS="false"; \
+		fi; \
+		\
+		echo ""; \
+		echo "Server domain (without http or https):"; \
+		echo "Set as domain or ip address of the server if you dont have a domain."; \
+		echo -n ": "; \
+		read SERVER_DOMAIN; \
+		\
+		DB_PASSWORD=$$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15); \
+		\
+		cp user_config/settings_example user_config/settings; \
+		sed -i "s/SERVER_IP_ADDRESS=\"YOUR_IP_HERE\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
+		sed -i "s|SERVER_WEB_ADDRESS=\"http://127.0.0.1\"|SERVER_WEB_ADDRESS=\"$$WEB_ADDRESS\"|" user_config/settings; \
+		sed -i "s/ENABLE_AUTO_HTTPS=false/ENABLE_AUTO_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
+		sed -i "s/SERVER_DOMAIN=\"yourdomain.com\"/SERVER_DOMAIN=\"$$SERVER_DOMAIN\"/" user_config/settings; \
+		sed -i "s/MARIADB_DB_USER_PASSWORD=\"password\"/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD\"/" user_config/settings; \
+		\
+		echo ""; \
+		echo "$(GREEN)$(BOLD)Great! Your mandatory configurations have been setup successfully!$(RESET)"; \
+		echo ""; \
+		echo "$(BOLD)Next steps:$(RESET)"; \
+		echo "1. Please review the $(BOLD)user_config/settings$(RESET) file to verify your settings"; \
+		echo "2. Run $(BOLD)sudo make setup-main-server$(RESET) again to finish the installation"; \
+		echo ""; \
+		echo "Your Containers on the Fly Main Server will be ready shortly!"; \
+		exit 0; \
+	else \
+		echo "$(GREEN)Settings file exists.$(RESET)"; \
+		echo -n "Press $(GREEN)y$(RESET) to continue setting up the main server: "; \
+		read CONTINUE; \
+		if [ "$$CONTINUE" != "y" ]; then \
+			echo "Setup cancelled."; \
+			exit 1; \
+		fi; \
+	fi
+
 verify-config-file-exists: # Verify that the main configuration file exists.
 	@if [ ! -e $(CONFIG_SETTINGS) ]; then \
 		echo "Error: $(CONFIG_SETTINGS) does not exist. Please copy user_config/settings_example to user_config/settings and configure it first."; \
 		exit 1; \
 	fi
 
-check-os-ubuntu: # Checks if the operating system is Ubuntu. Stops executing if not.
+check-os-ubuntu: # Checks if the operating system is Ubuntu 24.04. Stops executing if not.
 	@OS_NAME=$$(lsb_release -si 2>/dev/null || echo "Unknown") && \
+	OS_VERSION=$$(lsb_release -sr 2>/dev/null || echo "Unknown") && \
 	if [ "$$OS_NAME" != "Ubuntu" ]; then \
 		echo "\n$(RED)Error: This setup script is only compatible with Ubuntu Linux. Please refer to the readme documentation for manual steps. Exiting.$(RESET)"; \
 		exit 1; \
+	elif [ "$$OS_VERSION" != "24.04" ]; then \
+		echo "\n$(RED)Error: This setup script is only compatible with Ubuntu 24.04. Current version: $$OS_VERSION. Please refer to the readme documentation for manual steps. Exiting.$(RESET)"; \
+		exit 1; \
 	fi
-	@echo "$(GREEN)Operating system is Ubuntu Linux. Proceeding with setup.$(RESET)"
+	@echo ""
+	@echo "$(GREEN)Operating system is Ubuntu 24.04. Proceeding with setup.$(RESET)"
 
 apply-settings: # Applies the settings from user_config/settings to template files and generates configuration files.
 	@chmod +x scripts/apply_settings.py
@@ -48,7 +122,7 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 
 # Production targets
 
-setup-main-server: check-os-ubuntu verify-config-file-exists apply-settings apply-firewall-rules ## Installs and configures all dependencies for main server. Only works on Ubuntu Linux. If using any other operating system, then refer to the readme documentation for manual steps. Call 'make start-main-server' after setup.
+setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings apply-firewall-rules ## Installs and configures all dependencies for main server. Only works on Ubuntu 24.04. If using any other operating system, then refer to the readme documentation for manual steps. Call 'make start-main-server' after setup.
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed

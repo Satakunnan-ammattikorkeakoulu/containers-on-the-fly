@@ -185,4 +185,4 @@ The frontend has been developed using Vue 2.
 
 The backend has been developed using Python 3, SQLAlchemy and FastAPI.
 
-The backend also includes a tool called `dockerUtils.py` that handles starting and stopping the reserved containers.
+The backend also includes a tool called `dockerUtil.py` that handles starting and stopping the reserved containers.

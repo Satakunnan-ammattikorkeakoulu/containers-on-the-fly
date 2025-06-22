@@ -54,7 +54,7 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "  - Reservation Duration: $(GREEN)$$EXISTING_MIN_DURATION - $$EXISTING_MAX_DURATION hours$(RESET)"; \
 		echo ""; \
 		echo "What would you like to do?"; \
-		echo "  $(GREEN)1$(RESET) - Continue with current settings"; \
+		echo "  $(GREEN)1$(RESET) - Use these settings and start main server setup"; \
 		echo "  $(GREEN)2$(RESET) - Reconfigure mandatory settings"; \
 		echo "  $(GREEN)3$(RESET) - Cancel setup"; \
 		echo -n "Enter your choice (1, 2, or 3): "; \
@@ -289,7 +289,11 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo "Access the launched web interface at: $(GREEN)$$URL$(RESET) (it can take several seconds for the server to launch)" && \
 	echo "You can view any logs (errors) using the $(GREEN)make logs$(RESET) command."
 
-setup-docker-utility: verify-config-file-exists apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
+setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
+	@if [ -f .docker_settings_just_created ]; then \
+		rm -f .docker_settings_just_created; \
+		exit 0; \
+	fi
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
@@ -352,3 +356,178 @@ start-dev-backend: apply-settings
 
 start-dev-docker-utility: apply-settings
 	cd webapp/backend && $(PYTHON) dockerUtil.py
+
+# Add this new target after the existing interactive-settings-creation target
+
+interactive-docker-settings-creation: # Creates Docker utility settings interactively
+	@if [ ! -e $(CONFIG_SETTINGS) ]; then \
+		RECONFIGURE_DOCKER_SETTINGS=true; \
+		FIRST_TIME_DOCKER_SETUP=true; \
+	else \
+		EXISTING_SERVER_NAME=$$(grep "^DOCKER_SERVER_NAME=" user_config/settings | cut -d'"' -f2); \
+		EXISTING_PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2); \
+		EXISTING_PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2); \
+		EXISTING_REGISTRY_ADDRESS=$$(grep "^DOCKER_REGISTRY_ADDRESS=" user_config/settings | cut -d'=' -f2); \
+		EXISTING_DB_ADDRESS=$$(grep "^MARIADB_SERVER_ADDRESS=" user_config/settings | cut -d'"' -f2); \
+		EXISTING_DB_NAME=$$(grep "^MARIADB_DB_NAME=" user_config/settings | cut -d'"' -f2); \
+		EXISTING_DB_USER=$$(grep "^MARIADB_DB_USER=" user_config/settings | cut -d'"' -f2); \
+		\
+		echo "$(GREEN)Docker settings file exists with current configuration:$(RESET)"; \
+		echo "  - Docker Server Name: $(GREEN)$$EXISTING_SERVER_NAME$(RESET)"; \
+		echo "  - Port Range: $(GREEN)$$EXISTING_PORT_START - $$EXISTING_PORT_END$(RESET)"; \
+		echo "  - Registry Address: $(GREEN)$$EXISTING_REGISTRY_ADDRESS$(RESET)"; \
+		echo "  - Database Address: $(GREEN)$$EXISTING_DB_ADDRESS$(RESET)"; \
+		echo "  - Database Name: $(GREEN)$$EXISTING_DB_NAME$(RESET)"; \
+		echo "  - Database User: $(GREEN)$$EXISTING_DB_USER$(RESET)"; \
+		echo ""; \
+		echo "What would you like to do?"; \
+		echo "  $(GREEN)1$(RESET) - Use these settings and start Docker setup"; \
+		echo "  $(GREEN)2$(RESET) - Reconfigure Docker settings"; \
+		echo "  $(GREEN)3$(RESET) - Cancel setup"; \
+		echo -n "Enter your choice (1, 2, or 3): "; \
+		read DOCKER_SETUP_CHOICE; \
+		\
+		case "$$DOCKER_SETUP_CHOICE" in \
+			1) \
+				echo "Continuing with existing Docker settings..."; \
+				RECONFIGURE_DOCKER_SETTINGS=false; \
+				FIRST_TIME_DOCKER_SETUP=false; \
+				;; \
+			2) \
+				echo "Reconfiguring Docker settings..."; \
+				RECONFIGURE_DOCKER_SETTINGS=true; \
+				FIRST_TIME_DOCKER_SETUP=false; \
+				;; \
+			3) \
+				echo "Setup cancelled."; \
+				exit 1; \
+				;; \
+			*) \
+				echo "$(RED)Invalid choice. Setup cancelled.$(RESET)"; \
+				exit 1; \
+				;; \
+		esac; \
+	fi; \
+	\
+	if [ "$$RECONFIGURE_DOCKER_SETTINGS" = "true" ]; then \
+		echo ""; \
+		echo "$(GREEN)$(BOLD)Welcome to Containers on the Fly Docker Utility Setup!$(RESET)"; \
+		echo "We're starting the installation process for your Docker utility."; \
+		echo ""; \
+		\
+		echo "$(GREEN)$(BOLD)Server Type Configuration:$(RESET)"; \
+		echo "Are you setting up a Docker utility for:"; \
+		echo "  $(GREEN)1$(RESET) - Main server (same machine as web interface)"; \
+		echo "  $(GREEN)2$(RESET) - Separate container server (different machine)"; \
+		echo -n "Enter your choice (1 or 2): "; \
+		read SERVER_TYPE_CHOICE; \
+		\
+		case "$$SERVER_TYPE_CHOICE" in \
+			1) \
+				echo "Setting up Docker utility for main server..."; \
+				IS_MAIN_SERVER=true; \
+				;; \
+			2) \
+				echo "Setting up Docker utility for separate container server..."; \
+				IS_MAIN_SERVER=false; \
+				;; \
+			*) \
+				echo "$(RED)Invalid choice. Setup cancelled.$(RESET)"; \
+				exit 1; \
+				;; \
+		esac; \
+		\
+		echo ""; \
+		echo "$(GREEN)$(BOLD)Docker Server Name:$(RESET)"; \
+		echo "This identifies your Docker server in the system."; \
+		echo "Examples: \"server1\", \"server2\", \"docker-node-1\""; \
+		if [ "$$IS_MAIN_SERVER" = "true" ]; then \
+			DEFAULT_SERVER_NAME="server1"; \
+		else \
+			DEFAULT_SERVER_NAME="server2"; \
+		fi; \
+		echo -n "Enter Docker server name (or empty for $(GREEN)$$DEFAULT_SERVER_NAME$(RESET)): "; \
+		read DOCKER_SERVER_NAME_INPUT; \
+		if [ -z "$$DOCKER_SERVER_NAME_INPUT" ]; then \
+			DOCKER_SERVER_NAME_INPUT=$$DEFAULT_SERVER_NAME; \
+		fi; \
+		\
+		echo ""; \
+		echo "$(GREEN)$(BOLD)Container Reservation Port Range:$(RESET)"; \
+		echo "When containers are started, they're assigned ports from this range."; \
+		echo "Make sure this range doesn't conflict with other services."; \
+		echo -n "Port range start (or empty for $(GREEN)2000$(RESET)): "; \
+		read PORT_START; \
+		if [ -z "$$PORT_START" ]; then \
+			PORT_START="2000"; \
+		fi; \
+		echo -n "Port range end (or empty for $(GREEN)3000$(RESET)): "; \
+		read PORT_END; \
+		if [ -z "$$PORT_END" ]; then \
+			PORT_END="3000"; \
+		fi; \
+		\
+		if [ "$$IS_MAIN_SERVER" = "false" ]; then \
+			echo ""; \
+			echo "$(GREEN)$(BOLD)Main Server Connection:$(RESET)"; \
+			echo "Enter the IP address of your main server."; \
+			echo "This will be used for Docker registry and database connections."; \
+			echo -n "Main server IP address: "; \
+			read MAIN_SERVER_IP; \
+			\
+			echo ""; \
+			echo "$(GREEN)$(BOLD)Database Connection Details:$(RESET)"; \
+			echo "These must match the database configuration on your main server."; \
+			echo -n "Database name (or empty for $(GREEN)containerfly$(RESET)): "; \
+			read DB_NAME; \
+			if [ -z "$$DB_NAME" ]; then \
+				DB_NAME="containerfly"; \
+			fi; \
+			echo -n "Database user (or empty for $(GREEN)containerflyuser$(RESET)): "; \
+			read DB_USER; \
+			if [ -z "$$DB_USER" ]; then \
+				DB_USER="containerflyuser"; \
+			fi; \
+			echo -n "Database password: "; \
+			read -s DB_PASSWORD; \
+			echo ""; \
+		fi; \
+		\
+		if [ "$$FIRST_TIME_DOCKER_SETUP" = "true" ]; then \
+			if [ ! -e user_config/settings ]; then \
+				cp user_config/settings_example user_config/settings; \
+			fi; \
+		fi; \
+		\
+		sed -i "s/DOCKER_SERVER_NAME=\"[^\"]*\"/DOCKER_SERVER_NAME=\"$$DOCKER_SERVER_NAME_INPUT\"/" user_config/settings; \
+		sed -i "s/DOCKER_RESERVATION_PORT_RANGE_START=[^[:space:]]*/DOCKER_RESERVATION_PORT_RANGE_START=$$PORT_START/" user_config/settings; \
+		sed -i "s/DOCKER_RESERVATION_PORT_RANGE_END=[^[:space:]]*/DOCKER_RESERVATION_PORT_RANGE_END=$$PORT_END/" user_config/settings; \
+		\
+		if [ "$$IS_MAIN_SERVER" = "false" ]; then \
+			sed -i "s/DOCKER_REGISTRY_ADDRESS=.*/DOCKER_REGISTRY_ADDRESS=$$MAIN_SERVER_IP/" user_config/settings; \
+			sed -i "s/MARIADB_SERVER_ADDRESS=\"[^\"]*\"/MARIADB_SERVER_ADDRESS=\"$$MAIN_SERVER_IP\"/" user_config/settings; \
+			sed -i "s/MARIADB_DB_NAME=\"[^\"]*\"/MARIADB_DB_NAME=\"$$DB_NAME\"/" user_config/settings; \
+			sed -i "s/MARIADB_DB_USER=\"[^\"]*\"/MARIADB_DB_USER=\"$$DB_USER\"/" user_config/settings; \
+			sed -i "s/MARIADB_DB_USER_PASSWORD=\"[^\"]*\"/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD\"/" user_config/settings; \
+		fi; \
+		\
+		chown $${SUDO_USER:-$(shell whoami)}:$${SUDO_USER:-$(shell whoami)} user_config/settings 2>/dev/null || true; \
+		\
+		echo ""; \
+		echo "$(GREEN)$(BOLD)Great! Your Docker utility configurations have been setup successfully!$(RESET)"; \
+		echo ""; \
+		echo "$(BOLD)Configuration Summary:$(RESET)"; \
+		echo "  - Docker Server Name: $(GREEN)$$DOCKER_SERVER_NAME_INPUT$(RESET)"; \
+		echo "  - Port Range: $(GREEN)$$PORT_START - $$PORT_END$(RESET)"; \
+		if [ "$$IS_MAIN_SERVER" = "false" ]; then \
+			echo "  - Main Server IP: $(GREEN)$$MAIN_SERVER_IP$(RESET)"; \
+			echo "  - Database: $(GREEN)$$DB_NAME$(RESET) (user: $(GREEN)$$DB_USER$(RESET))"; \
+		fi; \
+		echo ""; \
+		echo "$(GREEN)$(BOLD)Next steps:$(RESET)"; \
+		echo "$(GREEN)1. Please review the $(BOLD)user_config/settings$(RESET)$(GREEN) file to verify your settings"; \
+		echo "2. Run $(BOLD)sudo make setup-docker-utility$(RESET)$(GREEN) again to finish the installation$(RESET)"; \
+		echo ""; \
+		touch .docker_settings_just_created; \
+		exit 1; \
+	fi

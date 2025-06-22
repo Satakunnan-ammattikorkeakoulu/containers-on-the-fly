@@ -30,71 +30,159 @@ apply-firewall-rules: # Applies ufw firewall rules to the server
 
 interactive-settings-creation: # Creates settings file interactively if it doesn't exist or prompts for continuation if it exists
 	@if [ ! -e $(CONFIG_SETTINGS) ]; then \
-		echo "$(GREEN)$(BOLD)Welcome to Containers on the Fly Main Server Setup!$(RESET)"; \
-		echo ""; \
-		echo "We're starting the installation process for your main server."; \
-		echo "Since this is your first time running the setup"; \
-		echo "(there was no user_config/settings file)"; \
-		echo "we'll ask you for some mandatory configuration settings to get your server up and running."; \
-		echo ""; \
-		echo "$(BOLD)Let's configure your Containers on the Fly Main Server:$(RESET)"; \
-		echo ""; \
+		RECONFIGURE_SETTINGS=true; \
+	else \
+		EXISTING_SERVER_IP=$$(grep "^SERVER_IP_ADDRESS=" user_config/settings | cut -d'"' -f2); \
+		EXISTING_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
+		EXISTING_WEB_HTTPS=$$(grep "^MAIN_SERVER_WEB_HTTPS=" user_config/settings | cut -d'=' -f2); \
 		\
-		DETERMINED_IP=$$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo ""); \
-		if [ -n "$$DETERMINED_IP" ]; then \
-			echo -n "IP address of this server (leave as empty to use the default $(GREEN)$$DETERMINED_IP$(RESET)): "; \
+		if [ "$$EXISTING_WEB_HTTPS" = "true" ]; then \
+			EXISTING_WEB_ADDRESS="https://$$EXISTING_WEB_HOST"; \
 		else \
-			echo -n "IP address of this server: "; \
+			EXISTING_WEB_ADDRESS="http://$$EXISTING_WEB_HOST"; \
 		fi; \
-		read SERVER_IP; \
-		if [ -z "$$SERVER_IP" ] && [ -n "$$DETERMINED_IP" ]; then \
-			SERVER_IP=$$DETERMINED_IP; \
+		\
+		echo "$(GREEN)Settings file exists with current configuration:$(RESET)"; \
+		echo "  - Server IP: $(GREEN)$$EXISTING_SERVER_IP$(RESET)"; \
+		echo "  - Web Host: $(GREEN)$$EXISTING_WEB_HOST$(RESET)"; \
+		echo "  - Web Address: $(GREEN)$$EXISTING_WEB_ADDRESS$(RESET)"; \
+		echo "  - Please also review your other settings in $(BOLD)user_config/settings$(RESET)!"; \
+		echo ""; \
+		echo "What would you like to do?"; \
+		echo "  $(GREEN)1$(RESET) - Finish main server setup with current settings"; \
+		echo "  $(GREEN)2$(RESET) - Reconfigure mandatory settings"; \
+		echo "  $(GREEN)3$(RESET) - Cancel setup"; \
+		echo -n "Enter your choice (1, 2, or 3): "; \
+		read SETUP_CHOICE; \
+		\
+		case "$$SETUP_CHOICE" in \
+			1) \
+				echo "Continuing with existing settings..."; \
+				RECONFIGURE_SETTINGS=false; \
+				;; \
+			2) \
+				echo "Reconfiguring settings..."; \
+				RECONFIGURE_SETTINGS=true; \
+				;; \
+			3) \
+				echo "Setup cancelled."; \
+				exit 1; \
+				;; \
+			*) \
+				echo "$(RED)Invalid choice. Setup cancelled.$(RESET)"; \
+				exit 1; \
+				;; \
+		esac; \
+	fi; \
+	\
+	if [ "$$RECONFIGURE_SETTINGS" = "true" ]; then \
+		echo ""; \
+		echo "$(GREEN)$(BOLD)Welcome to Containers on the Fly Main Server Setup!$(RESET)"; \
+		echo "We're starting the installation process for your main server."; \
+		echo "Since this is your first time running the setup, we'll ask you for some"; \
+		echo "mandatory configuration settings to get your server up and running."; \
+		echo ""; \
+		\
+		echo "Detecting IP addresses..."; \
+		LOCAL_IP=$$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo ""); \
+		INTERNET_IP=$$(timeout 10 curl -s ifconfig.me 2>/dev/null || timeout 10 curl -s ipinfo.io/ip 2>/dev/null || echo ""); \
+		\
+		echo ""; \
+		echo "$(GREEN)$(BOLD)Server IP Address:$(RESET)"; \
+		if [ -n "$$LOCAL_IP" ]; then \
+			echo "  $(GREEN)1$(RESET) - Local IP address: $(GREEN)$$LOCAL_IP$(RESET)"; \
+		fi; \
+		if [ -n "$$INTERNET_IP" ]; then \
+			echo "  $(GREEN)2$(RESET) - Internet-facing IP address: $(GREEN)$$INTERNET_IP$(RESET)"; \
+		fi; \
+		echo "  $(GREEN)3$(RESET) - Manually enter IP address"; \
+		echo ""; \
+		echo -n "Enter your choice (1, 2, or 3): "; \
+		read IP_CHOICE; \
+		\
+		case "$$IP_CHOICE" in \
+			1) \
+				if [ -n "$$LOCAL_IP" ]; then \
+					SERVER_IP=$$LOCAL_IP; \
+					echo "Using local IP address: $(GREEN)$$SERVER_IP$(RESET)"; \
+				else \
+					echo "$(RED)Local IP could not be determined. Please enter manually:$(RESET)"; \
+					echo -n "IP address: "; \
+					read SERVER_IP; \
+				fi \
+				;; \
+			2) \
+				if [ -n "$$INTERNET_IP" ]; then \
+					SERVER_IP=$$INTERNET_IP; \
+					echo "Using internet-facing IP address: $(GREEN)$$SERVER_IP$(RESET)"; \
+				else \
+					echo "$(RED)Internet-facing IP could not be determined. Please enter manually:$(RESET)"; \
+					echo -n "IP address: "; \
+					read SERVER_IP; \
+				fi \
+				;; \
+			3) \
+				echo -n "Please enter the IP address manually: "; \
+				read SERVER_IP; \
+				;; \
+			*) \
+				echo "$(RED)Invalid choice. Please enter manually:$(RESET)"; \
+				echo -n "IP address: "; \
+				read SERVER_IP; \
+				;; \
+		esac; \
+		\
+		echo ""; \
+		echo "$(GREEN)$(BOLD)Web Server Host:$(RESET)"; \
+		echo "Domain name or IP address, without http/https."; \
+		echo "This will be used to access your web interface."; \
+		echo "Examples: \"mydomain.com\", \"localhost\", \"$$SERVER_IP\""; \
+		echo ""; \
+		echo -n "Enter web server host (or leave as empty to use $(GREEN)$$SERVER_IP$(RESET)): "; \
+		read WEB_HOST; \
+		if [ -z "$$WEB_HOST" ]; then \
+			WEB_HOST=$$SERVER_IP; \
 		fi; \
 		\
 		echo ""; \
-		echo "Web address of this server (with http or https)"; \
-		echo "For example, \"http://127.0.0.1\" or \"https://mydomain.com\" or \"http://4.512.512.512\""; \
-		echo -n ": "; \
-		read WEB_ADDRESS; \
-		\
-		if echo "$$WEB_ADDRESS" | grep -q "^https://"; then \
+		echo "$(GREEN)$(BOLD)Enable Automatic HTTPS with Let's Encrypt for Web Interface?$(RESET)"; \
+		echo "Choose 'y' if you have a real domain name that resolves to this server."; \
+		echo "Choose 'n' if you specified an IP address in the step above or do not want to setup ssl/https."; \
+		echo -n "Enable HTTPS? (y/n) [n]: "; \
+		read HTTPS_CHOICE; \
+		if [ "$$HTTPS_CHOICE" = "y" ] || [ "$$HTTPS_CHOICE" = "Y" ]; then \
 			ENABLE_HTTPS="true"; \
 		else \
 			ENABLE_HTTPS="false"; \
 		fi; \
 		\
-		echo ""; \
-		echo "Server domain (without http or https):"; \
-		echo "Set as domain or ip address of the server if you dont have a domain."; \
-		echo -n ": "; \
-		read SERVER_DOMAIN; \
-		\
 		DB_PASSWORD=$$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15); \
 		\
 		cp user_config/settings_example user_config/settings; \
 		sed -i "s/SERVER_IP_ADDRESS=\"YOUR_IP_HERE\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
-		sed -i "s|SERVER_WEB_ADDRESS=\"http://127.0.0.1\"|SERVER_WEB_ADDRESS=\"$$WEB_ADDRESS\"|" user_config/settings; \
-		sed -i "s/ENABLE_AUTO_HTTPS=false/ENABLE_AUTO_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
-		sed -i "s/SERVER_DOMAIN=\"yourdomain.com\"/SERVER_DOMAIN=\"$$SERVER_DOMAIN\"/" user_config/settings; \
+		sed -i "s/MAIN_SERVER_WEB_HOST=\"YOUR_IP_OR_DOMAIN_HERE\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
+		sed -i "s/MAIN_SERVER_WEB_HTTPS=false/MAIN_SERVER_WEB_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
 		sed -i "s/MARIADB_DB_USER_PASSWORD=\"password\"/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD\"/" user_config/settings; \
+		chown $${SUDO_USER:-$(shell whoami)}:$${SUDO_USER:-$(shell whoami)} user_config/settings 2>/dev/null || true; \
 		\
 		echo ""; \
 		echo "$(GREEN)$(BOLD)Great! Your mandatory configurations have been setup successfully!$(RESET)"; \
 		echo ""; \
-		echo "$(BOLD)Next steps:$(RESET)"; \
-		echo "1. Please review the $(BOLD)user_config/settings$(RESET) file to verify your settings"; \
-		echo "2. Run $(BOLD)sudo make setup-main-server$(RESET) again to finish the installation"; \
-		echo ""; \
-		echo "Your Containers on the Fly Main Server will be ready shortly!"; \
-		exit 0; \
-	else \
-		echo "$(GREEN)Settings file exists.$(RESET)"; \
-		echo -n "Press $(GREEN)y$(RESET) to continue setting up the main server: "; \
-		read CONTINUE; \
-		if [ "$$CONTINUE" != "y" ]; then \
-			echo "Setup cancelled."; \
-			exit 1; \
+		echo "$(BOLD)Configuration Summary:$(RESET)"; \
+		echo "  - Server IP: $(GREEN)$$SERVER_IP$(RESET)"; \
+		echo "  - Web Host: $(GREEN)$$WEB_HOST$(RESET)"; \
+		if [ "$$ENABLE_HTTPS" = "true" ]; then \
+			echo "  - Web Address: $(GREEN)https://$$WEB_HOST$(RESET)"; \
+		else \
+			echo "  - Web Address: $(GREEN)http://$$WEB_HOST$(RESET)"; \
 		fi; \
+		echo ""; \
+		echo "$(BOLD)$(GREEN)Next steps:$(RESET)"; \
+		echo "$(GREEN)1. Please review the $(BOLD)user_config/settings$(RESET)$(GREEN) file to verify your settings$(RESET)"; \
+		echo "$(GREEN)2. Run $(BOLD)sudo make setup-main-server$(RESET)$(GREEN) again to finish the installation$(RESET)"; \
+		echo ""; \
+		touch .settings_just_created; \
+		exit 1; \
 	fi
 
 verify-config-file-exists: # Verify that the main configuration file exists.
@@ -122,7 +210,11 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 
 # Production targets
 
-setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings apply-firewall-rules ## Installs and configures all dependencies for main server. Only works on Ubuntu 24.04. If using any other operating system, then refer to the readme documentation for manual steps. Call 'make start-main-server' after setup.
+setup-main-server: check-os-ubuntu interactive-settings-creation ## Installs and configures all dependencies for main server. Only works on Ubuntu 24.04. If using any other operating system, then refer to the readme documentation for manual steps. Call 'make start-main-server' after setup.
+	@if [ -f .settings_just_created ]; then \
+		rm -f .settings_just_created; \
+		exit 0; \
+	fi
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed

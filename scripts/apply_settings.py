@@ -67,6 +67,17 @@ class SettingsApplier:
         
     def _process_derived_settings(self):
         """Process derived settings that depend on other settings."""
+        # Build web address from MAIN_SERVER_WEB_HOST and MAIN_SERVER_WEB_HTTPS
+        web_host = self.settings.get('MAIN_SERVER_WEB_HOST', 'localhost')
+        enable_https = self.settings.get('MAIN_SERVER_WEB_HTTPS', 'false').lower() == 'true'
+        
+        if enable_https:
+            web_address = f"https://{web_host}"
+        else:
+            web_address = f"http://{web_host}"
+        
+        self.settings['SERVER_WEB_ADDRESS'] = web_address
+        
         # Build database URI
         db_uri = f"mysql+pymysql://{self.settings.get('MARIADB_DB_USER', '')}:{self.settings.get('MARIADB_DB_USER_PASSWORD', '')}@{self.settings.get('MARIADB_SERVER_ADDRESS', 'localhost')}/{self.settings.get('MARIADB_DB_NAME', '')}"
         self.settings['DATABASE_URI'] = db_uri
@@ -81,7 +92,7 @@ class SettingsApplier:
         # Convert boolean strings to proper JSON boolean values
         bool_settings = [
             'USE_WHITELIST', 'DATABASE_DEBUG', 'ADD_TEST_DATA', 
-            'ENABLE_EMAIL_NOTIFICATIONS', 'ENABLE_AUTO_HTTPS'
+            'ENABLE_EMAIL_NOTIFICATIONS', 'MAIN_SERVER_WEB_HTTPS'
         ]
         
         for setting in bool_settings:
@@ -110,8 +121,8 @@ class SettingsApplier:
                     
     def _process_caddy_settings(self):
         """Process Caddy-specific settings based on HTTPS configuration."""
-        enable_https = self.settings.get('ENABLE_AUTO_HTTPS', 'false').lower() == 'true'
-        domain = self.settings.get('SERVER_DOMAIN', 'localhost')
+        enable_https = self.settings.get('MAIN_SERVER_WEB_HTTPS', 'false').lower() == 'true'
+        domain = self.settings.get('MAIN_SERVER_WEB_HOST', 'localhost')
         
         if enable_https:
             # HTTPS mode - automatic certificates

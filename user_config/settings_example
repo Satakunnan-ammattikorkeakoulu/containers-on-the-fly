@@ -15,23 +15,15 @@
 # The IP address of this server.
 SERVER_IP_ADDRESS="YOUR_IP_HERE"
 
-# The full address to your web server which you can access from the browser.
-# Should match your HTTPS setting below:
-# - If ENABLE_AUTO_HTTPS=true:  use "https://yourdomain.com"
-# - If ENABLE_AUTO_HTTPS=false: use "http://localhost" or "http://192.168.1.100"
-# This is only used in the main server. You can leave it as empty on the container server.
-SERVER_WEB_ADDRESS="http://127.0.0.1"
-
-# Enable automatic HTTPS with Let's Encrypt certificates
-# true  = Production setup with real domain name (automatic HTTPS + SSL certificates)
-# false = Local development or IP-based access (HTTP only, no SSL)
-# Set to true only if you have a real domain name that resolves to this server set in SERVER_DOMAIN
-ENABLE_AUTO_HTTPS=false
-
-# Domain or IP address for your server (without http://)
+# Main server web interface host (domain or IP, without http/https)
+# Only main server, separate container servers can leave this empty.
 # Examples: "yourdomain.com", "localhost", "192.168.1.100"
-# This is only used in the main server. You can leave it as empty on the container server.
-SERVER_DOMAIN="yourdomain.com"
+MAIN_SERVER_WEB_HOST="YOUR_IP_OR_DOMAIN_HERE"
+
+# Enable automatic HTTPS with Let's Encrypt certificates for main server web interface
+# Only main server, separate container servers can leave this empty.
+# Set to true if you have a real domain name, false for local/IP-based access
+MAIN_SERVER_WEB_HTTPS=false
 
 # Name of your application (displayed in the web interface)
 APP_NAME="Containers on the Fly"
@@ -151,24 +143,27 @@ SESSION_TIMEOUT_MINUTES=1440
 # ADVANCED SETTINGS
 ###
 
+# Optional text added to the beginning of notification emails
+EMAIL_GENERAL_TEXT=""
+
 # Can be used to set an additional port for the backend that the frontend connects to when making API calls from the browser.
 # Useful when the backend is running in development environment port (like 8000)
 BACKEND_ADDITIONAL_PORT=""
 
-# Backend application port (leave default unless you know what you're doing)
+# Backend application port
+# Leave to default 8000 unless you know what you're doing
 BACKEND_PORT=8000
 
-# Frontend development port (leave default unless you know what you're doing)
+# Frontend development port
+# Leave to default 8080 unless you know what you're doing
 FRONTEND_PORT=8080
 
 # Set to true to enable debug printing for database operations
 DATABASE_DEBUG=false
 
-# Set to true to add test data when the server starts (development only)
+# Set to true to add test data (like, admin user, computer, and test container) when the server starts
+# Recommended to always keep this on, and then manually remove the test data after setup.
 ADD_TEST_DATA=true
 
 # Docker container shared memory size (e.g., "1g")
 DOCKER_SHM_SIZE="1g"
-
-# Optional text added to the beginning of notification emails
-EMAIL_GENERAL_TEXT="" 

@@ -296,6 +296,35 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 # Production targets
 
 setup-main-server: check-os-ubuntu interactive-settings-creation ## Installs and configures all dependencies for main server. Only works on Ubuntu 24.04. If using any other operating system, then refer to the readme documentation for manual steps. Call 'make start-main-server' after setup.
+	@echo ""
+	@echo "$(GREEN)$(BOLD)Firewall Configuration$(RESET)"
+	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
+	@echo "This will:"
+	@echo "  - Enable UFW firewall with secure defaults"
+	@echo "  - Allow SSH (22), HTTP (80), HTTPS (443)"
+	@echo "  - Allow container ports (2000-3000 by default)"
+	@echo "  - Secure Docker registry and containers"
+	@echo ""
+	@echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing UFW firewall rules!"
+	@echo ""
+	@echo "Configure firewall rules automatically?"
+	@echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"
+	@echo "  $(GREEN)n$(RESET) - No, skip firewall configuration (not recommended)"
+	@echo -n "Choice (y/n): "; \
+	read FIREWALL_CHOICE; \
+	echo ""; \
+	if [ "$$FIREWALL_CHOICE" = "y" ] || [ "$$FIREWALL_CHOICE" = "Y" ]; then \
+		echo "$(GREEN)Configuring firewall rules...$(RESET)"; \
+		$(MAKE) apply-firewall-rules; \
+		echo "$(GREEN)Firewall configuration completed.$(RESET)"; \
+	else \
+		echo "$(RED)WARNING: Firewall not configured!$(RESET)"; \
+		echo "Your server may be vulnerable to unauthorized access."; \
+		echo "You can configure it later with: $(BOLD)make apply-firewall-rules$(RESET)"; \
+		echo -n "Press Enter to continue with setup anyway..."; \
+		read CONTINUE_ANYWAY; \
+	fi; \
+	echo ""
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed

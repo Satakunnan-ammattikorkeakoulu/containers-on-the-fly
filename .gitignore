@@ -14,3 +14,4 @@ user_config/Caddyfile
 user_config/settings
 webapp/backend/docker/local_overrides.py
 .vscode
+.settings_just_created

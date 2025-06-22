@@ -31,6 +31,7 @@ apply-firewall-rules: # Applies ufw firewall rules to the server
 interactive-settings-creation: # Creates settings file interactively if it doesn't exist or prompts for continuation if it exists
 	@if [ ! -e $(CONFIG_SETTINGS) ]; then \
 		RECONFIGURE_SETTINGS=true; \
+		FIRST_TIME_SETUP=true; \
 	else \
 		EXISTING_SERVER_IP=$$(grep "^SERVER_IP_ADDRESS=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
@@ -63,10 +64,12 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			1) \
 				echo "Continuing with existing settings..."; \
 				RECONFIGURE_SETTINGS=false; \
+				FIRST_TIME_SETUP=false; \
 				;; \
 			2) \
 				echo "Reconfiguring settings..."; \
 				RECONFIGURE_SETTINGS=true; \
+				FIRST_TIME_SETUP=false; \
 				;; \
 			3) \
 				echo "Setup cancelled."; \
@@ -142,7 +145,7 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "This will be used to access your web interface."; \
 		echo "Examples: \"mydomain.com\", \"localhost\", \"$$SERVER_IP\""; \
 		echo ""; \
-		echo -n "Enter web server host (or leave as empty to use $(GREEN)$$SERVER_IP$(RESET)): "; \
+		echo -n "Enter web server host (or empty for $(GREEN)$$SERVER_IP$(RESET)): "; \
 		read WEB_HOST; \
 		if [ -z "$$WEB_HOST" ]; then \
 			WEB_HOST=$$SERVER_IP; \
@@ -152,7 +155,7 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "$(GREEN)$(BOLD)Enable Automatic HTTPS with Let's Encrypt for Web Interface?$(RESET)"; \
 		echo "Choose 'y' if you have a real domain name that resolves to this server."; \
 		echo "Choose 'n' if you specified an IP address in the step above or do not want to setup ssl/https."; \
-		echo -n "Enable HTTPS? (y/n) [n]: "; \
+		echo -n "Enable HTTPS? (y/n) (or empty for $(GREEN)n$(RESET)): "; \
 		read HTTPS_CHOICE; \
 		if [ "$$HTTPS_CHOICE" = "y" ] || [ "$$HTTPS_CHOICE" = "Y" ]; then \
 			ENABLE_HTTPS="true"; \
@@ -165,7 +168,7 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "Enter your server's timezone for proper scheduling and logging."; \
 		echo "Common examples: Europe/London, America/New_York, Asia/Tokyo, UTC"; \
 		echo "Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"; \
-		echo -n "Enter timezone [Europe/Helsinki]: "; \
+		echo -n "Enter timezone (or empty for $(GREEN)Europe/Helsinki$(RESET)): "; \
 		read TIMEZONE_INPUT; \
 		if [ -z "$$TIMEZONE_INPUT" ]; then \
 			TIMEZONE_INPUT="Europe/Helsinki"; \
@@ -173,30 +176,39 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		\
 		echo ""; \
 		echo "$(GREEN)$(BOLD)Container Reservation Duration:$(RESET)"; \
-		echo "Set the minimum and maximum duration (in hours) users can reserve containers."; \
+		echo "Set the minimum and maximum duration (hours) users can reserve containers."; \
 		echo "This can prevent super short bookings and stops people from reserving containers forever."; \
 		echo ""; \
-		echo -n "Minimum reservation duration in hours [5]: "; \
+		echo -n "Minimum reservation duration in hours (or empty for $(GREEN)5$(RESET)): "; \
 		read MIN_DURATION; \
 		if [ -z "$$MIN_DURATION" ]; then \
 			MIN_DURATION="5"; \
 		fi; \
-		echo -n "Maximum reservation duration in hours [72]: "; \
+		echo -n "Maximum reservation duration in hours (or empty for $(GREEN)72$(RESET)): "; \
 		read MAX_DURATION; \
 		if [ -z "$$MAX_DURATION" ]; then \
 			MAX_DURATION="72"; \
 		fi; \
 		\
-		DB_PASSWORD=$$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15); \
-		\
-		cp user_config/settings_example user_config/settings; \
-		sed -i "s/SERVER_IP_ADDRESS=\"YOUR_IP_HERE\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
-		sed -i "s/MAIN_SERVER_WEB_HOST=\"YOUR_IP_OR_DOMAIN_HERE\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
-		sed -i "s/MAIN_SERVER_WEB_HTTPS=false/MAIN_SERVER_WEB_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
-		sed -i "s/TIMEZONE=\"Europe\/Helsinki\"/TIMEZONE=\"$$TIMEZONE_INPUT\"/" user_config/settings; \
-		sed -i "s/RESERVATION_MIN_DURATION=5/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
-		sed -i "s/RESERVATION_MAX_DURATION=72/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
-		sed -i "s/MARIADB_DB_USER_PASSWORD=\"password\"/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD\"/" user_config/settings; \
+		if [ "$$FIRST_TIME_SETUP" = "true" ]; then \
+			DB_PASSWORD=$$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15); \
+			cp user_config/settings_example user_config/settings; \
+			sed -i "s/SERVER_IP_ADDRESS=\"YOUR_IP_HERE\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
+			sed -i "s/MAIN_SERVER_WEB_HOST=\"YOUR_IP_OR_DOMAIN_HERE\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
+			sed -i "s/MAIN_SERVER_WEB_HTTPS=false/MAIN_SERVER_WEB_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
+			sed -i "s/TIMEZONE=\"Europe\/Helsinki\"/TIMEZONE=\"$$TIMEZONE_INPUT\"/" user_config/settings; \
+			sed -i "s/RESERVATION_MIN_DURATION=5/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
+			sed -i "s/RESERVATION_MAX_DURATION=72/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
+			sed -i "s/MARIADB_DB_USER_PASSWORD=\"password\"/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD\"/" user_config/settings; \
+		else \
+			sed -i "s/SERVER_IP_ADDRESS=\"[^\"]*\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
+			sed -i "s/MAIN_SERVER_WEB_HOST=\"[^\"]*\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
+			sed -i "s/MAIN_SERVER_WEB_HTTPS=[^[:space:]]*/MAIN_SERVER_WEB_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
+			ESCAPED_TIMEZONE=$$(echo "$$TIMEZONE_INPUT" | sed 's/\//\\\//g'); \
+			sed -i "s/TIMEZONE=\"[^\"]*\"/TIMEZONE=\"$$ESCAPED_TIMEZONE\"/" user_config/settings; \
+			sed -i "s/RESERVATION_MIN_DURATION=[^[:space:]]*/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
+			sed -i "s/RESERVATION_MAX_DURATION=[^[:space:]]*/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
+		fi; \
 		chown $${SUDO_USER:-$(shell whoami)}:$${SUDO_USER:-$(shell whoami)} user_config/settings 2>/dev/null || true; \
 		\
 		echo ""; \
@@ -213,9 +225,10 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "  - Timezone: $(GREEN)$$TIMEZONE_INPUT$(RESET)"; \
 		echo "  - Reservation Duration: $(GREEN)$$MIN_DURATION - $$MAX_DURATION hours$(RESET)"; \
 		echo ""; \
-		echo "$(BOLD)Next steps:$(RESET)"; \
-		echo "1. Please review the $(BOLD)user_config/settings$(RESET) file to verify your settings"; \
-		echo "2. Run $(BOLD)sudo make setup-main-server$(RESET) again to finish the installation"; \
+		echo "$(BOLD)$(GREEN)Next steps:"; \
+		echo "1. Please review the $(BOLD)user_config/settings$(RESET)$(GREEN) file to verify your settings"; \
+		echo "2. Run $(BOLD)sudo make setup-main-server$(RESET)$(GREEN) again and finish the installation"; \
+		echo "Note: The error message below is expected and can be ignored.$(RESET)"; \
 		touch .settings_just_created; \
 		exit 1; \
 	fi
@@ -260,8 +273,9 @@ setup-main-server: check-os-ubuntu interactive-settings-creation ## Installs and
 
 	@echo "\n$(GREEN)The main server has been setup.\n"
 	@echo "NEXT STEPS:"
-	@echo "1. Run command $(BOLD)pm2 startup$(RESET)$(GREEN) and copy/paste the command to your terminal."
-	@echo "2. Restart the machine for all the changes to take effect.$(RESET)\n"
+	@echo "1. Run command $(BOLD)pm2 startup$(RESET)$(GREEN) and copy/paste the command that is outputted to your terminal."
+	@echo "2. Restart the machine for all the changes to take effect."
+	@echo "3. Run $(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
 
 start-main-server: verify-config-file-exists apply-settings ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend.
 	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile

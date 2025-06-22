@@ -290,10 +290,6 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo "You can view any logs (errors) using the $(GREEN)make logs$(RESET) command."
 
 setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
-	@if [ -f .docker_settings_just_created ]; then \
-		rm -f .docker_settings_just_created; \
-		exit 0; \
-	fi
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
@@ -516,18 +512,54 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		echo ""; \
 		echo "$(GREEN)$(BOLD)Great! Your Docker utility configurations have been setup successfully!$(RESET)"; \
 		echo ""; \
-		echo "$(BOLD)Configuration Summary:$(RESET)"; \
-		echo "  - Docker Server Name: $(GREEN)$$DOCKER_SERVER_NAME_INPUT$(RESET)"; \
-		echo "  - Port Range: $(GREEN)$$PORT_START - $$PORT_END$(RESET)"; \
-		if [ "$$IS_MAIN_SERVER" = "false" ]; then \
-			echo "  - Main Server IP: $(GREEN)$$MAIN_SERVER_IP$(RESET)"; \
-			echo "  - Database: $(GREEN)$$DB_NAME$(RESET) (user: $(GREEN)$$DB_USER$(RESET))"; \
-		fi; \
+		echo "$(GREEN)$(BOLD)!! IMPORTANT !!$(RESET) Please take a moment to manually review the full $(GREEN)user_config/settings$(RESET) file"; \
+		echo "as it contains additional optional settings that you may want to configure for your setup."; \
 		echo ""; \
-		echo "$(GREEN)$(BOLD)Next steps:$(RESET)"; \
-		echo "$(GREEN)1. Please review the $(BOLD)user_config/settings$(RESET)$(GREEN) file to verify your settings"; \
-		echo "2. Run $(BOLD)sudo make setup-docker-utility$(RESET)$(GREEN) again to finish the installation$(RESET)"; \
+		echo -n "Press Enter to continue and please manually review the settings file before you proceed with the installation."; \
+		read CONTINUE_INPUT; \
 		echo ""; \
-		touch .docker_settings_just_created; \
-		exit 1; \
+	fi; \
+	\
+	# Loop back to show updated configuration if settings were just changed \
+	if [ "$$RECONFIGURE_DOCKER_SETTINGS" = "true" ]; then \
+		echo "$(GREEN)Updated Docker settings:$(RESET)"; \
+		UPDATED_SERVER_NAME=$$(grep "^DOCKER_SERVER_NAME=" user_config/settings | cut -d'"' -f2); \
+		UPDATED_PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2); \
+		UPDATED_PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2); \
+		UPDATED_REGISTRY_ADDRESS=$$(grep "^DOCKER_REGISTRY_ADDRESS=" user_config/settings | cut -d'=' -f2); \
+		UPDATED_DB_ADDRESS=$$(grep "^MARIADB_SERVER_ADDRESS=" user_config/settings | cut -d'"' -f2); \
+		UPDATED_DB_NAME=$$(grep "^MARIADB_DB_NAME=" user_config/settings | cut -d'"' -f2); \
+		UPDATED_DB_USER=$$(grep "^MARIADB_DB_USER=" user_config/settings | cut -d'"' -f2); \
+		\
+		echo "  - Docker Server Name: $(GREEN)$$UPDATED_SERVER_NAME$(RESET)"; \
+		echo "  - Port Range: $(GREEN)$$UPDATED_PORT_START - $$UPDATED_PORT_END$(RESET)"; \
+		echo "  - Registry Address: $(GREEN)$$UPDATED_REGISTRY_ADDRESS$(RESET)"; \
+		echo "  - Database Address: $(GREEN)$$UPDATED_DB_ADDRESS$(RESET)"; \
+		echo "  - Database Name: $(GREEN)$$UPDATED_DB_NAME$(RESET)"; \
+		echo "  - Database User: $(GREEN)$$UPDATED_DB_USER$(RESET)"; \
+		echo ""; \
+		echo "What would you like to do?"; \
+		echo "  $(GREEN)1$(RESET) - Proceed with installation using these settings"; \
+		echo "  $(GREEN)2$(RESET) - Reconfigure Docker settings again"; \
+		echo "  $(GREEN)3$(RESET) - Cancel setup"; \
+		echo -n "Enter your choice (1, 2, or 3): "; \
+		read FINAL_CHOICE; \
+		\
+		case "$$FINAL_CHOICE" in \
+			1) \
+				echo "Proceeding with Docker utility installation..."; \
+				;; \
+			2) \
+				echo "Starting reconfiguration again..."; \
+				exec $(MAKE) interactive-docker-settings-creation; \
+				;; \
+			3) \
+				echo "Setup cancelled."; \
+				exit 1; \
+				;; \
+			*) \
+				echo "$(RED)Invalid choice. Setup cancelled.$(RESET)"; \
+				exit 1; \
+				;; \
+		esac; \
 	fi

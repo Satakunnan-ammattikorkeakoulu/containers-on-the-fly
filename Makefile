@@ -55,7 +55,7 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo ""; \
 		echo "What would you like to do?"; \
 		echo "  $(GREEN)1$(RESET) - Use these settings and start main server setup"; \
-		echo "  $(GREEN)2$(RESET) - Reconfigure mandatory settings"; \
+		echo "  $(GREEN)2$(RESET) - Reconfigure main server settings"; \
 		echo "  $(GREEN)3$(RESET) - Cancel setup"; \
 		echo -n "Enter your choice (1, 2, or 3): "; \
 		read SETUP_CHOICE; \
@@ -212,25 +212,62 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		chown $${SUDO_USER:-$(shell whoami)}:$${SUDO_USER:-$(shell whoami)} user_config/settings 2>/dev/null || true; \
 		\
 		echo ""; \
-		echo "$(GREEN)$(BOLD)Great! Your mandatory configurations have been setup successfully!$(RESET)"; \
+		echo "$(GREEN)$(BOLD)Great! Your main server configurations have been setup successfully!$(RESET)"; \
 		echo ""; \
-		echo "$(BOLD)Configuration Summary:$(RESET)"; \
-		echo "  - Server IP: $(GREEN)$$SERVER_IP$(RESET)"; \
-		echo "  - Web Host: $(GREEN)$$WEB_HOST$(RESET)"; \
-		if [ "$$ENABLE_HTTPS" = "true" ]; then \
-			echo "  - Web Address: $(GREEN)https://$$WEB_HOST$(RESET)"; \
+		echo "$(GREEN)$(BOLD)!! IMPORTANT !!$(RESET) Please take a moment to manually review the full $(GREEN)user_config/settings$(RESET) file"; \
+		echo "as it contains additional optional settings that you may want to configure for your setup."; \
+		echo ""; \
+		echo -n "Press Enter to continue and please manually review the settings file before you proceed with the installation."; \
+		read CONTINUE_INPUT; \
+		echo ""; \
+	fi; \
+	\
+	# Loop back to show updated configuration if settings were just changed \
+	if [ "$$RECONFIGURE_SETTINGS" = "true" ]; then \
+		echo "$(GREEN)Updated main server settings:$(RESET)"; \
+		UPDATED_SERVER_IP=$$(grep "^SERVER_IP_ADDRESS=" user_config/settings | cut -d'"' -f2); \
+		UPDATED_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
+		UPDATED_WEB_HTTPS=$$(grep "^MAIN_SERVER_WEB_HTTPS=" user_config/settings | cut -d'=' -f2); \
+		UPDATED_TIMEZONE=$$(grep "^TIMEZONE=" user_config/settings | cut -d'"' -f2); \
+		UPDATED_MIN_DURATION=$$(grep "^RESERVATION_MIN_DURATION=" user_config/settings | cut -d'=' -f2); \
+		UPDATED_MAX_DURATION=$$(grep "^RESERVATION_MAX_DURATION=" user_config/settings | cut -d'=' -f2); \
+		\
+		if [ "$$UPDATED_WEB_HTTPS" = "true" ]; then \
+			UPDATED_WEB_ADDRESS="https://$$UPDATED_WEB_HOST"; \
 		else \
-			echo "  - Web Address: $(GREEN)http://$$WEB_HOST$(RESET)"; \
+			UPDATED_WEB_ADDRESS="http://$$UPDATED_WEB_HOST"; \
 		fi; \
-		echo "  - Timezone: $(GREEN)$$TIMEZONE_INPUT$(RESET)"; \
-		echo "  - Reservation Duration: $(GREEN)$$MIN_DURATION - $$MAX_DURATION hours$(RESET)"; \
+		\
+		echo "  - Server IP: $(GREEN)$$UPDATED_SERVER_IP$(RESET)"; \
+		echo "  - Web Host: $(GREEN)$$UPDATED_WEB_HOST$(RESET)"; \
+		echo "  - Web Address: $(GREEN)$$UPDATED_WEB_ADDRESS$(RESET)"; \
+		echo "  - Timezone: $(GREEN)$$UPDATED_TIMEZONE$(RESET)"; \
+		echo "  - Reservation Duration: $(GREEN)$$UPDATED_MIN_DURATION - $$UPDATED_MAX_DURATION hours$(RESET)"; \
 		echo ""; \
-		echo "$(GREEN)$(BOLD)Next steps:$(RESET)"; \
-		echo "$(GREEN)1. Please review the $(BOLD)user_config/settings$(RESET)$(GREEN) file to verify your settings"; \
-		echo "2. Run $(BOLD)sudo make setup-main-server$(RESET)$(GREEN) again and finish the installation"; \
-		echo "\nNote: The error message below is expected and can be ignored.$(RESET)"; \
-		touch .settings_just_created; \
-		exit 1; \
+		echo "What would you like to do?"; \
+		echo "  $(GREEN)1$(RESET) - Proceed with installation using these settings"; \
+		echo "  $(GREEN)2$(RESET) - Reconfigure main server settings again"; \
+		echo "  $(GREEN)3$(RESET) - Cancel setup"; \
+		echo -n "Enter your choice (1, 2, or 3): "; \
+		read FINAL_CHOICE; \
+		\
+		case "$$FINAL_CHOICE" in \
+			1) \
+				echo "Proceeding with main server installation..."; \
+				;; \
+			2) \
+				echo "Starting reconfiguration again..."; \
+				exec $(MAKE) interactive-settings-creation; \
+				;; \
+			3) \
+				echo "Setup cancelled."; \
+				exit 1; \
+				;; \
+			*) \
+				echo "$(RED)Invalid choice. Setup cancelled.$(RESET)"; \
+				exit 1; \
+				;; \
+		esac; \
 	fi
 
 verify-config-file-exists: # Verify that the main configuration file exists.
@@ -259,10 +296,6 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 # Production targets
 
 setup-main-server: check-os-ubuntu interactive-settings-creation ## Installs and configures all dependencies for main server. Only works on Ubuntu 24.04. If using any other operating system, then refer to the readme documentation for manual steps. Call 'make start-main-server' after setup.
-	@if [ -f .settings_just_created ]; then \
-		rm -f .settings_just_created; \
-		exit 0; \
-	fi
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed

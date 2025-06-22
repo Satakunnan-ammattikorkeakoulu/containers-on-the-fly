@@ -517,9 +517,9 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			if [ -z "$$DB_USER" ]; then \
 				DB_USER="containerflyuser"; \
 			fi; \
+			echo "$(GREEN)$(BOLD)WARNING:$(RESET) Password will be visible on screen"; \
 			echo -n "Database password: "; \
-			read -s DB_PASSWORD; \
-			echo ""; \
+			read DB_PASSWORD; \
 		fi; \
 		\
 		if [ "$$FIRST_TIME_DOCKER_SETUP" = "true" ]; then \

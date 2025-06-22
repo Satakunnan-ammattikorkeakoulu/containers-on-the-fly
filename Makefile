@@ -35,6 +35,9 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		EXISTING_SERVER_IP=$$(grep "^SERVER_IP_ADDRESS=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_WEB_HTTPS=$$(grep "^MAIN_SERVER_WEB_HTTPS=" user_config/settings | cut -d'=' -f2); \
+		EXISTING_TIMEZONE=$$(grep "^TIMEZONE=" user_config/settings | cut -d'"' -f2); \
+		EXISTING_MIN_DURATION=$$(grep "^RESERVATION_MIN_DURATION=" user_config/settings | cut -d'=' -f2); \
+		EXISTING_MAX_DURATION=$$(grep "^RESERVATION_MAX_DURATION=" user_config/settings | cut -d'=' -f2); \
 		\
 		if [ "$$EXISTING_WEB_HTTPS" = "true" ]; then \
 			EXISTING_WEB_ADDRESS="https://$$EXISTING_WEB_HOST"; \
@@ -46,6 +49,8 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "  - Server IP: $(GREEN)$$EXISTING_SERVER_IP$(RESET)"; \
 		echo "  - Web Host: $(GREEN)$$EXISTING_WEB_HOST$(RESET)"; \
 		echo "  - Web Address: $(GREEN)$$EXISTING_WEB_ADDRESS$(RESET)"; \
+		echo "  - Timezone: $(GREEN)$$EXISTING_TIMEZONE$(RESET)"; \
+		echo "  - Reservation Duration: $(GREEN)$$EXISTING_MIN_DURATION - $$EXISTING_MAX_DURATION hours$(RESET)"; \
 		echo ""; \
 		echo "What would you like to do?"; \
 		echo "  $(GREEN)1$(RESET) - Continue with current settings"; \
@@ -135,7 +140,7 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "$(GREEN)$(BOLD)Web Server Host:$(RESET)"; \
 		echo "Domain name or IP address, without http/https."; \
 		echo "This will be used to access your web interface."; \
-		echo "Examples: mydomain.com, localhost, $$SERVER_IP"; \
+		echo "Examples: \"mydomain.com\", \"localhost\", \"$$SERVER_IP\""; \
 		echo ""; \
 		echo -n "Enter web server host (or leave as empty to use $(GREEN)$$SERVER_IP$(RESET)): "; \
 		read WEB_HOST; \
@@ -145,8 +150,8 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		\
 		echo ""; \
 		echo "$(GREEN)$(BOLD)Enable Automatic HTTPS with Let's Encrypt for Web Interface?$(RESET)"; \
-		echo "Choose $(GREEN)$(BOLD)y$(RESET) if you have a real domain name that resolves to this server."; \
-		echo "Choose $(GREEN)$(BOLD)n$(RESET) if you specified an IP address in the step above or do not want to setup ssl/https."; \
+		echo "Choose 'y' if you have a real domain name that resolves to this server."; \
+		echo "Choose 'n' if you specified an IP address in the step above or do not want to setup ssl/https."; \
 		echo -n "Enable HTTPS? (y/n) [n]: "; \
 		read HTTPS_CHOICE; \
 		if [ "$$HTTPS_CHOICE" = "y" ] || [ "$$HTTPS_CHOICE" = "Y" ]; then \
@@ -160,7 +165,7 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "Enter your server's timezone for proper scheduling and logging."; \
 		echo "Common examples: Europe/London, America/New_York, Asia/Tokyo, UTC"; \
 		echo "Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"; \
-		echo -n "Enter timezone [or leave as empty to use $(BOLD)$(GREEN)Europe/Helsinki$(RESET)]: "; \
+		echo -n "Enter timezone [Europe/Helsinki]: "; \
 		read TIMEZONE_INPUT; \
 		if [ -z "$$TIMEZONE_INPUT" ]; then \
 			TIMEZONE_INPUT="Europe/Helsinki"; \
@@ -168,15 +173,15 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		\
 		echo ""; \
 		echo "$(GREEN)$(BOLD)Container Reservation Duration:$(RESET)"; \
-		echo "How long should users be able to reserve containers for?"; \
+		echo "Set the minimum and maximum duration (in hours) users can reserve containers."; \
 		echo "This can prevent super short bookings and stops people from reserving containers forever."; \
 		echo ""; \
-		echo -n "Minimum reservation duration in hours (or leave as empty to use $(BOLD)$(GREEN)5$(RESET)): "; \
+		echo -n "Minimum reservation duration in hours [5]: "; \
 		read MIN_DURATION; \
 		if [ -z "$$MIN_DURATION" ]; then \
 			MIN_DURATION="5"; \
 		fi; \
-		echo -n "Maximum reservation duration in hours (or leave as empty to use $(BOLD)$(GREEN)72$(RESET)): "; \
+		echo -n "Maximum reservation duration in hours [72]: "; \
 		read MAX_DURATION; \
 		if [ -z "$$MAX_DURATION" ]; then \
 			MAX_DURATION="72"; \

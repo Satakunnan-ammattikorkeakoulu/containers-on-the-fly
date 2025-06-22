@@ -28,15 +28,14 @@ The installation is split into two parts: **main server** and **container server
 
 ### Installing Main Server
 
-If you wish to install the **main server** which contains the web interface, database, local docker registry, then follow these steps:
+Main server contains the web interface, database, local docker registry. Follow these steps to install the main server:
 
-1. Create a fresh Ubuntu 24.04 server (NOTE! It is required to use Ubuntu version 24.04)
-2. Enable all connections to that server. This means that if you have some external firewall (like Azure firewall) before your server, you should allow all connections from that firewall to your main server. The main server will automatically configure the UFW firewall and handle the firewall tasks.
-3. [Install the Main Server](#automatic-installation-main-server)
-4. [Install the Container Server](#automatic-installation-container-server)
-5. [Create reservable containers (images)](#creating-reservable-containers)
+1. Create a fresh `Ubuntu 24.04` server (NOTE! It is required to use Ubuntu version 24.04)
+2. [Install the Main Server](#automatic-installation-main-server)
+3. [Install the Container Server](#automatic-installation-container-server)
+4. [Create reservable containers (images)](#creating-reservable-containers)
 
-Default admin and a regular user accounts are added to the system automatically, if the backend setting `addTestDataInDevelopment` is set to true (true by default). The accounts are as follows:
+By default, the setting `ADD_TEST_DATA` is set to true, which sets up the server machine, adds default docker images and adds default admin and a regular user accounts to the system automatically. The default accounts are as follows:
 
 ```
 username: admin@foo.com
@@ -50,7 +49,7 @@ password: test
 
 #### Settings or Application Updates
 
-If you change any setting files in the ``user_config/`` folder or run ``git pull`` to update the application, just run these commands again to apply the settings and to restart the servers in the main server:
+If you change any settings in the ``user_config/settings`` file or run ``git pull`` to update the application, just run these commands again to apply the settings and to restart the servers in the main server:
 
 ```
 make start-main-server
@@ -77,7 +76,7 @@ make start-docker-utility
 
 ### Automatic Installation: Main Server
 
-> Heads up! The automatic installation script for the **main server** only works with Ubuntu Linux 24.04. It is HIGHLY RECOMMENDED to use a fresh Ubuntu installation, due to various software being installed and configured. For any other operating system, the installation procedure is required to be conducted manually (#manual-installation-main-server).
+> Heads up! The automatic installation script for the **main server** only works with Ubuntu Linux 24.04. It is HIGHLY RECOMMENDED (or even mandatory) to use a fresh Ubuntu installation, due to various software being installed and configured. For any other operating system, the installation procedure is required to be conducted manually (#manual-installation-main-server).
 
 Before proceeding, make sure you are logged in as the user with which you want to setup the Main Server. The user should have sudo permissions. For example: `containeruser`. Root user is not recommended to be used.
 
@@ -88,29 +87,18 @@ The installation procedure of the Main Server (web servers, database, local Dock
 Suppose you have an external firewall in front of your server (for example, you have the server hosted on an Azure VM, Google Cloud VM, Amazon VM, or any other hardware firewall in front of your server). In that case, you need to open these ports at least to be allowed into the server:
 
 - `5000` (TCP/HTTP, for Docker Registry on the main server)
-- `80` and `443` for HTTP / HTTPS connection to the server web interface
+- `80` and `443` for HTTP / HTTPS connection to the server web interface and possible Let's Encrypt SSL certificate renewal
 - `2000-3000` (default) or the range of ports from which you want to host the reserved servers, which can be configured in the settings file. These services can be any, usually SSH, but could be HTTP, HTTPS, etc...
-
-#### Copy Configurations
-
-Copy the settings files from `user_config/examples` to `user_config` folder. If you do not require an SSL certificate (your web interface is accessed using the HTTP protocol), then copy the `nginx_settings.conf` file. If you plan to use an SSL certificate (your web server will be accessed using the HTTPS protocol) then copy the file `nginx_settings_ssl.conf`.
-
-#### Create Configurations
-
-After copying the files, make configurations to the files. The files to configure are:
-
-- `user_config/settings`: The main settings file. You should at least review and configure the settings here.
-- `user_config/backend_settings.json`: Settings for the backend (web api) of the web interface. Would be good to review this file for any extra configurations.
-- `user_config/frontend_settings.js`: Settings for the frontend of the web interface. Might not require any extra configurations.
-- `user_config/nginx_settings.conf`: Contains the configurations for the Nginx proxy server. Does not require any extra configurations.
 
 #### Setup the Main Server
 
-After the configurations are ready, start setting up the main server and it's dependencies with:
+Start setting up the main server and it's dependencies with:
 
 ```bash
 sudo make setup-main-server
 ```
+
+> Note that after the initial setup the script asks you to review the ``user_config/settings`` file. You should do it before you finish the installation.
 
 #### Start the Main Server
 
@@ -124,30 +112,21 @@ That's it! Now you should be able to access the web interface using a browser. T
 
 ### Automatic Installation: Container Server
 
-> The automatic installation of the Container Server has been at least tested with with Ubuntu Linux and MacOS and should work with other Unix systems. If you encounter any problems in the installation, then review the make commands to run from the Makefile and manually run the commands.
+> Heads up! The automatic installation script for the **container server** only works with Ubuntu Linux 24.04. It is HIGHLY RECOMMENDED (or even mandatory) to use a fresh Ubuntu installation, due to various software being installed and configured. For any other operating system, the installation procedure is required to be conducted manually (#manual-installation-container-server).
 
 Before proceeding, make sure you are logged in as the user with which you want to setup the Main Server. The user should have sudo permissions. For example: `containeruser`. Root user is not recommended to be used.
 
 The installation procedure of the Container Server is as follows:
 
-#### Copy Configurations
-
-Copy the settings files `user_config/examples/settings` and `user_config/examples/backend_settings.json` to the `user_config` folder.
-
-#### Create Configurations
-
-After copying the files, make configurations to the files. The files to configure are:
-
-- `user_config/settings`: The main settings file. You should at least review and configure the settings here.
-- `user_config/backend_settings.json`: Settings for the backend (web api) of the web interface. Would be good to review this file for any extra configurations.
-
 #### Setup the Docker Utility
 
-After the configurations are ready, set up the docker utility with:
+Set up the docker utility with:
 
 ```bash
 sudo make setup-docker-utility
 ```
+
+> Note that after the initial setup the script asks you to review the ``user_config/settings`` file. You should do it before you finish the installation.
 
 #### Start Docker Utility
 
@@ -158,70 +137,6 @@ make start-docker-utility
 ```
 
 That's it! If the container crashes or something happens to the utility, then you should only need to run the `make start-docker-utility` command again.
-
-### Manual Installation: Main Server
-
-The installation procedure of the Main Server (web servers, database, local Docker registry) is as follows:
-
-##### Install Dependencies
-
-Install:
-- Python
-- Pip
-- Nginx
-- MariaDB
-- pm2 Process Manager
-- NPM & NodeJS (version 20)
-
-##### Configure the Dependencies
-
-Set MariaDB to launch at startup.
-
-In MariaDB, create a database and a user that has access to it.
-
-Disable the default nginx site:
-```
-sudo rm /etc/nginx/sites-enabled/default
-```
-
-Add custom nginx configurations to the nginx file:
-```
-sudo sed -i "/http {/a \\    include /path/to/your/user_config/nginx_settings.conf;" /path/to/your/user_config/nginx_settings.conf
-```
-
-##### Copy Configurations
-
-Copy the settings files from `user_config/examples` to `user_config` folder. If you do not require an SSL certificate (your web interface is accessed using the HTTP protocol), then copy the `nginx_settings.conf` file. If you plan to use an SSL certificate (your web server will be accessed using the HTTPS protocol) then copy the file `nginx_settings_ssl.conf`.
-
-##### Create Configurations
-
-After copying the files, make configurations to the files. The files to configure are:
-
-- `user_config/settings`: The main settings file. You should at least review and configure the settings here.
-- `user_config/backend_settings.json`: Settings for the backend (web api) of the web interface. Would be good to review this file for any extra configurations.
-- `user_config/frontend_settings.js`: Settings for the frontend of the web interface. Might not require any extra configurations.
-- `user_config/nginx_settings.conf`: Contains the configurations for the Nginx proxy server. Does not require any extra configurations.
-
-##### LDPA Setup
-
-If you wish to use LDAP for the login, then configure the LDAP in the `user_config/backend_settings.json` file with these settings:
-
-```json
-    "login": {
-      ... previous settings
-      "ldap": {
-        "ldap_url": "ldaps://your-ldap-server-address",
-        "usernameFormat": "{username}@ad.local",
-        "passwordFormat": "{password}",
-        "ldapDomain": "dc=ad,dc=local",
-        "searchMethod": "(sAMAccountName={username})",
-        "accountField": "sAMAccountName",
-        "emailField": "mail"
-      }
-    },
-```
-
-Make sure to set your settings in those configurations. It is trying to authenticate with the `mail` field coming from the LDAP in that case.
 
 ##### Start the Servers
 
@@ -234,6 +149,10 @@ make start-main-server
 That's it! Now you should be able to access the web interface using a browser. There will be more information printed on your console after running the `make start-main-server` command.
 
 ## Additional Tasks
+
+### LDPA Setup
+
+If you wish to use LDAP for the login, then configure the LDAP in the ``user_config/settings`` file. Example settings are commented in the file.
 
 ### Creating Reservable Containers
 Using the admin interface, user can add new containers. These containers still require an image added to it manually.

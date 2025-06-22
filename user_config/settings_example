@@ -133,6 +133,17 @@ DOCKER_MOUNT_GROUP="docker"
 # If "ldap", logins are done against an (external) LDAP server
 LOGIN_TYPE="password"
 
+# Below are the settings for LDAP authentication, which you can use if you want to use LDAP for authentication.
+# LDAP settings
+# LOGIN_TYPE="ldap"
+# LDAP_URL="ldaps://your-ldap-server-address"
+# LDAP_USERNAME_FORMAT="{username}@ad.local"
+# LDAP_PASSWORD_FORMAT="{password}"
+# LDAP_DOMAIN="dc=ad,dc=local"
+# LDAP_SEARCH_METHOD="(sAMAccountName={username})"
+# LDAP_ACCOUNT_FIELD="sAMAccountName"
+# LDAP_EMAIL_FIELD="mail"
+
 # If enabled, user email will need to be found in Whitelist table in the server to login.
 USE_WHITELIST=false
 

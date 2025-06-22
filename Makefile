@@ -225,10 +225,10 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "  - Timezone: $(GREEN)$$TIMEZONE_INPUT$(RESET)"; \
 		echo "  - Reservation Duration: $(GREEN)$$MIN_DURATION - $$MAX_DURATION hours$(RESET)"; \
 		echo ""; \
-		echo "$(BOLD)$(GREEN)Next steps:"; \
-		echo "1. Please review the $(BOLD)user_config/settings$(RESET)$(GREEN) file to verify your settings"; \
+		echo "$(GREEN)$(BOLD)Next steps:$(RESET)"; \
+		echo "$(GREEN)1. Please review the $(BOLD)user_config/settings$(RESET)$(GREEN) file to verify your settings"; \
 		echo "2. Run $(BOLD)sudo make setup-main-server$(RESET)$(GREEN) again and finish the installation"; \
-		echo "Note: The error message below is expected and can be ignored.$(RESET)"; \
+		echo "\nNote: The error message below is expected and can be ignored.$(RESET)"; \
 		touch .settings_just_created; \
 		exit 1; \
 	fi

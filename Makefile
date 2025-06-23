@@ -345,11 +345,14 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	@cd webapp/frontend && pm2 restart frontend 2>/dev/null || pm2 start "npm run production" --name frontend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@cd webapp/backend && pm2 restart backend 2>/dev/null || pm2 start "$(PYTHON) main.py" --name backend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save
-	@URL=$$(grep '"url"' webapp/backend/settings.json | sed 's/.*"url": "\(.*\)".*/\1/') && \
+	@URL=$$(grep -o '"url": "[^"]*"' webapp/backend/settings.json | cut -d'"' -f4) && \
 	echo "" && \
-	echo "$(GREEN)Web servers (nginx proxy, frontend, backend) have been started / restarted!$(RESET)" && \
-	echo "Access the launched web interface at: $(GREEN)$$URL$(RESET) (it can take several seconds for the server to launch)" && \
-	echo "You can view any logs (errors) using the $(GREEN)make logs$(RESET) command."
+	echo "$(GREEN)$(BOLD)Servers started/restarted!$(RESET)" && \
+	echo "Access at: $(GREEN)$(BOLD)$$URL$(RESET) (can take some time for the server to start)" && \
+	echo "View logs: $(GREEN)$(BOLD)make logs$(RESET)" && \
+	echo "" && \
+	echo "$(GREEN)Note:$(RESET) Run this task again after changing settings or pulling updates to restart servers and apply changes." && \
+	echo ""
 
 setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
 	@chmod +x scripts/install_docker_dependencies.bash

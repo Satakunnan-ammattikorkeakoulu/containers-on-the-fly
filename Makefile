@@ -366,7 +366,7 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo "* If you have not yet setup the Docker utility, run $(GREEN)$(BOLD)make setup-docker-utility$(RESET) to start setting it up.$(RESET)" && \
 	echo ""
 
-setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
+setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
 	@echo "Verifying Docker registry connectivity..."
 	@REGISTRY_ADDRESS=$$(grep '"registryAddress"' webapp/backend/settings.json | sed 's/.*"registryAddress": "\(.*\)".*/\1/' 2>/dev/null) && \
 	SERVER_IP=$$(grep '"serverIp"' webapp/backend/settings.json | sed 's/.*"serverIp": "\(.*\)".*/\1/' 2>/dev/null) && \
@@ -642,7 +642,7 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			\
 			echo ""; \
 			echo "$(GREEN)$(BOLD)Database Connection Details:$(RESET)"; \
-			echo "These must match the database configuration on your main server."; \
+			echo "These must match the database configuration on your main server. You can review them in the main server user_config/settings file."; \
 			echo -n "Database name (or empty for $(GREEN)containerfly$(RESET)): "; \
 			read DB_NAME; \
 			if [ -z "$$DB_NAME" ]; then \

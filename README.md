@@ -13,14 +13,42 @@ Originally created in Satakunta University of Applied Sciences to give AI studen
 
 ## Screenshots
 
-![image](https://user-images.githubusercontent.com/3810422/197523647-d603e763-fbf8-42cc-b211-1ca1343e2550.png)
+*Click on any image to view full size*
 
-![image](https://user-images.githubusercontent.com/3810422/197523917-237ddd05-d35c-4d76-917d-963e60144598.png)
+<a href="https://user-images.githubusercontent.com/3810422/197523647-d603e763-fbf8-42cc-b211-1ca1343e2550.png" target="_blank">
+  <img width="500" alt="Login interface" src="https://user-images.githubusercontent.com/3810422/197523647-d603e763-fbf8-42cc-b211-1ca1343e2550.png">
+</a>
+<a href="https://user-images.githubusercontent.com/3810422/197524065-1a6b3452-e449-458c-a703-edd699a43f3b.png" target="_blank">
+  <img width="500" alt="Container reservation form" src="https://user-images.githubusercontent.com/3810422/197524065-1a6b3452-e449-458c-a703-edd699a43f3b.png">
 
-![image](https://user-images.githubusercontent.com/3810422/197524065-1a6b3452-e449-458c-a703-edd699a43f3b.png)
+<a href="https://user-images.githubusercontent.com/3810422/197523917-237ddd05-d35c-4d76-917d-963e60144598.png" target="_blank">
+  <img width="500" alt="User reservations dashboard" src="https://user-images.githubusercontent.com/3810422/197523917-237ddd05-d35c-4d76-917d-963e60144598.png">
+</a>
+</a>
+<a href="https://github.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/assets/3810422/b548cb69-7226-4d14-8363-ddcdb6dc244b" target="_blank">
+  <img width="500" alt="Admin interface" src="https://github.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/assets/3810422/b548cb69-7226-4d14-8363-ddcdb6dc244b">
+</a>
 
-![image](https://github.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/assets/3810422/b548cb69-7226-4d14-8363-ddcdb6dc244b)
-
+# Table of Contents
+   * [Getting Started](#getting-started)
+      * [Installing Main Server](#installing-main-server)
+         * [Settings or Application Updates](#settings-or-application-updates)
+      * [Installing Additional Container Servers](#installing-additional-container-servers)
+         * [Settings or Application Updates](#settings-or-application-updates-1)
+      * [Automatic Installation: Main Server](#automatic-installation-main-server)
+         * [Open Ports](#open-ports)
+         * [Setup the Main Server](#setup-the-main-server)
+         * [Start the Main Server](#start-the-main-server)
+      * [Automatic Installation: Container Server](#automatic-installation-container-server)
+         * [Setup the Docker Utility](#setup-the-docker-utility)
+         * [Start Docker Utility](#start-docker-utility)
+            * [Start the Servers](#start-the-servers)
+   * [Additional Tasks](#additional-tasks)
+      * [Creating Reservable Containers](#creating-reservable-containers)
+      * [LDPA Setup](#ldpa-setup)
+   * [Technical Details](#technical-details)
+      * [Frontend](#frontend)
+      * [Backend](#backend)
 
 ## Getting Started
 
@@ -155,10 +183,6 @@ That's it! Now you should be able to access the web interface using a browser. T
 
 ## Additional Tasks
 
-### LDPA Setup
-
-If you wish to use LDAP for the login, then configure the LDAP in the ``user_config/settings`` file. Example settings are commented in the file.
-
 ### Creating Reservable Containers
 Using the admin interface, user can add new containers. These containers still require an image added to it manually.
 
@@ -175,6 +199,10 @@ docker push YOUR_DOCKER_REGISTRY_IP:5000/IMAGENAME:latest
 ```
 
 And that's it. Now you should be able to reserve the container!
+
+### LDPA Setup
+
+If you wish to use LDAP for the login, then configure the LDAP in the ``user_config/settings`` file. Example settings are commented in the file.
 
 ## Technical Details
 

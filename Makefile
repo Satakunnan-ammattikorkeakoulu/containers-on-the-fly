@@ -295,7 +295,7 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 
 # Production targets
 
-setup-main-server: check-os-ubuntu interactive-settings-creation ## Installs and configures all dependencies for main server. Call 'make start-main-server' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
+setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings ## Installs and configures all dependencies for main server. Call 'make start-main-server' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
 	@echo ""
 	@echo "$(GREEN)$(BOLD)Firewall Configuration$(RESET)"
 	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."

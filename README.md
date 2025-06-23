@@ -45,7 +45,7 @@ Originally created in Satakunta University of Applied Sciences to give AI studen
             * [Start the Servers](#start-the-servers)
    * [Additional Tasks](#additional-tasks)
       * [Creating Reservable Containers](#creating-reservable-containers)
-      * [LDAP Authentication Setup](#ldpa-authentication-setup)
+      * [LDAP Authentication Setup](#ldap-authentication-setup)
    * [Technical Details](#technical-details)
       * [Frontend](#frontend)
       * [Backend](#backend)

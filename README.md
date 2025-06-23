@@ -63,7 +63,7 @@ The container server is recommended to be installed to the same server as the ma
 
 Main server contains the web interface, database, local docker registry. Follow these steps to install the main server:
 
-1. Create a fresh `Ubuntu 24.04` server (NOTE! It is required to use Ubuntu version 24.04)
+1. Create a fresh `Ubuntu 24.04` server (NOTE! It is **mandatory** to use Ubuntu version 24.04)
 2. [Install the Main Server](#automatic-installation-main-server)
 3. [Install the Container Server](#automatic-installation-container-server)
 4. [Create reservable containers (images)](#creating-reservable-containers)
@@ -94,7 +94,7 @@ make start-docker-utility
 Note that this step is only required to be followed if you have multiple (physical) servers and want reservations to be made from multiple different servers.
 
 After the main server has been installed, it is possible to create more Ubuntu 24.04 servers in which the **container server** can run and from which container reservations can be made. If you wish to expand the main server with additional container servers, then in another servers you need to:
-1. Create fresh Ubuntu 24.04 server to be used with additional container server (Note! Ubuntu version 24.04 is required to be used)
+1. Create a fresh `Ubuntu 24.04` server (NOTE! It is **mandatory** to use Ubuntu version 24.04)
 2. Run command ``sudo make allow-container-server IP=CONTAINER_SERVER_IP`` in the main server to allow connection from the container server to the main server
 3. Add the computer through the main server admin web interface (Computers -> Create new Computer). Make a note of the name that you set for the computer as you need to configure this in your settings file.
 4. [Install the Container Server](#automatic-installation-container-server) in the new server

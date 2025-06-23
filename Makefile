@@ -333,11 +333,20 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	# Install frontend dependencies as the original user
 	cd webapp/frontend && sudo -u $${SUDO_USER:-$(shell whoami)} npm install
 
-	@echo "\n$(GREEN)The main server has been setup.\n"
-	@echo "NEXT STEPS:"
-	@echo "1. Run command $(BOLD)pm2 startup$(RESET)$(GREEN) and copy/paste the command that is outputted to your terminal."
-	@echo "2. Restart the machine for all the changes to take effect."
-	@echo "3. Run $(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
+	# Automatically configure pm2 startup
+	@echo "$(GREEN)Configuring pm2 startup...$(RESET)"
+	@PM2_STARTUP_CMD=$$(sudo -u $${SUDO_USER:-$(shell whoami)} pm2 startup 2>/dev/null | grep "sudo env" || true); \
+	if [ -n "$$PM2_STARTUP_CMD" ]; then \
+		echo "Executing pm2 startup command automatically...$(RESET)"; \
+		eval "$$PM2_STARTUP_CMD"; \
+		echo "PM2 startup configured successfully.$(RESET)"; \
+	else \
+		echo "$(RED)Could not automatically configure pm2 startup. Please run 'pm2 startup' manually and run the output command at the end of the output.$(RESET)"; \
+	fi
+
+	@echo "\n$(GREEN)$(BOLD)The main server has been setup.$(RESET)\n"
+	@echo "$(GREEN)$(BOLD)NEXT STEPS:$(RESET)"
+	@echo "$(GREEN)* Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
 
 start-main-server: verify-config-file-exists apply-settings ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend.
 	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile
@@ -352,6 +361,9 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo "View logs: $(GREEN)$(BOLD)make logs$(RESET)" && \
 	echo "" && \
 	echo "$(GREEN)Note:$(RESET) Run this task again after changing settings or pulling updates to restart servers and apply changes." && \
+	echo "" && \
+	echo "Potential Next Step:" && \
+	echo "* If you have not yet setup the Docker utility, run $(GREEN)$(BOLD)make setup-docker-utility$(RESET) to start setting it up.$(RESET)" && \
 	echo ""
 
 setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
@@ -359,10 +371,22 @@ setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-dock
 	@./scripts/install_docker_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
 	@usermod -aG docker $${SUDO_USER:-$(shell whoami)}
+
+	# Automatically configure pm2 startup
+	@echo "$(GREEN)Configuring pm2 startup...$(RESET)"
+	@PM2_STARTUP_CMD=$$(sudo -u $${SUDO_USER:-$(shell whoami)} pm2 startup 2>/dev/null | grep "sudo env" || true); \
+	if [ -n "$$PM2_STARTUP_CMD" ]; then \
+		echo "Executing pm2 startup command automatically...$(RESET)"; \
+		eval "$$PM2_STARTUP_CMD"; \
+		echo "PM2 startup configured successfully.$(RESET)"; \
+	else \
+		echo "$(RED)Could not automatically configure pm2 startup. Please run 'pm2 startup' manually and run the output command at the end of the output.$(RESET)"; \
+	fi
+
 	@echo "\n$(GREEN)The Docker utility has been setup.\n"
 	@echo "NEXT STEPS:"
-	@echo "1. Run command $(BOLD)pm2 startup$(RESET)$(GREEN) and copy/paste the command to your terminal."
-	@echo "2. Restart the machine for all the changes to take effect.$(RESET)\n"
+	@echo "1. Restart the machine for all the changes to take effect."
+	@echo "2. Run $(BOLD)make start-docker-utility$(RESET)$(GREEN) to start the Docker utility.$(RESET)\n"
 
 start-docker-utility: apply-settings ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background.
 	@echo "Verifying that connection to the database can be made using the webapp/backend/settings.json setting engineUri..."

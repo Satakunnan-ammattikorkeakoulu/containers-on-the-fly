@@ -45,7 +45,7 @@ Originally created in Satakunta University of Applied Sciences to give AI studen
             * [Start the Servers](#start-the-servers)
    * [Additional Tasks](#additional-tasks)
       * [Creating Reservable Containers](#creating-reservable-containers)
-      * [LDPA Setup](#ldpa-setup)
+      * [LDAP Authentication Setup](#ldpa-authentication-setup)
    * [Technical Details](#technical-details)
       * [Frontend](#frontend)
       * [Backend](#backend)
@@ -206,7 +206,7 @@ docker push YOUR_DOCKER_REGISTRY_IP:5000/IMAGENAME:latest
 
 And that's it. Now you should be able to reserve the container!
 
-### LDPA Setup
+### LDAP Authentication Setup
 
 If you wish to use LDAP for the login, then configure the LDAP in the ``user_config/settings`` file. Example settings are commented in the file.
 

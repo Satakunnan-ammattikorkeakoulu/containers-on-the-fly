@@ -436,6 +436,7 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 			echo "$(RED)ERROR: Cannot connect to Docker registry at $$REGISTRY_IP:$$REGISTRY_PORT$(RESET)"; \
 			echo "$(RED)Please ensure:$(RESET)"; \
 			echo "  - The main server is running and accessible"; \
+			echo "  - Main server has allowed access using command $(BOLD)make allow-container-server IP=<IP_ADDRESS_OF_THIS_CONTAINER_SERVER>$(RESET)"; \
 			echo "  - Port $$REGISTRY_PORT is open on the main server"; \
 			echo "  - The Docker registry service is running on the main server\n"; \
 			exit 1; \

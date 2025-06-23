@@ -149,6 +149,12 @@ That's it! Now you should be able to access the web interface using a browser. T
 
 Before proceeding, make sure you are logged in as the user with which you want to setup the Main Server. The user should have sudo permissions. For example: `containeruser`. Root user is not recommended to be used.
 
+#### Open Ports
+
+Suppose you have an external firewall in front of your server (for example, you have the server hosted on an Azure VM, Google Cloud VM, Amazon VM, or any other hardware firewall in front of your server). In that case, you need to open these ports at least to be allowed into the server:
+
+- `2000-3000` (default) or the range of ports from which you want to host the reserved servers, which can be configured in the settings file. These services can be any, usually SSH, but could be HTTP, HTTPS, etc...
+
 The installation procedure of the Container Server is as follows:
 
 #### Setup the Docker Utility

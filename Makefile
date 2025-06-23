@@ -378,6 +378,11 @@ start-docker-utility: apply-settings ## Starts the Docker utility. The utility s
 	@pm2 save
 	@echo "\n$(GREEN)Docker utility is now running.$(RESET)"
 	@echo "Containers will now automatically start, stop, and restart on this server."
+	@echo ""
+	@echo "View logs: $(GREEN)$(BOLD)make logs$(RESET)"
+	@echo ""
+	@echo "$(GREEN)Note:$(RESET) Run this task again after changing settings or pulling updates to restart the Docker utility and apply changes."
+	@echo ""
 
 allow-container-server: check-os-ubuntu ## Allows an external given container server to access this main server. For example: make allow-container-server IP=62.151.151.151
 	@if [ -z "$(IP)" ]; then \

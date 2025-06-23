@@ -1,7 +1,7 @@
 # Containers on the Fly
 > Instant Up. Timely Down. Simple web-based Docker container reservation platform.
 
-<img width="500" alt="image 7" src="https://github.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/assets/3810422/61a9d8d4-c788-4528-a245-3930543a7a34">
+<img width="200" alt="image 7" src="https://github.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/assets/3810422/61a9d8d4-c788-4528-a245-3930543a7a34">
 
 ## Description
 
@@ -16,17 +16,17 @@ Originally created in Satakunta University of Applied Sciences to give AI studen
 *Click on any image to view full size*
 
 <a href="https://user-images.githubusercontent.com/3810422/197523647-d603e763-fbf8-42cc-b211-1ca1343e2550.png" target="_blank">
-  <img width="500" alt="Login interface" src="https://user-images.githubusercontent.com/3810422/197523647-d603e763-fbf8-42cc-b211-1ca1343e2550.png">
+  <img width="380" alt="Login interface" src="https://user-images.githubusercontent.com/3810422/197523647-d603e763-fbf8-42cc-b211-1ca1343e2550.png">
 </a>
 <a href="https://user-images.githubusercontent.com/3810422/197524065-1a6b3452-e449-458c-a703-edd699a43f3b.png" target="_blank">
-  <img width="500" alt="Container reservation form" src="https://user-images.githubusercontent.com/3810422/197524065-1a6b3452-e449-458c-a703-edd699a43f3b.png">
+  <img width="380" alt="Container reservation form" src="https://user-images.githubusercontent.com/3810422/197524065-1a6b3452-e449-458c-a703-edd699a43f3b.png">
 
 <a href="https://user-images.githubusercontent.com/3810422/197523917-237ddd05-d35c-4d76-917d-963e60144598.png" target="_blank">
-  <img width="500" alt="User reservations dashboard" src="https://user-images.githubusercontent.com/3810422/197523917-237ddd05-d35c-4d76-917d-963e60144598.png">
+  <img width="380" alt="User reservations dashboard" src="https://user-images.githubusercontent.com/3810422/197523917-237ddd05-d35c-4d76-917d-963e60144598.png">
 </a>
 </a>
 <a href="https://github.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/assets/3810422/b548cb69-7226-4d14-8363-ddcdb6dc244b" target="_blank">
-  <img width="500" alt="Admin interface" src="https://github.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/assets/3810422/b548cb69-7226-4d14-8363-ddcdb6dc244b">
+  <img width="380" alt="Admin interface" src="https://github.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/assets/3810422/b548cb69-7226-4d14-8363-ddcdb6dc244b">
 </a>
 
 # Table of Contents

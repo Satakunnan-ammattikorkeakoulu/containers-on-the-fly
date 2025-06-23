@@ -212,7 +212,11 @@ If you wish to use LDAP for the login, then configure the LDAP in the ``user_con
 
 ## Technical Details
 
-![image](/additional_documentation/architecture.png)
+* Click on the image to view full size
+
+<a href="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/architecture.png" target="_blank">
+  <img width="600" alt="Login interface" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/architecture.png">
+</a>
 
 The app is split into two projects: frontend and backend. The frontend can be located from `webapp/frontend` and backend from `webapp/backend`. Both the frontend and backend will run on different ports. The backend also includes a separate script for starting and stopping the reserved containers, called `dockerUtil.py`.
 

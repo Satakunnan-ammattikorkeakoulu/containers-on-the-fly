@@ -295,7 +295,7 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 
 # Production targets
 
-setup-main-server: check-os-ubuntu interactive-settings-creation ## Installs and configures all dependencies for main server. Only works on Ubuntu 24.04. If using any other operating system, then refer to the readme documentation for manual steps. Call 'make start-main-server' after setup.
+setup-main-server: check-os-ubuntu interactive-settings-creation ## Installs and configures all dependencies for main server. Call 'make start-main-server' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
 	@echo ""
 	@echo "$(GREEN)$(BOLD)Firewall Configuration$(RESET)"
 	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
@@ -354,7 +354,7 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo "$(GREEN)Note:$(RESET) Run this task again after changing settings or pulling updates to restart servers and apply changes." && \
 	echo ""
 
-setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
+setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed

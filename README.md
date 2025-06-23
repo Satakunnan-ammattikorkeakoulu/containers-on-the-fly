@@ -24,7 +24,12 @@ Originally created in Satakunta University of Applied Sciences to give AI studen
 
 ## Getting Started
 
-The installation is split into two parts: **main server** and **container server**. The main server contains the web interface, database, local docker registry. The container server contains the script that handles starting, stopping, and restarting the reserved containers.
+The installation is split into two parts: **main server** and **container server**.
+
+- **Main server** contains the web interface, database, and local docker registry.
+- **Container server** handles starting, stopping, and restarting the reserved containers.
+
+The container server is recommended to be installed to the same server as the main server, at least on the first install. This single-server setup is the easiest way to get up and running quickly, requiring minimal configuration and infrastructure. The container server can be deployed later to dedicated separate servers that will be used specifically for hosting and managing reserved containers. You can have unlimited amount of separate container servers from which users can reserve virtual machines.
 
 ### Installing Main Server
 

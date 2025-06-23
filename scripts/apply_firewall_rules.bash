@@ -23,6 +23,8 @@ yes | sudo ufw reset
 # Add UFW rules
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
+sudo ufw allow from 127.0.0.1 to any port $DOCKER_REGISTRY_PORT
+sudo ufw allow from $SERVER_IP_ADDRESS to any port $DOCKER_REGISTRY_PORT
 sudo ufw route allow from $SERVER_IP_ADDRESS to any port $DOCKER_REGISTRY_PORT
 sudo ufw route deny from any to any port $DOCKER_REGISTRY_PORT
 sudo ufw allow 22

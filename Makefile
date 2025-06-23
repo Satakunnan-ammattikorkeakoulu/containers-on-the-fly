@@ -367,9 +367,9 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo ""
 
 setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
-	@echo "\nVerifying Docker registry connection..."
-	@SERVER_IP=$$(grep '"serverIp"' webapp/backend/settings.json | sed 's/.*"serverIp": "\(.*\)".*/\1/' 2>/dev/null) && \
-	REGISTRY_ADDRESS=$$(grep '"registryAddress"' webapp/backend/settings.json | sed 's/.*"registryAddress": "\(.*\)".*/\1/' 2>/dev/null) && \
+	@echo "Verifying Docker registry connectivity..."
+	@REGISTRY_ADDRESS=$$(grep '"registryAddress"' webapp/backend/settings.json | sed 's/.*"registryAddress": "\(.*\)".*/\1/' 2>/dev/null) && \
+	SERVER_IP=$$(grep '"serverIp"' webapp/backend/settings.json | sed 's/.*"serverIp": "\(.*\)".*/\1/' 2>/dev/null) && \
 	if [ -z "$$SERVER_IP" ]; then \
 		echo "$(RED)Error: serverIp not found in webapp/backend/settings.json$(RESET)"; \
 		echo "$(RED)Make sure apply-settings has run successfully.$(RESET)"; \
@@ -379,21 +379,69 @@ setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-dock
 		echo "$(RED)Error: registryAddress not found in webapp/backend/settings.json$(RESET)"; \
 		exit 1; \
 	fi; \
-	REGISTRY_PORT=$$(echo "$$REGISTRY_ADDRESS" | sed 's/.*://' | sed 's/[^0-9]//g'); \
-	if [ -z "$$REGISTRY_PORT" ]; then \
+	# Handle unsubstituted variables in registryAddress \
+	if echo "$$REGISTRY_ADDRESS" | grep -q '\$$'; then \
+		echo "Registry address contains unsubstituted variables: $$REGISTRY_ADDRESS"; \
+		echo "Using serverIp ($$SERVER_IP) for registry connectivity test..."; \
+		REGISTRY_IP="$$SERVER_IP"; \
 		REGISTRY_PORT="5000"; \
+	else \
+		REGISTRY_IP=$$(echo "$$REGISTRY_ADDRESS" | sed 's/:.*//' 2>/dev/null); \
+		REGISTRY_PORT=$$(echo "$$REGISTRY_ADDRESS" | sed 's/.*://' | sed 's/[^0-9]//g'); \
+		if [ -z "$$REGISTRY_PORT" ]; then \
+			REGISTRY_PORT="5000"; \
+		fi; \
 	fi; \
-	echo "Testing connection to Docker registry at $$SERVER_IP:$$REGISTRY_PORT..."; \
-	if ! timeout 10 nc -z $$SERVER_IP $$REGISTRY_PORT 2>/dev/null; then \
-		echo ""; \
-		echo "$(RED)ERROR: Cannot connect to Docker registry at $$SERVER_IP:$$REGISTRY_PORT$(RESET)"; \
-		echo "$(RED)Please ensure:$(RESET)"; \
-		echo "  - The main server is running and accessible"; \
-		echo "  - Port $$REGISTRY_PORT is open on the main server"; \
-		echo "  - The Docker registry service is running on the main server\n"; \
-		exit 1; \
-	fi; \
-	echo "$(GREEN)Docker registry connection successful.$(RESET)"
+	if [ "$$REGISTRY_IP" = "$$SERVER_IP" ] || [ "$$REGISTRY_IP" = "localhost" ] || [ "$$REGISTRY_IP" = "127.0.0.1" ]; then \
+		echo "Testing registry port accessibility on main server ($$REGISTRY_IP:$$REGISTRY_PORT)..."; \
+		# Check if something is already running on the port \
+		if timeout 2 bash -c "echo >/dev/tcp/$$REGISTRY_IP/$$REGISTRY_PORT" 2>/dev/null; then \
+			echo "$(GREEN)Registry port is accessible and has a service already running.$(RESET)"; \
+		else \
+			echo "No service detected on port $$REGISTRY_PORT. Starting temporary test service..."; \
+			# Start a simple HTTP server for testing port accessibility \
+			$(PYTHON) -m http.server $$REGISTRY_PORT --bind 0.0.0.0 >/dev/null 2>&1 & \
+			TEST_SERVICE_PID=$$!; \
+			sleep 3; \
+			# Test connection to our temporary HTTP server \
+			if timeout 5 curl -s "http://$$REGISTRY_IP:$$REGISTRY_PORT" >/dev/null 2>&1; then \
+				echo "$(GREEN)Registry port $$REGISTRY_PORT is accessible! Test successful.$(RESET)"; \
+				TEST_RESULT="success"; \
+			else \
+				EXIT_CODE=$$?; \
+				if [ $$EXIT_CODE -eq 124 ]; then \
+					echo "\n$(RED)ERROR: Connection to registry port $$REGISTRY_PORT timed out.$(RESET)"; \
+					echo "$(RED)This likely means the port is blocked by firewall or filtered.$(RESET)"; \
+				else \
+					echo "\n$(RED)ERROR: Cannot connect to registry port $$REGISTRY_PORT (connection refused).$(RESET)"; \
+					echo "$(RED)This could mean the port is closed or blocked by firewall.$(RESET)"; \
+				fi; \
+				echo "$(RED)Please ensure:$(RESET)"; \
+				echo "  - Port $$REGISTRY_PORT is open on this server"; \
+				echo "  - Firewall rules allow access to port $$REGISTRY_PORT\n"; \
+				TEST_RESULT="failed"; \
+			fi; \
+			# Stop the test service \
+			kill $$TEST_SERVICE_PID 2>/dev/null || true; \
+			wait $$TEST_SERVICE_PID 2>/dev/null || true; \
+			echo "Temporary test service stopped."; \
+			if [ "$$TEST_RESULT" = "failed" ]; then \
+				exit 1; \
+			fi; \
+		fi; \
+	else \
+		echo "Testing connection to remote Docker registry at $$REGISTRY_IP:$$REGISTRY_PORT..."; \
+		if ! timeout 10 nc -z $$REGISTRY_IP $$REGISTRY_PORT 2>/dev/null; then \
+			echo ""; \
+			echo "$(RED)ERROR: Cannot connect to Docker registry at $$REGISTRY_IP:$$REGISTRY_PORT$(RESET)"; \
+			echo "$(RED)Please ensure:$(RESET)"; \
+			echo "  - The main server is running and accessible"; \
+			echo "  - Port $$REGISTRY_PORT is open on the main server"; \
+			echo "  - The Docker registry service is running on the main server\n"; \
+			exit 1; \
+		fi; \
+		echo "$(GREEN)Docker registry connection successful.$(RESET)"; \
+	fi
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed

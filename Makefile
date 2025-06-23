@@ -367,6 +367,33 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo ""
 
 setup-docker-utility: check-os-ubuntu verify-config-file-exists interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
+	@echo "\nVerifying Docker registry connection..."
+	@SERVER_IP=$$(grep '"serverIp"' webapp/backend/settings.json | sed 's/.*"serverIp": "\(.*\)".*/\1/' 2>/dev/null) && \
+	REGISTRY_ADDRESS=$$(grep '"registryAddress"' webapp/backend/settings.json | sed 's/.*"registryAddress": "\(.*\)".*/\1/' 2>/dev/null) && \
+	if [ -z "$$SERVER_IP" ]; then \
+		echo "$(RED)Error: serverIp not found in webapp/backend/settings.json$(RESET)"; \
+		echo "$(RED)Make sure apply-settings has run successfully.$(RESET)"; \
+		exit 1; \
+	fi; \
+	if [ -z "$$REGISTRY_ADDRESS" ]; then \
+		echo "$(RED)Error: registryAddress not found in webapp/backend/settings.json$(RESET)"; \
+		exit 1; \
+	fi; \
+	REGISTRY_PORT=$$(echo "$$REGISTRY_ADDRESS" | sed 's/.*://' | sed 's/[^0-9]//g'); \
+	if [ -z "$$REGISTRY_PORT" ]; then \
+		REGISTRY_PORT="5000"; \
+	fi; \
+	echo "Testing connection to Docker registry at $$SERVER_IP:$$REGISTRY_PORT..."; \
+	if ! timeout 10 nc -z $$SERVER_IP $$REGISTRY_PORT 2>/dev/null; then \
+		echo ""; \
+		echo "$(RED)ERROR: Cannot connect to Docker registry at $$SERVER_IP:$$REGISTRY_PORT$(RESET)"; \
+		echo "$(RED)Please ensure:$(RESET)"; \
+		echo "  - The main server is running and accessible"; \
+		echo "  - Port $$REGISTRY_PORT is open on the main server"; \
+		echo "  - The Docker registry service is running on the main server\n"; \
+		exit 1; \
+	fi; \
+	echo "$(GREEN)Docker registry connection successful.$(RESET)"
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed

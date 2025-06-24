@@ -91,7 +91,7 @@ echo "Starting NVIDIA Container Toolkit installation and configuration..."
 
 echo "1/5: Adding NVIDIA Container Toolkit repository..."
 
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -y -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
 if [ $? -ne 0 ]; then
     echo "Error: Failed to download GPG key for NVIDIA Container Toolkit. Exiting."
     exit 1

@@ -1,0 +1,156 @@
+# .cursorrules for Containers on the Fly - Docker Container Reservation Platform
+
+## Project Overview
+# This is a web-based Docker container reservation platform that allows users to reserve
+# Docker containers with specific hardware resources and time slots. The system supports
+# multiple container servers and includes admin management tools.
+
+## Architecture
+# - Frontend: Vue.js 2 with Vuetify (webapp/frontend/)
+# - Backend: Python 3 with FastAPI + SQLAlchemy (webapp/backend/) 
+# - Database: MariaDB with defined schema
+# - Reverse Proxy: Caddy with automatic HTTPS
+# - Process Management: pm2
+# - Container Management: Docker + custom utility
+# - Build System: Make with comprehensive automation
+
+## Development Guidelines
+
+### Code Style & Patterns
+# Python Backend:
+- Use FastAPI with dependency injection patterns
+- Follow SQLAlchemy ORM patterns established in database.py
+- Maintain separation: endpoints/ -> responses/ -> helpers/tables/ -> database
+- Use session management with context managers: `with Session() as session:`
+- Follow existing authentication patterns using ForceAuthentication() and CheckToken()
+- Use the Response helper for consistent API responses
+- Keep admin routes separate in adminRoutes/ subdirectory
+- Use proper type hints where established
+
+# Vue.js Frontend:
+- Follow Vue 2 composition patterns with Vuetify components
+- Maintain store/ pattern with Vuex for state management
+- Keep components organized: admin/, user/, global/
+- Follow existing routing patterns in router/
+- Use layouts/ for page structure
+- Maintain responsive design with Vuetify grid system
+
+### Security Focus
+# Since security fixes are planned, always consider:
+- Authentication and authorization on ALL endpoints
+- Input validation and sanitization
+- SQL injection prevention (use SQLAlchemy properly)
+- XSS prevention in frontend
+- CSRF protection
+- Rate limiting considerations
+- Proper error handling without information leakage
+- Session management and token validation
+- Admin-only endpoint protection with role checking
+
+### Database Patterns
+# When making database changes:
+- Update models in database.py first
+- Add helper functions in helpers/tables/
+- Use proper relationships and foreign keys
+- Maintain existing naming conventions (camelCase for columns)
+- Add migrations carefully since this affects production data
+- Follow existing patterns for created/updated timestamps
+- Use proper indexing for performance
+
+### API Endpoint Patterns
+# For new endpoints:
+- Use FastAPI router patterns in endpoints/
+- Implement business logic in endpoints/responses/
+- Use OAuth2PasswordBearer for authentication
+- Apply ForceAuthentication() decorator with proper role checking
+- Separate admin endpoints into adminRoutes/
+- Use proper HTTP status codes and error handling
+- Follow existing parameter and response patterns
+
+### Frontend Development
+# For UI enhancements:
+- Use Vuetify components consistently
+- Follow existing color schemes and styling
+- Maintain mobile responsiveness
+- Use proper Vue 2 patterns (avoid Vue 3 syntax)
+- Keep components modular and reusable
+- Follow existing naming conventions for components and files
+- Use proper error handling and loading states
+
+### Configuration Management
+# Settings and configuration:
+- Use user_config/settings for environment-specific settings
+- Update templates in user_config/templates/ when needed
+- Use scripts/apply_settings.py for template processing
+- Follow existing Make targets for deployment
+- Consider backwards compatibility for existing installations
+
+### Development Commands
+# Common development workflows:
+- `make start-dev-frontend` - Start frontend development server
+- `make start-dev-backend` - Start backend development server  
+- `make start-dev-docker-utility` - Start Docker utility for testing
+- `make apply-settings` - Apply configuration changes
+- `make logs` - View server logs
+- `make status` - Check server status
+
+### File Organization
+# Maintain existing structure:
+webapp/
+├── backend/
+│   ├── endpoints/ (API routes)
+│   ├── helpers/ (business logic)
+│   ├── docker/ (container management)
+│   └── database.py (ORM models)
+└── frontend/
+    ├── src/
+    │   ├── components/ (Vue components)
+    │   ├── pages/ (route components)
+    │   ├── layouts/ (page layouts)
+    │   └── store/ (Vuex store)
+
+### Dependencies
+# Backend: FastAPI, SQLAlchemy, PyMySQL, ldap3, python-on-whales
+# Frontend: Vue.js 2, Vuetify, Vue Router, Vuex, axios, dayjs
+
+### Performance & Scalability
+# Consider these factors:
+- Database connection pooling is configured
+- Container port range management (2000-3000 default)
+- Multiple server support architecture
+- Resource allocation and hardware specs handling
+- Session timeout and cleanup
+
+### Docker & Deployment
+# Container and deployment patterns:
+- Use existing Dockerfile patterns
+- Follow Docker registry patterns (port 5000)
+- Maintain pm2 process management patterns
+- Use Caddy configuration patterns for reverse proxy
+- Consider firewall rules when adding new services
+- Test with Ubuntu 24.04 deployment environment
+
+### Common Gotchas
+# Avoid these issues:
+- Don't break the Make-based deployment system
+- Maintain backwards compatibility for user_config/settings
+- Don't hardcode ports or IPs (use configuration)
+- Be careful with database schema changes in production
+- Maintain existing authentication patterns
+- Don't break the multi-server architecture support
+- Consider timezone handling for scheduling
+- Validate hardware resource allocations properly
+
+### Future-Proofing
+# When implementing new features:
+- Design for multi-tenancy where applicable
+- Maintain audit trails for admin actions
+- Design for horizontal scaling
+- Consider monitoring and logging needs
+- Plan for backup and recovery scenarios
+
+### Git Patterns
+# Never commit:
+- user_config/settings (use settings_example)
+- webapp/backend/settings.json
+- Any files with real passwords/tokens

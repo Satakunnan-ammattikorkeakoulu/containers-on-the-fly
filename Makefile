@@ -199,7 +199,8 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			sed -i "s/TIMEZONE=\"Europe\/Helsinki\"/TIMEZONE=\"$$TIMEZONE_INPUT\"/" user_config/settings; \
 			sed -i "s/RESERVATION_MIN_DURATION=5/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
 			sed -i "s/RESERVATION_MAX_DURATION=72/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
-			sed -i "s/MARIADB_DB_USER_PASSWORD=\"password\"/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD\"/" user_config/settings; \
+			DB_PASSWORD_ESCAPED=$$(printf '%s\n' "$$DB_PASSWORD" | sed 's/[\/&]/\\&/g'); \
+			sed -i "s/^MARIADB_DB_USER_PASSWORD=.*/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD_ESCAPED\"/" user_config/settings; \
 		else \
 			sed -i "s/SERVER_IP_ADDRESS=\"[^\"]*\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HOST=\"[^\"]*\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
@@ -208,6 +209,8 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			sed -i "s/TIMEZONE=\"[^\"]*\"/TIMEZONE=\"$$ESCAPED_TIMEZONE\"/" user_config/settings; \
 			sed -i "s/RESERVATION_MIN_DURATION=[^[:space:]]*/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
 			sed -i "s/RESERVATION_MAX_DURATION=[^[:space:]]*/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
+			DB_PASSWORD_ESCAPED=$$(printf '%s\n' "$$DB_PASSWORD" | sed 's/[\/&]/\\&/g'); \
+			sed -i "s/^MARIADB_DB_USER_PASSWORD=.*/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD_ESCAPED\"/" user_config/settings; \
 		fi; \
 		chown $${SUDO_USER:-$(shell whoami)}:$${SUDO_USER:-$(shell whoami)} user_config/settings 2>/dev/null || true; \
 		\
@@ -674,7 +677,8 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			sed -i "s/MARIADB_SERVER_ADDRESS=\"[^\"]*\"/MARIADB_SERVER_ADDRESS=\"$$MAIN_SERVER_IP\"/" user_config/settings; \
 			sed -i "s/MARIADB_DB_NAME=\"[^\"]*\"/MARIADB_DB_NAME=\"$$DB_NAME\"/" user_config/settings; \
 			sed -i "s/MARIADB_DB_USER=\"[^\"]*\"/MARIADB_DB_USER=\"$$DB_USER\"/" user_config/settings; \
-			sed -i "s/MARIADB_DB_USER_PASSWORD=\"[^\"]*\"/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD\"/" user_config/settings; \
+			DB_PASSWORD_ESCAPED=$$(printf '%s\n' "$$DB_PASSWORD" | sed 's/[\/&]/\\&/g'); \
+			sed -i "s/^MARIADB_DB_USER_PASSWORD=.*/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD_ESCAPED\"/" user_config/settings; \
 		fi; \
 		\
 		chown $${SUDO_USER:-$(shell whoami)}:$${SUDO_USER:-$(shell whoami)} user_config/settings 2>/dev/null || true; \

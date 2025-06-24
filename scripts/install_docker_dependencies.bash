@@ -13,10 +13,10 @@ CURRENT_USER=$(whoami)
 # Load settings
 source "$CURRENT_DIR/user_config/settings"
 
-# Check that the server IP address is set
-if [ "$SERVER_IP_ADDRESS" = "YOUR_IP_HERE" ] || [ -z "$SERVER_IP_ADDRESS" ]; then
-    echo -e "\n${RED}Error: SERVER_IP_ADDRESS is not configured in user_config/settings${RESET}"
-    echo "Please run 'make setup-docker-utility' first to configure the server IP address."
+# Check that the docker registry address is set
+if [ "$DOCKER_REGISTRY_ADDRESS" = "YOUR_IP_HERE" ] || [ -z "$DOCKER_REGISTRY_ADDRESS" ]; then
+    echo -e "\n${RED}Error: DOCKER_REGISTRY_ADDRESS is not configured in user_config/settings${RESET}"
+    echo "Please run 'make setup-docker-utility' first to configure the Docker registry address."
     exit 1
 fi
 
@@ -168,7 +168,7 @@ DOCKER_DAEMON_CONFIG="/etc/docker/daemon.json"
 
 # Add 127.0.0.1 and server IP address to docker insecure-registry configuration.
 # This allows (insecure) HTTP protocol to be used for pushing / pulling with the given IP addresses.
-INSECURE_REGISTRY="${SERVER_IP_ADDRESS}:${DOCKER_REGISTRY_PORT}"
+INSECURE_REGISTRY="${DOCKER_REGISTRY_ADDRESS}:${DOCKER_REGISTRY_PORT}"
 LOCAL_REGISTRY="127.0.0.1:${DOCKER_REGISTRY_PORT}"
 DOCKER_DAEMON_CONFIG="/etc/docker/daemon.json"
 update_docker_daemon_config() {

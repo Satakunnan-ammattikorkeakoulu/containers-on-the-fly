@@ -13,6 +13,13 @@ CURRENT_USER=$(whoami)
 # Load settings
 source "$CURRENT_DIR/user_config/settings"
 
+# Check that the server IP address is set
+if [ "$SERVER_IP_ADDRESS" = "YOUR_IP_HERE" ] || [ -z "$SERVER_IP_ADDRESS" ]; then
+    echo -e "\n${RED}Error: SERVER_IP_ADDRESS is not configured in user_config/settings${RESET}"
+    echo "Please run 'make setup-docker-utility' first to configure the server IP address."
+    exit 1
+fi
+
 # Check if the script is run as root
 if [ "$EUID" -ne 0 ]; then
     echo -e "\n${RED}This script must be run with sudo privileges. Please run this with sudo permissions. Exiting.${RESET}"

@@ -354,8 +354,11 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	@echo "$(GREEN)* Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
 
 start-main-server: verify-config-file-exists apply-settings ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend.
+	@echo "Moving Caddyfile to /etc/caddy/Caddyfile"
 	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile
+	@echo "Reloading Caddy"
 	@sudo systemctl reload caddy
+	@echo "Starting frontend and backend"
 	@cd webapp/frontend && pm2 restart frontend 2>/dev/null || pm2 start "npm run production" --name frontend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@cd webapp/backend && pm2 restart backend 2>/dev/null || pm2 start "$(PYTHON) main.py" --name backend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save

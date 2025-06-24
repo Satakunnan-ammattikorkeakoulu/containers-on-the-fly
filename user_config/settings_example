@@ -23,10 +23,16 @@ SERVER_IP_ADDRESS="YOUR_IP_HERE"
 # Examples: "yourdomain.com", "localhost", "192.168.1.100"
 MAIN_SERVER_WEB_HOST="YOUR_IP_OR_DOMAIN_HERE"
 
-# Enable automatic HTTPS with Let's Encrypt certificates for main server web interface
-# Only main server, separate container servers can leave this empty.
+# Enable HTTPS for main server web interface
 # Set to true if you have a real domain name, false for local/IP-based access
+# Only main server, separate container servers can leave this empty.
 MAIN_SERVER_WEB_HTTPS=false
+
+# Use custom SSL certificates instead of Let's Encrypt automatic certificates
+# Set to true to use custom certificates, false to use Let's Encrypt to automatically generate certificates.
+CUSTOM_SSL_ENABLED=false
+CUSTOM_SSL_CERT_PATH="/path/to/your/certificate.crt"
+CUSTOM_SSL_KEY_PATH="/path/to/your/private.key"
 
 # Minimum and maximum duration (in hours) for a container reservation.
 # Default: minimum 5, maximum 72

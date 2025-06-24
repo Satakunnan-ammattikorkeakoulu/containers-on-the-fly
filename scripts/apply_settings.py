@@ -122,17 +122,39 @@ class SettingsApplier:
     def _process_caddy_settings(self):
         """Process Caddy-specific settings based on HTTPS configuration."""
         enable_https = self.settings.get('MAIN_SERVER_WEB_HTTPS', 'false').lower() == 'true'
+        custom_ssl = self.settings.get('CUSTOM_SSL_ENABLED', 'false').lower() == 'true'
         domain = self.settings.get('MAIN_SERVER_WEB_HOST', 'localhost')
         
         if enable_https:
-            # HTTPS mode - automatic certificates
-            self.settings['CADDY_SITE_BLOCK'] = domain
-            self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode)"
-            self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
-            print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
+            if custom_ssl:
+                # HTTPS mode with custom certificates
+                cert_path = self.settings.get('CUSTOM_SSL_CERT_PATH', '')
+                key_path = self.settings.get('CUSTOM_SSL_KEY_PATH', '')
+                
+                if cert_path and key_path:
+                    self.settings['CADDY_SITE_BLOCK'] = f"{domain}"
+                    self.settings['CADDY_TLS_CONFIG'] = f"\n\ttls {cert_path} {key_path}"
+                    self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode - custom certificates)"
+                    self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
+                    print(f"Caddy mode: HTTPS enabled for domain '{domain}' (custom SSL certificates)")
+                else:
+                    print(f"Warning: Custom SSL enabled but certificate paths not specified. Falling back to Let's Encrypt.")
+                    self.settings['CADDY_SITE_BLOCK'] = domain
+                    self.settings['CADDY_TLS_CONFIG'] = ""
+                    self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode - Let's Encrypt fallback)"
+                    self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
+                    print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
+            else:
+                # HTTPS mode - automatic Let's Encrypt certificates
+                self.settings['CADDY_SITE_BLOCK'] = domain
+                self.settings['CADDY_TLS_CONFIG'] = ""
+                self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode - Let's Encrypt)"
+                self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
+                print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
         else:
-            # HTTP mode - no automatic certificates
+            # HTTP mode - no SSL certificates
             self.settings['CADDY_SITE_BLOCK'] = f"http://{domain}"
+            self.settings['CADDY_TLS_CONFIG'] = ""
             self.settings['CADDY_SECURITY_HEADERS'] = " (HTTP mode)"
             self.settings['CADDY_HSTS_HEADER'] = ""
             print(f"Caddy mode: HTTP only for '{domain}' (no SSL certificates)")

@@ -1,4 +1,4 @@
-{{CADDY_SITE_BLOCK}} {
+{{CADDY_SITE_BLOCK}} {{{CADDY_TLS_CONFIG}}
 	# API routes
 	handle /api* {
 		reverse_proxy localhost:{{BACKEND_PORT}}

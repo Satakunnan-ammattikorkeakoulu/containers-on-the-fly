@@ -152,9 +152,12 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		fi; \
 		\
 		echo ""; \
-		echo "$(GREEN)$(BOLD)Enable Automatic HTTPS with Let's Encrypt for Web Interface?$(RESET)"; \
+		echo "$(GREEN)$(BOLD)Enable HTTPS for Web Interface?$(RESET)"; \
+		echo "By default, HTTPS uses Let's Encrypt for automatic certificate management."; \
+		echo "You can also configure custom SSL certificates in the settings file if needed."; \
+		echo ""; \
 		echo "Choose 'y' if you have a real domain name that resolves to this server."; \
-		echo "Choose 'n' if you specified an IP address in the step above or do not want to setup ssl/https."; \
+		echo "Choose 'n' if you specified an IP address in the step above or do not want HTTPS."; \
 		echo -n "Enable HTTPS? (y/n) (or empty for $(GREEN)n$(RESET)): "; \
 		read HTTPS_CHOICE; \
 		if [ "$$HTTPS_CHOICE" = "y" ] || [ "$$HTTPS_CHOICE" = "Y" ]; then \

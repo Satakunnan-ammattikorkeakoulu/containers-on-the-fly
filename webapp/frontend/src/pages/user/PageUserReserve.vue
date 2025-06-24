@@ -549,7 +549,7 @@
           "computerId": computerId,
           "duration": duration,
           "containerId": this.container,
-          "hardwareSpecs": {...this.selectedHardwareSpecs},
+          "hardwareSpecs": JSON.stringify(this.selectedHardwareSpecs),
           "adminReserveUserEmail": this.adminReserveUserEmail ? this.adminReserveUserEmail : ""
         }
 

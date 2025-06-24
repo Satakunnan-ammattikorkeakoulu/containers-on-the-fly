@@ -140,6 +140,7 @@ DOCKER_USER_MOUNT_LOCATION=""
 #]'
 
 # User in the host system who will own the mounted folder. This needs to exist.
+# This is usually the current user which has the server running or root.
 # Default value: "root"
 DOCKER_MOUNT_USER="root"
 

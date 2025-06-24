@@ -16,6 +16,7 @@ import sys
 import shutil
 import subprocess
 from pathlib import Path
+import json
 
 
 class SettingsApplier:
@@ -118,7 +119,23 @@ class SettingsApplier:
                     int(self.settings[setting])
                 except ValueError:
                     print(f"Warning: {setting} should be numeric, got: {self.settings[setting]}")
-                    
+        
+        # Process DOCKER_EXTRA_MOUNTS JSON string
+        docker_extra_mounts = self.settings.get('DOCKER_EXTRA_MOUNTS', '')
+        if docker_extra_mounts:
+            try:
+                # Validate that it's proper JSON
+                json.loads(docker_extra_mounts)
+                # Store the JSON string directly for template replacement
+                self.settings['DOCKER_EXTRA_MOUNTS_JSON'] = docker_extra_mounts
+                print(f"Processed DOCKER_EXTRA_MOUNTS: {len(json.loads(docker_extra_mounts))} mount(s) configured")
+            except json.JSONDecodeError as e:
+                print(f"Warning: DOCKER_EXTRA_MOUNTS contains invalid JSON: {e}")
+                self.settings['DOCKER_EXTRA_MOUNTS_JSON'] = '[]'
+        else:
+            # Default to empty array
+            self.settings['DOCKER_EXTRA_MOUNTS_JSON'] = '[]'
+        
     def _process_caddy_settings(self):
         """Process Caddy-specific settings based on HTTPS configuration."""
         enable_https = self.settings.get('MAIN_SERVER_WEB_HTTPS', 'false').lower() == 'true'

@@ -122,6 +122,23 @@ DOCKER_SERVER_NAME="server1"
 # It could then store user test@foo.com data as: "/home/containerfly/persistent_mounts/test_foo_com/"
 DOCKER_USER_MOUNT_LOCATION=""
 
+# With this you can also mount one or many additional folders to the container.
+# mountLocation is the full path to the location on the host system where the folder is located.
+# containerFolderName is the name of the folder in the container under the user. For example: /home/user/playground
+# readOnly is a boolean value. If set to true, the folder will be mounted as read-only.
+#DOCKER_EXTRA_MOUNTS='[
+#  {
+#    "mountLocation": "/home/containerfly/playground",
+#    "containerFolderName": "playground", 
+#    "readOnly": false
+#  },
+#  {
+#    "mountLocation": "/home/containerfly/shared_read_only",
+#    "containerFolderName": "read_only",
+#    "readOnly": true
+#  }
+#]'
+
 # User in the host system who will own the mounted folder. This needs to exist.
 # Default value: "root"
 DOCKER_MOUNT_USER="root"

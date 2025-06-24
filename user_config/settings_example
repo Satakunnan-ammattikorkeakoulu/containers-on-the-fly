@@ -143,12 +143,12 @@ DOCKER_MOUNT_GROUP="docker"
 
 # Authentication method: "password" or "ldap"
 # If "password", logins are executed directly with email and password combination
-# If "ldap", logins are done against an (external) LDAP server
+# If "LDAP", logins are done against an (external) LDAP server
 LOGIN_TYPE="password"
 
 # Below are the settings for LDAP authentication, which you can use if you want to use LDAP for authentication.
 # LDAP settings
-# LOGIN_TYPE="ldap"
+# LOGIN_TYPE="LDAP"
 # LDAP_URL="ldaps://your-ldap-server-address"
 # LDAP_USERNAME_FORMAT="{username}@ad.local"
 # LDAP_PASSWORD_FORMAT="{password}"

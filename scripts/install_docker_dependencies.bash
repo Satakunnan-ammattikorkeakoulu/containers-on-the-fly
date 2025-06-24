@@ -84,11 +84,62 @@ if ! command -v pm2 > /dev/null; then
     pm2 startup
 fi
 
-# Install Nvidia Docker Runtime
+# Exit immediately if a command exits with a non-zero status.
+set -e
 
+echo "Starting NVIDIA Container Toolkit installation and configuration..."
 
+echo "1/5: Adding NVIDIA Container Toolkit repository..."
+
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -y -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to download GPG key for NVIDIA Container Toolkit. Exiting."
+    exit 1
+fi
+echo "NVIDIA GPG key added."
+
+curl -s -L "https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list" | \
+    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list > /dev/null
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to add NVIDIA Container Toolkit repository list. Exiting."
+    exit 1
+fi
+echo "NVIDIA Container Toolkit repository added."
+
+echo "2/5: Updating apt package cache..."
 sudo apt-get update
-sudo apt-get install -y nvidia-docker2
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to update apt cache. Exiting."
+    exit 1
+fi
+echo "Apt cache updated."
+
+echo "3/5: Installing nvidia-container-toolkit..."
+sudo apt-get install -y nvidia-container-toolkit
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to install nvidia-container-toolkit. Exiting."
+    exit 1
+fi
+echo "nvidia-container-toolkit installed."
+
+echo "4/5: Configuring Docker to use the NVIDIA runtime..."
+sudo nvidia-ctk runtime configure --runtime=docker
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to configure Docker runtime. Exiting."
+    exit 1
+fi
+echo "Docker runtime configured for NVIDIA."
+
+echo "5/5: Restarting Docker daemon..."
+sudo systemctl restart docker
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to restart Docker daemon. Exiting."
+    exit 1
+fi
+echo "Docker daemon restarted successfully."
+
+echo "NVIDIA Container Toolkit installation and configuration complete."
 
 # Make sure that apt autoupdate does not update Nvidia drivers.
 # If it would update, then Nvidia drivers will stop working until system has been rebooted (not good!)

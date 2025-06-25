@@ -13,11 +13,16 @@ CURRENT_USER=$(whoami)
 # Load settings
 source "$CURRENT_DIR/user_config/settings"
 
-# Check that the docker registry address is set
+# Handle DOCKER_REGISTRY_ADDRESS default - use SERVER_IP_ADDRESS if empty or placeholder
 if [ "$DOCKER_REGISTRY_ADDRESS" = "YOUR_IP_HERE" ] || [ -z "$DOCKER_REGISTRY_ADDRESS" ]; then
-    echo -e "\n${RED}Error: DOCKER_REGISTRY_ADDRESS is not configured in user_config/settings${RESET}"
-    echo "Please run 'make setup-docker-utility' first to configure the Docker registry address."
-    exit 1
+    if [ -n "$SERVER_IP_ADDRESS" ] && [ "$SERVER_IP_ADDRESS" != "YOUR_IP_HERE" ]; then
+        echo -e "\n${YELLOW}DOCKER_REGISTRY_ADDRESS not set, using SERVER_IP_ADDRESS: $SERVER_IP_ADDRESS${RESET}"
+        DOCKER_REGISTRY_ADDRESS="$SERVER_IP_ADDRESS"
+    else
+        echo -e "\n${RED}Error: Both DOCKER_REGISTRY_ADDRESS and SERVER_IP_ADDRESS are not configured in user_config/settings${RESET}"
+        echo "Please run the setup process first to configure the server IP address."
+        exit 1
+    fi
 fi
 
 # Check if the script is run as root

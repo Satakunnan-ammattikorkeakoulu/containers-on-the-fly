@@ -542,7 +542,13 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		EXISTING_SERVER_NAME=$$(grep "^DOCKER_SERVER_NAME=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2); \
 		EXISTING_PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2); \
-		EXISTING_REGISTRY_ADDRESS=$$(grep "^DOCKER_REGISTRY_ADDRESS=" user_config/settings | cut -d'=' -f2); \
+		EXISTING_REGISTRY_ADDRESS=$$(grep "^DOCKER_REGISTRY_ADDRESS=" user_config/settings | cut -d'=' -f2 | tr -d '"'); \
+		# Show effective registry address (use SERVER_IP if registry address is empty) \
+		if [ -z "$$EXISTING_REGISTRY_ADDRESS" ] || [ "$$EXISTING_REGISTRY_ADDRESS" = '""' ]; then \
+			EFFECTIVE_REGISTRY_ADDRESS="$$EXISTING_SERVER_IP (default)"; \
+		else \
+			EFFECTIVE_REGISTRY_ADDRESS=$$EXISTING_REGISTRY_ADDRESS; \
+		fi; \
 		EXISTING_DB_ADDRESS=$$(grep "^MARIADB_SERVER_ADDRESS=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_DB_NAME=$$(grep "^MARIADB_DB_NAME=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_DB_USER=$$(grep "^MARIADB_DB_USER=" user_config/settings | cut -d'"' -f2); \
@@ -551,7 +557,7 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		echo "  - Current Server IP: $(GREEN)$$EXISTING_SERVER_IP$(RESET)"; \
 		echo "  - Docker Server Name: $(GREEN)$$EXISTING_SERVER_NAME$(RESET)"; \
 		echo "  - Port Range: $(GREEN)$$EXISTING_PORT_START - $$EXISTING_PORT_END$(RESET)"; \
-		echo "  - Registry Address: $(GREEN)$$EXISTING_REGISTRY_ADDRESS$(RESET)"; \
+		echo "  - Registry Address: $(GREEN)$$EFFECTIVE_REGISTRY_ADDRESS$(RESET)"; \
 		echo "  - Registry Port: $(GREEN)5000$(RESET)"; \
 		echo "  - Database Address: $(GREEN)$$EXISTING_DB_ADDRESS$(RESET)"; \
 		echo "  - Database Name: $(GREEN)$$EXISTING_DB_NAME$(RESET)"; \
@@ -703,5 +709,28 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		echo "$(GREEN)$(BOLD)!! IMPORTANT !!$(RESET) Please take a moment to manually review the full $(GREEN)user_config/settings$(RESET) file"; \
 		echo "as it contains additional optional settings that you may want to configure for your setup."; \
 		echo ""; \
-		exec $(MAKE) interactive-docker-settings-creation; \
+		echo "What would you like to do?"; \
+		echo "  $(GREEN)1$(RESET) - Proceed with Docker utility installation using these settings"; \
+		echo "  $(GREEN)2$(RESET) - Reconfigure Docker utility settings again"; \
+		echo "  $(GREEN)3$(RESET) - Cancel setup"; \
+		echo -n "Enter your choice (1, 2, or 3): "; \
+		read FINAL_CHOICE; \
+		\
+		case "$$FINAL_CHOICE" in \
+			1) \
+				echo "Proceeding with Docker utility installation..."; \
+				;; \
+			2) \
+				echo "Starting reconfiguration again..."; \
+				exec $(MAKE) interactive-docker-settings-creation; \
+				;; \
+			3) \
+				echo "Setup cancelled."; \
+				exit 1; \
+				;; \
+			*) \
+				echo "$(RED)Invalid choice. Setup cancelled.$(RESET)"; \
+				exit 1; \
+				;; \
+		esac; \
 	fi

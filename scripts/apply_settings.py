@@ -120,6 +120,13 @@ class SettingsApplier:
                 except ValueError:
                     print(f"Warning: {setting} should be numeric, got: {self.settings[setting]}")
         
+        # Handle DOCKER_REGISTRY_ADDRESS - use SERVER_IP_ADDRESS if empty
+        docker_registry_addr = self.settings.get('DOCKER_REGISTRY_ADDRESS', '').strip()
+        if not docker_registry_addr:
+            # Use SERVER_IP_ADDRESS if DOCKER_REGISTRY_ADDRESS is empty
+            self.settings['DOCKER_REGISTRY_ADDRESS'] = self.settings.get('SERVER_IP_ADDRESS', '')
+            print(f"DOCKER_REGISTRY_ADDRESS was empty, using SERVER_IP_ADDRESS: {self.settings['DOCKER_REGISTRY_ADDRESS']}")
+        
         # Process DOCKER_EXTRA_MOUNTS JSON string
         docker_extra_mounts = self.settings.get('DOCKER_EXTRA_MOUNTS', '')
         if docker_extra_mounts:

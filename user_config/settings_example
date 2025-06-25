@@ -94,10 +94,10 @@ SMTP_PASSWORD="abc123"
 ###
 
 # In what address is the Docker registry (local Docker image distribution) running.
-# If this is your main server, then just leave the default value and port here.
-# Otherwise, if this is a separate container server, then insert the IP and port of the main server here. 
-# For example: "51.115.104.42" and 5000.
-DOCKER_REGISTRY_ADDRESS=$SERVER_IP_ADDRESS
+# If this is your main server, then just leave it as empty and it will use the server IP address by default.
+# Otherwise, if this is a separate container server, then insert the IP of the main server here.
+# For example: "", or "51.115.104.42".
+DOCKER_REGISTRY_ADDRESS=""
 
 # Docker registry port (change only if you know what you are doing)
 DOCKER_REGISTRY_PORT=5000

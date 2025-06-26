@@ -300,7 +300,7 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 
 # Production targets
 
-setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings ## Installs and configures all dependencies for main server. Call 'make start-main-server' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
+setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings ## Run this with sudo. Installs and configures all dependencies for main server. Call 'make start-main-server' after setup.
 	@echo ""
 	@echo "$(GREEN)$(BOLD)Firewall Configuration$(RESET)"
 	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
@@ -353,7 +353,7 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	@echo "$(GREEN)$(BOLD)NEXT STEPS:$(RESET)"
 	@echo "$(GREEN)* Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
 
-start-main-server: verify-config-file-exists apply-settings ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend.
+start-main-server: verify-config-file-exists apply-settings ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
 	@echo "Moving Caddyfile to /etc/caddy/Caddyfile"
 	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile
 	@echo "Reloading Caddy"
@@ -371,10 +371,10 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo "$(GREEN)Note:$(RESET) Run this task again after changing settings or pulling updates to restart servers and apply changes." && \
 	echo "" && \
 	echo "Potential Next Step:" && \
-	echo "* If you have not yet setup the Docker utility, run $(GREEN)$(BOLD)make setup-docker-utility$(RESET) to start setting it up.$(RESET)" && \
+	echo "* If you have not yet setup the Docker utility, run $(GREEN)$(BOLD)sudo make setup-docker-utility$(RESET) to start setting it up.$(RESET)" && \
 	echo ""
 
-setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply-settings ## Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup. Call this again after changing settings or pulling updates to restart the servers and apply changes.
+setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
 	@echo "Verifying Docker registry connectivity..."
 	@REGISTRY_ADDRESS=$$(grep '"registryAddress"' webapp/backend/settings.json | sed 's/.*"registryAddress": "\(.*\)".*/\1/' 2>/dev/null) && \
 	SERVER_IP=$$(grep '"serverIp"' webapp/backend/settings.json | sed 's/.*"serverIp": "\(.*\)".*/\1/' 2>/dev/null) && \
@@ -472,7 +472,7 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 	@echo "1. Restart the machine for all the changes to take effect."
 	@echo "2. Run $(BOLD)make start-docker-utility$(RESET)$(GREEN) to start the Docker utility.$(RESET)\n"
 
-start-docker-utility: apply-settings ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background.
+start-docker-utility: apply-settings ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
 	@echo "Verifying that connection to the database can be made using the webapp/backend/settings.json setting engineUri..."
 	@CONNECTION_URI=$$(grep '"engineUri"' webapp/backend/settings.json | sed 's/.*"engineUri": "\(.*\)".*/\1/') && \
 	CONNECTION_OK=$$($(PYTHON) scripts/verify_db_connection.py "$$CONNECTION_URI") && \

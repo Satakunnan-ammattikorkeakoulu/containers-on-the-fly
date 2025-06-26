@@ -11,6 +11,11 @@ Users can login with username & password combination, or through LDAP. Includes 
 
 Originally created in Satakunta University of Applied Sciences to give AI students a solution to handle their AI calculating in a dedicated server.
 
+## Research & Publications
+
+This project has been featured in the following academic publications:
+- [Containers on the Fly: A Web-Based Docker Container Reservation Platform](https://ieeexplore.ieee.org/document/10569705) - IEEE Access, 2024
+
 ## Screenshots
 
 *Click on any image to view full size*
@@ -111,7 +116,7 @@ make start-docker-utility
 
 > Heads up! The automatic installation script for the **main server** only works with Ubuntu Linux 24.04. It is HIGHLY RECOMMENDED (or even mandatory) to use a fresh Ubuntu installation, due to various software being installed and configured.
 
-Before proceeding, make sure you are logged in as the user with which you want to setup the Main Server. The user should have sudo permissions. For example: `containeruser`. Root user is not recommended to be used.
+Before proceeding, make sure you are logged in as the user with which you want to setup the Main Server. The user should have sudo permissions. For example: `containeruser`. Do NOT install the script while logged in as the `root` user, this can cause security issues.
 
 The installation procedure of the Main Server (web servers, database, local Docker registry, setting up firewall) is as follows:
 
@@ -122,6 +127,13 @@ Suppose you have an external firewall in front of your server (for example, you 
 - `5000` (TCP/HTTP, for Docker Registry on the main server)
 - `80` and `443` for HTTP / HTTPS connection to the server web interface and possible Let's Encrypt SSL certificate renewal
 - `2000-3000` (default) or the range of ports from which you want to host the reserved servers, which can be configured in the settings file. These services can be any, usually SSH, but could be HTTP, HTTPS, etc...
+
+#### Install Make
+
+Install make through APT to run the make tasks:
+```
+sudo apt update && sudo apt install make
+```
 
 #### Setup the Main Server
 
@@ -147,7 +159,7 @@ That's it! Now you should be able to access the web interface using a browser. T
 
 > Heads up! The automatic installation script for the **container server** only works with Ubuntu Linux 24.04. It is HIGHLY RECOMMENDED (or even mandatory) to use a fresh Ubuntu installation, due to various software being installed and configured.
 
-Before proceeding, make sure you are logged in as the user with which you want to setup the Main Server. The user should have sudo permissions. For example: `containeruser`. Root user is not recommended to be used.
+Before proceeding, make sure you are logged in as the user with which you want to setup the Container Server. The user should have sudo permissions. For example: `containeruser`. Do NOT install the script while logged in as the `root` user, this can cause security issues.
 
 #### Open Ports
 
@@ -155,7 +167,12 @@ Suppose you have an external firewall in front of your server (for example, you 
 
 - `2000-3000` (default) or the range of ports from which you want to host the reserved servers, which can be configured in the settings file. These services can be any, usually SSH, but could be HTTP, HTTPS, etc...
 
-The installation procedure of the Container Server is as follows:
+#### Install Make
+
+Install make through APT to run the make tasks:
+```
+sudo apt update && sudo apt install make
+```
 
 #### Setup the Docker Utility
 

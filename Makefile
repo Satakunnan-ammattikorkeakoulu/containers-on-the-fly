@@ -304,7 +304,6 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	@echo ""
 	@echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"
 	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
-	# Force main server type for firewall configuration
 	@echo "true" > /tmp/containerfly_server_type
 	@echo "This will:"
 	@echo "  - Enable UFW firewall with secure defaults"
@@ -385,60 +384,61 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo ""
 
 setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
-	@echo ""
-	@echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"
-	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
 	@IS_MAIN_SERVER=$$(cat /tmp/containerfly_server_type 2>/dev/null || echo "true"); \
-	if [ "$$IS_MAIN_SERVER" = "true" ]; then \
-		echo "This will:"; \
-		echo "  - Enable UFW firewall with secure defaults"; \
-		echo "  - $(RED)BLOCK ALL incoming connections except:$(RESET)"; \
-		echo "    - SSH (22), HTTP (80), HTTPS (443)"; \
-		echo "    - Docker Registry (5000)"; \
-	else \
+	if [ "$$IS_MAIN_SERVER" = "false" ]; then \
+		echo ""; \
+		echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"; \
+		echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."; \
 		echo "This will:"; \
 		echo "  - Enable UFW firewall with secure defaults"; \
 		echo "  - $(RED)BLOCK ALL incoming connections except:$(RESET)"; \
 		echo "    - SSH (22)"; \
-	fi; \
-	PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "2000"); \
-	PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "3000"); \
-	echo "    - Container ports ($$PORT_START-$$PORT_END)"; \
-	ADDITIONAL_PORTS=$$(grep "^FIREWALL_ADDITIONAL_PORTS=" user_config/settings | cut -d'"' -f2 2>/dev/null || echo ""); \
-	if [ -n "$$ADDITIONAL_PORTS" ]; then \
-		echo "    - Additional ports ($$ADDITIONAL_PORTS)"; \
-	fi; \
-	echo "  - Secure Docker containers"; \
-	echo ""; \
-	echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing UFW firewall rules!"; \
-	echo ""; \
-	echo "Configure firewall rules automatically?"; \
-	echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"; \
-	echo "  $(GREEN)n$(RESET) - No, skip firewall configuration (not recommended)"; \
-	echo -n "Choice (y/n): "; \
-	read FIREWALL_CHOICE; \
-	echo ""; \
-	if [ "$$FIREWALL_CHOICE" = "y" ] || [ "$$FIREWALL_CHOICE" = "Y" ]; then \
-		echo "$(GREEN)Configuring firewall rules...$(RESET)"; \
-		$(MAKE) apply-firewall-rules; \
-		echo "$(GREEN)Firewall configuration completed.$(RESET)"; \
+		PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "2000"); \
+		PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "3000"); \
+		echo "    - Container ports ($$PORT_START-$$PORT_END)"; \
+		ADDITIONAL_PORTS=$$(grep "^FIREWALL_ADDITIONAL_PORTS=" user_config/settings | cut -d'"' -f2 2>/dev/null || echo ""); \
+		if [ -n "$$ADDITIONAL_PORTS" ]; then \
+			echo "    - Additional ports ($$ADDITIONAL_PORTS)"; \
+		fi; \
+		echo "  - Secure Docker containers"; \
+		echo ""; \
+		echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing UFW firewall rules!"; \
+		echo ""; \
+		echo "Configure firewall rules automatically?"; \
+		echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"; \
+		echo "  $(GREEN)n$(RESET) - No, skip firewall configuration (not recommended)"; \
+		echo -n "Choice (y/n): "; \
+		read FIREWALL_CHOICE; \
+		echo ""; \
+		if [ "$$FIREWALL_CHOICE" = "y" ] || [ "$$FIREWALL_CHOICE" = "Y" ]; then \
+			echo "$(GREEN)Configuring firewall rules...$(RESET)"; \
+			$(MAKE) apply-firewall-rules; \
+			echo "$(GREEN)Firewall configuration completed.$(RESET)"; \
+		else \
+			echo "$(RED)WARNING: Firewall not configured!$(RESET)"; \
+			echo "Your server may be vulnerable to unauthorized access."; \
+			echo "You can configure it later with: $(BOLD)make apply-firewall-rules$(RESET)"; \
+			echo -n "Press Enter to continue with setup anyway..."; \
+			read CONTINUE_ANYWAY; \
+		fi; \
+		echo ""; \
 	else \
-		echo "$(RED)WARNING: Firewall not configured!$(RESET)"; \
-		echo "Your server may be vulnerable to unauthorized access."; \
-		echo "You can configure it later with: $(BOLD)make apply-firewall-rules$(RESET)"; \
-		echo -n "Press Enter to continue with setup anyway..."; \
-		read CONTINUE_ANYWAY; \
-	fi; \
-	echo ""
+		echo ""; \
+		echo "$(GREEN)Skipping firewall configuration - already configured during main server setup.$(RESET)"; \
+		echo ""; \
+	fi
 
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
-	@usermod -aG docker $${SUDO_USER:-$(shell whoami)}
+	@REAL_USER=$${SUDO_USER:-$$(logname 2>/dev/null || echo $$(whoami))}; \
+	usermod -aG docker $$REAL_USER; \
+	echo "Added user $$REAL_USER to docker group"
 
 	# Automatically configure pm2 startup
 	@echo "$(GREEN)Configuring pm2 startup...$(RESET)"
-	@PM2_STARTUP_CMD=$$(sudo -u $${SUDO_USER:-$(shell whoami)} pm2 startup 2>/dev/null | grep "sudo env" || true); \
+	@REAL_USER=$${SUDO_USER:-$$(logname 2>/dev/null || echo $$(whoami))}; \
+	PM2_STARTUP_CMD=$$(sudo -u $$REAL_USER pm2 startup 2>/dev/null | grep "sudo env" || true); \
 	if [ -n "$$PM2_STARTUP_CMD" ]; then \
 		echo "Executing pm2 startup command automatically...$(RESET)"; \
 		eval "$$PM2_STARTUP_CMD"; \
@@ -713,19 +713,3 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			exit 1; \
 			;; \
 	esac
-
-# Configure MySQL connection limits and timeouts
-echo "Configuring MySQL connection limits and timeouts..."
-
-# Create the configuration file with proper permissions
-sudo tee /etc/mysql/conf.d/mysql.cnf > /dev/null <<EOF
-[mysqld]
-wait_timeout=240
-max_connections=2000
-EOF
-
-# Set proper ownership and permissions
-sudo chown root:root /etc/mysql/conf.d/mysql.cnf
-sudo chmod 644 /etc/mysql/conf.d/mysql.cnf
-
-echo -e "${GREEN}MySQL connection settings configured in /etc/mysql/conf.d/mysql.cnf${RESET}"

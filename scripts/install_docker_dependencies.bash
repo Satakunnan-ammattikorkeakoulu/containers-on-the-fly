@@ -8,7 +8,10 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 RESET='\033[0m'
 CURRENT_DIR=$(pwd)
-CURRENT_USER=$(whoami)
+
+# Robust user detection that works with sudo
+CURRENT_USER=${SUDO_USER:-$(logname 2>/dev/null || whoami)}
+echo "Detected user: $CURRENT_USER"
 
 # Load settings
 source "$CURRENT_DIR/user_config/settings"

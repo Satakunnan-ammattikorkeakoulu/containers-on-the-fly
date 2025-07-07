@@ -179,6 +179,47 @@ else
   echo -e "${GREEN}In mariadb/mysql, created the user ${MARIADB_DB_USER} and granted the user full access to the database ${MARIADB_DB_NAME}."
 fi
 
+# Configure MySQL connection limits and timeouts
+echo "Configuring MySQL connection limits and timeouts..."
+
+# Check if the MySQL configuration file already exists and has our settings
+MYSQL_CONF_FILE="/etc/mysql/conf.d/mysql.cnf"
+NEEDS_CONFIG=false
+
+if [ ! -f "$MYSQL_CONF_FILE" ]; then
+    echo "MySQL configuration file does not exist. Creating..."
+    NEEDS_CONFIG=true
+else
+    # Check if our specific configurations are already present
+    if ! grep -q "wait_timeout=240" "$MYSQL_CONF_FILE" || ! grep -q "max_connections=2000" "$MYSQL_CONF_FILE"; then
+        echo "MySQL configuration file exists but missing required settings. Updating..."
+        NEEDS_CONFIG=true
+    else
+        echo -e "${GREEN}MySQL configuration file already contains required settings.${RESET}"
+    fi
+fi
+
+if [ "$NEEDS_CONFIG" = true ]; then
+    # Create or update the configuration file with proper permissions
+    sudo tee "$MYSQL_CONF_FILE" > /dev/null <<EOF
+[mysqld]
+wait_timeout=240
+max_connections=2000
+EOF
+
+    # Set proper ownership and permissions
+    sudo chown root:root "$MYSQL_CONF_FILE"
+    sudo chmod 644 "$MYSQL_CONF_FILE"
+
+    echo -e "${GREEN}MySQL connection settings configured in $MYSQL_CONF_FILE${RESET}"
+    
+    # Restart MariaDB to apply new configuration
+    sudo systemctl restart mariadb
+    echo -e "${GREEN}MariaDB restarted to apply configuration changes.${RESET}"
+else
+    echo -e "${GREEN}MySQL configuration is already up to date.${RESET}"
+fi
+
 # Check if Node.js and npm are installed
 check_node_installed() {
     if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then

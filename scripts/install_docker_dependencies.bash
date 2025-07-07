@@ -210,6 +210,9 @@ update_docker_daemon_config
 # Add user to docker group
 sudo usermod -aG docker $CURRENT_USER
 
+# Restart Docker Daemon to apply insecure registry configuration
+sudo systemctl restart docker
+
 # Start private (local) docker registry
 if [ ! "$(sudo -u $CURRENT_USER docker ps -q -f name=registry)" ]; then
     if [ "$(sudo -u $CURRENT_USER docker ps -aq -f status=exited -f name=registry)" ]; then

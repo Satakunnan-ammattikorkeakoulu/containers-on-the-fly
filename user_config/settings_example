@@ -130,11 +130,11 @@ DOCKER_USER_MOUNT_LOCATION=""
 
 # User in the host system who will own the mounted folder. This needs to exist.
 # This is usually the current user which has the server running or root.
-# Default value: "root"
+# Default: "root"
 DOCKER_MOUNT_USER="root"
 
 # Group in the host system who will own the mounted folder.
-# Default value: "docker"
+# Default: "docker"
 DOCKER_MOUNT_GROUP="docker"
 
 ###
@@ -191,3 +191,8 @@ ADD_TEST_DATA=true
 
 # Docker container shared memory size (e.g., "1g")
 DOCKER_SHM_SIZE="1g"
+
+# Additional custom ports to keep open (comma-separated)
+# These ports will be allowed through the firewall in addition to the standard ports
+# Example: "8080,9000,3306" or leave empty for no additional ports
+FIREWALL_ADDITIONAL_PORTS=""

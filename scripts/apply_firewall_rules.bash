@@ -35,6 +35,18 @@ sudo ufw allow $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RAN
 sudo ufw route allow from any to any
 yes | sudo ufw enable
 
+# Allow additional custom ports if specified
+if [ -n "$FIREWALL_ADDITIONAL_PORTS" ]; then
+    IFS=',' read -ra PORTS <<< "$FIREWALL_ADDITIONAL_PORTS"
+    for port in "${PORTS[@]}"; do
+        port=$(echo "$port" | tr -d ' ')  # Remove spaces
+        if [[ "$port" =~ ^[0-9]+$ ]]; then  # Validate it's a number
+            echo "Allowing additional port: $port"
+            sudo ufw allow $port
+        fi
+    done
+fi
+
 # Apply Docker specific UFW firewall rules if not applied yet
 # These are taken from here: https://github.com/chaifeng/ufw-docker
 # By default Docker allows all connections to Docker containers and with this setup, anyone could access our

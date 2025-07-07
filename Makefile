@@ -306,8 +306,15 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
 	@echo "This will:"
 	@echo "  - Enable UFW firewall with secure defaults"
-	@echo "  - Allow SSH (22), HTTP (80), HTTPS (443)"
-	@echo "  - Allow container ports (2000-3000 by default)"
+	@echo "  - $(RED)BLOCK ALL incoming connections except:$(RESET)"
+	@echo "    - SSH (22), HTTP (80), HTTPS (443)"
+	@DOCKER_PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "2000"); \
+	DOCKER_PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "3000"); \
+	echo "    - Container ports ($$DOCKER_PORT_START-$$DOCKER_PORT_END from settings)"; \
+	ADDITIONAL_PORTS=$$(grep "^FIREWALL_ADDITIONAL_PORTS=" user_config/settings | cut -d'"' -f2 2>/dev/null || echo ""); \
+	if [ -n "$$ADDITIONAL_PORTS" ]; then \
+		echo "    - Additional ports ($$ADDITIONAL_PORTS from settings)"; \
+	fi
 	@echo "  - Secure Docker registry and containers"
 	@echo ""
 	@echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing UFW firewall rules!"

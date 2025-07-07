@@ -453,13 +453,13 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 	@echo "2. Run $(BOLD)make start-docker-utility$(RESET)$(GREEN) to start the Docker utility.$(RESET)\n"
 
 start-docker-utility: apply-settings ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
-	@echo "Verifying that connection to the database can be made using the webapp/backend/settings.json setting engineUri..."
+	@echo "Verifying that connection to the database can be established..."
 	@CONNECTION_URI=$$(grep '"engineUri"' webapp/backend/settings.json | sed 's/.*"engineUri": "\(.*\)".*/\1/') && \
 	CONNECTION_OK=$$($(PYTHON) scripts/verify_db_connection.py "$$CONNECTION_URI") && \
 	if [ "$$CONNECTION_OK" = "CONNECTION_OK" ]; then \
 		echo "Connection to the database was successful. Proceeding."; \
 	else \
-		echo "\n$(RED)Connection to the database could not be established. Please check that you have the webapp/backend/settings.json setting engineUri properly set and that connection to the database can be made (firewalls etc...).$(RESET)"; \
+		echo "\n$(RED)Connection to the database could not be established. Please check that you have the webapp/settings database connection settings properly configured and that connection to the database can be established (firewalls etc...).$(RESET)"; \
 		exit 1; \
 	fi
 	@cd webapp/backend && pm2 restart backendDockerUtil 2>/dev/null || pm2 start "$(PYTHON) dockerUtil.py" --name backendDockerUtil --log-date-format="YYYY-MM-DD HH:mm Z"

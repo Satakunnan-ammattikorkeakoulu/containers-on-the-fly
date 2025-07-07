@@ -28,8 +28,9 @@ MAIN_SERVER_WEB_HOST="YOUR_IP_OR_DOMAIN_HERE"
 # Only main server, separate container servers can leave this empty.
 MAIN_SERVER_WEB_HTTPS=false
 
-# Use custom SSL certificates instead of Let's Encrypt automatic certificates
+# Use custom SSL certificates instead of Let's Encrypt automatic certificates in the main server web interface
 # Set to true to use custom certificates, false to use Let's Encrypt to automatically generate certificates.
+# Only main server, separate container servers can leave this empty.
 CUSTOM_SSL_ENABLED=false
 CUSTOM_SSL_CERT_PATH="/path/to/your/certificate.crt"
 CUSTOM_SSL_KEY_PATH="/path/to/your/private.key"

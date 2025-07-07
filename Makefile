@@ -713,3 +713,19 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			exit 1; \
 			;; \
 	esac
+
+# Configure MySQL connection limits and timeouts
+echo "Configuring MySQL connection limits and timeouts..."
+
+# Create the configuration file with proper permissions
+sudo tee /etc/mysql/conf.d/mysql.cnf > /dev/null <<EOF
+[mysqld]
+wait_timeout=240
+max_connections=2000
+EOF
+
+# Set proper ownership and permissions
+sudo chown root:root /etc/mysql/conf.d/mysql.cnf
+sudo chmod 644 /etc/mysql/conf.d/mysql.cnf
+
+echo -e "${GREEN}MySQL connection settings configured in /etc/mysql/conf.d/mysql.cnf${RESET}"

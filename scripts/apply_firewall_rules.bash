@@ -9,6 +9,12 @@ CURRENT_DIR=$(pwd)
 # Load settings
 source "$CURRENT_DIR/user_config/settings"
 
+# Load server type from temporary file if it exists (for Docker utility setup)
+IS_MAIN_SERVER=true  # Default to true for backward compatibility
+if [ -f /tmp/containerfly_server_type ]; then
+    IS_MAIN_SERVER=$(cat /tmp/containerfly_server_type)
+    rm /tmp/containerfly_server_type  # Clean up
+fi
 
 # Check if the script is run as root
 if [ "$EUID" -ne 0 ]; then
@@ -23,17 +29,13 @@ yes | sudo ufw reset
 # Add UFW rules
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow from 127.0.0.1 to any port $DOCKER_REGISTRY_PORT
-sudo ufw allow from $SERVER_IP_ADDRESS to any port $DOCKER_REGISTRY_PORT
-sudo ufw route allow from $SERVER_IP_ADDRESS to any port $DOCKER_REGISTRY_PORT
-sudo ufw route deny from any to any port $DOCKER_REGISTRY_PORT
+
+# SSH is always needed
 sudo ufw allow 22
-sudo ufw allow 80
-sudo ufw allow 443
+
+# Container ports are always needed
 sudo ufw allow $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END/tcp
 sudo ufw allow $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END/udp
-sudo ufw route allow from any to any
-yes | sudo ufw enable
 
 # Allow additional custom ports if specified
 if [ -n "$FIREWALL_ADDITIONAL_PORTS" ]; then
@@ -47,11 +49,27 @@ if [ -n "$FIREWALL_ADDITIONAL_PORTS" ]; then
     done
 fi
 
+# Main server specific rules
+if [ "$IS_MAIN_SERVER" = "true" ]; then
+    echo "Configuring main server firewall rules..."
+    # Web interface ports
+    sudo ufw allow 80
+    sudo ufw allow 443
+    # Docker registry rules
+    sudo ufw allow from 127.0.0.1 to any port $DOCKER_REGISTRY_PORT
+    sudo ufw allow from $SERVER_IP_ADDRESS to any port $DOCKER_REGISTRY_PORT
+    sudo ufw route allow from $SERVER_IP_ADDRESS to any port $DOCKER_REGISTRY_PORT
+    sudo ufw route deny from any to any port $DOCKER_REGISTRY_PORT
+else
+    echo "Configuring container server firewall rules..."
+fi
+
+# Common final rules
+sudo ufw route allow from any to any
+yes | sudo ufw enable
+
 # Apply Docker specific UFW firewall rules if not applied yet
 # These are taken from here: https://github.com/chaifeng/ufw-docker
-# By default Docker allows all connections to Docker containers and with this setup, anyone could access our
-# private docker registry (push & pull images). With this setup we can disallow accessing the private docker registry from other locations.
-
 {
     echo "# BEGIN UFW AND DOCKER"
     echo "*filter"
@@ -75,3 +93,23 @@ fi
     echo "COMMIT"
     echo "# END UFW AND DOCKER"
 } | sudo tee -a "/etc/ufw/after.rules" > /dev/null
+
+# Print final configuration
+echo ""
+echo "Firewall configured successfully!"
+if [ "$IS_MAIN_SERVER" = "true" ]; then
+    echo "Main server ports opened:"
+    echo "  - SSH (22)"
+    echo "  - HTTP (80)"
+    echo "  - HTTPS (443)"
+    echo "  - Docker Registry ($DOCKER_REGISTRY_PORT)"
+    echo "  - Container ports ($DOCKER_RESERVATION_PORT_RANGE_START-$DOCKER_RESERVATION_PORT_RANGE_END)"
+else
+    echo "Container server ports opened:"
+    echo "  - SSH (22)"
+    echo "  - Container ports ($DOCKER_RESERVATION_PORT_RANGE_START-$DOCKER_RESERVATION_PORT_RANGE_END)"
+fi
+if [ -n "$FIREWALL_ADDITIONAL_PORTS" ]; then
+    echo "  - Additional ports: $FIREWALL_ADDITIONAL_PORTS"
+fi
+echo "All other incoming connections will be blocked."

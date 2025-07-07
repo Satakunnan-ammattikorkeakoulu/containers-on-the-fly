@@ -302,20 +302,23 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 
 setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings ## Run this with sudo. Installs and configures all dependencies for main server. Call 'make start-main-server' after setup.
 	@echo ""
-	@echo "$(GREEN)$(BOLD)Firewall Configuration$(RESET)"
+	@echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"
 	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
+	# Force main server type for firewall configuration
+	@echo "true" > /tmp/containerfly_server_type
 	@echo "This will:"
 	@echo "  - Enable UFW firewall with secure defaults"
 	@echo "  - $(RED)BLOCK ALL incoming connections except:$(RESET)"
 	@echo "    - SSH (22), HTTP (80), HTTPS (443)"
-	@DOCKER_PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "2000"); \
-	DOCKER_PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "3000"); \
-	echo "    - Container ports ($$DOCKER_PORT_START-$$DOCKER_PORT_END from settings)"; \
+	@echo "    - Docker Registry (5000)"
+	@PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "2000"); \
+	PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "3000"); \
+	echo "    - Container ports ($$PORT_START-$$PORT_END)"; \
 	ADDITIONAL_PORTS=$$(grep "^FIREWALL_ADDITIONAL_PORTS=" user_config/settings | cut -d'"' -f2 2>/dev/null || echo ""); \
 	if [ -n "$$ADDITIONAL_PORTS" ]; then \
-		echo "    - Additional ports ($$ADDITIONAL_PORTS from settings)"; \
-	fi
-	@echo "  - Secure Docker registry and containers"
+		echo "    - Additional ports ($$ADDITIONAL_PORTS)"; \
+	fi; \
+	echo "  - Secure Docker registry and containers"
 	@echo ""
 	@echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing UFW firewall rules!"
 	@echo ""
@@ -382,82 +385,52 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo ""
 
 setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
-	@echo "Verifying Docker registry connectivity..."
-	@REGISTRY_ADDRESS=$$(grep '"registryAddress"' webapp/backend/settings.json | sed 's/.*"registryAddress": "\(.*\)".*/\1/' 2>/dev/null) && \
-	SERVER_IP=$$(grep '"serverIp"' webapp/backend/settings.json | sed 's/.*"serverIp": "\(.*\)".*/\1/' 2>/dev/null) && \
-	if [ -z "$$SERVER_IP" ]; then \
-		echo "$(RED)Error: serverIp not found in webapp/backend/settings.json$(RESET)"; \
-		echo "$(RED)Make sure apply-settings has run successfully.$(RESET)"; \
-		exit 1; \
-	fi; \
-	if [ -z "$$REGISTRY_ADDRESS" ]; then \
-		echo "$(RED)Error: registryAddress not found in webapp/backend/settings.json$(RESET)"; \
-		exit 1; \
-	fi; \
-	# Handle unsubstituted variables in registryAddress \
-	if echo "$$REGISTRY_ADDRESS" | grep -q '\$$'; then \
-		echo "Registry address contains unsubstituted variables: $$REGISTRY_ADDRESS"; \
-		echo "Using serverIp ($$SERVER_IP) for registry connectivity test..."; \
-		REGISTRY_IP="$$SERVER_IP"; \
-		REGISTRY_PORT="5000"; \
+	@echo ""
+	@echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"
+	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
+	@IS_MAIN_SERVER=$$(cat /tmp/containerfly_server_type 2>/dev/null || echo "true"); \
+	if [ "$$IS_MAIN_SERVER" = "true" ]; then \
+		echo "This will:"; \
+		echo "  - Enable UFW firewall with secure defaults"; \
+		echo "  - $(RED)BLOCK ALL incoming connections except:$(RESET)"; \
+		echo "    - SSH (22), HTTP (80), HTTPS (443)"; \
+		echo "    - Docker Registry (5000)"; \
 	else \
-		REGISTRY_IP=$$(echo "$$REGISTRY_ADDRESS" | sed 's/:.*//' 2>/dev/null); \
-		REGISTRY_PORT=$$(echo "$$REGISTRY_ADDRESS" | sed 's/.*://' | sed 's/[^0-9]//g'); \
-		if [ -z "$$REGISTRY_PORT" ]; then \
-			REGISTRY_PORT="5000"; \
-		fi; \
+		echo "This will:"; \
+		echo "  - Enable UFW firewall with secure defaults"; \
+		echo "  - $(RED)BLOCK ALL incoming connections except:$(RESET)"; \
+		echo "    - SSH (22)"; \
 	fi; \
-	if [ "$$REGISTRY_IP" = "$$SERVER_IP" ] || [ "$$REGISTRY_IP" = "localhost" ] || [ "$$REGISTRY_IP" = "127.0.0.1" ]; then \
-		echo "Testing registry port accessibility on main server ($$REGISTRY_IP:$$REGISTRY_PORT)..."; \
-		# Check if something is already running on the port \
-		if timeout 2 bash -c "echo >/dev/tcp/$$REGISTRY_IP/$$REGISTRY_PORT" 2>/dev/null; then \
-			echo "$(GREEN)Registry port is accessible and has a service already running.$(RESET)"; \
-		else \
-			echo "No service detected on port $$REGISTRY_PORT. Starting temporary test service..."; \
-			# Start a simple HTTP server for testing port accessibility \
-			$(PYTHON) -m http.server $$REGISTRY_PORT --bind 0.0.0.0 >/dev/null 2>&1 & \
-			TEST_SERVICE_PID=$$!; \
-			sleep 3; \
-			# Test connection to our temporary HTTP server \
-			if timeout 5 curl -s "http://$$REGISTRY_IP:$$REGISTRY_PORT" >/dev/null 2>&1; then \
-				echo "$(GREEN)Registry port $$REGISTRY_PORT is accessible! Test successful.$(RESET)"; \
-				TEST_RESULT="success"; \
-			else \
-				EXIT_CODE=$$?; \
-				if [ $$EXIT_CODE -eq 124 ]; then \
-					echo "\n$(RED)ERROR: Connection to registry port $$REGISTRY_PORT timed out.$(RESET)"; \
-					echo "$(RED)This likely means the port is blocked by firewall or filtered.$(RESET)"; \
-				else \
-					echo "\n$(RED)ERROR: Cannot connect to registry port $$REGISTRY_PORT (connection refused).$(RESET)"; \
-					echo "$(RED)This could mean the port is closed or blocked by firewall.$(RESET)"; \
-				fi; \
-				echo "$(RED)Please ensure:$(RESET)"; \
-				echo "  - Port $$REGISTRY_PORT is open on this server"; \
-				echo "  - Firewall rules allow access to port $$REGISTRY_PORT\n"; \
-				TEST_RESULT="failed"; \
-			fi; \
-			# Stop the test service \
-			kill $$TEST_SERVICE_PID 2>/dev/null || true; \
-			wait $$TEST_SERVICE_PID 2>/dev/null || true; \
-			echo "Temporary test service stopped."; \
-			if [ "$$TEST_RESULT" = "failed" ]; then \
-				exit 1; \
-			fi; \
-		fi; \
+	PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "2000"); \
+	PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "3000"); \
+	echo "    - Container ports ($$PORT_START-$$PORT_END)"; \
+	ADDITIONAL_PORTS=$$(grep "^FIREWALL_ADDITIONAL_PORTS=" user_config/settings | cut -d'"' -f2 2>/dev/null || echo ""); \
+	if [ -n "$$ADDITIONAL_PORTS" ]; then \
+		echo "    - Additional ports ($$ADDITIONAL_PORTS)"; \
+	fi; \
+	echo "  - Secure Docker containers"; \
+	echo ""; \
+	echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing UFW firewall rules!"; \
+	echo ""; \
+	echo "Configure firewall rules automatically?"; \
+	echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"; \
+	echo "  $(GREEN)n$(RESET) - No, skip firewall configuration (not recommended)"; \
+	echo -n "Choice (y/n): "; \
+	read FIREWALL_CHOICE; \
+	echo ""; \
+	if [ "$$FIREWALL_CHOICE" = "y" ] || [ "$$FIREWALL_CHOICE" = "Y" ]; then \
+		echo "$(GREEN)Configuring firewall rules...$(RESET)"; \
+		$(MAKE) apply-firewall-rules; \
+		echo "$(GREEN)Firewall configuration completed.$(RESET)"; \
 	else \
-		echo "Testing connection to remote Docker registry at $$REGISTRY_IP:$$REGISTRY_PORT..."; \
-		if ! timeout 10 nc -z $$REGISTRY_IP $$REGISTRY_PORT 2>/dev/null; then \
-			echo ""; \
-			echo "$(RED)ERROR: Cannot connect to Docker registry at $$REGISTRY_IP:$$REGISTRY_PORT$(RESET)"; \
-			echo "$(RED)Please ensure:$(RESET)"; \
-			echo "  - The main server is running and accessible"; \
-			echo "  - Main server has allowed access using command $(BOLD)make allow-container-server IP=<IP_ADDRESS_OF_THIS_CONTAINER_SERVER>$(RESET)"; \
-			echo "  - Port $$REGISTRY_PORT is open on the main server"; \
-			echo "  - The Docker registry service is running on the main server\n"; \
-			exit 1; \
-		fi; \
-		echo "$(GREEN)Docker registry connection successful.$(RESET)"; \
-	fi
+		echo "$(RED)WARNING: Firewall not configured!$(RESET)"; \
+		echo "Your server may be vulnerable to unauthorized access."; \
+		echo "You can configure it later with: $(BOLD)make apply-firewall-rules$(RESET)"; \
+		echo -n "Press Enter to continue with setup anyway..."; \
+		read CONTINUE_ANYWAY; \
+	fi; \
+	echo ""
+
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
 	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
@@ -541,7 +514,33 @@ start-dev-docker-utility: apply-settings
 # Add this new target after the existing interactive-settings-creation target
 
 interactive-docker-settings-creation: # Creates Docker utility settings interactively
-	@if [ ! -e $(CONFIG_SETTINGS) ]; then \
+	@echo ""
+	@echo "$(GREEN)$(BOLD)Server Type Configuration:$(RESET)"
+	@echo "Are you setting up a Docker utility for:"
+	@echo "  $(GREEN)1$(RESET) - Main server (same machine as web interface)"
+	@echo "  $(GREEN)2$(RESET) - Separate container server (different machine)"
+	@echo -n "Enter your choice (1 or 2): "
+	@read SERVER_TYPE_CHOICE; \
+	\
+	case "$$SERVER_TYPE_CHOICE" in \
+		1) \
+			echo "Setting up Docker utility for main server..."; \
+			IS_MAIN_SERVER=true; \
+			DEFAULT_SERVER_NAME="server1"; \
+			;; \
+		2) \
+			echo "Setting up Docker utility for separate container server..."; \
+			IS_MAIN_SERVER=false; \
+			DEFAULT_SERVER_NAME="server2"; \
+			;; \
+		*) \
+			echo "$(RED)Invalid choice. Setup cancelled.$(RESET)"; \
+			exit 1; \
+			;; \
+	esac; \
+	echo "$$IS_MAIN_SERVER" > /tmp/containerfly_server_type; \
+	\
+	if [ ! -e $(CONFIG_SETTINGS) ]; then \
 		RECONFIGURE_SETTINGS=true; \
 		FIRST_TIME_SETUP=true; \
 	else \
@@ -550,7 +549,6 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		EXISTING_PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2); \
 		EXISTING_PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2); \
 		EXISTING_REGISTRY_ADDRESS=$$(grep "^DOCKER_REGISTRY_ADDRESS=" user_config/settings | cut -d'=' -f2 | tr -d '"'); \
-		# Show effective registry address (use SERVER_IP if registry address is empty) \
 		if [ -z "$$EXISTING_REGISTRY_ADDRESS" ] || [ "$$EXISTING_REGISTRY_ADDRESS" = '""' ]; then \
 			EFFECTIVE_REGISTRY_ADDRESS="$$EXISTING_SERVER_IP (default)"; \
 		else \
@@ -560,6 +558,7 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		EXISTING_DB_NAME=$$(grep "^MARIADB_DB_NAME=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_DB_USER=$$(grep "^MARIADB_DB_USER=" user_config/settings | cut -d'"' -f2); \
 		\
+		echo ""; \
 		echo "$(GREEN)Docker settings file exists with current configuration:$(RESET)"; \
 		echo "  - Current Server IP: $(GREEN)$$EXISTING_SERVER_IP$(RESET)"; \
 		echo "  - Docker Server Name: $(GREEN)$$EXISTING_SERVER_NAME$(RESET)"; \
@@ -571,8 +570,8 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		echo "  - Database User: $(GREEN)$$EXISTING_DB_USER$(RESET)"; \
 		echo ""; \
 		echo "What would you like to do?"; \
-		echo "  $(GREEN)1$(RESET) - Use these settings and start Docker utility setup"; \
-		echo "  $(GREEN)2$(RESET) - Reconfigure Docker utility settings"; \
+		echo "  $(GREEN)1$(RESET) - Use these settings and proceed with setup"; \
+		echo "  $(GREEN)2$(RESET) - Reconfigure all Docker utility settings"; \
 		echo "  $(GREEN)3$(RESET) - Cancel setup"; \
 		echo -n "Enter your choice (1, 2, or 3): "; \
 		read SETUP_CHOICE; \
@@ -600,73 +599,48 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 	fi; \
 	\
 	if [ "$$RECONFIGURE_SETTINGS" = "true" ]; then \
-		echo ""; \
-		echo "$(GREEN)$(BOLD)Welcome to Containers on the Fly Docker Utility Setup!$(RESET)"; \
-		echo "We're starting the installation process for your Docker utility."; \
-		echo ""; \
-		\
-		echo "$(GREEN)$(BOLD)Server Type Configuration:$(RESET)"; \
-		echo "Are you setting up a Docker utility for:"; \
-		echo "  $(GREEN)1$(RESET) - Main server (same machine as web interface)"; \
-		echo "  $(GREEN)2$(RESET) - Separate container server (different machine)"; \
-		echo -n "Enter your choice (1 or 2): "; \
-		read SERVER_TYPE_CHOICE; \
-		\
-		case "$$SERVER_TYPE_CHOICE" in \
-			1) \
-				echo "Setting up Docker utility for main server..."; \
-				IS_MAIN_SERVER=true; \
-				DEFAULT_SERVER_NAME="server1"; \
-				DB_ADDRESS="localhost"; \
-				CURRENT_SERVER_IP=$$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "127.0.0.1"); \
-				REGISTRY_ADDRESS=$$CURRENT_SERVER_IP; \
-				SERVER_IP_ADDRESS=$$CURRENT_SERVER_IP; \
-				DB_NAME="containerfly"; \
-				DB_USER="containerflyuser"; \
-				EXISTING_DB_PASSWORD=$$(grep "^MARIADB_DB_USER_PASSWORD=" user_config/settings | cut -d'"' -f2 2>/dev/null || echo ""); \
-				if [ -z "$$EXISTING_DB_PASSWORD" ] || [ "$$EXISTING_DB_PASSWORD" = "password" ]; then \
-					echo "$(GREEN)$(BOLD)Database Password:$(RESET)"; \
-					echo "Enter database password for main server:"; \
-					echo -n "Database password: "; \
-					read DB_PASSWORD; \
-				else \
-					DB_PASSWORD=$$EXISTING_DB_PASSWORD; \
-				fi \
-				;; \
-			2) \
-				echo "Setting up Docker utility for separate container server..."; \
-				IS_MAIN_SERVER=false; \
-				DEFAULT_SERVER_NAME="server2"; \
-				echo ""; \
-				echo "$(GREEN)$(BOLD)Main Server IP Configuration:$(RESET)"; \
-				echo -n "Enter the IP address of your main server: "; \
-				read MAIN_SERVER_IP; \
-				DB_ADDRESS=$$MAIN_SERVER_IP; \
-				REGISTRY_ADDRESS=$$MAIN_SERVER_IP; \
-				CURRENT_SERVER_IP=$$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "127.0.0.1"); \
-				SERVER_IP_ADDRESS=$$CURRENT_SERVER_IP; \
-				echo ""; \
-				echo "$(GREEN)$(BOLD)Database Connection Details:$(RESET)"; \
-				echo "These must match the database configuration on your main server."; \
-				echo -n "Database name (or empty for $(GREEN)containerfly$(RESET)): "; \
-				read DB_NAME; \
-				if [ -z "$$DB_NAME" ]; then \
-					DB_NAME="containerfly"; \
-				fi; \
-				echo -n "Database user (or empty for $(GREEN)containerflyuser$(RESET)): "; \
-				read DB_USER; \
-				if [ -z "$$DB_USER" ]; then \
-					DB_USER="containerflyuser"; \
-				fi; \
-				echo "$(GREEN)$(BOLD)WARNING:$(RESET) Password will be visible on screen"; \
+		if [ "$$IS_MAIN_SERVER" = "true" ]; then \
+			CURRENT_SERVER_IP=$$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "127.0.0.1"); \
+			REGISTRY_ADDRESS=$$CURRENT_SERVER_IP; \
+			SERVER_IP_ADDRESS=$$CURRENT_SERVER_IP; \
+			DB_ADDRESS="localhost"; \
+			DB_NAME="containerfly"; \
+			DB_USER="containerflyuser"; \
+			EXISTING_DB_PASSWORD=$$(grep "^MARIADB_DB_USER_PASSWORD=" user_config/settings | cut -d'"' -f2 2>/dev/null || echo ""); \
+			if [ -z "$$EXISTING_DB_PASSWORD" ] || [ "$$EXISTING_DB_PASSWORD" = "password" ]; then \
+				echo "$(GREEN)$(BOLD)Database Password:$(RESET)"; \
+				echo "Enter database password for main server:"; \
 				echo -n "Database password: "; \
-				read DB_PASSWORD \
-				;; \
-			*) \
-				echo "$(RED)Invalid choice. Setup cancelled.$(RESET)"; \
-				exit 1 \
-				;; \
-		esac; \
+				read DB_PASSWORD; \
+			else \
+				DB_PASSWORD=$$EXISTING_DB_PASSWORD; \
+			fi; \
+		else \
+			echo ""; \
+			echo "$(GREEN)$(BOLD)Main Server IP Configuration:$(RESET)"; \
+			echo -n "Enter the IP address of your main server: "; \
+			read MAIN_SERVER_IP; \
+			DB_ADDRESS=$$MAIN_SERVER_IP; \
+			REGISTRY_ADDRESS=$$MAIN_SERVER_IP; \
+			CURRENT_SERVER_IP=$$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "127.0.0.1"); \
+			SERVER_IP_ADDRESS=$$CURRENT_SERVER_IP; \
+			echo ""; \
+			echo "$(GREEN)$(BOLD)Database Connection Details:$(RESET)"; \
+			echo "These must match the database configuration on your main server."; \
+			echo -n "Database name (or empty for $(GREEN)containerfly$(RESET)): "; \
+			read DB_NAME; \
+			if [ -z "$$DB_NAME" ]; then \
+				DB_NAME="containerfly"; \
+			fi; \
+			echo -n "Database user (or empty for $(GREEN)containerflyuser$(RESET)): "; \
+			read DB_USER; \
+			if [ -z "$$DB_USER" ]; then \
+				DB_USER="containerflyuser"; \
+			fi; \
+			echo "$(GREEN)$(BOLD)WARNING:$(RESET) Password will be visible on screen"; \
+			echo -n "Database password: "; \
+			read DB_PASSWORD; \
+		fi; \
 		\
 		echo ""; \
 		echo "$(GREEN)$(BOLD)Docker Server Name:$(RESET)"; \
@@ -707,37 +681,35 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		sed -i "s/MARIADB_DB_USER=\"[^\"]*\"/MARIADB_DB_USER=\"$$DB_USER\"/" user_config/settings; \
 		DB_PASSWORD_ESCAPED=$$(printf '%s\n' "$$DB_PASSWORD" | sed 's/[\/&]/\\&/g'); \
 		sed -i "s/^MARIADB_DB_USER_PASSWORD=.*/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD_ESCAPED\"/" user_config/settings; \
-		\
-		chown $${SUDO_USER:-$(shell whoami)}:$${SUDO_USER:-$(shell whoami)} user_config/settings 2>/dev/null || true; \
-		\
-		echo ""; \
-		echo "$(GREEN)$(BOLD)Great! Your Docker utility configurations have been setup successfully!$(RESET)"; \
-		echo ""; \
-		echo "$(GREEN)$(BOLD)!! IMPORTANT !!$(RESET) Please take a moment to manually review the full $(GREEN)user_config/settings$(RESET) file"; \
-		echo "as it contains additional optional settings that you may want to configure for your setup."; \
-		echo ""; \
-		echo "What would you like to do?"; \
-		echo "  $(GREEN)1$(RESET) - Proceed with Docker utility installation using these settings"; \
-		echo "  $(GREEN)2$(RESET) - Reconfigure Docker utility settings again"; \
-		echo "  $(GREEN)3$(RESET) - Cancel setup"; \
-		echo -n "Enter your choice (1, 2, or 3): "; \
-		read FINAL_CHOICE; \
-		\
-		case "$$FINAL_CHOICE" in \
-			1) \
-				echo "Proceeding with Docker utility installation..."; \
-				;; \
-			2) \
-				echo "Starting reconfiguration again..."; \
-				exec $(MAKE) interactive-docker-settings-creation; \
-				;; \
-			3) \
-				echo "Setup cancelled."; \
-				exit 1; \
-				;; \
-			*) \
-				echo "$(RED)Invalid choice. Setup cancelled.$(RESET)"; \
-				exit 1; \
-				;; \
-		esac; \
-	fi
+	fi; \
+	\
+	echo ""; \
+	echo "$(GREEN)$(BOLD)Configuration completed successfully!$(RESET)"; \
+	echo ""; \
+	echo "$(GREEN)$(BOLD)!! IMPORTANT !!$(RESET) Please take a moment to manually review the full $(GREEN)user_config/settings$(RESET) file"; \
+	echo "as it contains additional optional settings that you may want to configure for your setup."; \
+	echo ""; \
+	echo "What would you like to do?"; \
+	echo "  $(GREEN)1$(RESET) - Settings are correct - Proceed with Docker utility installation"; \
+	echo "  $(GREEN)2$(RESET) - Reconfigure Docker utility settings again"; \
+	echo "  $(GREEN)3$(RESET) - Cancel setup"; \
+	echo -n "Enter your choice (1, 2, or 3): "; \
+	read FINAL_CHOICE; \
+	\
+	case "$$FINAL_CHOICE" in \
+		1) \
+			echo "Proceeding with Docker utility installation..."; \
+			;; \
+		2) \
+			echo "Starting reconfiguration again..."; \
+			exec $(MAKE) interactive-docker-settings-creation; \
+			;; \
+		3) \
+			echo "Setup cancelled."; \
+			exit 1; \
+			;; \
+		*) \
+			echo "$(RED)Invalid choice. Setup cancelled.$(RESET)"; \
+			exit 1; \
+			;; \
+	esac

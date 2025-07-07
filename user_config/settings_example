@@ -12,6 +12,11 @@
 # THESE ARE ALL MANDATORY TO BE SET
 ###
 
+# Set to true if you are running the main server on this server (web interface and database).
+# Set to false if this is a separate container server (you are running the main server on another server).
+# Default: true, can be either true or false.
+IS_MAIN_SERVER=true
+
 # Name of your application (displayed in the web interface)
 APP_NAME="Containers on the Fly"
 

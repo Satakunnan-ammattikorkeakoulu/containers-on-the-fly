@@ -11,8 +11,8 @@ source "$CURRENT_DIR/user_config/settings"
 
 # Load server type from temporary file if it exists (for Docker utility setup)
 IS_MAIN_SERVER=true  # Default to true for backward compatibility
-if [ -f ../.server_type ]; then
-    IS_MAIN_SERVER=$(cat ../.server_type)
+if [ -f .server_type ]; then
+    IS_MAIN_SERVER=$(cat "${CURRENT_DIR}/.server_type")
 fi
 
 # Check if the script is run as root

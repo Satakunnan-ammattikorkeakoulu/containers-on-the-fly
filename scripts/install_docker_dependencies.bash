@@ -205,17 +205,22 @@ update_docker_daemon_config() {
         echo "{\"insecure-registries\" : [\"$LOCAL_REGISTRY\", \"$INSECURE_REGISTRY\"]}" > "$DOCKER_DAEMON_CONFIG"
     fi
 }
+echo "Updating Docker daemon configuration..."
 update_docker_daemon_config
 
 # Add user to docker group
+echo "Adding user to docker group..."
 sudo usermod -aG docker $CURRENT_USER
 
 # Restart Docker Daemon to apply insecure registry configuration
+echo "Restarting Docker daemon..."
 sudo systemctl restart docker
 
+echo "Starting private (local) docker registry (only on main server)"
 # Start private (local) docker registry (only on main server)
-IS_MAIN_SERVER=$(cat ../.server_type 2>/dev/null || echo "true")
+IS_MAIN_SERVER=$(cat "${CURRENT_DIR}/.server_type" 2>/dev/null || echo "false")
 if [ "$IS_MAIN_SERVER" = "true" ]; then
+    echo "This is main server, starting private (local) docker registry..."
     if [ ! "$(sudo -u $CURRENT_USER docker ps -q -f name=registry)" ]; then
         if [ "$(sudo -u $CURRENT_USER docker ps -aq -f status=exited -f name=registry)" ]; then
             # Cleanup any exited registry container

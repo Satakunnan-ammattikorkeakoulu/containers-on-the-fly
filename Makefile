@@ -361,6 +361,7 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	@echo "\n$(GREEN)$(BOLD)The main server has been setup.$(RESET)\n"
 	@echo "$(GREEN)$(BOLD)NEXT STEPS:$(RESET)"
 	@echo "$(GREEN)* Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
+	@rm -f .server_type
 
 start-main-server: verify-config-file-exists apply-settings ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
 	@echo "Moving Caddyfile to /etc/caddy/Caddyfile"
@@ -384,7 +385,7 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo ""
 
 setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
-	@IS_MAIN_SERVER=$$(cat /tmp/containerfly_server_type 2>/dev/null || echo "true"); \
+	@IS_MAIN_SERVER=$$(cat ../.server_type 2>/dev/null || echo "true"); \
 	if [ "$$IS_MAIN_SERVER" = "false" ]; then \
 		echo ""; \
 		echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"; \
@@ -451,6 +452,7 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 	@echo "NEXT STEPS:"
 	@echo "1. Restart the machine for all the changes to take effect."
 	@echo "2. Run $(BOLD)make start-docker-utility$(RESET)$(GREEN) to start the Docker utility.$(RESET)\n"
+	@rm -f .server_type
 
 start-docker-utility: apply-settings ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
 	@echo "Verifying that connection to the database can be established..."
@@ -538,7 +540,7 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			exit 1; \
 			;; \
 	esac; \
-	echo "$$IS_MAIN_SERVER" > /tmp/containerfly_server_type; \
+	echo "$$IS_MAIN_SERVER" > .server_type; \
 	\
 	if [ ! -e $(CONFIG_SETTINGS) ]; then \
 		RECONFIGURE_SETTINGS=true; \

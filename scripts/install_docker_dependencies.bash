@@ -214,7 +214,7 @@ sudo usermod -aG docker $CURRENT_USER
 sudo systemctl restart docker
 
 # Start private (local) docker registry (only on main server)
-IS_MAIN_SERVER=$(cat /tmp/containerfly_server_type 2>/dev/null || echo "true")
+IS_MAIN_SERVER=$(cat ../.server_type 2>/dev/null || echo "true")
 if [ "$IS_MAIN_SERVER" = "true" ]; then
     if [ ! "$(sudo -u $CURRENT_USER docker ps -q -f name=registry)" ]; then
         if [ "$(sudo -u $CURRENT_USER docker ps -aq -f status=exited -f name=registry)" ]; then

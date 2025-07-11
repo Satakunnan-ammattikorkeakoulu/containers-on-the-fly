@@ -213,19 +213,24 @@ sudo usermod -aG docker $CURRENT_USER
 # Restart Docker Daemon to apply insecure registry configuration
 sudo systemctl restart docker
 
-# Start private (local) docker registry
-if [ ! "$(sudo -u $CURRENT_USER docker ps -q -f name=registry)" ]; then
-    if [ "$(sudo -u $CURRENT_USER docker ps -aq -f status=exited -f name=registry)" ]; then
-        # Cleanup any exited registry container
-        sudo -u $CURRENT_USER docker rm registry
+# Start private (local) docker registry (only on main server)
+IS_MAIN_SERVER=$(cat /tmp/containerfly_server_type 2>/dev/null || echo "true")
+if [ "$IS_MAIN_SERVER" = "true" ]; then
+    if [ ! "$(sudo -u $CURRENT_USER docker ps -q -f name=registry)" ]; then
+        if [ "$(sudo -u $CURRENT_USER docker ps -aq -f status=exited -f name=registry)" ]; then
+            # Cleanup any exited registry container
+            sudo -u $CURRENT_USER docker rm registry
+        fi
+        # Start the Docker registry container
+        sudo -u $CURRENT_USER docker run -d -p ${DOCKER_REGISTRY_PORT}:5000 --restart=always --name registry registry:2
     fi
-    # Start the Docker registry container
-    sudo -u $CURRENT_USER docker run -d -p ${DOCKER_REGISTRY_PORT}:5000 --restart=always --name registry registry:2
-fi
 
-# Build base-ubuntu image to be used as an example with default setup
-sudo -u $CURRENT_USER docker build -t $INSECURE_REGISTRY/ubuntu-base:latest -f DockerfileContainerExample .
-sudo -u $CURRENT_USER docker push $INSECURE_REGISTRY/ubuntu-base:latest
+    # Build base-ubuntu image to be used as an example with default setup
+    sudo -u $CURRENT_USER docker build -t $INSECURE_REGISTRY/ubuntu-base:latest -f DockerfileContainerExample .
+    sudo -u $CURRENT_USER docker push $INSECURE_REGISTRY/ubuntu-base:latest
+else
+    echo "Container server detected - skipping Docker registry setup (will connect to main server registry)"
+fi
 
 # Restart Docker Daemon to apply changes
 sudo systemctl restart docker

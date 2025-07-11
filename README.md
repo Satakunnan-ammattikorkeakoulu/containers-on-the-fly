@@ -184,9 +184,11 @@ sudo make setup-docker-utility
 
 > Note that after the initial setup the script asks you to review the ``user_config/settings`` file. You should do it before you finish the installation.
 
+It is required to restart the server after finishing the installation of the Docker utility.
+
 #### Start Docker Utility
 
-After the setup is complete, run the Docker utility with:
+After the setup is complete and the server has been restarted, run the Docker utility with:
 
 ```bash
 make start-docker-utility

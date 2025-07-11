@@ -132,7 +132,7 @@ Suppose you have an external firewall in front of your server (for example, you 
 
 Install make through APT to run the make tasks:
 ```
-sudo apt update && sudo apt install make
+sudo apt update && sudo apt install make lsb-release
 ```
 
 #### Setup the Main Server

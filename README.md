@@ -128,9 +128,9 @@ Suppose you have an external firewall in front of your server (for example, you 
 - `80` and `443` for HTTP / HTTPS connection to the server web interface and possible Let's Encrypt SSL certificate renewal
 - `2000-3000` (default) or the range of ports from which you want to host the reserved servers, which can be configured in the settings file. These services can be any, usually SSH, but could be HTTP, HTTPS, etc...
 
-#### Install Make
+#### Install Required APT Packages
 
-Install make through APT to run the make tasks:
+Install required APT packages:
 ```
 sudo apt update && sudo apt install make lsb-release
 ```
@@ -167,11 +167,11 @@ Suppose you have an external firewall in front of your server (for example, you 
 
 - `2000-3000` (default) or the range of ports from which you want to host the reserved servers, which can be configured in the settings file. These services can be any, usually SSH, but could be HTTP, HTTPS, etc...
 
-#### Install Make
+#### Install Required APT Packages
 
-Install make through APT to run the make tasks:
+Install required APT packages:
 ```
-sudo apt update && sudo apt install make
+sudo apt update && sudo apt install make lsb-release
 ```
 
 #### Setup the Docker Utility

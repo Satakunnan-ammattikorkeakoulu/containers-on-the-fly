@@ -385,7 +385,7 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo ""
 
 setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
-	@IS_MAIN_SERVER=$$(cat ../.server_type 2>/dev/null || echo "true"); \
+	@IS_MAIN_SERVER=$$(cat .server_type 2>/dev/null || echo "true"); \
 	if [ "$$IS_MAIN_SERVER" = "false" ]; then \
 		echo ""; \
 		echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"; \

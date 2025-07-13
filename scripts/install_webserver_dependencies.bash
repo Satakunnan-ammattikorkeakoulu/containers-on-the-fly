@@ -170,7 +170,32 @@ fi
 RESULT=$(mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$MARIADB_DB_USER');")
 
 if [ "$RESULT" -eq 1 ]; then
-  echo "User '$MARIADB_DB_USER' already exists. Continuing."
+  echo "User '$MARIADB_DB_USER' already exists. Verifying password..."
+  # Try to connect with the provided credentials
+  if ! mysql -u"$MARIADB_DB_USER" -p"$MARIADB_DB_USER_PASSWORD" -e "SELECT 1;" >/dev/null 2>&1; then
+    echo -e "${RED}Error: Password verification failed for user '$MARIADB_DB_USER'.${RESET}"
+    echo ""
+    echo "Would you like to reset the password?"
+    echo "  ${GREEN}y${RESET} - Yes, generate a new random password"
+    echo "  ${GREEN}n${RESET} - No, keep current password (installation will stop)"
+    echo -n "Choice (y/n): "
+    read RESET_PASSWORD
+
+    if [ "$RESET_PASSWORD" = "y" ] || [ "$RESET_PASSWORD" = "Y" ]; then
+      DB_PASSWORD=$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15)
+      DB_PASSWORD_ESCAPED=$(printf '%s\n' "$DB_PASSWORD" | sed 's/[\/&]/\\&/g')
+      sed -i "s/^MARIADB_DB_USER_PASSWORD=.*/MARIADB_DB_USER_PASSWORD=\"$DB_PASSWORD_ESCAPED\"/" user_config/settings
+      mysql -e "ALTER USER '$MARIADB_DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';"
+      mysql -e "FLUSH PRIVILEGES;"
+      echo -e "${GREEN}Password has been reset successfully.${RESET}"
+      echo "New password has been saved to user_config/settings"
+    else
+      echo -e "${RED}Password verification failed and password was not reset.${RESET}"
+      echo "Please set the correct password in user_config/settings and run this installation again."
+      exit 1
+    fi
+  fi
+  echo -e "${GREEN}Password verification successful.${RESET}"
 else
   echo "User '$MARIADB_DB_USER' does not exist."
   mysql -e "CREATE USER IF NOT EXISTS '$MARIADB_DB_USER'@'%' IDENTIFIED BY '$MARIADB_DB_USER_PASSWORD';"

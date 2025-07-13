@@ -176,8 +176,8 @@ if [ "$RESULT" -eq 1 ]; then
     echo -e "${RED}Error: Password verification failed for user '$MARIADB_DB_USER'.${RESET}"
     echo ""
     echo "Would you like to reset the password?"
-    echo "  ${GREEN}y${RESET} - Yes, generate a new random password"
-    echo "  ${GREEN}n${RESET} - No, keep current password (installation will stop)"
+    echo -e "  ${GREEN}y${RESET} - Yes, generate a new random password"
+    echo -e "  ${GREEN}n${RESET} - No, keep current password (installation will stop)"
     echo -n "Choice (y/n): "
     read RESET_PASSWORD
 
@@ -192,6 +192,7 @@ if [ "$RESULT" -eq 1 ]; then
     else
       echo -e "${RED}Password verification failed and password was not reset.${RESET}"
       echo "Please set the correct password in user_config/settings and run this installation again."
+      echo ""
       exit 1
     fi
   fi

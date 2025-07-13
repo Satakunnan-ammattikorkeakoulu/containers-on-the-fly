@@ -513,8 +513,6 @@ start-dev-backend: apply-settings
 start-dev-docker-utility: apply-settings
 	cd webapp/backend && $(PYTHON) dockerUtil.py
 
-# Add this new target after the existing interactive-settings-creation target
-
 interactive-docker-settings-creation: # Creates Docker utility settings interactively
 	@echo ""
 	@echo "$(GREEN)$(BOLD)Server Type Configuration:$(RESET)"

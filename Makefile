@@ -341,10 +341,7 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	echo ""
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
-	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
-	# Fix ownership of frontend directory first to avoid permission issues
-	@chown -R $${SUDO_USER:-$(shell whoami)}:$${SUDO_USER:-$(shell whoami)} webapp/frontend/ 2>/dev/null || true
-	# Install frontend dependencies as the original user
+	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location
 	cd webapp/frontend && sudo -u $${SUDO_USER:-$(shell whoami)} npm install
 
 	# Automatically configure pm2 startup
@@ -431,7 +428,7 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
-	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed
+	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location
 	@REAL_USER=$${SUDO_USER:-$$(logname 2>/dev/null || echo $$(whoami))}; \
 	usermod -aG docker $$REAL_USER; \
 	echo "Added user $$REAL_USER to docker group"

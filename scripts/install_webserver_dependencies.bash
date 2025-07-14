@@ -22,11 +22,11 @@ fi
 echo "Running with sudo privileges."
 
 # Update and install initial packages
-sudo apt update
+sudo apt update -qq
 
 # Install required libraries
-sudo apt --assume-yes install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev
-sudo apt --assume-yes install python3-ldap
+sudo apt --assume-yes -qq install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev
+sudo apt --assume-yes -qq install python3-ldap
 
 # Function to check if Caddy is installed
 check_caddy_installed() {
@@ -44,11 +44,11 @@ install_caddy() {
     echo "Installing Caddy..."
     
     # Install Caddy from official repository
-    sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+    sudo apt install -y -qq debian-keyring debian-archive-keyring apt-transport-https
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-    sudo apt update
-    sudo apt install -y caddy
+    sudo apt update -qq
+    sudo apt install -y -qq caddy
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Caddy installed successfully.${RESET}"
@@ -113,7 +113,7 @@ fi
 
 # Check if MariaDB is installed
 check_mariadb_installed() {
-    if dpkg -l | grep -q mariadb; then
+    if dpkg -l 2>/dev/null | grep -q mariadb; then
         echo -e "${GREEN}MariaDB is already installed.${RESET}"
         return 0
     else
@@ -125,7 +125,7 @@ check_mariadb_installed() {
 # Function to install MariaDB
 install_mariadb() {
     echo "Installing MariaDB..."
-    apt install -y mariadb-server mariadb-client
+    apt install -y -qq mariadb-server mariadb-client
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}MariaDB installed successfully.${RESET}"
@@ -261,7 +261,7 @@ check_node_installed() {
 install_node() {
     echo "Installing Node.js and npm..."
     curl -sL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-    sudo apt install -y nodejs
+    sudo apt install -y -qq nodejs
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Node.js and npm installed successfully.${RESET}"

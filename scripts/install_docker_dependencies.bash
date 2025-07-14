@@ -38,9 +38,9 @@ echo "Running with sudo privileges."
 sudo add-apt-repository ppa:graphics-drivers/ppa -y
 
 # Update and install initial packages
-sudo apt update
-sudo rm /etc/apt/sources.list.d/nvidia-*.list
-sudo apt-get purge -y '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*'
+sudo apt update -qq
+sudo rm /etc/apt/sources.list.d/nvidia-*.list 2>/dev/null
+sudo apt-get purge -y -qq '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*' 2>/dev/null
 
 # libnvidia-container key
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
@@ -52,10 +52,10 @@ curl -fsSL https://nvidia.github.io/nvidia-container-runtime/gpgkey | \
 curl -fsSL https://nvidia.github.io/nvidia-docker/gpgkey | \
   gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/nvidia-docker.gpg > /dev/null
 
-sudo apt update
+sudo apt update -qq
 
-sudo apt install -y python3-pip libsasl2-dev libldap2-dev libssl-dev
-sudo ubuntu-drivers install nvidia:570-server
+sudo apt install -y -qq python3-pip libsasl2-dev libldap2-dev libssl-dev
+sudo ubuntu-drivers install nvidia:570-server -qq >/dev/null 2>&1
 
 # Add Docker's official GPG key if it's not already added
 if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
@@ -74,11 +74,11 @@ if ! grep -q "^deb .*https://download.docker.com/linux/ubuntu" /etc/apt/sources.
 fi
 
 # Update repositories and install Docker
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt update -qq
+sudo apt install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 # Test that docker works
-sudo docker run hello-world
+sudo docker run hello-world >/dev/null 2>&1
 
 # Install Node.js and npm if they are not installed
 if ! command -v node > /dev/null || ! command -v npm > /dev/null; then
@@ -118,7 +118,7 @@ fi
 echo "NVIDIA Container Toolkit repository added."
 
 echo "2/5: Updating apt package cache..."
-sudo apt-get update
+sudo apt-get update -qq
 if [ $? -ne 0 ]; then
     echo "Error: Failed to update apt cache. Exiting."
     exit 1
@@ -126,7 +126,7 @@ fi
 echo "Apt cache updated."
 
 echo "3/5: Installing nvidia-container-toolkit..."
-sudo apt-get install -y nvidia-container-toolkit
+sudo apt-get install -y -qq nvidia-container-toolkit
 if [ $? -ne 0 ]; then
     echo "Error: Failed to install nvidia-container-toolkit. Exiting."
     exit 1
@@ -172,7 +172,7 @@ echo "Unattended upgrades configuration updated successfully."
 
 
 # Make sure that the Docker can use a local repository, that has no sertificate
-sudo apt install -y jq
+sudo apt install -y -qq jq
 # Docker Daemon Configuration File
 DOCKER_DAEMON_CONFIG="/etc/docker/daemon.json"
 

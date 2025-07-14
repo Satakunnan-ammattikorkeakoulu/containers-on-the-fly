@@ -34,7 +34,7 @@ class SettingsApplier:
             print("Please copy user_config/settings_example to user_config/settings and configure it.")
             sys.exit(1)
             
-        print(f"Loading settings from {self.settings_file}")
+        #print(f"Loading settings from {self.settings_file}")
         
         # Read the bash settings file
         with open(self.settings_file, 'r') as f:
@@ -64,7 +64,7 @@ class SettingsApplier:
         # Process derived settings
         self._process_derived_settings()
         self._process_caddy_settings()
-        print(f"Loaded {len(self.settings)} settings")
+        #print(f"Loaded {len(self.settings)} settings")
         
     def _process_derived_settings(self):
         """Process derived settings that depend on other settings."""
@@ -125,7 +125,7 @@ class SettingsApplier:
         if not docker_registry_addr:
             # Use SERVER_IP_ADDRESS if DOCKER_REGISTRY_ADDRESS is empty
             self.settings['DOCKER_REGISTRY_ADDRESS'] = self.settings.get('SERVER_IP_ADDRESS', '')
-            print(f"DOCKER_REGISTRY_ADDRESS was empty, using SERVER_IP_ADDRESS: {self.settings['DOCKER_REGISTRY_ADDRESS']}")
+            #print(f"DOCKER_REGISTRY_ADDRESS was empty, using SERVER_IP_ADDRESS: {self.settings['DOCKER_REGISTRY_ADDRESS']}")
         
         # Process DOCKER_EXTRA_MOUNTS JSON string
         docker_extra_mounts = self.settings.get('DOCKER_EXTRA_MOUNTS', '')
@@ -208,7 +208,7 @@ class SettingsApplier:
                 
     def _apply_template(self, template_path, output_path):
         """Apply settings to a single template file."""
-        print(f"Processing template: {template_path} -> {output_path}")
+        #print(f"Processing template: {template_path} -> {output_path}")
         
         with open(template_path, 'r') as f:
             content = f.read()
@@ -220,14 +220,14 @@ class SettingsApplier:
             
         # Check for unreplaced placeholders
         unreplaced = re.findall(r'\{\{([^}]+)\}\}', content)
-        if unreplaced:
-            print(f"Warning: Unreplaced placeholders in {template_path}: {unreplaced}")
+        #if unreplaced:
+        #    print(f"Info: Unreplaced placeholders in {template_path}: {unreplaced}")
             
         # Write output file
         try:
             with open(output_path, 'w') as f:
                 f.write(content)
-            print(f"Generated: {output_path}")
+            #print(f"Generated: {output_path}")
             
             # If running as root, fix ownership to the original user
             self._fix_file_ownership(output_path)
@@ -273,6 +273,7 @@ class SettingsApplier:
     def run(self):
         """Run the complete settings application process."""
         print("=== Containers on the Fly - Settings Application ===")
+        print("")
         
         try:
             self.load_settings()

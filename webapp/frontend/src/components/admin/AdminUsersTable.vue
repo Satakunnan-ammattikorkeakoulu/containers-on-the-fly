@@ -7,87 +7,88 @@
       :sort-by="'userId'"
       :sort-desc="true"
       class="elevation-1">
-      <!-- userId -->
-      <template v-slot:item.status="{item}">
-        {{ item.userId }}
+      
+      <!-- Actions -->
+      <template v-slot:item.actions="{item}">
+        <a class="link-action" @click="emitEditUser(item.userId)">Edit User</a>
       </template>
-      <!-- Email -->
-      <template v-slot:item.startDate="{item}">
-        {{ parseTime(item.startDate) }}
-      </template>
+
       <!-- Created At -->
       <template v-slot:item.createdAt="{item}">
-        {{ parseTime(item.createdAt) }}
+        {{ item.createdAt ? parseTime(item.createdAt) : '-' }}
+      </template>
+
+      <!-- Roles -->
+      <template v-slot:item.roles="{item}">
+        {{ Array.isArray(item.roles) ? item.roles.join(', ') : item.roles }}
       </template>
     </v-data-table>
   </div>
 </template>
 
 <script>
-  import { DisplayTime } from '/src/helpers/time.js'
+import { DisplayTime } from '/src/helpers/time.js'
 
-  export default {
-    name: 'AdminUsersTable',
-    props: {
-      propItems: {
-        type: Array,
-        required: true,
+export default {
+  name: 'AdminUsersTable',
+  props: {
+    propItems: {
+      type: Array,
+      required: true,
+    }
+  },
+  data: () => ({
+    data: [],
+    readAll: false,
+    hasLongItems: false,
+    table: {
+      headers: [
+        { text: 'User ID', value: 'userId' },
+        { text: 'Email', value: 'email' },
+        { text: 'Roles', value: 'roles' },
+        { text: 'Created At', value: 'createdAt' },
+        { text: 'Actions', value: 'actions' },
+      ],
+    }
+  }),
+  mounted () {
+    this.data = this.propItems
+  },
+  methods: {
+    emitEditUser(userId) {
+      this.$emit('emitEditUser', userId)
+    },
+    toggleReadAll() {
+      this.readAll = !this.readAll;
+    },
+    getText(text) {
+      if (this.readAll) return text;
+      else {
+        if (!this.hasLongItems) this.hasLongItems = true;
+        return text.slice(0,10) + "...";
       }
     },
-    data: () => ({
-      data: [],
-      readAll: false,
-      hasLongItems: false,
-      table: {
-        headers: [
-          { text: 'userId', value: 'userId' },
-          { text: 'email', value: 'email' },
-          { text: 'createdAt', value: 'createdAt' },
-          { text: 'actions', value: 'actions' },
-        ],
-      }
-    }),
-    mounted () {
-      this.data = this.propItems
+    parseTime(timestamp) {
+      if (!timestamp) return '-';
+      return DisplayTime(timestamp);
     },
-    methods: {
-      toggleReadAll() {
-        this.readAll = !this.readAll;
+  },
+  watch: {
+    propItems: {
+      handler(newVal) {
+        this.data = newVal
       },
-      getText(text) {
-        if (this.readAll) return text;
-        else {
-          if (!this.hasLongItems) this.hasLongItems = true;
-          return text.slice(0,10) + "...";
-        }
-      },
-      parseTime(timestamp) {
-        return DisplayTime(timestamp)
-      },
-    },
-    watch: {
-      propItems: {
-        handler(newVal) {
-          this.data = newVal
-        },
-        immediate: true,
-      },
+      immediate: true,
     },
   }
+}
 </script>
 
 <style scoped lang="scss">
-  .link-action {
-    display: block;
-    min-width: 150px;
-    margin: 10px 0px;
-  }
-
-  .link-toggle-read-all {
-    margin-bottom: 20px;
-    font-size: 14px;
-    display: inline-block;
-    padding-left: 15px;
-    width: auto;
-  }
+.link-action {
+  margin-right: 10px;
+  cursor: pointer;
+  color: #1976D2;
+  text-decoration: none;
+}
 </style>

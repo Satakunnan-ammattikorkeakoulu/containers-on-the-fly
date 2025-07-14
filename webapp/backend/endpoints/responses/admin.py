@@ -8,6 +8,10 @@ from endpoints.models.admin import ContainerEdit, ComputerEdit
 from endpoints.models.reservation import ReservationFilters
 from sqlalchemy.orm import joinedload
 from logger import log
+from helpers.auth import HashPassword, IsCorrectPassword
+import base64
+from endpoints.models.admin import UserEdit
+from database import UserRole, Role
 
 def getReservations(filters : ReservationFilters) -> object:
   '''
@@ -155,25 +159,107 @@ def removeContainer(containerId : int) -> object:
   return Response(True, "Container removed successfully")
 
 def getUsers() -> object:
-  '''
-  Returns a list of all users.
+    '''
+    Returns a list of all users.
 
-  Returns:
-    object: Response object with status, message and data.
-  '''
+    Returns:
+        object: Response object with status, message and data.
+    '''
+    data = []
 
-  data = []
+    with Session() as session:
+        query = session.query(User)
+        for user in query:
+            addable = {}
+            addable["userId"] = user.userId
+            addable["email"] = user.email
+            addable["roles"] = [role.name for role in user.roles]  # Changed role.role to role.name
+            data.append(addable)
 
-  with Session() as session:
-    query = session.query(User)
-    for user in query:
-      addable = {}
-      addable["userId"] = user.userId
-      addable["email"] = user.email
-      addable["createdAt"] = user.userCreatedAt
-      data.append(addable)
-  
-  return Response(True, "Users fetched.", { "users": data })
+    return Response(True, "Users fetched successfully", {"users": data})
+
+def getUser(userId: int) -> object:
+    '''
+    Returns a single user.
+
+    Parameters:
+        userId: id of the user to fetch.
+
+    Returns:
+        object: Response object with status, message and data.
+    '''
+    data = {}
+
+    with Session() as session:
+        user = session.query(User).filter(User.userId == userId).first()
+        if user is None:
+            return Response(False, "User not found")
+        
+        data = {
+            "userId": user.userId,
+            "email": user.email,
+            "roles": [role.name for role in user.roles],  # Changed from role.role to role.name
+            "createdAt": user.userCreatedAt
+        }
+
+    return Response(True, "User fetched successfully", {"user": data})
+
+def saveUser(userId: int, data: dict) -> object:
+    '''
+    Saves user data.
+
+    Parameters:
+        userId: id of the user to save (-1 for new user)
+        data: dictionary containing user data to save
+
+    Returns:
+        object: Response object with status and message
+    '''
+    with Session() as session:
+        # Check if email already exists
+        existing_user = session.query(User).filter(User.email == data["email"]).first()
+        if existing_user is not None and (userId == -1 or existing_user.userId != userId):
+            return Response(False, "A user with this email already exists")
+
+        if userId == -1:
+            # Create new user
+            hash = HashPassword(data["password"])
+            user = User(
+                email=data["email"],
+                password=base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
+                passwordSalt=base64.b64encode(hash["salt"]).decode('utf-8')
+            )
+            session.add(user)
+            session.flush()  # This will populate the userId
+            
+        else:
+            # Update existing user
+            user = session.query(User).filter(User.userId == userId).first()
+            if user is None:
+                return Response(False, "User not found")
+            
+            user.email = data["email"]
+            if "password" in data and data["password"]:
+                hash = HashPassword(data["password"])
+                user.password = base64.b64encode(hash["hashedPassword"]).decode('utf-8')
+                user.passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
+        
+        # Handle roles
+        # First remove all existing roles
+        user.roles = []
+        session.flush()
+        
+        # Then add new roles by querying the Role table
+        if "roles" in data:
+            # Create a set of role names to ensure uniqueness
+            role_names = set(data["roles"])
+            for roleName in role_names:
+                role = session.query(Role).filter(Role.name == roleName).first()
+                if role and role not in user.roles:  # Check if role exists and isn't already assigned
+                    user.roles.append(role)
+        
+        session.commit()
+        return Response(True, "User saved successfully")
 
 def getHardware() -> object:
   '''

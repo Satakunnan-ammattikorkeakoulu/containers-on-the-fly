@@ -14,3 +14,10 @@ class ComputerEdit(BaseModel):
     '''
     computerId: int
     data: Dict[str, Any]
+
+class UserEdit(BaseModel):
+    '''
+    For editing a user.
+    '''
+    userId: int
+    data: Dict[str, Any]

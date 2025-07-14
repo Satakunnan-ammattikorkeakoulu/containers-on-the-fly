@@ -1,9 +1,13 @@
 from fastapi import APIRouter, Depends, Request
-from helpers.server import ForceAuthentication
+from helpers.server import ForceAuthentication, Response
 from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import admin as functionality
-from endpoints.models.admin import ContainerEdit, ComputerEdit
+from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit
 from endpoints.models.reservation import ReservationFilters
+from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole
+from sqlalchemy import desc
+import datetime
+from pydantic import BaseModel
 
 router = APIRouter(
     prefix="/api/admin",
@@ -72,4 +76,14 @@ async def removeContainer(containerId : int, token: str = Depends(oauth2_scheme)
 async def editReservation(reservationId : int, endDate : str, token: str = Depends(oauth2_scheme)):
   ForceAuthentication(token, "admin")
   return functionality.editReservation(reservationId, endDate)
+
+@router.get("/user")
+async def getUser(userId: int, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.getUser(userId)
+
+@router.post("/save_user")
+async def saveUser(userEdit: UserEdit, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.saveUser(userEdit.userId, userEdit.data)
 

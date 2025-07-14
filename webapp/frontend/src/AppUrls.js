@@ -34,6 +34,8 @@ function createUrls(baseAddress) {
     URLS.admin.remove_computer = baseAdminUrl + "remove_computer"
     URLS.admin.get_ports = baseAdminUrl + "ports"
     URLS.admin.edit_reservation = baseAdminUrl + "edit_reservation"
+    URLS.admin.get_user = baseAdminUrl + "user"
+    URLS.admin.save_user = baseAdminUrl + "save_user"
 
     return URLS;
 }

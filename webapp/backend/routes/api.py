@@ -1,7 +1,5 @@
 from fastapi import APIRouter
 from endpoints import user, reservation, admin
-from endpoints.adminRoutes import adminRoles, adminHardwarespecs, adminComputers, adminContainers
-from endpoints.adminRoutes import adminUsers, adminUserWhitelists, adminUserStorages, adminReservations
 from settings import settings
 from helpers.auth import HashPassword
 from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, UserStorage, Container
@@ -11,14 +9,6 @@ router = APIRouter()
 router.include_router(user.router)
 router.include_router(reservation.router)
 router.include_router(admin.router)
-router.include_router(adminRoles.router)
-router.include_router(adminHardwarespecs.router)
-router.include_router(adminComputers.router)
-router.include_router(adminContainers.router)
-router.include_router(adminUsers.router)
-router.include_router(adminUserWhitelists.router)
-router.include_router(adminUserStorages.router)
-router.include_router(adminReservations.router)
 
 
 # Run code here when server starts

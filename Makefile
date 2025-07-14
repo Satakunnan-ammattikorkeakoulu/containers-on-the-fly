@@ -13,6 +13,9 @@ BOLD=\033[1m
 RED=\033[0;31m
 RESET=\033[0m
 
+install-backend-deps: ## Install or update backend dependencies
+	@echo "Installing backend dependencies..."
+	@sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location
 
 
 help:
@@ -365,7 +368,7 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	@echo "$(GREEN)* Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
 	@rm -f .server_type
 
-start-main-server: verify-config-file-exists apply-settings ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
+start-main-server: verify-config-file-exists apply-settings install-backend-deps init-database ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
 	@echo "Moving Caddyfile to /etc/caddy/Caddyfile"
 	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile
 	@echo "Reloading Caddy"
@@ -456,7 +459,7 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 	@echo "2. Run $(BOLD)make start-docker-utility$(RESET)$(GREEN) to start the Docker utility.$(RESET)\n"
 	@rm -f .server_type
 
-start-docker-utility: apply-settings ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
+start-docker-utility: apply-settings install-backend-deps init-database ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
 	@echo "Verifying that connection to the database can be established..."
 	@CONNECTION_URI=$$(grep '"engineUri"' webapp/backend/settings.json | sed 's/.*"engineUri": "\(.*\)".*/\1/') && \
 	CONNECTION_OK=$$($(PYTHON) scripts/verify_db_connection.py "$$CONNECTION_URI") && \
@@ -509,10 +512,10 @@ stop-servers: ## Kills (stops) the frontend, backend and docker utility servers 
 start-dev-frontend: apply-settings
 	cd webapp/frontend && npm run serve
 
-start-dev-backend: apply-settings
+start-dev-backend: apply-settings install-backend-deps init-database
 	cd webapp/backend && $(PYTHON) main.py
 
-start-dev-docker-utility: apply-settings
+start-dev-docker-utility: apply-settings install-backend-deps init-database
 	cd webapp/backend && $(PYTHON) dockerUtil.py
 
 interactive-docker-settings-creation: # Creates Docker utility settings interactively
@@ -715,3 +718,16 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			exit 1; \
 			;; \
 	esac
+
+init-database: ## Initialize database (for both new and existing environments)
+	@echo "Initializing database..."
+	@chmod +x $(BACKEND_PATH)/init_database.py
+	@cd $(BACKEND_PATH) && $(PYTHON) init_database.py
+
+migrate-database: ## Run database migrations
+	@echo "Running database migrations..."
+	@cd $(BACKEND_PATH) && alembic upgrade head
+
+create-migration: ## Create a new database migration (use MESSAGE="your message")
+	@echo "Creating new migration..."
+	@cd $(BACKEND_PATH) && alembic revision --autogenerate -m "$(MESSAGE)"

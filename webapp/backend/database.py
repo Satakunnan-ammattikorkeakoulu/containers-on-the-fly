@@ -191,9 +191,6 @@ class ReservedHardwareSpec(Base):
   hardwareSpec = relationship("HardwareSpec", back_populates = "reservations")
   reservation = relationship("Reservation", back_populates = "reservedHardwareSpecs")
 
-# Create the tables
-Base.metadata.create_all(engine)
-
 # Create session to interact with the database
 from sqlalchemy.orm import sessionmaker
 Session = sessionmaker(bind = engine)

@@ -39,3 +39,4 @@ uvicorn[standard]>=0.34.0
 uvloop==0.21.0
 watchfiles==1.1.0
 websockets==15.0.1
+alembic>=1.13.0

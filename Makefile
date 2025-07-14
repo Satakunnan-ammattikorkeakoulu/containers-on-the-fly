@@ -723,6 +723,8 @@ init-database: ## Initialize database (for both new and existing environments)
 	@echo "Initializing database..."
 	@chmod +x $(BACKEND_PATH)/init_database.py
 	@cd $(BACKEND_PATH) && $(PYTHON) init_database.py
+	@echo "Running any pending migrations..."
+	@cd $(BACKEND_PATH) && alembic upgrade head
 
 migrate-database: ## Run database migrations
 	@echo "Running database migrations..."

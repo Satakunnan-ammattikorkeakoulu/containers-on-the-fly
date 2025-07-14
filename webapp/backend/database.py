@@ -55,6 +55,7 @@ class Role(Base):
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 
   users = relationship("User", secondary = "UserRole", back_populates = "roles", single_parent=True)
+  mounts = relationship("RoleMount", back_populates="role")
 
 class UserRole(Base):
   __tablename__ = "UserRole"
@@ -158,6 +159,7 @@ class Computer(Base):
 
   hardwareSpecs = relationship("HardwareSpec", back_populates = "computer")
   reservations = relationship("Reservation", back_populates = "computer")
+  roleMounts = relationship("RoleMount", back_populates="computer")
 
 class HardwareSpec(Base):
   __tablename__ = "HardwareSpec"
@@ -190,6 +192,21 @@ class ReservedHardwareSpec(Base):
 
   hardwareSpec = relationship("HardwareSpec", back_populates = "reservations")
   reservation = relationship("Reservation", back_populates = "reservedHardwareSpecs")
+
+class RoleMount(Base):
+    __tablename__ = "RoleMount"
+    
+    roleMountId = Column(Integer, primary_key=True, autoincrement=True)
+    roleId = Column(ForeignKey("Role.roleId"), nullable=False)
+    computerId = Column(ForeignKey("Computer.computerId"), nullable=False)
+    hostPath = Column(Text, nullable=False)
+    containerPath = Column(Text, nullable=False)
+    readOnly = Column(Boolean, nullable=False)
+    createdAt = Column(DateTime(timezone=True), server_default=func.now())
+    updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
+
+    role = relationship("Role", back_populates="mounts")
+    computer = relationship("Computer", back_populates="roleMounts")
 
 # Create session to interact with the database
 from sqlalchemy.orm import sessionmaker

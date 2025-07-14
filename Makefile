@@ -14,8 +14,9 @@ RED=\033[0;31m
 RESET=\033[0m
 
 install-backend-deps: ## Install or update backend dependencies
-	@echo "Installing backend dependencies..."
-	@sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location
+	@echo ""
+	@echo "Installing backend dependencies... (pip packages)"
+	@sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location -qq
 
 
 help:
@@ -349,7 +350,7 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	echo ""
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
-	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location
+	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location -qq
 	cd webapp/frontend && sudo -u $${SUDO_USER:-$(shell whoami)} npm install
 
 	# Automatically configure pm2 startup
@@ -369,15 +370,18 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	@rm -f .server_type
 
 start-main-server: verify-config-file-exists apply-settings install-backend-deps init-database ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
+	@echo ""
 	@echo "Moving Caddyfile to /etc/caddy/Caddyfile"
 	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile
 	@echo "Reloading Caddy"
 	@sudo systemctl reload caddy
+	@echo ""
 	@echo "Starting frontend and backend"
 	@cd webapp/frontend && pm2 restart frontend 2>/dev/null || pm2 start "npm run production" --name frontend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@cd webapp/backend && pm2 restart backend 2>/dev/null || pm2 start "$(PYTHON) main.py" --name backend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save
 	@URL=$$(grep -o '"url": "[^"]*"' webapp/backend/settings.json | cut -d'"' -f4) && \
+	echo "" && \
 	echo "" && \
 	echo "$(GREEN)$(BOLD)Servers started/restarted!$(RESET)" && \
 	echo "Access at: $(GREEN)$(BOLD)$$URL$(RESET) (can take some time for the server to start)" && \
@@ -436,7 +440,7 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
-	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location
+	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location -qq
 	@REAL_USER=$${SUDO_USER:-$$(logname 2>/dev/null || echo $$(whoami))}; \
 	usermod -aG docker $$REAL_USER; \
 	echo "Added user $$REAL_USER to docker group"
@@ -460,6 +464,7 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 	@rm -f .server_type
 
 start-docker-utility: apply-settings install-backend-deps init-database ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
+	@echo ""
 	@echo "Verifying that connection to the database can be established..."
 	@CONNECTION_URI=$$(grep '"engineUri"' webapp/backend/settings.json | sed 's/.*"engineUri": "\(.*\)".*/\1/') && \
 	CONNECTION_OK=$$($(PYTHON) scripts/verify_db_connection.py "$$CONNECTION_URI") && \
@@ -471,7 +476,8 @@ start-docker-utility: apply-settings install-backend-deps init-database ## Start
 	fi
 	@cd webapp/backend && pm2 restart backendDockerUtil 2>/dev/null || pm2 start "$(PYTHON) dockerUtil.py" --name backendDockerUtil --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save
-	@echo "\n$(GREEN)Docker utility is now running.$(RESET)"
+	@echo ""
+	@echo "\n$(GREEN)$(BOLD)Docker utility is now running.$(RESET)"
 	@echo "Containers will now automatically start, stop, and restart on this server."
 	@echo ""
 	@echo "View logs: $(GREEN)$(BOLD)make logs$(RESET)"
@@ -720,6 +726,7 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 	esac
 
 init-database: ## Initialize database (for both new and existing environments)
+	@echo ""
 	@echo "Initializing database..."
 	@chmod +x $(BACKEND_PATH)/init_database.py
 	@cd $(BACKEND_PATH) && $(PYTHON) init_database.py

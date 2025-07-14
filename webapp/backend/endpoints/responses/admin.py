@@ -173,7 +173,8 @@ def getUsers() -> object:
             addable = {}
             addable["userId"] = user.userId
             addable["email"] = user.email
-            addable["roles"] = [role.name for role in user.roles]  # Changed role.role to role.name
+            addable["roles"] = [role.name for role in user.roles]
+            addable["createdAt"] = user.userCreatedAt  # Added createdAt field
             data.append(addable)
 
     return Response(True, "Users fetched successfully", {"users": data})

@@ -9,7 +9,7 @@
 
     <v-row class="text-center">
       <v-col cols="12">
-        <v-btn color="green" @click="addRole">Create New Role</v-btn>
+        <v-btn color="green" @click="createNewRole">Create New Role</v-btn>
       </v-col>
     </v-row>
 
@@ -32,11 +32,11 @@
     </v-row>
 
     <AdminManageRoleModal 
-      v-if="selectedItem" 
-      :propData="selectedItem" 
+      v-if="showRoleModal" 
+      :propData="selectedItem"
       :key="dialogKey"
-      @emitModalClose="closeDialog">
-    </AdminManageRoleModal>
+      @emitModalClose="closeDialog"
+    />
 
     <!-- Add the mounts modal -->
     <AdminRoleMountsModal 
@@ -71,7 +71,7 @@ export default {
     roles: [],
     selectedItem: undefined,
     selectedMountsRole: null,
-    dialog: false,
+    showRoleModal: false,
     dialogKey: new Date().getTime(),
     tableName: "roles",
   }),
@@ -83,15 +83,16 @@ export default {
     this.intervalFetch = setInterval(() => { this.fetch()}, 30000);
   },
   methods: {
-    addRole() {
-      this.selectedItem = "new";
-      this.dialogKey = new Date().getTime();
-      this.dialog = true;
+    createNewRole() {
+      this.selectedItem = null;
+      this.showRoleModal = true;
+      this.dialogKey++;
     },
     editRole(roleId) {
-      this.dialogKey = new Date().getTime();
-      this.selectedItem = roleId;
-      this.dialog = true;
+      // Find the role data from our roles array
+      this.selectedItem = this.roles.find(role => role.roleId === roleId);
+      this.showRoleModal = true;
+      this.dialogKey++; // Force modal refresh
     },
     async removeRole(roleId) {
       if (roleId <= 1) {
@@ -135,7 +136,7 @@ export default {
       }
     },
     closeDialog() {
-      this.dialog = false;
+      this.showRoleModal = false;
       this.selectedItem = undefined;
       this.fetch(); // Always fetch when closing the modal
     },

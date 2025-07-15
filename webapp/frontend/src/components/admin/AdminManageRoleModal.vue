@@ -105,37 +105,35 @@ export default {
       
       this.isSubmitting = true;
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.$store.getters.user;  // Get user the same way as other components
+        
         const response = await axios({
           method: "post",
           url: this.AppSettings.APIServer.admin.save_role,
           params: { 
-            roleId: this.isCreatingNew ? null : this.item 
-          },
-          data: {
+            roleId: this.isCreatingNew ? null : this.item,
             name: this.data.name
           },
-          headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${currentUser.loginToken}`  // Use currentUser.loginToken
+          }
         });
 
-        if (response.data.status) {
-          this.$store.commit('showMessage', { 
-            text: this.isCreatingNew ? "Role created successfully" : "Role updated successfully", 
-            color: "success" 
-          });
-          this.close(); // This will trigger the refresh
+        console.log('Role save response:', response.data);
+
+        if (response.data.status === true) {
+          this.$emit('emitModalClose', true);
         } else {
-          this.$store.commit('showMessage', { 
-            text: response.data.message, 
-            color: "error" 
-          });
+          this.$store.commit('showMessage', { text: response.data.message, color: "red" });
         }
       } catch (error) {
-        console.error(error);
-        this.$store.commit('showMessage', { 
-          text: "Error saving role", 
-          color: "error" 
-        });
+        console.error('Role save error:', error);
+        if (error.response && (error.response.status === 400 || error.response.status === 401)) {
+          this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+        } else {
+          this.$store.commit('showMessage', { text: "Unknown error while trying to save role", color: "red" });
+        }
       } finally {
         this.isSubmitting = false;
       }

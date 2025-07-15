@@ -12,7 +12,8 @@ from helpers.auth import HashPassword, IsCorrectPassword
 import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
-from helpers.tables.Role import getRoles, getRoleById, addRole, editRole, removeRole
+from helpers.tables.Role import getRoles, getRoleById, addRole as addRoleHelper, editRole as editRoleHelper, removeRole as removeRoleHelper
+from sqlalchemy import func
 
 def getReservations(filters : ReservationFilters) -> object:
   '''
@@ -572,7 +573,7 @@ def getAllRoles() -> object:
     data.append({
         "roleId": 0,
         "name": "Everyone",
-        "createdAt": datetime.datetime.utcnow().isoformat(),  # Add import if needed
+        "createdAt": datetime.datetime.utcnow().isoformat(),
         "updatedAt": datetime.datetime.utcnow().isoformat()
     })
     
@@ -581,35 +582,36 @@ def getAllRoles() -> object:
         for role in roles:
             data.append(ORMObjectToDict(role))
     
-    return Response(True, "Data fetched.", { "roles": data })
+    return Response(True, "Roles fetched successfully.", {"roles": data})
 
-def saveRole(roleId: int, data: dict) -> object:
+def addRole(name: str) -> object:
     '''
-    Creates or updates a role.
+    Adds a new role.
     Parameters:
-        roleId: The ID of the role to edit, or None for new role
-        data: Dictionary containing role data
+        name: The name of the role
     Returns:
         object: Response object with status and message
     '''
-    name = data.get("name")
-    if not name:
-        return Response(False, "Role name is required")
-
-    # Creating new role
-    if roleId is None:
-        role = addRole(name)
-        if not role:
-            return Response(False, "Role with this name already exists")
-        return Response(True, "Role created successfully")
-    
-    # Editing existing role
-    success = editRole(roleId, name)
+    success, message, role_dict = addRoleHelper(name)
     if not success:
-        return Response(False, "Failed to update role. Role not found or name already exists")
-    return Response(True, "Role updated successfully")
+        return Response(False, message)
+    return Response(True, message, role_dict)
 
-def deleteRole(roleId: int) -> object:
+def editRole(roleId: int, name: str) -> object:
+    '''
+    Edits an existing role.
+    Parameters:
+        roleId: The ID of the role to edit
+        name: The new name for the role
+    Returns:
+        object: Response object with status and message
+    '''
+    success, message, role_dict = editRoleHelper(roleId, name)
+    if not success:
+        return Response(False, message)
+    return Response(True, message, role_dict)
+
+def removeRole(roleId: int) -> object:
     '''
     Removes a role.
     Parameters:
@@ -617,7 +619,7 @@ def deleteRole(roleId: int) -> object:
     Returns:
         object: Response object with status and message
     '''
-    success = removeRole(roleId)
+    success, message = removeRoleHelper(roleId)
     if not success:
-        return Response(False, "Failed to remove role. Role not found or is built-in")
-    return Response(True, "Role removed successfully")
+        return Response(False, message)
+    return Response(True, message)

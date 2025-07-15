@@ -1,6 +1,7 @@
 # Role table management functionality
 from database import Role, Session
 from helpers.server import Response
+from sqlalchemy import func
 
 def getRoles():
     '''
@@ -22,51 +23,104 @@ def getRoleById(roleId):
     with Session() as session:
         return session.query(Role).filter(Role.roleId == roleId).first()
 
-def addRole(name):
+def isRoleNameTaken(session, name: str, excludeRoleId: int = None) -> bool:
     '''
-    Adds a new role to the system.
+    Checks if a role name is already taken.
     Parameters:
-        name: The name of the role.
+        session: The database session
+        name: The name to check
+        excludeRoleId: Optional role ID to exclude from the check (for updates)
     Returns:
-        The created role object or None if name already exists.
+        bool: True if name is taken, False otherwise
     '''
-    with Session() as session:
-        # Check if role with this name already exists
-        existing = session.query(Role).filter(Role.name == name).first()
-        if existing:
-            return None
-            
-        newRole = Role(name=name)
-        session.add(newRole)
-        session.commit()
-        return session.query(Role).filter(Role.name == name).first()
+    query = session.query(Role).filter(func.lower(Role.name) == func.lower(name))
+    if excludeRoleId is not None:
+        query = query.filter(Role.roleId != excludeRoleId)
+    return query.count() > 0
 
-def editRole(roleId, name):
+def validateRoleName(name: str) -> tuple[bool, str]:
     '''
-    Edits an existing role.
+    Validates a role name.
     Parameters:
-        roleId: The ID of the role to edit.
-        name: The new name for the role.
+        name: The name to validate
     Returns:
-        True if successful, False if role not found or name already exists.
+        tuple[bool, str]: (is_valid, error_message)
+    '''
+    # Check for reserved names (case insensitive)
+    reserved_names = ["admin", "everyone"]
+    if name.lower() in reserved_names:
+        return False, f"The name '{name}' is reserved for built-in roles"
+    return True, ""
+
+def addRole(name: str) -> tuple[bool, str, dict]:
+    '''
+    Adds a new role to the database.
+    Parameters:
+        name: The name of the role
+    Returns:
+        tuple[bool, str, dict]: (success, message, role_dict)
     '''
     with Session() as session:
-        # Don't allow editing built-in roles
-        if roleId <= 1:
-            return False
+        try:
+            # Validate name
+            is_valid, error_msg = validateRoleName(name)
+            if not is_valid:
+                return False, error_msg, None
+
+            # Check for duplicate names
+            if isRoleNameTaken(session, name):
+                return False, f"A role with the name '{name}' already exists", None
+
+            # Create new role
+            role = Role(name=name)
+            session.add(role)
+            session.commit()
             
-        # Check if new name already exists
-        existing = session.query(Role).filter(Role.name == name).first()
-        if existing and existing.roleId != roleId:
-            return False
+            # Convert to dict while still in session
+            from helpers.server import ORMObjectToDict
+            role_dict = ORMObjectToDict(role)
+            return True, "Role added successfully", role_dict
+
+        except Exception as e:
+            session.rollback()
+            return False, f"Failed to add role: {str(e)}", None
+
+def editRole(roleId: int, name: str) -> tuple[bool, str, dict]:
+    '''
+    Edits an existing role in the database.
+    Parameters:
+        roleId: The ID of the role to update
+        name: The new name for the role
+    Returns:
+        tuple[bool, str, dict]: (success, message, role_dict)
+    '''
+    with Session() as session:
+        try:
+            # Validate name
+            is_valid, error_msg = validateRoleName(name)
+            if not is_valid:
+                return False, error_msg, None
+
+            # Check for duplicate names (excluding this role)
+            if isRoleNameTaken(session, name, roleId):
+                return False, f"A role with the name '{name}' already exists", None
+
+            # Update existing role
+            role = session.query(Role).filter(Role.roleId == roleId).first()
+            if not role:
+                return False, "Role not found", None
+                
+            role.name = name
+            session.commit()
             
-        role = session.query(Role).filter(Role.roleId == roleId).first()
-        if not role:
-            return False
-            
-        role.name = name
-        session.commit()
-        return True
+            # Convert to dict while still in session
+            from helpers.server import ORMObjectToDict
+            role_dict = ORMObjectToDict(role)
+            return True, "Role updated successfully", role_dict
+
+        except Exception as e:
+            session.rollback()
+            return False, f"Failed to update role: {str(e)}", None
 
 def removeRole(roleId):
     '''
@@ -74,17 +128,17 @@ def removeRole(roleId):
     Parameters:
         roleId: The ID of the role to remove.
     Returns:
-        True if successful, False if role not found or is built-in.
+        tuple[bool, str]: (success, message)
     '''
     with Session() as session:
         # Don't allow removing built-in roles
         if roleId <= 1:
-            return False
+            return False, "Cannot remove built-in roles"
             
         role = session.query(Role).filter(Role.roleId == roleId).first()
         if not role:
-            return False
+            return False, "Role not found"
             
         session.delete(role)
         session.commit()
-        return True
+        return True, "Role removed successfully"

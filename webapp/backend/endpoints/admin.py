@@ -8,7 +8,7 @@ from database import Session, Computer, ContainerPort, User, Reservation, Contai
 from sqlalchemy import desc
 import datetime
 from pydantic import BaseModel
-from helpers.tables.Role import getRoles, getRoleById, addRole, editRole, removeRole
+from helpers.tables.Role import getRoles, getRoleById, addRole as addRoleHelper, editRole as editRoleHelper, removeRole as removeRoleHelper
 from helpers.server import Response, ORMObjectToDict
 
 router = APIRouter(
@@ -17,7 +17,7 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/login")  # Make sure the tokenUrl is correct
 
 @router.post("/reservations")
 async def getReservations(filters : ReservationFilters, token: str = Depends(oauth2_scheme)):
@@ -95,12 +95,15 @@ async def getRoles(token: str = Depends(oauth2_scheme)):
     return functionality.getAllRoles()
 
 @router.post("/save_role")
-async def saveRole(roleId: int = None, data: dict = None, token: str = Depends(oauth2_scheme)):
+async def saveRole(roleId: int = None, name: str = None, token: str = Depends(oauth2_scheme)):
     ForceAuthentication(token, "admin")
-    return functionality.saveRole(roleId, data)
+    if roleId:
+        return functionality.editRole(roleId, name)
+    else:
+        return functionality.addRole(name)
 
 @router.post("/remove_role")
 async def removeRole(roleId: int, token: str = Depends(oauth2_scheme)):
     ForceAuthentication(token, "admin")
-    return functionality.deleteRole(roleId)
+    return functionality.removeRole(roleId)
 

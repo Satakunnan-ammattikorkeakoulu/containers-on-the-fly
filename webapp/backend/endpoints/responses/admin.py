@@ -623,3 +623,38 @@ def removeRole(roleId: int) -> object:
     if not success:
         return Response(False, message)
     return Response(True, message)
+
+def getRoleMounts(roleId: int) -> object:
+    '''
+    Gets all mounts for a specific role.
+    
+    Parameters:
+        roleId: The ID of the role to get mounts for
+        
+    Returns:
+        object: Response object with status, message and data containing mounts
+    '''
+    try:
+        from helpers.tables.Role import getRoleMounts as getRoleMountsHelper
+        mounts = getRoleMountsHelper(roleId)
+        return Response(True, "Role mounts retrieved successfully", {"mounts": mounts})
+    except Exception as e:
+        return Response(False, f"Error retrieving role mounts: {str(e)}")
+
+def saveRoleMounts(roleId: int, mounts: list) -> object:
+    '''
+    Saves role mounts, replacing existing ones.
+    
+    Parameters:
+        roleId: The ID of the role
+        mounts: List of mount dictionaries
+        
+    Returns:
+        object: Response object with status and message
+    '''
+    try:
+        from helpers.tables.Role import saveRoleMounts as saveRoleMountsHelper
+        success, message = saveRoleMountsHelper(roleId, mounts)
+        return Response(success, message)
+    except Exception as e:
+        return Response(False, f"Error saving role mounts: {str(e)}")

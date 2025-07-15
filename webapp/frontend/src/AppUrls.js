@@ -39,6 +39,8 @@ function createUrls(baseAddress) {
     URLS.admin.get_roles = baseAdminUrl + "roles"
     URLS.admin.save_role = baseAdminUrl + "save_role"
     URLS.admin.remove_role = baseAdminUrl + "remove_role"
+    URLS.admin.get_role_mounts = baseAdminUrl + "role_mounts"
+    URLS.admin.save_role_mounts = baseAdminUrl + "save_role_mounts"
 
     return URLS;
 }

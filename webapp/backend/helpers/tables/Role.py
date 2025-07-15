@@ -1,5 +1,5 @@
 # Role table management functionality
-from database import Role, Session
+from database import Role, RoleMount, Computer, Session
 from helpers.server import Response
 from sqlalchemy import func
 
@@ -142,3 +142,73 @@ def removeRole(roleId):
         session.delete(role)
         session.commit()
         return True, "Role removed successfully"
+
+def getRoleMounts(roleId: int) -> list:
+    '''
+    Gets all mounts for a specific role.
+    Parameters:
+        roleId: The ID of the role
+    Returns:
+        List of mount objects with computer information
+    '''
+    with Session() as session:
+        role = session.query(Role).filter(Role.roleId == roleId).first()
+        if not role:
+            return []
+        
+        mounts = []
+        for mount in role.mounts:
+            mount_data = {
+                "roleMountId": mount.roleMountId,
+                "roleId": mount.roleId,
+                "computerId": mount.computerId,
+                "hostPath": mount.hostPath,
+                "containerPath": mount.containerPath,
+                "readOnly": mount.readOnly,
+                "computerName": mount.computer.name if mount.computer else ""
+            }
+            mounts.append(mount_data)
+        
+        return mounts
+
+def saveRoleMounts(roleId: int, mounts: list) -> tuple[bool, str]:
+    '''
+    Saves role mounts, removing old ones and adding new ones.
+    Parameters:
+        roleId: The ID of the role
+        mounts: List of mount dictionaries with computerId, hostPath, containerPath, readOnly
+    Returns:
+        tuple[bool, str]: (success, message)
+    '''
+    with Session() as session:
+        # Check if role exists
+        role = session.query(Role).filter(Role.roleId == roleId).first()
+        if not role:
+            return False, "Role not found"
+        
+        # Remove all existing mounts for this role
+        session.query(RoleMount).filter(RoleMount.roleId == roleId).delete()
+        session.flush()
+        
+        # Add new mounts
+        for mount_data in mounts:
+            # Validate required fields
+            if not all(key in mount_data for key in ['computerId', 'hostPath', 'containerPath']):
+                return False, "Missing required mount fields"
+                
+            # Check if computer exists
+            computer = session.query(Computer).filter(Computer.computerId == mount_data['computerId']).first()
+            if not computer:
+                return False, f"Computer with ID {mount_data['computerId']} not found"
+            
+            new_mount = RoleMount(
+                roleId=roleId,
+                computerId=mount_data['computerId'],
+                hostPath=mount_data['hostPath'],
+                containerPath=mount_data['containerPath'],
+                readOnly=mount_data.get('readOnly', False)
+            )
+            session.add(new_mount)
+        
+        session.commit()
+        return True, "Role mounts saved successfully"

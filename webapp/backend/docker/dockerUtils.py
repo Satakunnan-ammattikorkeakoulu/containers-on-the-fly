@@ -126,6 +126,18 @@ def startDockerContainer(reservationId: str):
       userMountLocation = f'{settings.docker["userMountLocation"]}/{userEmailParsed}'
       details["localMountFolderPath"] = userMountLocation
 
+    # Add role-based mounts
+    details["roleMounts"] = []
+    for role in reservation.user.roles:
+        for mount in role.mounts:
+            # Only add mounts for the current computer
+            if mount.computerId == reservation.computerId:
+                details["roleMounts"].append({
+                    "hostPath": mount.hostPath,
+                    "containerPath": mount.containerPath,
+                    "readOnly": mount.readOnly
+                })
+
     cont_was_started = False
     #print(details)
 

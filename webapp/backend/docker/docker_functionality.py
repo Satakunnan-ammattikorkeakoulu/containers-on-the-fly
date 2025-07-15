@@ -94,6 +94,22 @@ def start_container(pars):
                 else:
                     volumes.append((mount["mountLocation"], f"/home/{pars['username']}/{mount['containerFolderName']}"))
 
+        # Add role-based mounts
+        if "roleMounts" in pars and len(pars["roleMounts"]) > 0:
+            for mount in pars["roleMounts"]:
+                # Create directory for mounting if it does not exist
+                if not os.path.isdir(mount["hostPath"]):
+                    os.makedirs(mount["hostPath"], exist_ok=True)
+                # Set correct owner and group for the mount folder
+                shutil.chown(mount["hostPath"], user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
+                # Set correct file permissions for the mount folder
+                os.chmod(mount["hostPath"], 0o755 if mount["readOnly"] else 0o777)
+                
+                if mount["readOnly"]:
+                    volumes.append((mount["hostPath"], mount["containerPath"], "ro"))
+                else:
+                    volumes.append((mount["hostPath"], mount["containerPath"]))
+
         try:
             import local_overrides
             local_overrides.add_extra_volumes(pars, volumes)

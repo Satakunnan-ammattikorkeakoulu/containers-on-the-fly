@@ -49,48 +49,44 @@
                           persistent-hint
                         ></v-text-field>
                       </v-col>
-                      <v-col cols="6" md="1">
+                      <v-col cols="12" md="2">
                         <v-checkbox
                           v-model="computerForms[computer.computerId].readOnly"
                           label="Read Only"
                         ></v-checkbox>
                       </v-col>
-                      <v-col cols="6" md="1">
-                        <v-btn
-                          color="primary"
+                    </v-row>
+                    <v-row>
+                      <v-col cols="12">
+                        <v-btn 
+                          color="green" 
                           @click="addMount(computer.computerId)"
-                          :disabled="!computerForms[computer.computerId].valid || isSubmitting"
                           :loading="isSubmitting"
                         >
-                          Add
+                          Add Mount
                         </v-btn>
                       </v-col>
                     </v-row>
                   </v-form>
+
+                  <v-divider class="my-4"></v-divider>
 
                   <!-- Existing mounts table -->
                   <v-data-table
                     :headers="mountsHeaders"
                     :items="getMountsForComputer(computer.computerId)"
                     :loading="isLoadingMounts"
-                    class="elevation-1 mt-4"
-                    hide-default-footer
-                    dense
+                    class="elevation-1"
                   >
                     <template v-slot:item.readOnly="{ item }">
-                      <v-chip
-                        small
-                        :color="item.readOnly ? 'warning' : 'success'"
-                        text-color="white"
-                      >
-                        {{ item.readOnly ? 'Read Only' : 'Read Write' }}
+                      <v-chip :color="item.readOnly ? 'orange' : 'green'">
+                        {{ item.readOnly ? 'Read Only' : 'Read/Write' }}
                       </v-chip>
                     </template>
                     <template v-slot:item.actions="{ item }">
-                      <v-btn
-                        small
-                        color="error"
-                        text
+                      <v-btn 
+                        small 
+                        color="red" 
                         @click="removeMount(computer.computerId, item)"
                         :loading="isSubmitting"
                       >
@@ -98,7 +94,9 @@
                       </v-btn>
                     </template>
                     <template v-slot:no-data>
-                      No mounts configured
+                      <div class="text-center pa-4">
+                        No mounts configured
+                      </div>
                     </template>
                   </v-data-table>
                 </v-expansion-panel-content>
@@ -136,7 +134,7 @@ export default {
   },
   data: () => ({
     isOpen: true,
-    isFetching: true,
+    isFetching: false,
     isSubmitting: false,
     isLoadingMounts: false,
     computers: [],
@@ -145,8 +143,8 @@ export default {
     mountsHeaders: [
       { text: 'Host Path', value: 'hostPath' },
       { text: 'Container Path', value: 'containerPath' },
-      { text: 'Read Only', value: 'readOnly', width: '100px' },
-      { text: 'Actions', value: 'actions', sortable: false, width: '100px' }
+      { text: 'Access', value: 'readOnly' },
+      { text: 'Actions', value: 'actions', sortable: false }
     ],
     rules: {
       required: v => !!v || 'This field is required'
@@ -158,15 +156,18 @@ export default {
   methods: {
     async fetchData() {
       try {
+        this.isFetching = true;
         const currentUser = this.$store.getters.user;
-        const response = await axios({
+        
+        // Fetch computers
+        const computersResponse = await axios({
           method: "get",
           url: this.AppSettings.APIServer.admin.get_computers,
           headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
         });
 
-        if (response.data.status) {
-          this.computers = response.data.data.computers;
+        if (computersResponse.data.status) {
+          this.computers = computersResponse.data.data.computers;
           
           // Initialize form data for each computer
           this.computers.forEach(computer => {
@@ -178,16 +179,20 @@ export default {
             });
           });
 
-          // TODO: Fetch existing mounts for this role
-          // Mock data for now
-          this.mounts = [
-            {
-              computerId: this.computers[0]?.computerId,
-              hostPath: '/data/shared',
-              containerPath: '/mnt/shared',
-              readOnly: true
-            }
-          ];
+          // Fetch existing mounts for this role
+          const mountsResponse = await axios({
+            method: "get",
+            url: this.AppSettings.APIServer.admin.get_role_mounts,
+            params: { roleId: this.roleId },
+            headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
+          });
+
+          if (mountsResponse.data.status) {
+            this.mounts = mountsResponse.data.data.mounts;
+          } else {
+            console.warn("Failed to fetch mounts:", mountsResponse.data.message);
+            this.mounts = [];
+          }
         } else {
           this.$store.commit('showMessage', { 
             text: "Failed to fetch computers", 
@@ -214,24 +219,50 @@ export default {
       
       this.isSubmitting = true;
       try {
+        // Create new mount locally first
         const newMount = {
           computerId,
           ...this.computerForms[computerId]
         };
         
-        // TODO: Add API call to create new mount
-        // Mock success for now
-        this.mounts.push(newMount);
+        // Add to local array
+        const updatedMounts = [...this.mounts, newMount];
         
-        // Reset form
-        this.computerForms[computerId] = {
-          valid: false,
-          hostPath: '',
-          containerPath: '',
-          readOnly: false
-        };
-        this.$refs[`mountForm-${computerId}`][0].resetValidation();
-        
+        // Save all mounts to backend
+        const currentUser = this.$store.getters.user;
+        const response = await axios({
+          method: "post",
+          url: this.AppSettings.APIServer.admin.save_role_mounts,
+          data: {
+            roleId: this.roleId,
+            mounts: updatedMounts
+          },
+          headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
+        });
+
+        if (response.data.status) {
+          // Update local state
+          this.mounts = updatedMounts;
+          
+          // Reset form
+          this.computerForms[computerId] = {
+            valid: false,
+            hostPath: '',
+            containerPath: '',
+            readOnly: false
+          };
+          this.$refs[`mountForm-${computerId}`][0].resetValidation();
+          
+          this.$store.commit('showMessage', { 
+            text: "Mount added successfully", 
+            color: "success" 
+          });
+        } else {
+          this.$store.commit('showMessage', { 
+            text: response.data.message || "Failed to add mount", 
+            color: "error" 
+          });
+        }
       } catch (error) {
         console.error(error);
         this.$store.commit('showMessage', { 
@@ -249,13 +280,39 @@ export default {
 
       this.isSubmitting = true;
       try {
-        // TODO: Add API call to remove mount
-        // Mock success for now
-        this.mounts = this.mounts.filter(m => 
+        // Remove from local array
+        const updatedMounts = this.mounts.filter(m => 
           m.computerId !== computerId ||
           m.hostPath !== mount.hostPath || 
           m.containerPath !== mount.containerPath
         );
+        
+        // Save updated mounts to backend
+        const currentUser = this.$store.getters.user;
+        const response = await axios({
+          method: "post",
+          url: this.AppSettings.APIServer.admin.save_role_mounts,
+          data: {
+            roleId: this.roleId,
+            mounts: updatedMounts
+          },
+          headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
+        });
+
+        if (response.data.status) {
+          // Update local state
+          this.mounts = updatedMounts;
+          
+          this.$store.commit('showMessage', { 
+            text: "Mount removed successfully", 
+            color: "success" 
+          });
+        } else {
+          this.$store.commit('showMessage', { 
+            text: response.data.message || "Failed to remove mount", 
+            color: "error" 
+          });
+        }
       } catch (error) {
         console.error(error);
         this.$store.commit('showMessage', { 

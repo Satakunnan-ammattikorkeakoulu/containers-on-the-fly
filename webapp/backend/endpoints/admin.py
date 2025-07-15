@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from helpers.server import ForceAuthentication, Response
 from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import admin as functionality
-from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit
+from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit, RoleMountsEdit
 from endpoints.models.reservation import ReservationFilters
 from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole
 from sqlalchemy import desc
@@ -10,6 +10,7 @@ import datetime
 from pydantic import BaseModel
 from helpers.tables.Role import getRoles, getRoleById, addRole as addRoleHelper, editRole as editRoleHelper, removeRole as removeRoleHelper
 from helpers.server import Response, ORMObjectToDict
+from typing import Dict, Any, List
 
 router = APIRouter(
     prefix="/api/admin",
@@ -106,4 +107,14 @@ async def saveRole(roleId: int = None, name: str = None, token: str = Depends(oa
 async def removeRole(roleId: int, token: str = Depends(oauth2_scheme)):
     ForceAuthentication(token, "admin")
     return functionality.removeRole(roleId)
+
+@router.get("/role_mounts")
+async def getRoleMounts(roleId: int, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.getRoleMounts(roleId)
+
+@router.post("/save_role_mounts")
+async def saveRoleMounts(roleMountsEdit: RoleMountsEdit, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.saveRoleMounts(roleMountsEdit.roleId, roleMountsEdit.mounts)
 

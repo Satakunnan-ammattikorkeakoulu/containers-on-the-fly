@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 class ContainerEdit(BaseModel):
     '''
@@ -21,3 +21,10 @@ class UserEdit(BaseModel):
     '''
     userId: int
     data: Dict[str, Any]
+
+class RoleMountsEdit(BaseModel):
+    '''
+    For editing role mounts.
+    '''
+    roleId: int
+    mounts: List[Dict[str, Any]]

@@ -97,12 +97,12 @@ export default {
       this.roles = [
         {
           roleId: 0,
-          name: "everyone",
+          name: "Everyone",
           createdAt: new Date().toISOString()
         },
         {
           roleId: 1,
-          name: "admin",
+          name: "Admin",
           createdAt: new Date().toISOString()
         }
       ];

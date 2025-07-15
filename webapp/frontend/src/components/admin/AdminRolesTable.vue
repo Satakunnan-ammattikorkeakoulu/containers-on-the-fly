@@ -7,13 +7,21 @@
       :sort-desc="false"
       class="elevation-1">
 
+      <!-- Name column with description for built-in roles -->
+      <template v-slot:item.name="{item}">
+        {{ item.name }}
+        <br v-if="item.roleId <= 1">
+        <span v-if="item.roleId <= 1" class="role-description">
+          {{ getRoleDescription(item.roleId) }}
+        </span>
+      </template>
+
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
-        <template v-if="item.roleId > 1">  <!-- Only show actions for non-built-in roles -->
+        <template v-if="item.roleId > 1">
           <a class="link-action" @click="emitEditRole(item.roleId)">Edit Role</a>
           <a class="link-action" @click="emitRemoveRole(item.roleId)">Remove Role</a>
         </template>
-        <span v-else class="built-in-role">Built-in Role</span>
       </template>
 
       <!-- Format the timestamps -->
@@ -50,6 +58,14 @@ export default {
     this.data = this.propItems;
   },
   methods: {
+    getRoleDescription(roleId) {
+      if (roleId === 0) {
+        return "Built-in role for all users in the system. Everyone belongs to this role automatically.";
+      } else if (roleId === 1) {
+        return "Built-in role for system administrators.";
+      }
+      return "";
+    },
     emitEditRole(roleId) {
       this.$emit('emitEditRole', roleId);
     },
@@ -72,8 +88,11 @@ export default {
     text-decoration: underline;
   }
 }
-.built-in-role {
+.role-description {
   color: #666;
   font-style: italic;
+  font-size: 0.85em;
+  display: inline-block;
+  margin-top: 4px;
 }
 </style> 

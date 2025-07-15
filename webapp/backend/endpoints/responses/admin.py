@@ -567,20 +567,9 @@ def getAllRoles() -> object:
     Returns:
         object: Response object with status, message and data.
     '''
-    data = []
-    
-    # Add the built-in "Everyone" role first
-    data.append({
-        "roleId": 0,
-        "name": "Everyone",
-        "createdAt": datetime.datetime.utcnow().isoformat(),
-        "updatedAt": datetime.datetime.utcnow().isoformat()
-    })
-    
     with Session() as session:
         roles = getRoles()
-        for role in roles:
-            data.append(ORMObjectToDict(role))
+        data = [ORMObjectToDict(role) for role in roles]
     
     return Response(True, "Roles fetched successfully.", {"roles": data})
 

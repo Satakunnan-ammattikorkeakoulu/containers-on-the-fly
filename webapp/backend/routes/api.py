@@ -4,6 +4,7 @@ from settings import settings
 from helpers.auth import HashPassword
 from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, UserStorage, Container
 import base64
+import sqlalchemy as sa
 
 router = APIRouter()
 router.include_router(user.router)
@@ -18,17 +19,27 @@ if settings.app["production"] == True:
 else:
   print("Running server in development mode")
 
-if settings.app["addTestDataInDevelopment"]:
-  with Session() as session:
-    # Admin role
-    adminRole = session.query(Role).filter( Role.name == "admin" ).first()
-    if adminRole is None:
-      print("Creating test data: admin role with name admin")
-      session.add(Role(
-        name = "admin"
-      ))
-      session.commit()
-    
+# Add everyone role if it does not exist
+with Session() as session:
+  everyoneRole = session.query(Role).filter(Role.name == "everyone").first()
+  if everyoneRole is None:
+    print("Creating role everyone")
+    session.add(Role(
+      name = "everyone"
+    ))
+    session.commit()
+
+# Add admin role if it does not exist
+with Session() as session:
+  adminRole = session.query(Role).filter(Role.name == "admin").first()
+  if adminRole is None:
+    print("Creating role admin")
+    session.add(Role(
+      name = "admin"
+    ))
+    session.commit()
+
+if settings.app["addTestDataInDevelopment"]:    
     # Admin user
     adminUser = session.query(User).filter( User.email == "admin@foo.com" ).first()
     if adminUser is None:

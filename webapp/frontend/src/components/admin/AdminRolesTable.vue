@@ -10,16 +10,16 @@
       <!-- Name column with description for built-in roles -->
       <template v-slot:item.name="{item}">
         {{ item.name }}
-        <br v-if="item.roleId <= 1">
-        <span v-if="item.roleId <= 1" class="role-description">
-          {{ getRoleDescription(item.roleId) }}
+        <br v-if="isBuiltInRole(item.name)">
+        <span v-if="isBuiltInRole(item.name)" class="role-description">
+          {{ getRoleDescription(item.name) }}
         </span>
       </template>
 
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
         <!-- Regular role management actions -->
-        <template v-if="item.roleId > 1">
+        <template v-if="!isBuiltInRole(item.name)">
           <a class="link-action" @click="emitEditRole(item.roleId)">Edit Role</a>
           <a class="link-action" @click="emitRemoveRole(item.roleId)">Remove Role</a>
         </template>
@@ -29,7 +29,7 @@
 
       <!-- Format the timestamps -->
       <template v-slot:item.createdAt="{item}">
-        {{ parseTime(item.createdAt) }}
+        {{ isBuiltInRole(item.name) ? '-' : parseTime(item.createdAt) }}
       </template>
     </v-data-table>
   </div>
@@ -69,10 +69,13 @@ export default {
     },
   },
   methods: {
-    getRoleDescription(roleId) {
-      if (roleId === 0) {
+    isBuiltInRole(name) {
+      return name === "everyone" || name === "admin";
+    },
+    getRoleDescription(name) {
+      if (name === "everyone") {
         return "Built-in role for all users in the system. Everyone belongs to this role automatically.";
-      } else if (roleId === 1) {
+      } else if (name === "admin") {
         return "Built-in role for system administrators.";
       }
       return "";

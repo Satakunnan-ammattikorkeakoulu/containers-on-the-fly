@@ -8,7 +8,7 @@ import os
 import shutil
 import traceback
 
-def start_container(pars):
+def start_container(pars, reservation):
     """
     Starts a Docker container with the given parameters.
 
@@ -18,26 +18,13 @@ def start_container(pars):
     Required parameters:
         name (string): Name of the container. Must be unique in Docker.
         image (string): Name of the image. Note: The image must be created in Docker before starting the container.
-        username (string): Username of the container user. Note: The user must be created in the Docker image before starting the container.
+        username (string): Username of the container user. Note: The user must be created in Docker image before starting the container.
         cpus (int): The amount of cpus dedicated for the container. Note: The amount of cpus must be available in the host machine.
         memory (string): The amount of RAM memory dedicated for the container. For example: "1g" or "8g"
         ports (list): The ports to be used. In format: [(local_port, container_port), (local_port2, container_port2)]. For example: [(2213, 22)] for SSH.
         localMountFolderPath (string): The folder to mount in the local filesystem. For example: /home/user/docker_mounts
-        dbUserId (string): User ID from the database who started the container
-    Optional parameters:
-        gpus (string): The amount of gpus dedicated for the container in format "device=0,2,4" where "0", "2" and "4" are device nvidia / cuda IDs. Pass None if no gpus are needed.
-        image_version (string) (default: "latest"): The image version to use.
-        password (string) (default: random password): Password for the user of the container
-        interactive (int) (default: True): Leave stdin open during the duration of the process to allow communication with the parent process. Currently only works with tty=True for interactive use on the terminal.
-        remove (int) (default: True): If this is True, removes the container after it is stopped.
-        shm_size (int): The size of the shared memory. For example: 1g
-    Returns:
-        namedtuple:
-            (boolean) started: True if the container was started successfully,
-            (string) container_name: The name of the container (if any),
-            (string) password: The password of the container user (if any),
-            (string) error_message: Error message(s) (if any),
-            (string) non_critical_error: Non-critical error messages (if any)
+        volumes (list): Extra volumes to mount. In format: [(local_path, container_path), (local_path2, container_path2)]
+        reservation: Reservation object for accessing user roles and role-based mounts
     """
 
     try:
@@ -49,6 +36,7 @@ def start_container(pars):
         if "memory" not in pars: raise Exception("Missing parameter: memory")
         if "ports" not in pars: raise Exception("Missing parameter: ports")
         if "dbUserId" not in pars: raise Exception("Missing parameter: dbUserId")
+        if "reservation" not in pars: raise Exception("Missing parameter: reservation")
 
         if "gpus" not in pars: pars["gpus"] = None
         if pars["gpus"] == 0: pars["gpus"] = None
@@ -77,44 +65,37 @@ def start_container(pars):
 
         # Add volumes and mounts
         volumes = []
-        if pars.get("localMountFolderPath"):
-            # Create directory for mounting if it does not exist
-            if not os.path.isdir(pars["localMountFolderPath"]):
-                os.makedirs(pars["localMountFolderPath"], exist_ok=True)
-            # Set correct owner and group for the mount folder
-            shutil.chown(pars["localMountFolderPath"], user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
-            # Set correct file permissions for the mount folder
-            os.chmod(pars["localMountFolderPath"], 0o777)
-            volumes.append((pars['localMountFolderPath'], f"/home/{pars['username']}/persistent"))
-            #volumes = [(pars['localMountFolderPath'], f"/home/{pars['username']}/persistent")]
-        if "extraMounts" in settings.docker and len(settings.docker["extraMounts"]) > 0:
-            for mount in settings.docker["extraMounts"]:
-                if mount["readOnly"]:
-                    volumes.append((mount["mountLocation"], f"/home/{pars['username']}/{mount['containerFolderName']}", "ro"))
-                else:
-                    volumes.append((mount["mountLocation"], f"/home/{pars['username']}/{mount['containerFolderName']}"))
 
         # Add role-based mounts
-        if "roleMounts" in pars and len(pars["roleMounts"]) > 0:
-            for mount in pars["roleMounts"]:
-                # Create directory for mounting if it does not exist
-                if not os.path.isdir(mount["hostPath"]):
-                    os.makedirs(mount["hostPath"], exist_ok=True)
-                # Set correct owner and group for the mount folder
-                shutil.chown(mount["hostPath"], user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
-                # Set correct file permissions for the mount folder
-                os.chmod(mount["hostPath"], 0o755 if mount["readOnly"] else 0o777)
-                
-                if mount["readOnly"]:
-                    volumes.append((mount["hostPath"], mount["containerPath"], "ro"))
-                else:
-                    volumes.append((mount["hostPath"], mount["containerPath"]))
-
-        try:
-            import local_overrides
-            local_overrides.add_extra_volumes(pars, volumes)
-        except ImportError:
-            pass
+        # Get all roles for the user (including "Everyone" role)
+        user_roles = list(reservation.user.roles)
+        
+        # Always include "Everyone" role for all users
+        from database import Session, Role
+        with Session() as session:
+            everyone_role = session.query(Role).filter(Role.name == "everyone").first()
+            if everyone_role: user_roles.append(everyone_role)
+        
+        # Apply mounts from all roles
+        for role in user_roles:
+            for mount in role.mounts:
+                # Only include mounts for this specific computer
+                if mount.computerId == reservation.reservedContainer.computerId:
+                    # Apply the same directory setup logic as localMountFolderPath
+                    if mount.hostPath:
+                        # Create directory for mounting if it does not exist
+                        if not os.path.isdir(mount.hostPath):
+                            os.makedirs(mount.hostPath, exist_ok=True)
+                        # Set correct owner and group for the mount folder
+                        shutil.chown(mount.hostPath, user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
+                        # Set correct file permissions for the mount folder
+                        os.chmod(mount.hostPath, 0o777)
+                    
+                    # Add the volume mount
+                    if mount.readOnly:
+                        volumes.append((mount.hostPath, mount.containerPath, "ro"))
+                    else:
+                        volumes.append((mount.hostPath, mount.containerPath))
 
         full_image_name = f"{settings.docker['registryAddress']}/{pars['image']}:{pars['image_version']}"
         #testing ram disk

@@ -95,7 +95,8 @@ export default {
       this.dialogKey++; // Force modal refresh
     },
     async removeRole(roleId) {
-      if (roleId <= 1) {
+      const role = this.roles.find(r => r.roleId === roleId);
+      if (role.name === "admin" || role.name === "everyone") {
         this.$store.commit('showMessage', { 
           text: "Cannot remove built-in roles", 
           color: "error" 

@@ -1,5 +1,5 @@
 from python_on_whales import docker
-from database import Session, Reservation, Computer, ReservedContainerPort
+from database import Session, Reservation, Computer, ReservedContainerPort, Role
 from helpers.auth import create_password
 from helpers.server import ORMObjectToDict
 #from dateutil import parser
@@ -128,20 +128,41 @@ def startDockerContainer(reservationId: str):
 
     # Add role-based mounts
     details["roleMounts"] = []
+    
+    # Always add mounts from "Everyone" role (roleId = 0)
+    with Session() as session:
+        everyone_role = session.query(Role).filter(Role.name == "everyone").first()
+        if everyone_role:
+            for mount in everyone_role.mounts:
+                if mount.computerId == reservation.computerId:
+                    details["roleMounts"].append({
+                        "hostPath": mount.hostPath,
+                        "containerPath": mount.containerPath,
+                        "readOnly": mount.readOnly
+                    })
+    
+    # Add mounts from user's assigned roles
     for role in reservation.user.roles:
         for mount in role.mounts:
             # Only add mounts for the current computer
             if mount.computerId == reservation.computerId:
-                details["roleMounts"].append({
-                    "hostPath": mount.hostPath,
-                    "containerPath": mount.containerPath,
-                    "readOnly": mount.readOnly
-                })
+                # Check if this mount is already added (avoid duplicates from Everyone role)
+                mount_exists = any(
+                    existing["hostPath"] == mount.hostPath and 
+                    existing["containerPath"] == mount.containerPath 
+                    for existing in details["roleMounts"]
+                )
+                if not mount_exists:
+                    details["roleMounts"].append({
+                        "hostPath": mount.hostPath,
+                        "containerPath": mount.containerPath,
+                        "readOnly": mount.readOnly
+                    })
 
     cont_was_started = False
     #print(details)
 
-    cont_was_started, cont_name, cont_password, errors, non_critical_errors = start_container(details)
+    cont_was_started, cont_name, cont_password, errors, non_critical_errors = start_container(details, reservation)
     
     if cont_was_started == True:
       print(f"Container with Docker name {cont_name} was started succesfully.")

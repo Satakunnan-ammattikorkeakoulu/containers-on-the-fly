@@ -33,11 +33,19 @@
 
               <!-- ROLES -->
               <v-col cols="12">
-                <v-checkbox 
-                  v-model="data.roles" 
-                  label="admin" 
-                  value="admin">
-                </v-checkbox>
+                <p class="subtitle-1">Roles</p>
+                <div class="roles-container">
+                  <v-checkbox 
+                    v-for="role in availableRoles"
+                    :key="role.roleId"
+                    v-model="data.roles" 
+                    :label="capitalizeBuiltInRole(role.name)" 
+                    :value="role.name"
+                    class="role-checkbox"
+                    hide-details
+                    dense>
+                  </v-checkbox>
+                </div>
               </v-col>
             </v-row>
           </v-container>
@@ -68,6 +76,7 @@ export default {
     return {
       item: this.propData,
       data: { roles: [] },
+      availableRoles: [],
       isCreatingNew: false,
       isOpen: true,
       isFetching: true,
@@ -96,6 +105,8 @@ export default {
       this.isFetching = true;
       this.fetchData();
     }
+    // Fetch available roles when component is created
+    this.fetchRoles();
   },
   methods: {
     closeDialog() {
@@ -166,6 +177,34 @@ export default {
         }
         _this.isFetching = false;
       });
+    },
+
+    capitalizeBuiltInRole(name) {
+      if (name === "admin") return "Admin";
+      if (name === "everyone") return "Everyone";
+      return name;
+    },
+
+    fetchRoles() {
+      let currentUser = this.$store.getters.user;
+      
+      axios({
+        method: "get",
+        url: this.AppSettings.APIServer.admin.get_roles,
+        headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
+      })
+      .then(response => {
+        if (response.data.status === true) {
+          // Filter out the "everyone" role since all users belong to it automatically
+          this.availableRoles = response.data.data.roles.filter(role => role.name !== "everyone");
+        } else {
+          this.$store.commit('showMessage', { text: "Failed to fetch roles", color: "red" });
+        }
+      })
+      .catch(error => {
+        console.error(error);
+        this.$store.commit('showMessage', { text: "Error fetching roles", color: "red" });
+      });
     }
   },
   watch: {
@@ -185,5 +224,16 @@ export default {
 
 .help-text {
   margin-top: -7px;
+}
+
+.roles-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.role-checkbox {
+  margin-top: 0;
+  padding-top: 0;
 }
 </style> 

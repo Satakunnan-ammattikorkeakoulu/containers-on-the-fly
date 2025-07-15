@@ -1,5 +1,5 @@
 # Role table management functionality
-from database import Role, RoleMount, Computer, Session
+from database import Role, RoleMount, Computer, Session, UserRole
 from helpers.server import Response
 from sqlalchemy import func
 
@@ -124,24 +124,40 @@ def editRole(roleId: int, name: str) -> tuple[bool, str, dict]:
 
 def removeRole(roleId):
     '''
-    Removes a role from the system.
+    Removes a role from the system and cleans up all associated data:
+    - Removes all user associations (UserRole entries)
+    - Removes all role mounts (RoleMount entries)
+    - Removes the role itself
+    
     Parameters:
         roleId: The ID of the role to remove.
     Returns:
         tuple[bool, str]: (success, message)
     '''
     with Session() as session:
-        # Don't allow removing built-in roles
-        if roleId <= 1:
-            return False, "Cannot remove built-in roles"
+        try:
+            role = session.query(Role).filter(Role.roleId == roleId).first()
+            if not role:
+                return False, "Role not found"
             
-        role = session.query(Role).filter(Role.roleId == roleId).first()
-        if not role:
-            return False, "Role not found"
+            # Don't allow removing built-in roles
+            if role.name.lower() in ["admin", "everyone"]:
+                return False, f"Cannot remove built-in role '{role.name}'"
             
-        session.delete(role)
-        session.commit()
-        return True, "Role removed successfully"
+            # Remove all user associations
+            session.query(UserRole).filter(UserRole.roleId == roleId).delete()
+            
+            # Remove all role mounts
+            session.query(RoleMount).filter(RoleMount.roleId == roleId).delete()
+            
+            # Remove the role itself
+            session.delete(role)
+            session.commit()
+            return True, "Role and all its associations removed successfully"
+            
+        except Exception as e:
+            session.rollback()
+            return False, f"Failed to remove role: {str(e)}"
 
 def getRoleMounts(roleId: int) -> list:
     '''

@@ -50,6 +50,11 @@ const routes = [
     component: () => import(/* webpackChunkName: "admincomputers" */ '../views/admin/ViewAdminComputers.vue')
   },
   {
+    path: '/admin/roles',
+    name: 'admin/roles',
+    component: () => import(/* webpackChunkName: "adminroles" */ '../views/admin/ViewAdminRoles.vue')
+  },
+  {
     // path: "*",
     path: "/:catchAll(.*)",
     name: "NotFound",

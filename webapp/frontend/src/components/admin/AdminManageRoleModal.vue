@@ -44,6 +44,9 @@
   </template>
   
   <script>
+  // Add axios back
+  const axios = require('axios').default;
+
   export default {
     name: "AdminManageRoleModal",
     props: {
@@ -92,19 +95,79 @@
         this.isFetching = false;
       }
     },
-    methods: {
-      close() {
-        this.$emit('emitModalClose');
+    watch: {
+      propData: {
+        handler(newVal) {
+          this.item = newVal;
+          this.isCreatingNew = this.item === "new";
+          if (this.isCreatingNew) {
+            this.data = {
+              name: "",
+            };
+            this.isFetching = false;
+          } else {
+            // TODO: Add backend call to fetch role details
+            // For now using mock data
+            if (this.item === 0) {
+              this.data = {
+                roleId: 0,
+                name: "everyone",
+              };
+            } else if (this.item === 1) {
+              this.data = {
+                roleId: 1,
+                name: "admin",
+              };
+            }
+            this.isFetching = false;
+          }
+        },
+        immediate: true,
       },
-      save() {
+    },
+    methods: {
+      async save() {
         if (!this.$refs.form.validate()) return;
         
         this.isSubmitting = true;
-        // TODO: Add backend call to save role
-        setTimeout(() => {
+        try {
+          const currentUser = this.$store.getters.user;
+          const response = await axios({
+            method: "post",
+            url: this.AppSettings.APIServer.admin.save_role,
+            params: { 
+              roleId: this.isCreatingNew ? null : this.item 
+            },
+            data: {
+              name: this.data.name
+            },
+            headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
+          });
+
+          if (response.data.status) {
+            this.$store.commit('showMessage', { 
+              text: this.isCreatingNew ? "Role created successfully" : "Role updated successfully", 
+              color: "success" 
+            });
+            this.close(); // This will trigger the refresh
+          } else {
+            this.$store.commit('showMessage', { 
+              text: response.data.message, 
+              color: "error" 
+            });
+          }
+        } catch (error) {
+          console.error(error);
+          this.$store.commit('showMessage', { 
+            text: "Error saving role", 
+            color: "error" 
+          });
+        } finally {
           this.isSubmitting = false;
-          this.close();
-        }, 500);
+        }
+      },
+      close() {
+        this.$emit('emitModalClose');
       }
     }
   }

@@ -16,7 +16,11 @@
     <v-row v-if="!isFetching">
       <v-col cols="12">
         <div v-if="roles && roles.length > 0" style="margin-top: 50px">
-          <AdminRolesTable v-on:emitEditRole="editRole" v-on:emitRemoveRole="removeRole" v-bind:propItems="roles" />
+          <AdminRolesTable 
+            v-on:emitEditRole="editRole" 
+            v-on:emitRemoveRole="removeRole" 
+            v-on:emitManageMounts="manageMounts" 
+            v-bind:propItems="roles" />
         </div>
         <p v-else class="dim text-center">No roles.</p>
       </v-col>
@@ -28,12 +32,19 @@
     </v-row>
 
     <AdminManageRoleModal 
-      @click.stop="dialog = true" 
       v-if="selectedItem" 
-      v-on:emitModalClose="closeDialog" 
       :propData="selectedItem" 
-      :key="dialogKey">
+      :key="dialogKey"
+      @emitModalClose="closeDialog">
     </AdminManageRoleModal>
+
+    <!-- Add the mounts modal -->
+    <AdminRoleMountsModal 
+      v-if="selectedMountsRole"
+      :roleId="selectedMountsRole.roleId"
+      :roleName="selectedMountsRole.name"
+      @emitModalClose="closeMountsDialog">
+    </AdminRoleMountsModal>
   </v-container>
 </template>
 
@@ -41,19 +52,25 @@
 import Loading from '/src/components/global/Loading.vue';
 import AdminRolesTable from '/src/components/admin/AdminRolesTable.vue';
 import AdminManageRoleModal from '/src/components/admin/AdminManageRoleModal.vue';
+import AdminRoleMountsModal from '/src/components/admin/AdminRoleMountsModal.vue';
+
+// Add axios back
+const axios = require('axios').default;
 
 export default {
   name: 'PageAdminRoles',
   components: {
     Loading,
     AdminRolesTable,
-    AdminManageRoleModal
+    AdminManageRoleModal,
+    AdminRoleMountsModal
   },
   data: () => ({
     intervalFetch: null,
     isFetching: false,
     roles: [],
     selectedItem: undefined,
+    selectedMountsRole: null,
     dialog: false,
     dialogKey: new Date().getTime(),
     tableName: "roles",
@@ -76,41 +93,93 @@ export default {
       this.selectedItem = roleId;
       this.dialog = true;
     },
-    removeRole(roleId) {
-      // Don't allow removing built-in roles (everyone and admin)
-      if (roleId === 0 || roleId === 1) {
-        this.$store.commit('showMessage', { text: "Cannot remove built-in roles.", color: "error" });
+    async removeRole(roleId) {
+      if (roleId <= 1) {
+        this.$store.commit('showMessage', { 
+          text: "Cannot remove built-in roles", 
+          color: "error" 
+        });
         return;
       }
-      let result = window.confirm("Do you really want to remove this role? This action cannot be undone.");
-      if (!result) return;
-      // TODO: Add backend call to remove role
+
+      const confirm = window.confirm("Do you really want to remove this role? This action cannot be undone.");
+      if (!confirm) return;
+
+      try {
+        const currentUser = this.$store.getters.user;
+        const response = await axios({
+          method: "post",
+          url: this.AppSettings.APIServer.admin.remove_role,
+          params: { roleId },
+          headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
+        });
+
+        if (response.data.status) {
+          this.$store.commit('showMessage', { 
+            text: "Role removed successfully", 
+            color: "success" 
+          });
+          await this.fetch(); // Make sure to await the fetch
+        } else {
+          this.$store.commit('showMessage', { 
+            text: response.data.message, 
+            color: "error" 
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        this.$store.commit('showMessage', { 
+          text: "Error removing role", 
+          color: "error" 
+        });
+      }
     },
     closeDialog() {
       this.dialog = false;
       this.selectedItem = undefined;
-      this.fetch();
+      this.fetch(); // Always fetch when closing the modal
     },
-    fetch() {
-      // TODO: Add backend call to fetch roles
-      // For now, using mock data with built-in roles
-      this.roles = [
-        {
-          roleId: 0,
-          name: "Everyone",
-          createdAt: new Date().toISOString()
-        },
-        {
-          roleId: 1,
-          name: "Admin",
-          createdAt: new Date().toISOString()
+    async fetch() {
+      try {
+        const currentUser = this.$store.getters.user;
+        const response = await axios({
+          method: "get",
+          url: this.AppSettings.APIServer.admin.get_roles,
+          headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
+        });
+
+        if (response.data.status) {
+          this.roles = response.data.data.roles;
+        } else {
+          this.$store.commit('showMessage', { 
+            text: "Failed to fetch roles", 
+            color: "error" 
+          });
         }
-      ];
-      this.isFetching = false;
+      } catch (error) {
+        console.error(error);
+        this.$store.commit('showMessage', { 
+          text: "Error fetching roles", 
+          color: "error" 
+        });
+      } finally {
+        this.isFetching = false;
+      }
+    },
+    manageMounts(role) {
+      this.selectedMountsRole = role;
+    },
+    closeMountsDialog(shouldRefresh) {
+      this.selectedMountsRole = null;
+      if (shouldRefresh) {
+        this.fetch();
+      }
     }
   },
   beforeDestroy() {
-    clearInterval(this.intervalFetch);
+    if (this.intervalFetch) {
+      clearInterval(this.intervalFetch);
+    }
   },
 }
 </script>

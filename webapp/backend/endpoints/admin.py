@@ -8,6 +8,8 @@ from database import Session, Computer, ContainerPort, User, Reservation, Contai
 from sqlalchemy import desc
 import datetime
 from pydantic import BaseModel
+from helpers.tables.Role import getRoles, getRoleById, addRole, editRole, removeRole
+from helpers.server import Response, ORMObjectToDict
 
 router = APIRouter(
     prefix="/api/admin",
@@ -86,4 +88,19 @@ async def getUser(userId: int, token: str = Depends(oauth2_scheme)):
 async def saveUser(userEdit: UserEdit, token: str = Depends(oauth2_scheme)):
     ForceAuthentication(token, "admin")
     return functionality.saveUser(userEdit.userId, userEdit.data)
+
+@router.get("/roles")
+async def getRoles(token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.getAllRoles()
+
+@router.post("/save_role")
+async def saveRole(roleId: int = None, data: dict = None, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.saveRole(roleId, data)
+
+@router.post("/remove_role")
+async def removeRole(roleId: int, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.deleteRole(roleId)
 

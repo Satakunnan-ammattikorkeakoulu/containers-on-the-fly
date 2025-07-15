@@ -36,6 +36,9 @@ function createUrls(baseAddress) {
     URLS.admin.edit_reservation = baseAdminUrl + "edit_reservation"
     URLS.admin.get_user = baseAdminUrl + "user"
     URLS.admin.save_user = baseAdminUrl + "save_user"
+    URLS.admin.get_roles = baseAdminUrl + "roles"
+    URLS.admin.save_role = baseAdminUrl + "save_role"
+    URLS.admin.remove_role = baseAdminUrl + "remove_role"
 
     return URLS;
 }

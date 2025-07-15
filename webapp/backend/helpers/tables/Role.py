@@ -1,76 +1,90 @@
 # Role table management functionality
 from database import Role, Session
+from helpers.server import Response
 
-def getRoles(filter = None):
-  '''
-  Finds roles with the given optional filter. If no filter is given, finds all roles in the system.
-    Parameters:
-      filter: Additional filters. Example usage: ...
+def getRoles():
+    '''
+    Gets all roles from the database.
     Returns:
-      All found roles in a list.
-  '''
-  with Session() as session:
-    if filter != None:
-      roles = session.query(Role).filter(Role.name == filter).first()
-      if roles != None: return [roles]
-      else:
-        try:
-          roles = session.query(Role).filter(Role.roleId == int(filter)).first()
-          if roles != None:
-            return [roles]
-          else:
-            return None
-        except:
-          return None
-    else:
-      roles = session.query(Role).all()
-    return roles
+        List of all roles.
+    '''
+    with Session() as session:
+        return session.query(Role).all()
+
+def getRoleById(roleId):
+    '''
+    Gets a role by its ID.
+    Parameters:
+        roleId: The ID of the role to get.
+    Returns:
+        The role object or None if not found.
+    '''
+    with Session() as session:
+        return session.query(Role).filter(Role.roleId == roleId).first()
 
 def addRole(name):
-  '''
-  Adds the given role in the system.
+    '''
+    Adds a new role to the system.
     Parameters:
-      name: The name of the role to be added.
+        name: The name of the role.
     Returns:
-      The created role object fetched from database. Or None if provided name already exists.
-  '''
+        The created role object or None if name already exists.
+    '''
+    with Session() as session:
+        # Check if role with this name already exists
+        existing = session.query(Role).filter(Role.name == name).first()
+        if existing:
+            return None
+            
+        newRole = Role(name=name)
+        session.add(newRole)
+        session.commit()
+        return session.query(Role).filter(Role.name == name).first()
 
-  with Session() as session:
-    duplicate = session.query(Role).filter(Role.name == name).first()
-    if duplicate != None:
-      return None
-    newRole = Role(name = name)
-    session.add(newRole)
-    session.commit()
-
-    user = session.query(Role).filter(Role.name == name).first()
-
-    return user
-
-def removeRole(role_id):
-  '''
-  Removes the given role in the system.
+def editRole(roleId, name):
+    '''
+    Edits an existing role.
     Parameters:
-      role: The id of the role to be removed.
+        roleId: The ID of the role to edit.
+        name: The new name for the role.
     Returns:
-      Nothing
-  '''
-  with Session as session:
-    role = session.query(Role).filter(Role.roleId == role_id).first()
-    session.delete(role)
-    session.commit()
+        True if successful, False if role not found or name already exists.
+    '''
+    with Session() as session:
+        # Don't allow editing built-in roles
+        if roleId <= 1:
+            return False
+            
+        # Check if new name already exists
+        existing = session.query(Role).filter(Role.name == name).first()
+        if existing and existing.roleId != roleId:
+            return False
+            
+        role = session.query(Role).filter(Role.roleId == roleId).first()
+        if not role:
+            return False
+            
+        role.name = name
+        session.commit()
+        return True
 
-def editRole(role_id, new_name):
-  '''
-  Edits the given role in the system.
+def removeRole(roleId):
+    '''
+    Removes a role from the system.
     Parameters:
-      role: The id of the role to be edited.
-      new_name: The new name for the given role. #is this too hardcoded..?
+        roleId: The ID of the role to remove.
     Returns:
-      The edited role object fetched from database.
-  '''
-  with Session as session:
-    role = session.query(Role).filter(Role.roleId == role_id).first()
-    role.name = new_name
-    session.commit()
-    return role
+        True if successful, False if role not found or is built-in.
+    '''
+    with Session() as session:
+        # Don't allow removing built-in roles
+        if roleId <= 1:
+            return False
+            
+        role = session.query(Role).filter(Role.roleId == roleId).first()
+        if not role:
+            return False
+            
+        session.delete(role)
+        session.commit()
+        return True

@@ -18,10 +18,13 @@
 
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
+        <!-- Regular role management actions -->
         <template v-if="item.roleId > 1">
           <a class="link-action" @click="emitEditRole(item.roleId)">Edit Role</a>
           <a class="link-action" @click="emitRemoveRole(item.roleId)">Remove Role</a>
         </template>
+        <!-- Mounts action available for all roles -->
+        <a class="link-action" @click="emitManageMounts(item)">Mounts</a>
       </template>
 
       <!-- Format the timestamps -->
@@ -57,6 +60,14 @@ export default {
   mounted () {
     this.data = this.propItems;
   },
+  watch: {
+    propItems: {
+      handler(newVal) {
+        this.data = newVal;
+      },
+      immediate: true,
+    },
+  },
   methods: {
     getRoleDescription(roleId) {
       if (roleId === 0) {
@@ -75,6 +86,9 @@ export default {
     parseTime(timestamp) {
       return DisplayTime(timestamp);
     },
+    emitManageMounts(role) {
+      this.$emit('emitManageMounts', role);
+    }
   },
 }
 </script>

@@ -16,6 +16,11 @@
         </span>
       </template>
 
+      <!-- Mount count display -->
+      <template v-slot:item.mountCount="{item}">
+        {{ item.mountCount || 0 }}
+      </template>
+
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
         <!-- Regular role management actions -->
@@ -52,6 +57,7 @@ export default {
       headers: [
         { text: 'Role ID', value: 'roleId', sortable: true },
         { text: 'Name', value: 'name', sortable: true },
+        { text: 'Mounts', value: 'mountCount', sortable: true },
         { text: 'Created At', value: 'createdAt', sortable: true },
         { text: 'Actions', value: 'actions', sortable: false },
       ],

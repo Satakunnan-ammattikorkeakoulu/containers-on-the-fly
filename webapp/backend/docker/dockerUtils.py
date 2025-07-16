@@ -118,7 +118,8 @@ def startDockerContainer(reservationId: str):
       "shm_size": settings.docker["shm_size"],
       "ports": portsForContainer,
       "password": sshPassword,
-      "dbUserId": reservation.userId
+      "dbUserId": reservation.userId,
+      "reservation": reservation  # Add this line to include the reservation parameter
     }
 
     if settings.docker.get("userMountLocation"):
@@ -130,15 +131,16 @@ def startDockerContainer(reservationId: str):
     details["roleMounts"] = []
     
     # Always add mounts from "Everyone" role (roleId = 0)
-    with Session() as session:
-        everyone_role = session.query(Role).filter(Role.name == "everyone").first()
+    with Session() as mount_session:
+        everyone_role = mount_session.query(Role).filter(Role.name == "everyone").first()
         if everyone_role:
             for mount in everyone_role.mounts:
                 if mount.computerId == reservation.computerId:
                     details["roleMounts"].append({
                         "hostPath": mount.hostPath,
                         "containerPath": mount.containerPath,
-                        "readOnly": mount.readOnly
+                        "readOnly": mount.readOnly,
+                        "computerId": mount.computerId
                     })
     
     # Add mounts from user's assigned roles
@@ -156,14 +158,22 @@ def startDockerContainer(reservationId: str):
                     details["roleMounts"].append({
                         "hostPath": mount.hostPath,
                         "containerPath": mount.containerPath,
-                        "readOnly": mount.readOnly
+                        "readOnly": mount.readOnly,
+                        "computerId": mount.computerId
                     })
+
+    # Convert reservation to dictionary
+    details["reservation"] = {
+        "computerId": reservation.computerId
+    }
 
     cont_was_started = False
     #print(details)
+    print("Starting container..")
+    cont_was_started, cont_name, cont_password, errors, non_critical_errors = start_container(details)
+    print("Container started!")
+    print("Result: " + str(cont_was_started))
 
-    cont_was_started, cont_name, cont_password, errors, non_critical_errors = start_container(details, reservation)
-    
     if cont_was_started == True:
       print(f"Container with Docker name {cont_name} was started succesfully.")
       # Set bound ports

@@ -36,7 +36,7 @@
                           v-model="computerForms[computer.computerId].hostPath"
                           label="Host Path*"
                           :rules="[rules.required]"
-                          hint="Path on the host machine"
+                          hint="Path on the host machine (without ending slash /)"
                           persistent-hint
                         ></v-text-field>
                       </v-col>
@@ -45,7 +45,7 @@
                           v-model="computerForms[computer.computerId].containerPath"
                           label="Container Path*"
                           :rules="[rules.required]"
-                          hint="Path inside the container"
+                          hint="Path inside the container (without ending slash /), user home directory is /home/user"
                           persistent-hint
                         ></v-text-field>
                       </v-col>

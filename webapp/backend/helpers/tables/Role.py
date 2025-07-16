@@ -12,6 +12,24 @@ def getRoles():
     with Session() as session:
         return session.query(Role).all()
 
+def getRolesWithMountCounts():
+    '''
+    Gets all roles from the database with their mount counts.
+    Returns:
+        List of all roles with additional mountCount field.
+    '''
+    with Session() as session:
+        roles = session.query(Role).all()
+        result = []
+        for role in roles:
+            from helpers.server import ORMObjectToDict
+            role_dict = ORMObjectToDict(role)
+            # Add mount count
+            mount_count = session.query(RoleMount).filter(RoleMount.roleId == role.roleId).count()
+            role_dict['mountCount'] = mount_count
+            result.append(role_dict)
+        return result
+
 def getRoleById(roleId):
     '''
     Gets a role by its ID.

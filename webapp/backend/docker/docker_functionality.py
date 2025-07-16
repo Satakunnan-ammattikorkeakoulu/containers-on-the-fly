@@ -7,8 +7,9 @@ from python_on_whales.exceptions import NoSuchContainer
 import os
 import shutil
 import traceback
+from database import Session, Role
 
-def start_container(pars, reservation):
+def start_container(pars):
     """
     Starts a Docker container with the given parameters.
 
@@ -18,17 +19,31 @@ def start_container(pars, reservation):
     Required parameters:
         name (string): Name of the container. Must be unique in Docker.
         image (string): Name of the image. Note: The image must be created in Docker before starting the container.
-        username (string): Username of the container user. Note: The user must be created in Docker image before starting the container.
+        username (string): Username of the container user. Note: The user must be created in the Docker image before starting the container.
         cpus (int): The amount of cpus dedicated for the container. Note: The amount of cpus must be available in the host machine.
         memory (string): The amount of RAM memory dedicated for the container. For example: "1g" or "8g"
         ports (list): The ports to be used. In format: [(local_port, container_port), (local_port2, container_port2)]. For example: [(2213, 22)] for SSH.
         localMountFolderPath (string): The folder to mount in the local filesystem. For example: /home/user/docker_mounts
-        volumes (list): Extra volumes to mount. In format: [(local_path, container_path), (local_path2, container_path2)]
-        reservation: Reservation object for accessing user roles and role-based mounts
+        dbUserId (string): User ID from the database who started the container
+        reservation: Reservation dictionary containing computerId and mount data
+        roleMounts (list): List of mount dictionaries with hostPath, containerPath, readOnly, computerId
+    Optional parameters:
+        gpus (string): The amount of gpus dedicated for the container in format "device=0,2,4" where "0", "2" and "4" are device nvidia / cuda IDs. Pass None if no gpus are needed.
+        image_version (string) (default: "latest"): The image version to use.
+        password (string) (default: random password): Password for the user of the container
+        interactive (int) (default: True): Leave stdin open during the duration of the process to allow communication with the parent process. Currently only works with tty=True for interactive use on the terminal.
+        remove (int) (default: True): If this is True, removes the container after it is stopped.
+        shm_size (int): The size of the shared memory. For example: 1g
+    Returns:
+        namedtuple:
+            (boolean) started: True if the container was started successfully,
+            (string) container_name: The name of the container (if any),
+            (string) password: The password of the container user (if any),
+            (string) error_message: Error message(s) (if any),
+            (string) non_critical_error: Non-critical error messages (if any)
     """
-
     try:
-        # Verify all that all the required parameters are present.
+        # Verify parameters first
         if "name" not in pars: raise Exception("Missing parameter: name")
         if "image" not in pars: raise Exception("Missing parameter: image")
         if "username" not in pars: raise Exception("Missing parameter: username")
@@ -37,6 +52,7 @@ def start_container(pars, reservation):
         if "ports" not in pars: raise Exception("Missing parameter: ports")
         if "dbUserId" not in pars: raise Exception("Missing parameter: dbUserId")
         if "reservation" not in pars: raise Exception("Missing parameter: reservation")
+        if "roleMounts" not in pars: raise Exception("Missing parameter: roleMounts")
 
         if "gpus" not in pars: pars["gpus"] = None
         if pars["gpus"] == 0: pars["gpus"] = None
@@ -55,6 +71,7 @@ def start_container(pars, reservation):
 
         if "password" not in pars: pars["password"] = create_password()
 
+        container_name = None
         container_name = pars['name']
 
         #print(pars["gpus"])
@@ -65,37 +82,41 @@ def start_container(pars, reservation):
 
         # Add volumes and mounts
         volumes = []
+        
+        if pars.get("localMountFolderPath"):
+            # Create directory for mounting if it does not exist
+            if not os.path.isdir(pars["localMountFolderPath"]):
+                os.makedirs(pars["localMountFolderPath"], exist_ok=True)
+            # Set correct owner and group for the mount folder
+            shutil.chown(pars["localMountFolderPath"], user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
+            # Set correct file permissions for the mount folder
+            os.chmod(pars["localMountFolderPath"], 0o777)
+            volumes.append((pars['localMountFolderPath'], f"/home/{pars['username']}/persistent"))
+            #volumes = [(pars['localMountFolderPath'], f"/home/{pars['username']}/persistent")]
 
-        # Add role-based mounts
-        # Get all roles for the user (including "Everyone" role)
-        user_roles = list(reservation.user.roles)
-        
-        # Always include "Everyone" role for all users
-        from database import Session, Role
-        with Session() as session:
-            everyone_role = session.query(Role).filter(Role.name == "everyone").first()
-            if everyone_role: user_roles.append(everyone_role)
-        
-        # Apply mounts from all roles
-        for role in user_roles:
-            for mount in role.mounts:
-                # Only include mounts for this specific computer
-                if mount.computerId == reservation.reservedContainer.computerId:
-                    # Apply the same directory setup logic as localMountFolderPath
-                    if mount.hostPath:
-                        # Create directory for mounting if it does not exist
-                        if not os.path.isdir(mount.hostPath):
-                            os.makedirs(mount.hostPath, exist_ok=True)
-                        # Set correct owner and group for the mount folder
-                        shutil.chown(mount.hostPath, user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
-                        # Set correct file permissions for the mount folder
-                        os.chmod(mount.hostPath, 0o777)
-                    
-                    # Add the volume mount
-                    if mount.readOnly:
-                        volumes.append((mount.hostPath, mount.containerPath, "ro"))
-                    else:
-                        volumes.append((mount.hostPath, mount.containerPath))
+        # Process role-based mounts (passed as parameter)
+        computer_id = pars["reservation"]["computerId"]
+        for mount in pars["roleMounts"]:
+            # Only include mounts for this specific computer
+            if mount["computerId"] == computer_id:
+                host_path = mount["hostPath"]
+                container_path = mount["containerPath"]
+                read_only = mount["readOnly"]
+                
+                if host_path:
+                    # Create directory for mounting if it does not exist
+                    if not os.path.isdir(host_path):
+                        os.makedirs(host_path, exist_ok=True)
+                    # Set correct owner and group for the mount folder
+                    shutil.chown(host_path, user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
+                    # Set correct file permissions for the mount folder
+                    os.chmod(host_path, 0o777)
+                
+                # Add the volume mount
+                if read_only:
+                    volumes.append((host_path, container_path, "ro"))
+                else:
+                    volumes.append((host_path, container_path))
 
         full_image_name = f"{settings.docker['registryAddress']}/{pars['image']}:{pars['image_version']}"
         #testing ram disk
@@ -130,17 +151,18 @@ def start_container(pars, reservation):
         #print("=== Stop printing running container")
         docker.execute(container=container_name, command=["/bin/bash","-c", f"/bin/echo 'user:{pars['password']}' | /usr/sbin/chpasswd"], user="root")
     except Exception as e:
-        print(f"Something went wrong starting container {container_name}. Trying to stop the container. Error:")
+        print(f"Something went wrong starting container {container_name or 'unknown'}. Trying to stop the container. Error:")
         print(e)
         print("Stack trace:")
         print(traceback.format_exc())
-        stop_container(container_name)
+        if container_name:  # Only try to stop if we have a name
+            stop_container(container_name)
         return False, "", "", e, None
 
     try:
         non_critical_errors = ""
         #This will check if the user has config.bash in config folder. If yes, then this config.bash will be executed, before container is given to user
-        if os.path.exists(f'{pars["localMountFolderPath"]}/config/config.bash'):
+        if pars.get("localMountFolderPath") and os.path.exists(f'{pars["localMountFolderPath"]}/config/config.bash'):
             docker.execute(container=container_name, command=["/bin/bash","-c", "timeout 60 /home/user/persistent/config/config.bash"], user="root")
     except Exception as e:
         print(f"Something went wrong when running users config.bash in  {container_name}. This is not critical, most likely user error")

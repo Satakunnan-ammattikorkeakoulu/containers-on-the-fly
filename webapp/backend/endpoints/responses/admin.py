@@ -563,13 +563,12 @@ def editReservation(reservationId : int, endDate : str) -> object:
 
 def getAllRoles() -> object:
     '''
-    Returns a list of all roles.
+    Returns a list of all roles with mount counts.
     Returns:
         object: Response object with status, message and data.
     '''
-    with Session() as session:
-        roles = getRoles()
-        data = [ORMObjectToDict(role) for role in roles]
+    from helpers.tables.Role import getRolesWithMountCounts
+    data = getRolesWithMountCounts()
     
     return Response(True, "Roles fetched successfully.", {"roles": data})
 

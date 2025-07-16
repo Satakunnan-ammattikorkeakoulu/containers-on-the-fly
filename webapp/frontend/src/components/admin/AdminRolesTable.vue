@@ -26,7 +26,9 @@
         <!-- Regular role management actions -->
         <template v-if="!isBuiltInRole(item.name)">
           <a class="link-action" @click="emitEditRole(item.roleId)">Edit Role</a>
+          <br>
           <a class="link-action" @click="emitRemoveRole(item.roleId)">Remove Role</a>
+          <br>
         </template>
         <!-- Mounts action available for all roles -->
         <a class="link-action" @click="emitManageMounts(item)">Mounts</a>

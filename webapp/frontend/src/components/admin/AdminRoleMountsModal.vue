@@ -4,7 +4,30 @@
       <v-card-title>
         <span class="headline">Manage Role Mounts - {{ roleName }}</span>
       </v-card-title>
+      
       <v-card-text>
+        <!-- Description section -->
+        <v-alert
+          type="info"
+          outlined
+          class="mb-4"
+        >
+          <div class="text-body-2">
+            <strong>Role Mounts</strong> allow you to automatically mount folders from the host system into containers for users with this role.
+            You can configure different mounts for each server/computer. The path to the folder will be automatically created if it does not exist.
+          </div>
+          <div class="mt-3 text-body-2">
+            <strong>Available template variables:</strong>
+            <ul class="mt-1 ml-4">
+              <li><code>&#123;email&#125;</code> - User's email address with special characters removed (e.g., "test@foo.com" becomes "testfoocom")</li>
+              <li><code>&#123;userid&#125;</code> - User's database ID (e.g., "123")</li>
+            </ul>
+          </div>
+          <div class="mt-2 text-caption grey--text">
+            Example: <code>/data/users/&#123;email&#125;</code> → <code>/home/user/persistent</code>
+          </div>
+        </v-alert>
+
         <v-container>
           <!-- Loading state -->
           <v-row v-if="isFetching">
@@ -274,69 +297,9 @@ export default {
       }
     },
 
-    async removeMount(computerId, mount) {
-      const confirm = window.confirm("Are you sure you want to remove this mount?");
-      if (!confirm) return;
-
-      this.isSubmitting = true;
-      try {
-        // Remove from local array
-        const updatedMounts = this.mounts.filter(m => 
-          m.computerId !== computerId ||
-          m.hostPath !== mount.hostPath || 
-          m.containerPath !== mount.containerPath
-        );
-        
-        // Save updated mounts to backend
-        const currentUser = this.$store.getters.user;
-        const response = await axios({
-          method: "post",
-          url: this.AppSettings.APIServer.admin.save_role_mounts,
-          data: {
-            roleId: this.roleId,
-            mounts: updatedMounts
-          },
-          headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
-        });
-
-        if (response.data.status) {
-          // Update local state
-          this.mounts = updatedMounts;
-          
-          this.$store.commit('showMessage', { 
-            text: "Mount removed successfully", 
-            color: "success" 
-          });
-        } else {
-          this.$store.commit('showMessage', { 
-            text: response.data.message || "Failed to remove mount", 
-            color: "error" 
-          });
-        }
-      } catch (error) {
-        console.error(error);
-        this.$store.commit('showMessage', { 
-          text: "Error removing mount", 
-          color: "error" 
-        });
-      } finally {
-        this.isSubmitting = false;
-      }
-    },
-
     close() {
       this.$emit('emitModalClose');
     }
-  }
+  },
 }
 </script>
-
-<style scoped lang="scss">
-.headline {
-  font-size: 1.25rem;
-  font-weight: 500;
-}
-.v-expansion-panels {
-  margin-top: 1rem;
-}
-</style> 

@@ -141,11 +141,14 @@ def start_container(pars):
                     volumes.append((host_path, container_path))
 
         full_image_name = f"{settings.docker['registryAddress']}/{pars['image']}:{pars['image_version']}"
-        #testing ram disk
+
+        # RAM disk
         mount_path = "/home/user/ram_disk"
         ram_disk_size = "1073741824" # 1G in bytes, if I understanded correctly, this need to be in bytes, not 1GB etc
         tmpfs_config = f"type=tmpfs,destination={mount_path},tmpfs-size={ram_disk_size}" 
         ram_mounts = [tmpfs_config]
+        
+        # Start the container
         cont = docker.run(
             full_image_name,
             volumes = volumes,

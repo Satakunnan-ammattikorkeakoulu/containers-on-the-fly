@@ -54,7 +54,17 @@ curl -fsSL https://nvidia.github.io/nvidia-docker/gpgkey | \
 
 sudo apt update -qq
 
-sudo apt install -y -qq python3-pip libsasl2-dev libldap2-dev libssl-dev
+sudo apt install -y -qq python3-pip libsasl2-dev libldap2-dev libssl-dev acl
+
+# Create containerfly group if it doesn't exist
+if ! getent group containerfly > /dev/null 2>&1; then
+    echo "Creating containerfly group with GID 5620..."
+    sudo groupadd -g 5620 containerfly
+    echo -e "${GREEN}Group 'containerfly' created with GID 5620.${RESET}"
+else
+    echo -e "${GREEN}Group 'containerfly' already exists.${RESET}"
+fi
+
 sudo ubuntu-drivers install nvidia:570-server -qq >/dev/null 2>&1
 
 # Add Docker's official GPG key if it's not already added

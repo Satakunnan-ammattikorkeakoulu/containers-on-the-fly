@@ -309,7 +309,14 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 
 # Production targets
 
-setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings ## Run this with sudo. Installs and configures all dependencies for main server. Call 'make start-main-server' after setup.
+check-root: # Checks if running with root privileges
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		echo "\n$(RED)Error: This command must be run with sudo privileges. Please run with sudo. Exiting.$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Running with root privileges. Proceeding.$(RESET)"
+
+setup-main-server: check-root check-os-ubuntu interactive-settings-creation apply-settings ## Run this with sudo. Installs and configures all dependencies for main server. Call 'make start-main-server' after setup.
 	@echo ""
 	@echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"
 	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
@@ -366,7 +373,8 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 
 	@echo "\n$(GREEN)$(BOLD)The main server has been setup.$(RESET)\n"
 	@echo "$(GREEN)$(BOLD)NEXT STEPS:$(RESET)"
-	@echo "$(GREEN)* Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
+	@echo "$(GREEN)1. Restart the machine for all changes to take effect.$(RESET)"
+	@echo "$(GREEN)2. Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
 	@rm -f .server_type
 
 start-main-server: verify-config-file-exists apply-settings install-backend-deps init-database ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
@@ -393,7 +401,7 @@ start-main-server: verify-config-file-exists apply-settings install-backend-deps
 	echo "* If you have not yet setup the Docker utility, run $(GREEN)$(BOLD)sudo make setup-docker-utility$(RESET) to start setting it up.$(RESET)" && \
 	echo ""
 
-setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
+setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
 	@IS_MAIN_SERVER=$$(cat .server_type 2>/dev/null || echo "true"); \
 	if [ "$$IS_MAIN_SERVER" = "false" ]; then \
 		echo ""; \

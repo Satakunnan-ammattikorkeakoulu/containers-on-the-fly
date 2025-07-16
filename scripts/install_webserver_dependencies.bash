@@ -25,8 +25,17 @@ echo "Running with sudo privileges."
 sudo apt update -qq
 
 # Install required libraries
-sudo apt --assume-yes -qq install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev
+sudo apt --assume-yes -qq install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev acl
 sudo apt --assume-yes -qq install python3-ldap
+
+# Create containerfly group if it doesn't exist
+if ! getent group containerfly > /dev/null 2>&1; then
+    echo "Creating containerfly group with GID 5620..."
+    sudo groupadd -g 5620 containerfly
+    echo -e "${GREEN}Group 'containerfly' created with GID 5620.${RESET}"
+else
+    echo -e "${GREEN}Group 'containerfly' already exists.${RESET}"
+fi
 
 # Function to check if Caddy is installed
 check_caddy_installed() {

@@ -1,6 +1,7 @@
 #! /usr/bin/python3
 from python_on_whales import docker
 from helpers.auth import create_password
+from helpers.Utils import removeSpecialCharacters
 from datetime import datetime
 from settings import settings
 from python_on_whales.exceptions import NoSuchContainer
@@ -9,6 +10,25 @@ import shutil
 import traceback
 import getpass
 from database import Session, Role
+
+def substitute_mount_variables(path, user_email, user_id):
+    """Substitute template variables in mount paths"""
+    if not path:
+        return path
+    
+    # Sanitize email for filesystem use
+    email_sanitized = removeSpecialCharacters(user_email)
+    
+    substitutions = {
+        '{email}': email_sanitized,
+        '{userid}': str(user_id)
+    }
+    
+    result = path
+    for variable, value in substitutions.items():
+        result = result.replace(variable, value)
+    
+    return result
 
 def start_container(pars):
     """
@@ -24,10 +44,12 @@ def start_container(pars):
         cpus (int): The amount of cpus dedicated for the container. Note: The amount of cpus must be available in the host machine.
         memory (string): The amount of RAM memory dedicated for the container. For example: "1g" or "8g"
         ports (list): The ports to be used. In format: [(local_port, container_port), (local_port2, container_port2)]. For example: [(2213, 22)] for SSH.
-        localMountFolderPath (string): The folder to mount in the local filesystem. For example: /home/user/docker_mounts
         dbUserId (string): User ID from the database who started the container
-        reservation: Reservation dictionary containing computerId and mount data
+        reservation: Reservation dictionary containing computerId and user data (with email)
         roleMounts (list): List of mount dictionaries with hostPath, containerPath, readOnly, computerId
+                          hostPath and containerPath support template variables:
+                          - {email}: User's email with special characters removed (e.g., "test_foo_com")
+                          - {userid}: User's database ID (e.g., "123")
     Optional parameters:
         gpus (string): The amount of gpus dedicated for the container in format "device=0,2,4" where "0", "2" and "4" are device nvidia / cuda IDs. Pass None if no gpus are needed.
         image_version (string) (default: "latest"): The image version to use.
@@ -62,21 +84,20 @@ def start_container(pars):
         if "interactive" not in pars: pars["interactive"] = True
         if "remove" not in pars: pars["remove"] = True
 
+        # Create random password for the user if it was not passed
+        if "password" not in pars: pars["password"] = create_password()
+
         # can this lead to oum? we need to test so if weird shit is happening, look in to this:
         # we add that as half of the ram size, if this seems to work, remove this shm_size from docker.settings.
-
         mem_value = int(float((pars["memory"][:-1])))
         unit = pars["memory"][-1]
         shm_value = f"{mem_value // 2}{unit}"
         pars["shm_size"] = shm_value
 
-        if "password" not in pars: pars["password"] = create_password()
-
         container_name = None
         container_name = pars['name']
 
         #print(pars["gpus"])
-
         gpus = None
         if pars["gpus"] != None:
             gpus = f'"{pars["gpus"]}"'
@@ -90,24 +111,18 @@ def start_container(pars):
         mountUser = os.getenv('USER') or os.getenv('USERNAME') or getpass.getuser()
         mountGroup = "docker"
 
-        if pars.get("localMountFolderPath"):
-            # Create directory for mounting if it does not exist
-            if not os.path.isdir(pars["localMountFolderPath"]):
-                os.makedirs(pars["localMountFolderPath"], exist_ok=True)
-            # Set correct owner and group for the mount folder
-            shutil.chown(pars["localMountFolderPath"], user=mountUser, group=mountGroup)
-            # Set correct file permissions for the mount folder
-            os.chmod(pars["localMountFolderPath"], 0o777)
-            volumes.append((pars['localMountFolderPath'], f"/home/{pars['username']}/persistent"))
-            #volumes = [(pars['localMountFolderPath'], f"/home/{pars['username']}/persistent")]
+        # Get user info for variable substitution
+        user_email = pars["reservation"]["user"]["email"]
+        user_id = pars["dbUserId"]
 
-        # Process role-based mounts (passed as parameter)
+        # Unified mount processing with variable substitution
         computer_id = pars["reservation"]["computerId"]
         for mount in pars["roleMounts"]:
             # Only include mounts for this specific computer
             if mount["computerId"] == computer_id:
-                host_path = mount["hostPath"]
-                container_path = mount["containerPath"]
+                # Apply variable substitution to paths
+                host_path = substitute_mount_variables(mount["hostPath"], user_email, user_id)
+                container_path = substitute_mount_variables(mount["containerPath"], user_email, user_id)
                 read_only = mount["readOnly"]
                 
                 if host_path:
@@ -169,12 +184,23 @@ def start_container(pars):
     try:
         non_critical_errors = ""
         #This will check if the user has config.bash in config folder. If yes, then this config.bash will be executed, before container is given to user
-        if pars.get("localMountFolderPath") and os.path.exists(f'{pars["localMountFolderPath"]}/config/config.bash'):
-            docker.execute(container=container_name, command=["/bin/bash","-c", "timeout 60 /home/user/persistent/config/config.bash"], user="root")
+        # Note: Since we removed localMountFolderPath, config.bash should be placed in role-mounted paths with {email} variable
+        # For example, if a role mount maps /data/users/{email} to /home/user/persistent, 
+        # then config.bash should be at /data/users/{email_sanitized}/config/config.bash
+        
+        # Look for config.bash in any mounted persistent volume
+        for mount in pars["roleMounts"]:
+            if mount["computerId"] == computer_id and not mount["readOnly"]:
+                container_path = substitute_mount_variables(mount["containerPath"], user_email, user_id)
+                host_path = substitute_mount_variables(mount["hostPath"], user_email, user_id)
+                config_path = f'{host_path}/config/config.bash'
+                if os.path.exists(config_path):
+                    docker.execute(container=container_name, command=["/bin/bash","-c", f"timeout 60 {container_path}/config/config.bash"], user="root")
+                    break  # Only run the first config.bash found
     except Exception as e:
         print(f"Something went wrong when running users config.bash in  {container_name}. This is not critical, most likely user error")
         print(e)
-        non_critical_errors = "Something went wrong when running users config.bash, from /home/persistent/config, check your script."
+        non_critical_errors = "Something went wrong when running users config.bash, from a persistent mount path /config, check your script."
 
     return True, container_name, pars["password"], "", non_critical_errors
 

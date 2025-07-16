@@ -13,6 +13,7 @@ from docker.docker_functionality import get_email_container_started, start_conta
 import random
 import socket
 import os
+from helpers.Utils import removeSpecialCharacters
 
 def is_port_in_use(port: int) -> bool:
   '''
@@ -50,11 +51,6 @@ def get_available_port():
 
   print("ERROR: Did not find a random port to bind to after 50 attempts. Randomly giving one out.")
   return random.choice(availablePorts)
-
-import re
-def removeSpecialCharacters(string):
-  pattern = re.compile(r'[^a-zA-Z0-9\s]')
-  return re.sub(pattern, '', string)
 
 def timeNow():
   return datetime.datetime.now(datetime.timezone.utc)
@@ -119,18 +115,18 @@ def startDockerContainer(reservationId: str):
       "ports": portsForContainer,
       "password": sshPassword,
       "dbUserId": reservation.userId,
-      "reservation": reservation  # Add this line to include the reservation parameter
+      "reservation": {
+        "computerId": reservation.computerId,
+        "user": {
+          "email": reservation.user.email
+        }
+      }
     }
 
-    if settings.docker.get("userMountLocation"):
-      userEmailParsed = removeSpecialCharacters(reservation.user.email)
-      userMountLocation = f'{settings.docker["userMountLocation"]}/{userEmailParsed}'
-      details["localMountFolderPath"] = userMountLocation
-
-    # Add role-based mounts
+    # Add role-based mounts (now the unified mounting system)
     details["roleMounts"] = []
     
-    # Always add mounts from "Everyone" role (roleId = 0)
+    # Always add mounts from "Everyone" role
     with Session() as mount_session:
         everyone_role = mount_session.query(Role).filter(Role.name == "everyone").first()
         if everyone_role:
@@ -161,11 +157,6 @@ def startDockerContainer(reservationId: str):
                         "readOnly": mount.readOnly,
                         "computerId": mount.computerId
                     })
-
-    # Convert reservation to dictionary
-    details["reservation"] = {
-        "computerId": reservation.computerId
-    }
 
     cont_was_started = False
     #print(details)

@@ -7,6 +7,7 @@ from python_on_whales.exceptions import NoSuchContainer
 import os
 import shutil
 import traceback
+import getpass
 from database import Session, Role
 
 def start_container(pars):
@@ -83,12 +84,18 @@ def start_container(pars):
         # Add volumes and mounts
         volumes = []
         
+        # Set mounting user and group
+        # For the user we will use the current user running this script
+        # "docker" is the group
+        mountUser = os.getenv('USER') or os.getenv('USERNAME') or getpass.getuser()
+        mountGroup = "docker"
+
         if pars.get("localMountFolderPath"):
             # Create directory for mounting if it does not exist
             if not os.path.isdir(pars["localMountFolderPath"]):
                 os.makedirs(pars["localMountFolderPath"], exist_ok=True)
             # Set correct owner and group for the mount folder
-            shutil.chown(pars["localMountFolderPath"], user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
+            shutil.chown(pars["localMountFolderPath"], user=mountUser, group=mountGroup)
             # Set correct file permissions for the mount folder
             os.chmod(pars["localMountFolderPath"], 0o777)
             volumes.append((pars['localMountFolderPath'], f"/home/{pars['username']}/persistent"))
@@ -108,7 +115,7 @@ def start_container(pars):
                     if not os.path.isdir(host_path):
                         os.makedirs(host_path, exist_ok=True)
                     # Set correct owner and group for the mount folder
-                    shutil.chown(host_path, user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
+                    shutil.chown(host_path, user=mountUser, group=mountGroup)
                     # Set correct file permissions for the mount folder
                     os.chmod(host_path, 0o777)
                 

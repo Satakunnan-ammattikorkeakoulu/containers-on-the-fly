@@ -10,6 +10,7 @@ import shutil
 import traceback
 import getpass
 from database import Session, Role
+import subprocess
 
 def substitute_mount_variables(path, user_email, user_id):
     """Substitute template variables in mount paths"""
@@ -133,6 +134,18 @@ def start_container(pars):
                     shutil.chown(host_path, user=mountUser, group=mountGroup)
                     # Set correct file permissions for the mount folder
                     os.chmod(host_path, 0o777)
+                    
+                    # Set ACL permissions for containerfly group
+                    try:
+                        # Give group containerfly access to everything currently there
+                        subprocess.run(['setfacl', '-R', '-m', 'g:containerfly:rwx', host_path], check=True)
+                        # Ensure new files/dirs inherit that access
+                        subprocess.run(['setfacl', '-d', '-m', 'g:containerfly:rwx', host_path], check=True)
+                        # Make sure the ACL mask does not reduce rights
+                        subprocess.run(['setfacl', '-m', 'm:rwx', host_path], check=True)
+                        subprocess.run(['setfacl', '-d', '-m', 'm:rwx', host_path], check=True)
+                    except Exception as e:
+                        print(f"Warning: Failed to set ACL on {host_path}: {e}")
                 
                 # Add the volume mount
                 if read_only:

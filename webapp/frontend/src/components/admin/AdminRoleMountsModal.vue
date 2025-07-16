@@ -14,7 +14,7 @@
         >
           <div class="text-body-2">
             <strong>Role Mounts</strong> allow you to automatically mount folders from the host system into containers for users with this role.
-            You can configure different mounts for each server/computer. The path to the folder will be automatically created if it does not exist.
+            You can configure different mounts for each server/computer. The path to the folder will be automatically created if it does not exist (both host and container paths).
           </div>
           <div class="mt-3 text-body-2">
             <strong>Available template variables:</strong>
@@ -45,7 +45,7 @@
                 :key="computer.computerId"
               >
                 <v-expansion-panel-header>
-                  {{ computer.name }}
+                  {{ getComputerTitle(computer) }}
                 </v-expansion-panel-header>
                 <v-expansion-panel-content>
                   <!-- Add new mount form -->
@@ -297,8 +297,67 @@ export default {
       }
     },
 
+    async removeMount(computerId, mountToRemove) {
+      const confirm = window.confirm("Are you sure you want to remove this mount?");
+      if (!confirm) return;
+
+      this.isSubmitting = true;
+      try {
+        // Remove from local array
+        const updatedMounts = this.mounts.filter(mount => 
+          !(mount.computerId === computerId && 
+            mount.hostPath === mountToRemove.hostPath && 
+            mount.containerPath === mountToRemove.containerPath)
+        );
+        
+        // Save updated mounts to backend
+        const currentUser = this.$store.getters.user;
+        const response = await axios({
+          method: "post",
+          url: this.AppSettings.APIServer.admin.save_role_mounts,
+          data: {
+            roleId: this.roleId,
+            mounts: updatedMounts
+          },
+          headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
+        });
+
+        if (response.data.status) {
+          // Update local state
+          this.mounts = updatedMounts;
+          
+          this.$store.commit('showMessage', { 
+            text: "Mount removed successfully", 
+            color: "success" 
+          });
+        } else {
+          this.$store.commit('showMessage', { 
+            text: response.data.message || "Failed to remove mount", 
+            color: "error" 
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        this.$store.commit('showMessage', { 
+          text: "Error removing mount", 
+          color: "error" 
+        });
+      } finally {
+        this.isSubmitting = false;
+      }
+    },
+
     close() {
       this.$emit('emitModalClose');
+    },
+
+    getComputerTitle(computer) {
+      const mountCount = this.getMountsForComputer(computer.computerId).length;
+      if (mountCount > 0) {
+        const mountText = mountCount === 1 ? 'mount' : 'mounts';
+        return `${computer.name} (${mountCount} ${mountText})`;
+      }
+      return computer.name;
     }
   },
 }

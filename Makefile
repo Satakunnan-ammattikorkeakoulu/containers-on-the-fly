@@ -453,6 +453,15 @@ setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-cre
 	usermod -aG docker $$REAL_USER; \
 	echo "Added user $$REAL_USER to docker group"
 
+	# Set containerfly group permissions on user home directory
+	@echo "$(GREEN)Setting containerfly group permissions on user home directory...$(RESET)"
+	@REAL_USER=$${SUDO_USER:-$$(logname 2>/dev/null || echo $$(whoami))}; \
+	USER_HOME=$$(eval echo ~$$REAL_USER); \
+	echo "Configuring ACL permissions for containerfly group on $$USER_HOME"; \
+	echo "This allows containers to access your home directory when mounted."; \
+	setfacl -m g:containerfly:rwx "$$USER_HOME" 2>/dev/null || echo "Warning: Could not set ACL on home directory"; \
+	echo "Home directory permissions configured for containerfly group."
+
 	# Automatically configure pm2 startup
 	@echo "$(GREEN)Configuring pm2 startup...$(RESET)"
 	@REAL_USER=$${SUDO_USER:-$$(logname 2>/dev/null || echo $$(whoami))}; \

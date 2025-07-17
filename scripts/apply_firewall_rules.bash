@@ -22,10 +22,13 @@ if [ "$EUID" -ne 0 ]; then
 fi
 echo "Running with sudo privileges."
 
-# Reset all current UFW rules
+# Reset all UFW rules
 yes | sudo ufw reset
 
-# Add UFW rules
+# Remove existing Docker UFW rules to prevent duplicates
+sudo sed -i '/# BEGIN UFW AND DOCKER/,/# END UFW AND DOCKER/d' /etc/ufw/after.rules
+
+# Set defaults
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 
@@ -64,7 +67,9 @@ else
 fi
 
 # Common final rules
-sudo ufw route allow from any to any
+sudo ufw route deny from any to any  # Default deny all routes
+#sudo ufw route allow from any to any port $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END/tcp  # Only allow container ports TCP
+#sudo ufw route allow from any to any port $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END/udp  # Only allow container ports UDP
 yes | sudo ufw enable
 
 # Apply Docker specific UFW firewall rules if not applied yet

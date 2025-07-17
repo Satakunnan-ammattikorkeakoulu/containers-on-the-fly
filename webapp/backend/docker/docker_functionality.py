@@ -130,17 +130,21 @@ def start_container(pars):
                     # Create directory for mounting if it does not exist
                     if not os.path.isdir(host_path):
                         os.makedirs(host_path, exist_ok=True)
-                    # Set correct owner and group for the mount folder
-                    shutil.chown(host_path, user=mountUser, group=mountGroup)
-                    # Set correct file permissions for the mount folder including SGID bit (2 for SGID + 775 for rwxrwxr-x)
-                    os.chmod(host_path, 0o2775)
+                    # Set correct owner and group for the mount folder (use containerfly group so setgid works)
+                    shutil.chown(host_path, user=mountUser, group="containerfly")
+                    # Set correct file permissions for the mount folder with setgid bit
+                    os.chmod(host_path, 0o2775)  # 2775 = rwxrwsr-x (setgid bit set)
                     
-                    # Set ACL permissions for containerfly group
+                    # Set ACL permissions for docker group access and containerfly group with default inheritance
                     try:
+                        # Give docker group access for any host operations
+                        subprocess.run(['setfacl', '-R', '-m', 'g:docker:rwx', host_path], check=True)
+                        subprocess.run(['setfacl', '-d', '-m', 'g:docker:rwx', host_path], check=True)
                         # Give group containerfly access to everything currently there
                         subprocess.run(['setfacl', '-R', '-m', 'g:containerfly:rwx', host_path], check=True)
-                        # Ensure new files/dirs inherit that access
+                        # Ensure new files/dirs inherit containerfly group and permissions
                         subprocess.run(['setfacl', '-d', '-m', 'g:containerfly:rwx', host_path], check=True)
+                        subprocess.run(['setfacl', '-d', '-m', 'g::rwx', host_path], check=True)  # Default group gets rwx
                         # Make sure the ACL mask does not reduce rights
                         subprocess.run(['setfacl', '-m', 'm:rwx', host_path], check=True)
                         subprocess.run(['setfacl', '-d', '-m', 'm:rwx', host_path], check=True)

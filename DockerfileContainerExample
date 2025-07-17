@@ -25,7 +25,7 @@ RUN groupadd -g 5620 containerfly
 
 # Create a user with username 'user'
 # When spinning up a new container from this image, the password will be randomly set for the user by the docker utility.
-RUN useradd -rm -d /home/user -s /bin/bash -g root -G sudo,containerfly -u 1000 user
+RUN useradd -rm -d /home/user -s /bin/bash -g containerfly -G sudo -u 1000 user
 RUN echo 'user:password' | chpasswd
 
 # Configure SSH server to listen on port 22 and allow root login

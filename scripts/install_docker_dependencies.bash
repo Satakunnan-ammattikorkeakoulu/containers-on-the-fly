@@ -87,8 +87,8 @@ fi
 sudo apt update -qq
 sudo apt install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Test that docker works
-sudo docker run hello-world >/dev/null 2>&1
+# Test that docker works and cleanup
+sudo docker run --rm hello-world >/dev/null 2>&1
 
 # Install Node.js and npm if they are not installed
 if ! command -v node > /dev/null || ! command -v npm > /dev/null; then

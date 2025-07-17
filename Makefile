@@ -13,6 +13,8 @@ BOLD=\033[1m
 RED=\033[0;31m
 RESET=\033[0m
 
+.DEFAULT_GOAL = help
+
 install-backend-deps: ## Install or update backend dependencies
 	@echo ""
 	@echo "Installing backend dependencies... (pip packages)"

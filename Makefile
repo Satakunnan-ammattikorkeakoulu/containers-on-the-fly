@@ -516,7 +516,7 @@ allow-container-server: check-os-ubuntu ## Allows an external given container se
 		exit 1; \
 	fi; \
 	echo "Running as root, proceeding with firewall configuration"; \
-	sudo ufw route insert 1 allow from $(IP) to any port 5000
+	sudo ufw route insert 1 allow from $(IP) to any
 	sudo ufw insert 1 allow from $(IP)
 
 logs: ## View log entries for started servers (pm2)

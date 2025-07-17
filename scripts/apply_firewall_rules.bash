@@ -15,6 +15,35 @@ if [ -f .server_type ]; then
     IS_MAIN_SERVER=$(cat "${CURRENT_DIR}/.server_type")
 fi
 
+# Validate required variables and set defaults
+if [ -z "$DOCKER_REGISTRY_PORT" ]; then
+    echo "Warning: DOCKER_REGISTRY_PORT not set, using default: 5000"
+    DOCKER_REGISTRY_PORT=5000
+fi
+
+if [ -z "$SERVER_IP_ADDRESS" ] || [ "$SERVER_IP_ADDRESS" = "YOUR_IP_HERE" ]; then
+    echo "Error: SERVER_IP_ADDRESS not properly configured."
+    echo "Current value: '$SERVER_IP_ADDRESS'"
+    echo "Please check your user_config/settings file and ensure SERVER_IP_ADDRESS is set correctly."
+    exit 1
+fi
+
+# Convert localhost to 127.0.0.1 for UFW compatibility
+if [ "$SERVER_IP_ADDRESS" = "localhost" ]; then
+    echo "Converting localhost to 127.0.0.1 for UFW compatibility"
+    SERVER_IP_ADDRESS="127.0.0.1"
+fi
+
+# Validate IP address format
+if ! [[ $SERVER_IP_ADDRESS =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+    echo "Error: SERVER_IP_ADDRESS must be a valid IP address, got: '$SERVER_IP_ADDRESS'"
+    echo "Converting to 127.0.0.1 for local access"
+    SERVER_IP_ADDRESS="127.0.0.1"
+fi
+
+echo "SERVER_IP_ADDRESS='$SERVER_IP_ADDRESS'"
+echo "DOCKER_REGISTRY_PORT='$DOCKER_REGISTRY_PORT'"
+
 # Check if the script is run as root
 if [ "$EUID" -ne 0 ]; then
     echo -e "\n${RED}This script must be run with sudo privileges. Please run this with sudo permissions. Exiting.${RESET}"

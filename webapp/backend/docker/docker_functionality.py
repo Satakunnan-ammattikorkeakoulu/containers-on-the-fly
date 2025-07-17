@@ -141,6 +141,13 @@ def start_container(pars):
                     except Exception as e:
                         print("Resetting ACL permissions for a mount folder failed:")
                         print(e)
+                    
+                    # Give containerfly group write access to the directory
+                    try:
+                        subprocess.run(['setfacl', '-m', 'g:containerfly:rwx', host_path], check=True)
+                    except Exception as e:
+                        print(f"Failed to set containerfly group permissions on {host_path}:")
+                        print(e)
                 
                 # Add the volume mount
                 if read_only:

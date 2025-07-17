@@ -132,8 +132,8 @@ def start_container(pars):
                         os.makedirs(host_path, exist_ok=True)
                     # Set correct owner and group for the mount folder
                     shutil.chown(host_path, user=mountUser, group=mountGroup)
-                    # Set correct file permissions for the mount folder
-                    os.chmod(host_path, 0o777)
+                    # Set correct file permissions for the mount folder including SGID bit (2 for SGID + 775 for rwxrwxr-x)
+                    os.chmod(host_path, 0o2775)
                     
                     # Set ACL permissions for containerfly group
                     try:

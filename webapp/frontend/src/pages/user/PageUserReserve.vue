@@ -318,7 +318,7 @@
         this.hardwareData.forEach((spec) => {
           if (spec.type != "gpu" && spec.type !== "gpus") data.push(spec)
         })
-        return data
+        return data.sort((a, b) => a.type.localeCompare(b.type))
       },
       /**
        * Returns a list of all GPUs in the hardware data.
@@ -335,7 +335,7 @@
             }
           }
         })
-        return data
+        return data.sort((a, b) => a.text.localeCompare(b.text))
       },
       /**
        * Goes to the next step in the reservation process.

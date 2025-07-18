@@ -29,7 +29,9 @@
               <p style="margin-bottom: 0px;"><small>All times are in timezone <strong>{{globalTimezone}}</strong></small></p>
               <p><small><a @click="fetchReservations">Refresh reservations</a></small></p>
             </div>
-            <CalendarReservations v-if="allReservations" :propReservations="allReservations" @slotSelected="slotSelected" />
+            <div style="text-align: center;">
+              <CalendarReservations v-if="allReservations" :propReservations="allReservations" @slotSelected="slotSelected" />
+            </div>
           </v-col>
         </v-row>
       </v-stepper-content>

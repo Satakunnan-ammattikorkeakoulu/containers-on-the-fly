@@ -95,10 +95,13 @@ else
     echo "Configuring container server firewall rules..."
 fi
 
-# Common final rules
-sudo ufw route deny from any to any  # Default deny all routes
+# Common final rules - Remove the overly restrictive route deny rule
+# The default routing policy is already set to deny above
+#sudo ufw route deny from any to any  # This was blocking MariaDB access
 #sudo ufw route allow from any to any port $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END/tcp  # Only allow container ports TCP
 #sudo ufw route allow from any to any port $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END/udp  # Only allow container ports UDP
+
+# Enable (start) the UFW firewall
 yes | sudo ufw enable
 
 # Apply Docker specific UFW firewall rules if not applied yet

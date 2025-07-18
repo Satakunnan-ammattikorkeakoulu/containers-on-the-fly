@@ -22,6 +22,7 @@
         <CalendarReservations 
           v-if="allReservations" 
           :propReservations="allReservations" 
+          :readOnly="true"
           @slotSelected="handleSlotSelected" 
         />
         <Loading v-if="fetchingAllReservations" />

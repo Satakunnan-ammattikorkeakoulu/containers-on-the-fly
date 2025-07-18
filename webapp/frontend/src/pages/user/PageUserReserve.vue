@@ -30,7 +30,7 @@
               <p><small><a @click="fetchReservations">Refresh reservations</a></small></p>
             </div>
             <div style="text-align: center;">
-              <CalendarReservations v-if="allReservations" :propReservations="allReservations" @slotSelected="slotSelected" />
+              <CalendarReservations v-if="allReservations" :propReservations="allReservations" :readOnly="false" @slotSelected="slotSelected" />
             </div>
           </v-col>
         </v-row>

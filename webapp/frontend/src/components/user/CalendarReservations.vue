@@ -100,6 +100,10 @@
         type: Array,
         required: true
       },
+      readOnly: {
+        type: Boolean,
+        default: false
+      },
     },
     data: () => ({
       focus: '',
@@ -127,6 +131,11 @@
         return interval.time
       },
       selectSlot( event ) {
+        // If calendar is in read-only mode, don't allow slot selection
+        if (this.readOnly) {
+          return
+        }
+        
         let now = dayjs()
         let selectedTime = dayjs(event.date + " " + event.time)
         // Round to nearest 30 minutes (down)

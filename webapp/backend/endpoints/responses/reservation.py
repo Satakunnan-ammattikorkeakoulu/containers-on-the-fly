@@ -151,7 +151,7 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
       ).\
       filter(
         Reservation.userId == userId,
-        Reservation.startDate > minStartDate)
+        (Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()))
     if filters.filters["status"] != "":
       query = query.filter( Reservation.status == filters.filters["status"] )
     session.close()

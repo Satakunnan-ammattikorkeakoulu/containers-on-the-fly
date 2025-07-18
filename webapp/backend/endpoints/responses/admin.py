@@ -39,7 +39,7 @@ def getReservations(filters : ReservationFilters) -> object:
         joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
         joinedload(Reservation.computer)
       )\
-      .filter(Reservation.startDate > minStartDate )
+      .filter((Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()) )
     if filters.filters["status"] != "":
       query = query.filter( Reservation.status == filters.filters["status"] )
     session.close()

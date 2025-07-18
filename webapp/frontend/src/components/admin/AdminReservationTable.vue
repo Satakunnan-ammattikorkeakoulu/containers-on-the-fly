@@ -49,6 +49,10 @@
           </div>
         </v-tooltip>
       </template>
+      <!-- Docker Name -->
+      <template v-slot:item.dockerName="{item}">
+        {{ item.reservedContainer.containerDockerName }}
+      </template>
       <!-- Container Status -->
       <template v-slot:item.containerStatus="{item}">
         {{ item.status == "error" && item.reservedContainer.containerDockerErrorMessage ? getText(item.reservedContainer.containerDockerErrorMessage) : item.reservedContainer.containerStatus }}
@@ -93,6 +97,7 @@
           { text: 'Starts', value: 'startDate' },
           { text: 'Ends', value: 'endDate' },
           { text: 'Resources', value: 'resourcesInfo' },
+          { text: 'Docker Name', value: 'dockerName' },
           { text: 'Issues', value: 'containerStatus' },
           { text: 'actions', value: 'actions' },
         ],

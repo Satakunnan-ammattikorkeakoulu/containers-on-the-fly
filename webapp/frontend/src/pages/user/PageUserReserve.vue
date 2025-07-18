@@ -136,6 +136,25 @@
               </v-row>
           </v-col>
 
+          <!-- Reservation Description -->
+          <v-col cols="12" v-if="computer && hardwareData" style="margin-top: 30px;">
+              <h2>Reservation Description</h2>
+              <v-row>
+                <v-col cols="3" style="margin: 0 auto">
+                  <p style="color: gray; font-size: 15px; margin-bottom: 0px;">Optional description for your reservation.</p>
+                  <p style="color: gray; font-size: 15px;">(max 50 characters)</p>
+                  <v-text-field 
+                    v-model="reservationDescription" 
+                    label="Description (optional)"
+                    placeholder="Enter description..."
+                    counter="50"
+                    :rules="[rules.maxLength50]"
+                    maxlength="50">
+                  </v-text-field>
+                </v-col>
+              </v-row>
+          </v-col>
+
         </v-row>
 
         <!-- Notification of depleted resources -->
@@ -222,6 +241,7 @@
       pickedHour: {},
       reservableHours: [],
       adminReserveUserEmail: null,
+      reservationDescription: "", // Description for the reservation
       hours: [],
       refreshTip: false, // True if there were not enough resources for reservation, shows a tip to refresh hardware data
       reserveDurationDays: null,
@@ -244,6 +264,9 @@
       minimumDurationHours: 0, // TODO: Grab from server settings
       maximumDurationHours: 24,  // TODO: Grab from server settings
       minimumDuration: 5, // TODO: Grab from server settings
+      rules: {
+        maxLength50: value => !value || value.length <= 50 || "Description must be 50 characters or less"
+      }
     }),
     mounted() {
       let d = new Date()
@@ -552,7 +575,8 @@
           "duration": duration,
           "containerId": this.container,
           "hardwareSpecs": JSON.stringify(this.selectedHardwareSpecs),
-          "adminReserveUserEmail": this.adminReserveUserEmail ? this.adminReserveUserEmail : ""
+          "adminReserveUserEmail": this.adminReserveUserEmail ? this.adminReserveUserEmail : "",
+          "description": this.reservationDescription && this.reservationDescription.trim() ? this.reservationDescription.trim() : ""
         }
 
         axios({

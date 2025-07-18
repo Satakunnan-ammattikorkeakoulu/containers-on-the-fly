@@ -253,7 +253,11 @@ def getCurrentReservations() -> object:
   
   return Response(True, "Current reservations fetched.", { "reservations": reservations })
 
-def createReservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None):
+def createReservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None):
+  # Validate description length if provided
+  if description and len(description) > 50:
+    return Response(False, "Description must be 50 characters or less.")
+  
   # Make sure that there are enough resources for the reservation
   getAvailableHardwareResponse = getAvailableHardware(date, duration, hardwareSpecs)
   if (getAvailableHardwareResponse["status"] == False):
@@ -301,14 +305,20 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
       user = anotherUser
 
     # Create the base reservation
-    reservation = Reservation(
-      reservedContainerId = containerId,
-      startDate = date,
-      endDate = endDate,
-      userId = user.userId,
-      computerId = computerId,
-      status = "reserved",
-    )
+    reservation_data = {
+      "reservedContainerId": containerId,
+      "startDate": date,
+      "endDate": endDate,
+      "userId": user.userId,
+      "computerId": computerId,
+      "status": "reserved",
+    }
+    
+    # Only add description if it's provided and not empty
+    if description and description.strip():
+      reservation_data["description"] = description.strip()
+
+    reservation = Reservation(**reservation_data)
 
     # Append all reserved hardware specs inside the reservation
     for key, val in hardwareSpecs.items():

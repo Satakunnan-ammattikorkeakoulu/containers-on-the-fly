@@ -15,6 +15,19 @@
       <template v-slot:item.reservationId="{item}">
         #{{ item.reservationId }}
       </template>
+      <!-- Description -->
+      <template v-slot:item.description="{item}">
+        <span v-if="item.description && item.description.trim()">
+          <v-tooltip bottom v-if="item.description.length > 20">
+            <template v-slot:activator="{ on, attrs }">
+              <span v-bind="attrs" v-on="on" class="description-text">{{ truncateDescription(item.description) }}</span>
+            </template>
+            <span>{{ item.description }}</span>
+          </v-tooltip>
+          <span v-else class="description-text">{{ item.description }}</span>
+        </span>
+        <span v-else class="description-empty"></span>
+      </template>
       <!-- Start date -->
       <template v-slot:item.startDate="{item}">
         <v-tooltip bottom>
@@ -88,6 +101,7 @@
           { text: 'Starts', value: 'startDate' },
           { text: 'Ends', value: 'endDate' },
           { text: 'Resources', value: 'resourcesInfo' },
+          { text: 'Description', value: 'description' },
           { text: 'Issues', value: 'containerStatus' },
           { text: 'actions', value: 'actions' },
         ],
@@ -97,6 +111,11 @@
       this.reservations = this.propReservations
     },
     methods: {
+      // Truncates description to 20 characters with ellipsis
+      truncateDescription(description) {
+        if (!description) return "-";
+        return description.length > 20 ? description.substring(0, 20) + "..." : description;
+      },
       // Returns a string of all ports for a reservation
       getPorts(ports) {
         if (ports) {
@@ -159,7 +178,7 @@
           return resources
         }
         return ""
-      }
+      },
     },
     watch: {
       propReservations: {
@@ -178,7 +197,7 @@
     min-width: 150px;
     margin: 10px 0px;
   }
-
+  
   .link-toggle-read-all {
     margin-bottom: 20px;
     font-size: 14px;
@@ -191,5 +210,13 @@
     cursor: help;
     text-decoration: underline;
     text-decoration-style: dotted;
+  }
+  
+  .description-text {
+    font-size: 13px;
+  }
+  
+  .description-empty {
+    color: #999;
   }
 </style>

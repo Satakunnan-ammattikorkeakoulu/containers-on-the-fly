@@ -36,7 +36,8 @@ def getReservations(filters : ReservationFilters) -> object:
       .options(
         joinedload(Reservation.reservedHardwareSpecs),
         joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
-        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container)
+        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
+        joinedload(Reservation.computer)
       )\
       .filter(Reservation.startDate > minStartDate )
     if filters.filters["status"] != "":
@@ -46,6 +47,7 @@ def getReservations(filters : ReservationFilters) -> object:
   for reservation in query:
     res = ORMObjectToDict(reservation)
     res["userEmail"] = reservation.user.email
+    res["computerName"] = reservation.computer.name
     res["reservedContainer"] = ORMObjectToDict(reservation.reservedContainer)
     res["reservedContainer"]["container"] = ORMObjectToDict(reservation.reservedContainer.container)
     

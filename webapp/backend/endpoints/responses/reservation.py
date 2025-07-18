@@ -146,7 +146,8 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
       .options(
         joinedload(Reservation.reservedHardwareSpecs),
         joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
-        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container)
+        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
+        joinedload(Reservation.computer)
       ).\
       filter(
         Reservation.userId == userId,
@@ -157,6 +158,7 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
   
   for reservation in query:
     res = ORMObjectToDict(reservation)
+    res["computerName"] = reservation.computer.name
     res["reservedContainer"] = ORMObjectToDict(reservation.reservedContainer)
     res["reservedContainer"]["container"] = ORMObjectToDict(reservation.reservedContainer.container)
     res["reservedContainer"]["reservedPorts"] = []

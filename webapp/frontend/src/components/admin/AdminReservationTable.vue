@@ -11,10 +11,6 @@
       <template v-slot:item.status="{item}">
         <v-chip :color="getStatusColor(item.status)">{{item.status}}</v-chip>
       </template>
-      <!-- Reservation ID -->
-      <template v-slot:item.reservationid="{item}">
-        {{ item.reservationId }}
-      </template>
       <!-- Reserve date -->
       <template v-slot:item.createdAt="{item}">
         {{ parseTime(item.createdAt) }}
@@ -58,6 +54,10 @@
         <a class="link-action" v-if="item.status == 'started'" @click="emitRestartContainer(item.reservationId)">Restart Container</a>
         <a class="link-action" v-if="item.status == 'started'" @click="emitShowReservationDetails(item.reservationId)">Show Details</a>
       </template>
+      <!-- Server & ID -->
+      <template v-slot:item.serverAndId="{item}">
+        {{ item.computerName }} • #{{ item.reservationId }}
+      </template>
     </v-data-table>
   </div>
 </template>
@@ -86,12 +86,11 @@
             sortable: false,
             value: 'status',
           },
-          { text: 'Reservation ID', value: 'reservationid' },
+          { text: 'Server & ID', value: 'serverAndId' },
           { text: 'User', value: 'userEmail' },
           { text: 'Reserved', value: 'createdAt' },
           { text: 'Starts', value: 'startDate' },
           { text: 'Ends', value: 'endDate' },
-          { text: 'Server ID', value: 'server' },
           { text: 'Resources', value: 'resources' },
           { text: 'Container Image', value: 'containerImage' },
           { text: 'Ports', value: 'ports' },

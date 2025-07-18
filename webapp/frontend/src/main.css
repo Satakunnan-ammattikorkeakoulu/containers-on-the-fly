@@ -65,3 +65,9 @@ body .section {
 .v-event-timed-container {
   text-align: center;
 }
+
+.v-tooltip__content {
+  opacity: 1 !important;
+  background-color: #37393f !important;
+  color: white !important;
+}

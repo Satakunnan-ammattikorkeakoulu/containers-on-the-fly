@@ -4,36 +4,46 @@
     <v-data-table
       :headers="table.headers"
       :items="reservations"
-      :sort-by="'createdAt'"
+      :sort-by="'reservationId'"
       :sort-desc="true"
       class="elevation-1">
       <!-- Status -->
       <template v-slot:item.status="{item}">
         <v-chip :color="getStatusColor(item.status)">{{item.status}}</v-chip>
       </template>
-      <!-- Reserve date -->
-      <template v-slot:item.createdAt="{item}">
-        {{ parseTime(item.createdAt) }}
+      <!-- ID -->
+      <template v-slot:item.reservationId="{item}">
+        #{{ item.reservationId }}
       </template>
       <!-- Start date -->
       <template v-slot:item.startDate="{item}">
-        {{ parseTime(item.startDate) }}
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <span v-bind="attrs" v-on="on" class="resource-link">{{ parseTime(item.startDate) }}</span>
+          </template>
+          <span>Reserved: {{ parseTime(item.createdAt) }}</span>
+        </v-tooltip>
       </template>
       <!-- End date -->
       <template v-slot:item.endDate="{item}">
         {{ parseTime(item.endDate) }}
       </template>
       <!-- Resources -->
-      <template v-slot:item.resources="{item}">
-        {{ getResources(item.reservedHardwareSpecs) }}
-      </template>
-      <!-- Container Image -->
-      <template v-slot:item.containerImage="{item}">
-        {{ item.reservedContainer.container.imageName }}
-      </template>
-      <!-- Ports -->
-      <template v-slot:item.ports="{item}">
-        <div v-html="getPorts(item.reservedContainer.reservedPorts)"></div>
+      <template v-slot:item.resourcesInfo="{item}">
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <span v-bind="attrs" v-on="on" class="resource-link">{{ item.computerName }}</span>
+          </template>
+          <div style="max-width: 300px;">
+            <div><strong>Server:</strong> {{ item.computerName }}</div>
+            <div><strong>Resources:</strong> {{ getResources(item.reservedHardwareSpecs) }}</div>
+            <div><strong>Container:</strong> {{ item.reservedContainer.container.imageName }}</div>
+            <div v-if="item.reservedContainer.reservedPorts && item.reservedContainer.reservedPorts.length > 0">
+              <strong>Ports:</strong><br>
+              <span v-html="getPorts(item.reservedContainer.reservedPorts)"></span>
+            </div>
+          </div>
+        </v-tooltip>
       </template>
       <!-- Container Status -->
       <template v-slot:item.containerStatus="{item}">
@@ -74,13 +84,11 @@
             sortable: false,
             value: 'status',
           },
-          { text: 'Reserved', value: 'createdAt' },
+          { text: 'ID', value: 'reservationId' },
           { text: 'Starts', value: 'startDate' },
           { text: 'Ends', value: 'endDate' },
-          { text: 'Resources', value: 'resources' },
-          { text: 'Container Image', value: 'containerImage' },
-          { text: 'Ports', value: 'ports' },
-          { text: 'Container Status', value: 'containerStatus' },
+          { text: 'Resources', value: 'resourcesInfo' },
+          { text: 'Issues', value: 'containerStatus' },
           { text: 'actions', value: 'actions' },
         ],
       }
@@ -94,12 +102,12 @@
         if (ports) {
           let portsString = ""
           for (let i = 0; i < ports.length; i++) {
-            portsString += ports[i].localPort + " -> " + ports[i].outsidePort + " (" + ports[i].serviceName + ")"
+            portsString += ports[i].localPort + " → " + ports[i].outsidePort + " (" + ports[i].serviceName + ")"
             portsString += i != ports.length - 1 ? "<br />" : ""
           }
           return portsString
         }
-        return ""
+        return "No ports"
       },
       // Checks if the given time is between the given time + hours
       lessHoursThan(time, hours) {
@@ -177,5 +185,11 @@
     display: inline-block;
     padding-left: 15px;
     width: auto;
+  }
+  
+  .resource-link {
+    cursor: help;
+    text-decoration: underline;
+    text-decoration-style: dotted;
   }
 </style>

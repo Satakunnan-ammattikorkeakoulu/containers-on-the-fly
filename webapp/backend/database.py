@@ -1,7 +1,7 @@
 from sqlalchemy import create_engine
 from settings import settings
 import pymysql
-engine = create_engine(settings.database["engineUri"], echo=settings.database["debugPrinting"], future=True, pool_size=1024, max_overflow=2048)
+engine = create_engine(settings.database["engineUri"], echo=settings.database["debugPrinting"], future=True, pool_size=30, max_overflow=40)
 from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
 
@@ -137,6 +137,7 @@ class Reservation(Base):
   userId = Column(ForeignKey("User.userId"), nullable = False)
   startDate = Column(DateTime, nullable = False)
   endDate = Column(DateTime, nullable = False)
+  description = Column(Text, nullable = True) # TODO: add to database drawing
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
   status = Column(Text, nullable = False) # reserved, started, stopped, error, restart

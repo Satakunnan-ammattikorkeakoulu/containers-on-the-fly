@@ -749,11 +749,22 @@ init-database: ## Initialize database (for both new and existing environments)
 	@echo "Initializing database..."
 	@chmod +x $(BACKEND_PATH)/init_database.py
 	@cd $(BACKEND_PATH) && $(PYTHON) init_database.py
+	@echo "$(RED)Stopping all pm2 processes to prevent database locks...$(RESET)"
+	@pm2 stop all
 	@echo "Running any pending migrations..."
+	@echo "$(RED)NOTE:$(RESET) If migration gets stuck, it may be due to container server(s) holding database connections."
+	@echo "$(RED)    If that happens, then on each container server, run: $(BOLD)pm2 stop all$(RESET)$(RED). Wait for migration to complete, then run: $(BOLD)pm2 restart all$(RESET)"
+	@echo ""
 	@cd $(BACKEND_PATH) && alembic upgrade head
+	@echo "$(GREEN)Restarting all pm2 processes...$(RESET)"
+	@pm2 restart all
 
 migrate-database: ## Run database migrations
 	@echo "Running database migrations..."
+	@echo "$(RED)NOTE:$(RESET) If migration gets stuck, it may be due to container server(s) holding database connections."
+	@echo "$(RED)      On each container server, run: pm2 stop all$(RESET)"
+	@echo "$(RED)      Wait for migration to complete, then run: pm2 restart all$(RESET)"
+	@echo ""
 	@cd $(BACKEND_PATH) && alembic upgrade head
 
 create-migration: ## Create a new database migration (use MESSAGE="your message")

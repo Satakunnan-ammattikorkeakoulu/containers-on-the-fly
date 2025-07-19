@@ -527,18 +527,6 @@
                         </template>
                       </v-select>
                     </v-col>
-                    
-                    <v-col cols="12" md="6">
-                      <v-text-field
-                        v-model="logLines"
-                        label="Amount of log lines to fetch"
-                        type="number"
-                        outlined
-                        :min="1"
-                        :max="5000"
-                        @change="fetchHardwareMetrics"
-                      ></v-text-field>
-                    </v-col>
                   </v-row>
                 </div>
                 
@@ -962,7 +950,6 @@ export default {
     loadingServers: false,
     fetchingLogs: false,
     fetchingMetrics: false,
-    logLines: 100, // Default lines to fetch
     logs: {
       backend: '',
       frontend: '',

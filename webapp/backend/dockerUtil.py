@@ -100,30 +100,30 @@ def updateServerLogs(computer_id: int, session):
         # Backend logs
         try:
             backend_logs = subprocess.check_output(
-                ["pm2", "logs", "backend", "--lines", "100", "--nostream"], 
+                ["pm2", "logs", "backend", "--lines", "300", "--nostream"], 
                 text=True, stderr=subprocess.STDOUT, timeout=10
             )
-            updateLogRecord(session, computer_id, "backend", backend_logs, 100)
+            updateLogRecord(session, computer_id, "backend", backend_logs, 300)
         except:
             pass
         
         # Frontend logs  
         try:
             frontend_logs = subprocess.check_output(
-                ["pm2", "logs", "frontend", "--lines", "100", "--nostream"],
+                ["pm2", "logs", "frontend", "--lines", "300", "--nostream"],
                 text=True, stderr=subprocess.STDOUT, timeout=10
             )
-            updateLogRecord(session, computer_id, "frontend", frontend_logs, 100)
+            updateLogRecord(session, computer_id, "frontend", frontend_logs, 300)
         except:
             pass
         
         # Docker utility logs
         try:
             docker_logs = subprocess.check_output(
-                ["pm2", "logs", "backendDockerUtil", "--lines", "100", "--nostream"],
+                ["pm2", "logs", "backendDockerUtil", "--lines", "300", "--nostream"],
                 text=True, stderr=subprocess.STDOUT, timeout=10
             )
-            updateLogRecord(session, computer_id, "docker_utility", docker_logs, 100)
+            updateLogRecord(session, computer_id, "docker_utility", docker_logs, 300)
         except:
             pass
             

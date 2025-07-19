@@ -7,6 +7,7 @@
         <!--<a @click="profile">Profile</a>-->
         <div class="admin-block" v-if="isAdmin">
           <p class="admin-text">Admin</p>
+          <a href="/admin/general">General</a>
           <a href="/admin/reservations">Reservations</a>
           <a href="/admin/users">Users</a>
           <a href="/admin/roles">Roles</a>

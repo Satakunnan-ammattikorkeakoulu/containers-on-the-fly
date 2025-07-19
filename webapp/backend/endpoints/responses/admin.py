@@ -1,4 +1,4 @@
-from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec
+from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs
 from dateutil import parser
 from dateutil.relativedelta import *
 from datetime import timezone, timedelta
@@ -648,3 +648,120 @@ def saveRoleMounts(roleId: int, mounts: list) -> object:
         return Response(success, message)
     except Exception as e:
         return Response(False, f"Error saving role mounts: {str(e)}")
+
+def getServerMonitoring(computer_id: int) -> object:
+    '''
+    Returns monitoring data (metrics and logs) for a specific server.
+    
+    Args:
+        computer_id (int): The ID of the computer/server.
+        
+    Returns:
+        object: Response object with server monitoring data.
+    '''
+    with Session() as session:
+        # Check if computer exists
+        computer = session.query(Computer).filter(Computer.computerId == computer_id).first()
+        if not computer:
+            return Response(False, "Server not found")
+        
+        # Get server status/metrics
+        status = session.query(ServerStatus).filter(
+            ServerStatus.computerId == computer_id
+        ).first()
+        
+        # Get server logs
+        logs = session.query(ServerLogs).filter(
+            ServerLogs.computerId == computer_id
+        ).all()
+        
+        # Build response
+        monitoring_data = {
+            "computer": {
+                "id": computer.computerId,
+                "name": computer.name,
+                "ip": computer.ip
+            },
+            "isOnline": status.isOnline if status else False,
+            "metrics": None,
+            "logs": {}
+        }
+        
+        # Add metrics if available
+        if status:
+            # Convert uptime seconds to days/hours/minutes
+            uptime_days = 0
+            uptime_hours = 0 
+            uptime_minutes = 0
+            
+            if status.systemUptimeSeconds:
+                uptime_days = status.systemUptimeSeconds // 86400
+                uptime_hours = (status.systemUptimeSeconds % 86400) // 3600
+                uptime_minutes = (status.systemUptimeSeconds % 3600) // 60
+            
+            monitoring_data["metrics"] = {
+                "cpu": {
+                    "usage": status.cpuUsagePercent,
+                    "cores": status.cpuCores
+                },
+                "memory": {
+                    "total": status.memoryTotalBytes,
+                    "used": status.memoryUsedBytes,
+                    "percentage": status.memoryUsagePercent
+                },
+                "disk": {
+                    "total": status.diskTotalBytes,
+                    "used": status.diskUsedBytes,
+                    "free": status.diskFreeBytes,
+                    "percentage": status.diskUsagePercent
+                },
+                "docker": {
+                    "running": status.dockerContainersRunning,
+                    "total": status.dockerContainersTotal
+                },
+                "load": {
+                    "avg1": status.loadAvg1Min,
+                    "avg5": status.loadAvg5Min,
+                    "avg15": status.loadAvg15Min
+                },
+                "uptime": {
+                    "days": uptime_days,
+                    "hours": uptime_hours,
+                    "minutes": uptime_minutes,
+                    "seconds": status.systemUptimeSeconds
+                },
+                "lastUpdated": status.lastUpdatedAt.isoformat() if status.lastUpdatedAt else None
+            }
+        
+        # Add logs
+        for log in logs:
+            monitoring_data["logs"][log.logType] = {
+                "content": log.logContent or "",
+                "lines": log.logLines or 0,
+                "lastUpdated": log.lastUpdatedAt.isoformat() if log.lastUpdatedAt else None
+            }
+        
+        return Response(True, "Server monitoring data retrieved", monitoring_data)
+
+def getServersForMonitoring() -> object:
+    '''
+    Returns a list of all servers/computers available for monitoring.
+    
+    Returns:
+        object: Response object with servers list.
+    '''
+    with Session() as session:
+        computers = session.query(Computer).filter(
+            (Computer.removed == False) | (Computer.removed.is_(None))
+        ).all()
+        
+        servers_list = []
+        for computer in computers:
+            servers_list.append({
+                "id": computer.computerId,
+                "name": computer.name,
+                "address": computer.ip,
+                "public": computer.public
+            })
+        
+        return Response(True, "Servers retrieved successfully", {"servers": servers_list})

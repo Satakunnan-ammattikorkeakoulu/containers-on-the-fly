@@ -41,6 +41,8 @@ function createUrls(baseAddress) {
     URLS.admin.remove_role = baseAdminUrl + "remove_role"
     URLS.admin.get_role_mounts = baseAdminUrl + "role_mounts"
     URLS.admin.save_role_mounts = baseAdminUrl + "save_role_mounts"
+    URLS.admin.get_servers = baseAdminUrl + "servers"
+    URLS.admin.get_server_monitoring = baseAdminUrl + "server" // Will append /{id}/monitoring
 
     return URLS;
 }

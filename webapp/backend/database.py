@@ -5,7 +5,7 @@ engine = create_engine(settings.database["engineUri"], echo=settings.database["d
 from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
 
-from sqlalchemy import Column, Integer, Text, Float, ForeignKey, DateTime, UniqueConstraint, Boolean
+from sqlalchemy import Column, Integer, Text, Float, ForeignKey, DateTime, UniqueConstraint, Boolean, BigInteger
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -208,6 +208,63 @@ class RoleMount(Base):
 
     role = relationship("Role", back_populates="mounts")
     computer = relationship("Computer", back_populates="roleMounts")
+
+class ServerStatus(Base):
+    __tablename__ = "ServerStatus"
+    
+    computerId = Column(ForeignKey("Computer.computerId"), primary_key=True)
+    
+    # Basic Health
+    isOnline = Column(Boolean, nullable=False, default=False)
+    
+    # CPU Metrics
+    cpuUsagePercent = Column(Float, nullable=True)
+    cpuCores = Column(Integer, nullable=True)
+    
+    # Memory Metrics  
+    memoryTotalBytes = Column(BigInteger, nullable=True)
+    memoryUsedBytes = Column(BigInteger, nullable=True)
+    memoryUsagePercent = Column(Float, nullable=True)
+    
+    # Root Disk Usage (/)
+    diskTotalBytes = Column(BigInteger, nullable=True)
+    diskUsedBytes = Column(BigInteger, nullable=True)
+    diskFreeBytes = Column(BigInteger, nullable=True)
+    diskUsagePercent = Column(Float, nullable=True)
+    
+    # Docker Status
+    dockerContainersRunning = Column(Integer, nullable=True)
+    dockerContainersTotal = Column(Integer, nullable=True)
+    
+    # System Load
+    loadAvg1Min = Column(Float, nullable=True)
+    loadAvg5Min = Column(Float, nullable=True)
+    loadAvg15Min = Column(Float, nullable=True)
+    
+    # Uptime (in seconds)
+    systemUptimeSeconds = Column(BigInteger, nullable=True)
+    
+    # Last update timestamp
+    lastUpdatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    computer = relationship("Computer", backref="status")
+
+class ServerLogs(Base):
+    __tablename__ = "ServerLogs"
+    
+    serverLogId = Column(Integer, primary_key=True, autoincrement=True)
+    computerId = Column(ForeignKey("Computer.computerId"), nullable=False)
+    logType = Column(Text, nullable=False)  # 'backend', 'frontend', 'docker_utility'
+    
+    logContent = Column(Text, nullable=True)  # Store last N lines
+    logLines = Column(Integer, nullable=True)  # How many lines stored
+    
+    lastUpdatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    # Unique constraint for upsert per computer+logtype
+    __table_args__ = (UniqueConstraint('computerId', 'logType', name='unique_computer_logtype'),)
+    
+    computer = relationship("Computer")
 
 # Create session to interact with the database
 from sqlalchemy.orm import sessionmaker

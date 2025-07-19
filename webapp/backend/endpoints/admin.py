@@ -4,8 +4,8 @@ from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import admin as functionality
 from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit, RoleMountsEdit
 from endpoints.models.reservation import ReservationFilters
-from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole
-from sqlalchemy import desc
+from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole, ServerStatus, ServerLogs
+from sqlalchemy import desc, Column, Integer, Text, Float, ForeignKey, DateTime, UniqueConstraint, Boolean, BigInteger, func
 import datetime
 from pydantic import BaseModel
 from helpers.tables.Role import getRoles, getRoleById, addRole as addRoleHelper, editRole as editRoleHelper, removeRole as removeRoleHelper
@@ -117,4 +117,14 @@ async def getRoleMounts(roleId: int, token: str = Depends(oauth2_scheme)):
 async def saveRoleMounts(roleMountsEdit: RoleMountsEdit, token: str = Depends(oauth2_scheme)):
     ForceAuthentication(token, "admin")
     return functionality.saveRoleMounts(roleMountsEdit.roleId, roleMountsEdit.mounts)
+
+@router.get("/server/{computer_id}/monitoring")
+async def getServerMonitoring(computer_id: int, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.getServerMonitoring(computer_id)
+
+@router.get("/servers")
+async def getServersForMonitoring(token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.getServersForMonitoring()
 

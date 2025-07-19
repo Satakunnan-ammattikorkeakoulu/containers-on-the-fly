@@ -5,6 +5,10 @@ import datetime
 from datetime import timezone, datetime, timedelta
 import sys
 from os import linesep
+import psutil
+import subprocess
+import time
+from database import ServerStatus, ServerLogs, Computer, Session
 
 # Runs the script forever
 run : bool = True
@@ -14,13 +18,152 @@ computerId : int = None
 def timeNow():
   return datetime.now(timezone.utc)
 
+def updateServerMonitoring():
+    """Update server monitoring data in database"""
+    try:
+        with Session() as session:
+            computer = session.query(Computer).filter(
+                Computer.name == settings.docker["serverName"]
+            ).first()
+            
+            if not computer:
+                print(f"Warning: Computer '{settings.docker['serverName']}' not found in database")
+                return
+            
+            # Get or create status record
+            status = session.query(ServerStatus).filter(
+                ServerStatus.computerId == computer.computerId
+            ).first()
+            
+            if not status:
+                status = ServerStatus(computerId=computer.computerId)
+                session.add(status)
+            
+            # Collect system metrics
+            status.isOnline = True
+            status.cpuUsagePercent = round(psutil.cpu_percent(interval=1), 1)
+            status.cpuCores = psutil.cpu_count()
+            
+            # Memory metrics
+            memory = psutil.virtual_memory()
+            status.memoryTotalBytes = memory.total
+            status.memoryUsedBytes = memory.used
+            status.memoryUsagePercent = round(memory.percent, 1)
+            
+            # Root disk usage (/)
+            try:
+                disk = psutil.disk_usage('/')
+                status.diskTotalBytes = disk.total
+                status.diskUsedBytes = disk.used
+                status.diskFreeBytes = disk.free
+                status.diskUsagePercent = round((disk.used / disk.total) * 100, 1)
+            except:
+                pass  # Skip if can't access root disk
+            
+            # Docker status
+            try:
+                from python_on_whales import docker
+                running_containers = docker.container.list()
+                all_containers = docker.container.list(all=True)
+                status.dockerContainersRunning = len(running_containers)
+                status.dockerContainersTotal = len(all_containers)
+            except:
+                status.dockerContainersRunning = None
+                status.dockerContainersTotal = None
+            
+            # System load
+            try:
+                load_avg = psutil.getloadavg()
+                status.loadAvg1Min = round(load_avg[0], 2)
+                status.loadAvg5Min = round(load_avg[1], 2)
+                status.loadAvg15Min = round(load_avg[2], 2)
+            except:
+                pass  # getloadavg not available on all systems
+            
+            # System uptime
+            try:
+                status.systemUptimeSeconds = int(time.time() - psutil.boot_time())
+            except:
+                pass
+            
+            session.commit()
+            
+            # Update logs
+            updateServerLogs(computer.computerId, session)
+            
+    except Exception as e:
+        print(f"Error updating server monitoring: {e}")
+
+def updateServerLogs(computer_id: int, session):
+    """Update server logs in database"""
+    try:
+        # Backend logs
+        try:
+            backend_logs = subprocess.check_output(
+                ["pm2", "logs", "backend", "--lines", "100", "--nostream"], 
+                text=True, stderr=subprocess.STDOUT, timeout=10
+            )
+            updateLogRecord(session, computer_id, "backend", backend_logs, 100)
+        except:
+            pass
+        
+        # Frontend logs  
+        try:
+            frontend_logs = subprocess.check_output(
+                ["pm2", "logs", "frontend", "--lines", "100", "--nostream"],
+                text=True, stderr=subprocess.STDOUT, timeout=10
+            )
+            updateLogRecord(session, computer_id, "frontend", frontend_logs, 100)
+        except:
+            pass
+        
+        # Docker utility logs
+        try:
+            docker_logs = subprocess.check_output(
+                ["pm2", "logs", "backendDockerUtil", "--lines", "100", "--nostream"],
+                text=True, stderr=subprocess.STDOUT, timeout=10
+            )
+            updateLogRecord(session, computer_id, "docker_utility", docker_logs, 100)
+        except:
+            pass
+            
+    except Exception as e:
+        print(f"Error updating server logs: {e}")
+
+def updateLogRecord(session, computer_id: int, log_type: str, content: str, lines: int):
+    """Helper function to upsert log records"""
+    try:
+        log_record = session.query(ServerLogs).filter(
+            ServerLogs.computerId == computer_id,
+            ServerLogs.logType == log_type
+        ).first()
+        
+        if not log_record:
+            log_record = ServerLogs(
+                computerId=computer_id,
+                logType=log_type
+            )
+            session.add(log_record)
+        
+        log_record.logContent = content
+        log_record.logLines = lines
+        session.commit()
+        
+    except Exception as e:
+        print(f"Error updating {log_type} logs: {e}")
+
 def main():
   while (run):
-    for _ in range(6):
+    for i in range(6):
       stopFinishedServers()
       startNewServers()
       restartCrashedServers()
       restartServersRequiringRestart()
+      
+      # Update monitoring data every 3rd iteration (every 30 seconds)
+      if i % 3 == 0:
+        updateServerMonitoring()
+      
       sleep(10)
     # Run this larger cleanup below every 60 seconds (1 minute)
     stopOrphanContainerReservations()

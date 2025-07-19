@@ -490,6 +490,362 @@
               </v-form>
             </v-expansion-panel-content>
           </v-expansion-panel>
+
+          <!-- Monitoring Section -->
+          <v-expansion-panel>
+            <v-expansion-panel-header>
+              <v-icon class="mr-3">mdi-monitor-eye</v-icon>
+              <span class="font-weight-medium">Server Monitoring</span>
+            </v-expansion-panel-header>
+            <v-expansion-panel-content>
+              <v-form ref="monitoringForm" v-model="forms.monitoring.valid">
+                
+                <!-- Server Selection -->
+                <div class="mb-6">
+                  <h6 class="text-h6 mb-2">Server Selection</h6>
+                  <p class="body-2 grey--text mb-4">
+                    Select a server to view PM2 logs and hardware metrics.
+                  </p>
+                  
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-select
+                        v-model="selectedServer"
+                        :items="availableServers"
+                        item-text="name"
+                        item-value="id"
+                        label="Select Server"
+                        outlined
+                        :loading="loadingServers"
+                        @change="onServerChange"
+                      >
+                        <template v-slot:item="{ item }">
+                          <div>
+                            <div class="font-weight-medium">{{ item.name }}</div>
+                            <div class="caption grey--text">{{ item.address }}</div>
+                          </div>
+                        </template>
+                      </v-select>
+                    </v-col>
+                    
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="logLines"
+                        label="Amount of log lines to fetch"
+                        type="number"
+                        outlined
+                        :min="1"
+                        :max="5000"
+                        @change="fetchHardwareMetrics"
+                      ></v-text-field>
+                    </v-col>
+                  </v-row>
+                </div>
+                
+                <!-- Server Selected Content -->
+                <div v-if="selectedServer">
+                  <!-- Refresh Data Section -->
+                  <div class="mb-4">
+                    <v-btn 
+                      color="primary" 
+                      :loading="fetchingMetrics || fetchingLogs"
+                      @click="fetchHardwareMetrics"
+                      class="mb-3"
+                    >
+                      <v-icon left>mdi-refresh</v-icon>
+                      Refresh Data
+                    </v-btn>
+                    
+                    <!-- Last Updated Info -->
+                    <div class="mb-3" v-if="lastMetricsUpdate">
+                      <p class="caption mb-0">
+                        Last Updated: {{ formatTimestamp(lastMetricsUpdate) }}
+                      </p>
+                    </div>
+                    
+                    <!-- Description -->
+                    <p class="body-2 grey--text mb-4">
+                      The logs and statistics are collected every 30 seconds, thus clicking on the refresh button will only update the data if there is new data available.
+                    </p><br>
+                  </div>
+                  
+                  <!-- Hardware Metrics Section -->
+                  <div class="mb-6">
+                    <div class="mb-2">
+                      <h6 class="text-h6 mb-0">System Hardware Metrics</h6>
+                    </div>
+                    
+                    <!-- No Data Available Notice -->
+                    <v-alert 
+                      v-if="metrics.cpu.usage === null && selectedServer"
+                      type="info" 
+                      outlined
+                      class="mb-4"
+                    >
+                      <div class="d-flex align-center">
+                        <v-icon class="mr-2">mdi-information-outline</v-icon>
+                        <span>No monitoring data available for this server yet. The server may not have submitted any data, or monitoring might not be running on this server.</span>
+                      </div>
+                    </v-alert>
+                    
+                    <v-row>
+                      <!-- CPU Usage -->
+                      <v-col cols="12" md="3">
+                        <v-card outlined class="pa-3">
+                          <div class="d-flex align-center mb-2">
+                            <v-icon class="mr-2" color="blue">mdi-chip</v-icon>
+                            <span class="font-weight-medium">CPU Usage</span>
+                          </div>
+                          <div class="text-center">
+                            <v-progress-circular
+                              v-if="metrics.cpu.usage !== null"
+                              :value="metrics.cpu.usage"
+                              :color="getCpuColor(metrics.cpu.usage)"
+                              size="60"
+                              width="6"
+                              class="mb-2"
+                            >
+                              <span class="text-h6">{{ Math.round(metrics.cpu.usage || 0) }}%</span>
+                            </v-progress-circular>
+                            <div v-else class="text-h6 mb-2 grey--text">
+                              No data
+                            </div>
+                            <div class="caption grey--text">
+                              {{ metrics.cpu.cores !== null ? `${metrics.cpu.cores} cores` : 'No data' }}
+                            </div>
+                          </div>
+                        </v-card>
+                      </v-col>
+                      
+                      <!-- RAM Usage -->
+                      <v-col cols="12" md="3">
+                        <v-card outlined class="pa-3">
+                          <div class="d-flex align-center mb-2">
+                            <v-icon class="mr-2" color="green">mdi-memory</v-icon>
+                            <span class="font-weight-medium">Memory</span>
+                          </div>
+                          <div class="text-center">
+                            <v-progress-circular
+                              v-if="metrics.memory.percentage !== null"
+                              :value="metrics.memory.percentage"
+                              :color="getMemoryColor(metrics.memory.percentage)"
+                              size="60"
+                              width="6"
+                              class="mb-2"
+                            >
+                              <span class="text-h6">{{ Math.round(metrics.memory.percentage || 0) }}%</span>
+                            </v-progress-circular>
+                            <div v-else class="text-h6 mb-2 grey--text">
+                              No data
+                            </div>
+                            <div class="caption grey--text">
+                              {{ metrics.memory.used !== null && metrics.memory.total !== null ? 
+                                 `${formatBytes(metrics.memory.used)} / ${formatBytes(metrics.memory.total)}` : 
+                                 'No data' }}
+                            </div>
+                          </div>
+                        </v-card>
+                      </v-col>
+                      
+                      <!-- System Load -->
+                      <v-col cols="12" md="3">
+                        <v-card outlined class="pa-3">
+                          <div class="d-flex align-center mb-2">
+                            <v-icon class="mr-2" color="orange">mdi-gauge</v-icon>
+                            <span class="font-weight-medium">System Load</span>
+                          </div>
+                          <div class="text-center">
+                            <div class="text-h6 mb-1">
+                              {{ metrics.load.avg1 !== null ? metrics.load.avg1 : 'No data' }}
+                            </div>
+                            <div class="caption grey--text">
+                              1m: {{ metrics.load.avg1 !== null ? metrics.load.avg1 : '-' }}<br>
+                              5m: {{ metrics.load.avg5 !== null ? metrics.load.avg5 : '-' }}<br>
+                              15m: {{ metrics.load.avg15 !== null ? metrics.load.avg15 : '-' }}
+                            </div>
+                          </div>
+                        </v-card>
+                      </v-col>
+                      
+                      <!-- Uptime -->
+                      <v-col cols="12" md="3">
+                        <v-card outlined class="pa-3">
+                          <div class="d-flex align-center mb-2">
+                            <v-icon class="mr-2" color="purple">mdi-clock-outline</v-icon>
+                            <span class="font-weight-medium">Uptime</span>
+                          </div>
+                          <div class="text-center">
+                            <div class="text-h6 mb-1">
+                              {{ metrics.uptime.days !== null ? `${metrics.uptime.days}d` : 'No data' }}
+                            </div>
+                            <div class="caption grey--text">
+                              {{ metrics.uptime.hours !== null && metrics.uptime.minutes !== null ? 
+                                 `${metrics.uptime.hours}h ${metrics.uptime.minutes}m` : 
+                                 'No data' }}
+                            </div>
+                          </div>
+                        </v-card>
+                      </v-col>
+                    </v-row>
+                    
+                    <!-- Disk Usage - Root Filesystem Only -->
+                    <v-row class="mt-4">
+                      <v-col cols="12" md="6">
+                        <v-card outlined class="pa-3">
+                          <div class="d-flex align-center mb-2">
+                            <v-icon class="mr-2" color="teal">mdi-harddisk</v-icon>
+                            <span class="font-weight-medium">Root Disk Usage (/)</span>
+                          </div>
+                          <div class="text-center">
+                            <v-progress-circular
+                              v-if="metrics.disk.percentage !== null"
+                              :value="metrics.disk.percentage"
+                              :color="getDiskColor(metrics.disk.percentage)"
+                              size="60"
+                              width="6"
+                              class="mb-2"
+                            >
+                              <span class="text-h6">{{ Math.round(metrics.disk.percentage || 0) }}%</span>
+                            </v-progress-circular>
+                            <div v-else class="text-h6 mb-2 grey--text">
+                              No data
+                            </div>
+                            <div class="caption grey--text">
+                              {{ metrics.disk.used !== null && metrics.disk.total !== null && metrics.disk.free !== null ? 
+                                 `${formatBytes(metrics.disk.used)} / ${formatBytes(metrics.disk.total)}` : 
+                                 'No data' }}
+                                <br>
+                                {{ metrics.disk.free !== null ? `${formatBytes(metrics.disk.free)} free` : 'No data' }}
+                            </div>
+                          </div>
+                        </v-card>
+                      </v-col>
+                      
+                      <!-- Keep Network/Docker in same row -->
+                      <v-col cols="12" md="6">
+                        <v-card outlined class="pa-3">
+                          <div class="d-flex align-center mb-2">
+                            <v-icon class="mr-2" color="cyan">mdi-docker</v-icon>
+                            <span class="font-weight-medium">Docker Status</span>
+                          </div>
+                          <div class="d-flex justify-space-between">
+                            <div class="text-center">
+                              <div class="caption grey--text">Running</div>
+                              <div class="text-subtitle-2">{{ metrics.docker.running !== null ? metrics.docker.running : '-' }}</div>
+                            </div>
+                            <div class="text-center">
+                              <div class="caption grey--text">Total</div>
+                              <div class="text-subtitle-2">{{ metrics.docker.total !== null ? metrics.docker.total : '-' }}</div>
+                            </div>
+                          </div>
+                        </v-card>
+                      </v-col>
+                    </v-row>
+                    
+                  </div>
+                  
+                  <v-divider class="mb-6"></v-divider>
+                  
+                  <div class="mb-4">
+                    <h6 class="text-h6 mb-2">PM2 Application Logs</h6>
+                    <p class="body-2 grey--text mb-4">
+                      Logs from PM2 processes. Latest logs are at the top.
+                    </p>
+                  </div>
+                  
+                  <!-- Backend Logs -->
+                  <div class="mb-6">
+                    <div class="d-flex align-center mb-2">
+                      <v-icon class="mr-2" color="blue">mdi-server</v-icon>
+                      <h6 class="text-subtitle-1 font-weight-medium">Backend Application</h6>
+                      <v-spacer></v-spacer>
+                      <v-chip 
+                        small 
+                        :color="logs.backend.length > 0 ? 'green' : 'grey'"
+                        text-color="white"
+                      >
+                        {{ logs.backend.length > 0 ? 'Active' : 'No Data' }}
+                      </v-chip>
+                    </div>
+                    <v-textarea
+                      :value="reverseLogOrder(logs.backend)"
+                      readonly
+                      outlined
+                      rows="15"
+                      placeholder="Backend logs will appear here..."
+                      class="logs-textarea"
+                      :loading="fetchingLogs"
+                    ></v-textarea>
+                  </div>
+                  
+                  <!-- Frontend Logs -->
+                  <div class="mb-6">
+                    <div class="d-flex align-center mb-2">
+                      <v-icon class="mr-2" color="green">mdi-web</v-icon>
+                      <h6 class="text-subtitle-1 font-weight-medium">Frontend Application</h6>
+                      <v-spacer></v-spacer>
+                      <v-chip 
+                        small 
+                        :color="logs.frontend.length > 0 ? 'green' : 'grey'"
+                        text-color="white"
+                      >
+                        {{ logs.frontend.length > 0 ? 'Active' : 'No Data' }}
+                      </v-chip>
+                    </div>
+                    <v-textarea
+                      :value="reverseLogOrder(logs.frontend)"
+                      readonly
+                      outlined
+                      rows="15"
+                      placeholder="Frontend logs will appear here..."
+                      class="logs-textarea"
+                      :loading="fetchingLogs"
+                    ></v-textarea>
+                  </div>
+                  
+                  <!-- Backend Docker Utility Logs -->
+                  <div class="mb-6">
+                    <div class="d-flex align-center mb-2">
+                      <v-icon class="mr-2" color="orange">mdi-docker</v-icon>
+                      <h6 class="text-subtitle-1 font-weight-medium">Backend Docker Utility</h6>
+                      <v-spacer></v-spacer>
+                      <v-chip 
+                        small 
+                        :color="logs.backendDockerUtil.length > 0 ? 'green' : 'grey'"
+                        text-color="white"
+                      >
+                        {{ logs.backendDockerUtil.length > 0 ? 'Active' : 'No Data' }}
+                      </v-chip>
+                    </div>
+                    <v-textarea
+                      :value="reverseLogOrder(logs.backendDockerUtil)"
+                      readonly
+                      outlined
+                      rows="15"
+                      placeholder="Backend Docker Utility logs will appear here..."
+                      class="logs-textarea"
+                      :loading="fetchingLogs"
+                    ></v-textarea>
+                  </div>
+                  
+                  <!-- Last Updated Info -->
+                  <div class="text-center grey--text" v-if="lastLogUpdate">
+                    <p class="caption">
+                      Last updated: {{ formatTimestamp(lastLogUpdate) }}
+                    </p>
+                  </div>
+                </div>
+                
+                <!-- No Server Selected Message -->
+                <div v-else class="text-center grey--text pa-8">
+                  <v-icon size="48" class="mb-4">mdi-server-off</v-icon>
+                  <h6 class="text-h6 mb-2">No Server Selected</h6>
+                  <p class="body-2">Please select a server first</p>
+                </div>
+                
+              </v-form>
+            </v-expansion-panel-content>
+          </v-expansion-panel>
           
         </v-expansion-panels>
       </v-col>
@@ -498,8 +854,7 @@
 </template>
 
 <script>
-// Note: axios import removed since we're implementing frontend first
-// const axios = require('axios').default;
+const axios = require('axios').default;
 
 export default {
   name: 'PageAdminGeneral',
@@ -518,7 +873,8 @@ export default {
       general: { valid: true },
       access: { valid: true },
       email: { valid: true },
-      notifications: { valid: true }
+      notifications: { valid: true },
+      monitoring: { valid: true } // Added monitoring form state
     },
     
     // Saving states for each section
@@ -527,7 +883,8 @@ export default {
       access: false,
       email: false,
       contact: false,  // Added contact saving state
-      notifications: false
+      notifications: false,
+      monitoring: false // Added monitoring saving state
     },
     
     // Form validation rules
@@ -593,15 +950,101 @@ export default {
       },
       notifications: {
         containerAlertsEnabled: true // Set to true to show example emails
+      },
+      monitoring: {
+        // Placeholder for monitoring settings if any
+      }
+    },
+
+    // Monitoring specific data
+    selectedServer: null,
+    availableServers: [],
+    loadingServers: false,
+    fetchingLogs: false,
+    fetchingMetrics: false,
+    logLines: 100, // Default lines to fetch
+    logs: {
+      backend: '',
+      frontend: '',
+      backendDockerUtil: ''
+    },
+    lastLogUpdate: null,
+    lastMetricsUpdate: null,
+    
+    // Hardware metrics data
+    metrics: {
+      cpu: {
+        usage: 0,
+        cores: 0
+      },
+      memory: {
+        total: 0,
+        used: 0,
+        percentage: 0
+      },
+      load: {
+        current: 0,
+        avg1: 0,
+        avg5: 0,
+        avg15: 0
+      },
+      uptime: {
+        days: 0,
+        hours: 0,
+        minutes: 0
+      },
+      disk: {
+        total: 0,
+        used: 0,
+        free: 0,
+        percentage: 0
+      },
+      docker: {
+        running: 0,
+        total: 0
       }
     }
   }),
   
   mounted() {
     this.loadSettings();
+    this.loadAvailableServers();  // Added this call
   },
   
   methods: {
+    // Server monitoring methods
+    onServerChange() {
+      // Clear old data when switching servers
+      this.clearMonitoringData();
+      // Fetch new data for the selected server
+      if (this.selectedServer) {
+        this.fetchHardwareMetrics();
+      }
+    },
+
+    clearMonitoringData() {
+      // Reset metrics to show no data state
+      this.metrics = {
+        cpu: { usage: null, cores: null },
+        memory: { total: null, used: null, percentage: null },
+        load: { avg1: null, avg5: null, avg15: null },
+        uptime: { days: null, hours: null, minutes: null },
+        disk: { total: null, used: null, free: null, percentage: null },
+        docker: { running: null, total: null }
+      };
+      
+      // Clear logs
+      this.logs = {
+        backend: '',
+        frontend: '',
+        backendDockerUtil: ''
+      };
+      
+      // Clear timestamps
+      this.lastMetricsUpdate = null;
+      this.lastLogUpdate = null;
+    },
+
     // Email list management methods
     addBlacklistEmail() {
       if (this.isValidEmail(this.newBlacklistEmail) && !this.blacklistedEmailsList.includes(this.newBlacklistEmail)) {
@@ -766,9 +1209,203 @@ export default {
         access: 'Access Control',
         email: 'Email Configuration',
         contact: 'Contact Information',  // Added contact
-        notifications: 'System Notifications'
+        notifications: 'System Notifications',
+        monitoring: 'Monitoring' // Added monitoring
       };
       return names[sectionName] || sectionName;
+    },
+
+    // Monitoring methods
+    async loadAvailableServers() {
+      try {
+        this.loadingServers = true;
+        
+        console.log('Loading available servers...');
+        
+        let _this = this;
+        let currentUser = this.$store.getters.user;
+
+        axios({
+          method: "get",
+          url: this.AppSettings.APIServer.admin.get_servers,
+          headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            _this.availableServers = response.data.data.servers.map(server => ({
+              id: server.id,
+              name: server.name,
+              address: server.address
+            }));
+          } else {
+            console.log("Failed getting servers...");
+            _this.$store.commit('showMessage', { 
+              text: "There was an error getting servers.", 
+              color: "red" 
+            });
+          }
+          _this.loadingServers = false;
+        })
+        .catch(function (error) {
+          console.error('Failed to load servers:', error);
+          if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          } else {
+            _this.$store.commit('showMessage', { 
+              text: 'Failed to load available servers', 
+              color: 'red' 
+            });
+          }
+          _this.loadingServers = false;
+        });
+        
+      } catch (error) {
+        console.error('Failed to load servers:', error);
+        this.$store.commit('showMessage', { 
+          text: 'Failed to load available servers', 
+          color: 'red' 
+        });
+        this.loadingServers = false;
+      }
+    },
+    
+    async fetchLogs() {
+      // Since logs are now fetched together with metrics, just call the main method
+      await this.fetchHardwareMetrics();
+    },
+    
+        async fetchHardwareMetrics() {
+      if (!this.selectedServer) return;
+      
+      try {
+        this.fetchingMetrics = true;
+        this.fetchingLogs = true;
+        
+        console.log(`Fetching monitoring data for server ${this.selectedServer}`);
+        
+        let _this = this;
+        let currentUser = this.$store.getters.user;
+
+        axios({
+          method: "get",
+          url: `${this.AppSettings.APIServer.admin.get_server_monitoring}/${this.selectedServer}/monitoring`,
+          headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            const data = response.data.data;
+            
+            // Update metrics
+            if (data.metrics) {
+              _this.metrics = {
+                cpu: data.metrics.cpu,
+                memory: data.metrics.memory,
+                disk: data.metrics.disk,
+                docker: data.metrics.docker,
+                load: data.metrics.load,
+                uptime: data.metrics.uptime
+              };
+              
+              if (data.metrics.lastUpdated) {
+                _this.lastMetricsUpdate = new Date(data.metrics.lastUpdated);
+              }
+            }
+            
+            // Update logs (reverse order so latest are on top)
+            _this.logs = {
+              backend: data.logs.backend?.content || '',
+              frontend: data.logs.frontend?.content || '',
+              backendDockerUtil: data.logs.docker_utility?.content || ''
+            };
+          
+            _this.lastLogUpdate = new Date();
+            
+          } else {
+            console.log("Failed getting monitoring data...");
+            _this.$store.commit('showMessage', { 
+              text: response.data.message || 'Failed to fetch monitoring data', 
+              color: 'red' 
+            });
+          }
+          _this.fetchingMetrics = false;
+          _this.fetchingLogs = false;
+        })
+        .catch(function (error) {
+          console.error('Failed to fetch monitoring data:', error);
+          if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          } else {
+            _this.$store.commit('showMessage', { 
+              text: 'Failed to fetch monitoring data', 
+              color: 'red' 
+            });
+          }
+          _this.fetchingMetrics = false;
+          _this.fetchingLogs = false;
+        });
+        
+      } catch (error) {
+        console.error('Failed to fetch monitoring data:', error);
+        this.$store.commit('showMessage', { 
+          text: 'Failed to fetch monitoring data', 
+          color: 'red' 
+        });
+        this.fetchingMetrics = false;
+        this.fetchingLogs = false;
+      }
+    },
+    
+    // Color helpers for metrics
+    getCpuColor(usage) {
+      if (usage === null || usage === undefined) return 'grey';
+      if (usage < 50) return 'green';
+      if (usage < 80) return 'orange';
+      return 'red';
+    },
+    
+    getMemoryColor(percentage) {
+      if (percentage === null || percentage === undefined) return 'grey';
+      if (percentage < 70) return 'green';
+      if (percentage < 90) return 'orange';
+      return 'red';
+    },
+    
+    getDiskColor(percentage) {
+      if (percentage === null || percentage === undefined) return 'grey';
+      if (percentage < 80) return 'green';
+      if (percentage < 95) return 'orange';
+      return 'red';
+    },
+    
+    // Format bytes to human readable
+    formatBytes(bytes) {
+      if (bytes === null || bytes === undefined) return '0 B';
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    },
+    
+    reverseLogOrder(logContent) {
+      if (!logContent || logContent.trim() === '') return logContent;
+      
+      // Split by lines, reverse, and rejoin
+      return logContent
+        .split('\n')
+        .reverse()
+        .join('\n');
+    },
+    
+    formatTimestamp(date) {
+      return new Intl.DateTimeFormat('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }).format(date);
     }
   }
 }
@@ -859,5 +1496,39 @@ export default {
 
 .v-expansion-panel-header>:not(.v-expansion-panel-header__icon) {
     flex: 0;
+}
+
+// Logs textarea styling
+.logs-textarea {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+}
+
+::v-deep .logs-textarea textarea {
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
+  color: rgba(255, 255, 255, 0.87) !important;
+  background-color: #1e1e1e !important;
+}
+
+::v-deep .logs-textarea .v-text-field__details {
+  display: none !important;
+}
+
+// Status chip styling
+.v-chip {
+  margin: 2px !important;
+  
+  &.v-chip--small {
+    height: 24px !important;
+    font-size: 11px !important;
+  }
+}
+
+// Server selection styling
+::v-deep .v-select__selections {
+  min-height: 48px !important;
 }
 </style> 

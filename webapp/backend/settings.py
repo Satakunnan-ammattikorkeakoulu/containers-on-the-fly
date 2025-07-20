@@ -10,7 +10,7 @@ import re
 # Handler for loading the settings.json file
 # Initialized class can be used with:
 #   from backend.settings import settings
-#   settings.app["name"]
+#   settings.app["url"]
 
 def die(text):
   import os
@@ -45,14 +45,12 @@ class Settings:
 
         # app
         if not hasattr(s, 'app'): die("app")
-        if "name" not in s.app: die("app.name")
         if "logoUrl" not in s.app: die("app.logoUrl")
         if "url" not in s.app: die("app.url")
         if "clientUrl" not in s.app: die("app.clientUrl")
         if "port" not in s.app: die("app.port")
         if "production" not in s.app: die("app.production")
         if "addTestDataInDevelopment" not in s.app: die("app.addTestDataInDevelopment")
-        if "timezone" not in s.app: die("app.timezone")
         # reservation
         if not hasattr(s, 'reservation'): die("reservation")
         if "minimumDuration" not in s.reservation: die("reservation.minimumDuration")

@@ -314,13 +314,20 @@ def get_email_container_started(image, ip, ports, password, includeEmailDetails,
         webAddress = f"You can access your reservations through: {settings.app['clientUrl']}{linesep}{linesep}"
     
     endDateText = ""
-    # TODO: Get endDate in user timezone and after that add in the email
     if endDate is not None:
-        # convert endDate from UTC to Europe_Helsinki timezone
+        # Get timezone from database settings
+        timezone_name = "UTC"  # Default timezone
+        try:
+            from helpers.tables.SystemSetting import getSetting
+            timezone_name = getSetting('general.timezone', 'UTC')
+        except Exception:
+            pass
+        
+        # convert endDate from UTC to configured timezone
         from dateutil import tz
         endDate.replace(tzinfo=None)
-        endDate = endDate.astimezone(tz.gettz('Europe_Helsinki'))
-        endDateText = f"Your reservation will end at (Europe_Helsinki): {endDate.strftime('%Y-%m-%d %H:%M:%S')}"
+        endDate = endDate.astimezone(tz.gettz(timezone_name))
+        endDateText = f"Your reservation will end at ({timezone_name}): {endDate.strftime('%Y-%m-%d %H:%M:%S')}"
 
     startMessage = ""
     if includeEmailDetails:

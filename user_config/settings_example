@@ -12,8 +12,6 @@
 # THESE ARE ALL MANDATORY TO BE SET
 ###
 
-# Name of your application (displayed in the web interface)
-APP_NAME="Containers on the Fly"
 
 # The IP address of this server.
 SERVER_IP_ADDRESS="YOUR_IP_HERE"
@@ -42,8 +40,6 @@ CUSTOM_SSL_KEY_PATH="/path/to/your/private.key"
 RESERVATION_MIN_DURATION=5
 RESERVATION_MAX_DURATION=72
 
-# Timezone in TZ format, view all available timezones from here: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-TIMEZONE="Europe/Helsinki"
 
 
 ###
@@ -120,8 +116,6 @@ LOGIN_TYPE="password"
 # LDAP_SEARCH_METHOD="(sAMAccountName={username})"
 # LDAP_ACCOUNT_FIELD="sAMAccountName"
 # LDAP_EMAIL_FIELD="mail"
-
-# Email whitelist is now configured through the admin interface in the database
 
 # Minutes how long the user is logged in until logged out automatically
 SESSION_TIMEOUT_MINUTES=1440

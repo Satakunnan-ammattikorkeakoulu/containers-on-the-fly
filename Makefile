@@ -42,7 +42,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		EXISTING_SERVER_IP=$$(grep "^SERVER_IP_ADDRESS=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_WEB_HTTPS=$$(grep "^MAIN_SERVER_WEB_HTTPS=" user_config/settings | cut -d'=' -f2); \
-		EXISTING_TIMEZONE=$$(grep "^TIMEZONE=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_MIN_DURATION=$$(grep "^RESERVATION_MIN_DURATION=" user_config/settings | cut -d'=' -f2); \
 		EXISTING_MAX_DURATION=$$(grep "^RESERVATION_MAX_DURATION=" user_config/settings | cut -d'=' -f2); \
 		\
@@ -56,7 +55,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "  - Server IP: $(GREEN)$$EXISTING_SERVER_IP$(RESET)"; \
 		echo "  - Web Host: $(GREEN)$$EXISTING_WEB_HOST$(RESET)"; \
 		echo "  - Web Address: $(GREEN)$$EXISTING_WEB_ADDRESS$(RESET)"; \
-		echo "  - Timezone: $(GREEN)$$EXISTING_TIMEZONE$(RESET)"; \
 		echo "  - Reservation Duration: $(GREEN)$$EXISTING_MIN_DURATION - $$EXISTING_MAX_DURATION hours$(RESET)"; \
 		echo ""; \
 		echo "What would you like to do?"; \
@@ -172,16 +170,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			ENABLE_HTTPS="false"; \
 		fi; \
 		\
-		echo ""; \
-		echo "$(GREEN)$(BOLD)Server Timezone:$(RESET)"; \
-		echo "Enter your server's timezone for proper scheduling and logging."; \
-		echo "Common examples: Europe/London, America/New_York, Asia/Tokyo, UTC"; \
-		echo "Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"; \
-		echo -n "Enter timezone (or empty for $(GREEN)Europe/Helsinki$(RESET)): "; \
-		read TIMEZONE_INPUT; \
-		if [ -z "$$TIMEZONE_INPUT" ]; then \
-			TIMEZONE_INPUT="Europe/Helsinki"; \
-		fi; \
 		\
 		echo ""; \
 		echo "$(GREEN)$(BOLD)Container Reservation Duration:$(RESET)"; \
@@ -205,7 +193,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			sed -i "s/SERVER_IP_ADDRESS=\"YOUR_IP_HERE\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HOST=\"YOUR_IP_OR_DOMAIN_HERE\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HTTPS=false/MAIN_SERVER_WEB_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
-			sed -i "s/TIMEZONE=\"Europe\/Helsinki\"/TIMEZONE=\"$$TIMEZONE_INPUT\"/" user_config/settings; \
 			sed -i "s/RESERVATION_MIN_DURATION=5/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
 			sed -i "s/RESERVATION_MAX_DURATION=72/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
 			DB_PASSWORD_ESCAPED=$$(printf '%s\n' "$$DB_PASSWORD" | sed 's/[\/&]/\\&/g'); \
@@ -215,8 +202,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			sed -i "s/SERVER_IP_ADDRESS=\"[^\"]*\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HOST=\"[^\"]*\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HTTPS=[^[:space:]]*/MAIN_SERVER_WEB_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
-			ESCAPED_TIMEZONE=$$(echo "$$TIMEZONE_INPUT" | sed 's/\//\\\//g'); \
-			sed -i "s/TIMEZONE=\"[^\"]*\"/TIMEZONE=\"$$ESCAPED_TIMEZONE\"/" user_config/settings; \
 			sed -i "s/RESERVATION_MIN_DURATION=[^[:space:]]*/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
 			sed -i "s/RESERVATION_MAX_DURATION=[^[:space:]]*/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
 			# Only update DB password if it's not already set \
@@ -244,7 +229,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		UPDATED_SERVER_IP=$$(grep "^SERVER_IP_ADDRESS=" user_config/settings | cut -d'"' -f2); \
 		UPDATED_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
 		UPDATED_WEB_HTTPS=$$(grep "^MAIN_SERVER_WEB_HTTPS=" user_config/settings | cut -d'=' -f2); \
-		UPDATED_TIMEZONE=$$(grep "^TIMEZONE=" user_config/settings | cut -d'"' -f2); \
 		UPDATED_MIN_DURATION=$$(grep "^RESERVATION_MIN_DURATION=" user_config/settings | cut -d'=' -f2); \
 		UPDATED_MAX_DURATION=$$(grep "^RESERVATION_MAX_DURATION=" user_config/settings | cut -d'=' -f2); \
 		\
@@ -257,7 +241,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "  - Server IP: $(GREEN)$$UPDATED_SERVER_IP$(RESET)"; \
 		echo "  - Web Host: $(GREEN)$$UPDATED_WEB_HOST$(RESET)"; \
 		echo "  - Web Address: $(GREEN)$$UPDATED_WEB_ADDRESS$(RESET)"; \
-		echo "  - Timezone: $(GREEN)$$UPDATED_TIMEZONE$(RESET)"; \
 		echo "  - Reservation Duration: $(GREEN)$$UPDATED_MIN_DURATION - $$UPDATED_MAX_DURATION hours$(RESET)"; \
 		echo ""; \
 		echo "What would you like to do?"; \

@@ -1,10 +1,8 @@
 {
     "app": {
-      "name": "{{APP_NAME}}",
       "url": "{{SERVER_WEB_ADDRESS}}",
       "serverIp": "{{SERVER_IP_ADDRESS}}",
       "clientUrl": "{{SERVER_WEB_ADDRESS}}:{{FRONTEND_PORT}}",
-      "timezone": "{{TIMEZONE}}",
       "logoUrl": "/static/logos/logo.png",
       "port": {{BACKEND_PORT}},
       "production": true,

@@ -43,6 +43,11 @@ function createUrls(baseAddress) {
     URLS.admin.save_role_mounts = baseAdminUrl + "save_role_mounts"
     URLS.admin.get_servers = baseAdminUrl + "servers"
     URLS.admin.get_server_monitoring = baseAdminUrl + "server" // Will append /{id}/monitoring
+    
+    // General admin settings endpoints
+    URLS.admin.get_general_settings = baseAdminUrl + "general-settings"
+    URLS.admin.save_general_settings = baseAdminUrl + "general-settings"
+    URLS.admin.test_email = baseAdminUrl + "test-email"
 
     return URLS;
 }

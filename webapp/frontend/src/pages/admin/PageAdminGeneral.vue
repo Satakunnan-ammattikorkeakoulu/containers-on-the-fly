@@ -246,9 +246,9 @@
               <span class="font-weight-medium">Email Configuration</span>
             </v-expansion-panel-header>
             <v-expansion-panel-content>
+              
+              <!-- SMTP Settings Section with its own form -->
               <v-form ref="emailForm" v-model="forms.email.valid">
-                
-                <!-- SMTP Settings Section -->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">SMTP Server Configuration</h6>
                   <p class="body-2 grey--text mb-4">
@@ -328,8 +328,10 @@
                     </v-col>
                   </v-row>
                 </div>
-                
-                <!-- Contact Information Section -->
+              </v-form>
+              
+              <!-- Contact Information Section with its own separate form -->
+              <v-form ref="contactForm" v-model="forms.contact.valid">
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Contact Email</h6>
                   <p class="body-2 grey--text mb-4">
@@ -339,14 +341,13 @@
                   <v-row>
                     <v-col cols="12" md="6">
                       <v-text-field
-                        v-model="settings.email.contactEmail"
+                        v-model="settings.contact.contactEmail"
                         label="Admin Contact Email"
                         placeholder="admin@yourdomain.com"
                         outlined
                         required
                         :rules="[rules.required, rules.email]"
                       ></v-text-field>
-                      <p class="caption grey--text mt-n2">Email address for users to contact administrators</p>
                     </v-col>
                   </v-row>
                   
@@ -364,45 +365,43 @@
                     </v-col>
                   </v-row>
                 </div>
-                
-                <!-- Test Email Delivery Section -->
-                <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Test Email Delivery</h6>
-                  <p class="body-2 grey--text mb-4">
-                    Send a test email to verify that your SMTP configuration is working correctly.
-                  </p>
-                  
-                  <v-row>
-                    <v-col cols="12" md="6">
-                      <v-text-field
-                        v-model="testEmail"
-                        label="Test Email Address"
-                        placeholder="test@example.com"
-                        outlined
-                        :rules="[rules.email]"
-                        @keyup.enter="sendTestEmail"
-                      ></v-text-field>
-                      <p class="caption grey--text mt-n2">Enter an email address to receive the test message</p>
-                    </v-col>
-                  </v-row>
-                  
-                  <!-- Test Email Button -->
-                  <v-row>
-                    <v-col cols="12">
-                      <v-btn 
-                        color="primary" 
-                        :loading="sendingTest"
-                        :disabled="!testEmail || !isValidEmail(testEmail)"
-                        @click="sendTestEmail"
-                      >
-                        <v-icon left>mdi-email-send</v-icon>
-                        Test Delivery
-                      </v-btn>
-                    </v-col>
-                  </v-row>
-                </div>
-                
               </v-form>
+              
+              <!-- Test Email Delivery Section (no form needed, just uses validation) -->
+              <div class="mb-6">
+                <h6 class="text-h6 mb-2">Test Email Delivery</h6>
+                <p class="body-2 grey--text mb-4">
+                  Send a test email to verify that your SMTP configuration is working correctly.
+                </p>
+                
+                <v-row>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="testEmail"
+                      label="Test Email Address"
+                      placeholder="test@example.com"
+                      outlined
+                      :rules="[rules.email]"
+                      @keyup.enter="sendTestEmail"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+                
+                <!-- Test Email Button -->
+                <v-row>
+                  <v-col cols="12">
+                    <v-btn 
+                      color="primary" 
+                      :loading="sendingTest"
+                      :disabled="!testEmail || !isValidEmail(testEmail)"
+                      @click="sendTestEmail"
+                    >
+                      Test Email Delivery
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </div>
+              
             </v-expansion-panel-content>
           </v-expansion-panel>
 
@@ -475,18 +474,7 @@
                   </div>
                 </div>
                 
-                <v-row>
-                  <v-col cols="12">
-                    <v-btn 
-                      color="primary" 
-                      :loading="saving.notifications"
-                      @click="saveSection('notifications')"
-                    >
-                      <v-icon left>mdi-content-save</v-icon>
-                      Save Notification Settings
-                    </v-btn>
-                  </v-col>
-                </v-row>
+
               </v-form>
             </v-expansion-panel-content>
           </v-expansion-panel>
@@ -848,6 +836,13 @@ export default {
   name: 'PageAdminGeneral',
   data: () => ({
     expandedPanels: [], // All panels collapsed by default
+    initialLoadComplete: false, // Flag to prevent auto-save during initial load
+    isLoading: false, // Flag to indicate we're currently loading data
+    settingsInitialized: {
+      blacklistEnabled: false,
+      whitelistEnabled: false,
+      containerAlertsEnabled: false
+    }, // Track which settings have been initialized from backend
     testEmail: '',
     sendingTest: false,
     
@@ -861,8 +856,9 @@ export default {
       general: { valid: true },
       access: { valid: true },
       email: { valid: true },
+      contact: { valid: true },  // Add contact form state
       notifications: { valid: true },
-      monitoring: { valid: true } // Added monitoring form state
+      monitoring: { valid: true }
     },
     
     // Saving states for each section
@@ -900,22 +896,10 @@ export default {
       { text: 'Once per day', value: 'daily' }
     ],
     
-    // Email lists with example data
-    blacklistedEmailsList: [
-      'blocked@example.com',
-      'spam@badsite.com'
-    ],
-    
-    whitelistedEmailsList: [
-      'admin@company.com',
-      'manager@company.com',
-      'developer@company.com'
-    ],
-    
-    alertEmailsList: [
-      'admin@company.com',
-      'devops@company.com'
-    ],
+    // Email lists - remove example data, will be loaded from backend
+    blacklistedEmailsList: [],
+    whitelistedEmailsList: [],
+    alertEmailsList: [],
     
     // Settings data structure
     settings: {
@@ -925,19 +909,21 @@ export default {
         emailInstructions: ''
       },
       access: {
-        blacklistEnabled: true, // Set to true to show example emails
+        blacklistEnabled: false, 
         whitelistEnabled: false
       },
       email: {
-        smtpServer: '',        // Changed from smtpHost to match config
+        smtpServer: '',
         smtpPort: 587,
         smtpUsername: '',
         smtpPassword: '',
-        fromEmail: '',
-        contactEmail: ''       // Moved here but will have separate save
+        fromEmail: ''
+      },
+      contact: {
+        contactEmail: ''
       },
       notifications: {
-        containerAlertsEnabled: true // Set to true to show example emails
+        containerAlertsEnabled: false
       },
       monitoring: {
         // Placeholder for monitoring settings if any
@@ -1037,60 +1023,134 @@ export default {
       if (this.isValidEmail(this.newBlacklistEmail) && !this.blacklistedEmailsList.includes(this.newBlacklistEmail)) {
         this.blacklistedEmailsList.push(this.newBlacklistEmail);
         this.newBlacklistEmail = '';
-        // TODO: Save to backend automatically
-        console.log('Added to blacklist:', this.blacklistedEmailsList);
+        this.saveEmailLists(); // Auto-save to backend
       }
     },
     
     removeBlacklistEmail(index) {
       this.blacklistedEmailsList.splice(index, 1);
-      // TODO: Save to backend automatically
-      console.log('Removed from blacklist:', this.blacklistedEmailsList);
+      this.saveEmailLists(); // Auto-save to backend
     },
     
     addWhitelistEmail() {
       if (this.isValidEmail(this.newWhitelistEmail) && !this.whitelistedEmailsList.includes(this.newWhitelistEmail)) {
         this.whitelistedEmailsList.push(this.newWhitelistEmail);
         this.newWhitelistEmail = '';
-        // TODO: Save to backend automatically
-        console.log('Added to whitelist:', this.whitelistedEmailsList);
+        this.saveEmailLists(); // Auto-save to backend
       }
     },
     
     removeWhitelistEmail(index) {
       this.whitelistedEmailsList.splice(index, 1);
-      // TODO: Save to backend automatically
-      console.log('Removed from whitelist:', this.whitelistedEmailsList);
+      this.saveEmailLists(); // Auto-save to backend
     },
     
     addAlertEmail() {
       if (this.isValidEmail(this.newAlertEmail) && !this.alertEmailsList.includes(this.newAlertEmail)) {
         this.alertEmailsList.push(this.newAlertEmail);
         this.newAlertEmail = '';
-        // TODO: Save to backend automatically
-        console.log('Added alert email:', this.alertEmailsList);
+        this.saveAlertEmails(); // Auto-save to backend
       }
     },
     
     removeAlertEmail(index) {
       this.alertEmailsList.splice(index, 1);
-      // TODO: Save to backend automatically
-      console.log('Removed alert email:', this.alertEmailsList);
+      this.saveAlertEmails(); // Auto-save to backend
     },
     
     async loadSettings() {
       try {
-        // TODO: Load settings from backend when implemented
         console.log('Loading settings from backend...');
-        // For now, we'll just initialize with empty values
-        // const response = await axios.get('/api/admin/general-settings');
-        // this.settings = response.data.settings;
+        this.isLoading = true; // Set loading flag
+        
+        let _this = this;
+        let currentUser = this.$store.getters.user;
+
+        axios({
+          method: "get",
+          url: this.AppSettings.APIServer.admin.get_general_settings,
+          headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            const data = response.data.data;
+            
+            // Update settings from backend (update individual properties)
+            _this.settings.general.loginPageInfo = data.general.loginPageInfo || '';
+            _this.settings.general.reservationPageInstructions = data.general.reservationPageInstructions || '';
+            _this.settings.general.emailInstructions = data.general.emailInstructions || '';
+            
+            _this.settings.access.blacklistEnabled = data.access.blacklistEnabled || false;
+            _this.settings.access.whitelistEnabled = data.access.whitelistEnabled || false;
+            _this.settings.notifications.containerAlertsEnabled = data.notifications.containerAlertsEnabled || false;
+            
+            // Update email settings (excluding contactEmail)
+            _this.settings.email = {
+              smtpServer: data.email.smtpServer || '',
+              smtpPort: data.email.smtpPort || 587,
+              smtpUsername: data.email.smtpUsername || '',
+              smtpPassword: data.email.smtpPassword || '',
+              fromEmail: data.email.fromEmail || ''
+            };
+            
+            // Update contact settings separately
+            _this.settings.contact = {
+              contactEmail: data.email.contactEmail || data.contact?.contactEmail || ''
+            };
+            
+            // Mark settings as initialized after a small delay to ensure watchers don't fire during load
+            setTimeout(() => {
+              _this.settingsInitialized.blacklistEnabled = true;
+              _this.settingsInitialized.whitelistEnabled = true;
+              _this.settingsInitialized.containerAlertsEnabled = true;
+            }, 200);
+            
+            // Update email lists
+            _this.blacklistedEmailsList = data.access.blacklistedEmails || [];
+            _this.whitelistedEmailsList = data.access.whitelistedEmails || [];
+            _this.alertEmailsList = data.notifications.alertEmails || [];
+            
+            // Mark initial load as complete AFTER all updates using a longer timeout to ensure all reactivity is done
+            setTimeout(() => {
+              _this.isLoading = false;
+              _this.initialLoadComplete = true;
+            }, 500); // Increased timeout to 500ms
+            
+          } else {
+            console.log("Failed to load settings...");
+            _this.$store.commit('showMessage', { 
+              text: "There was an error loading settings.", 
+              color: "red" 
+            });
+          }
+          // Mark initial load as complete even on error to enable auto-save watchers
+          _this.isLoading = false;
+          _this.initialLoadComplete = true;
+        })
+        .catch(function (error) {
+          console.error('Failed to load settings:', error);
+          if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          } else {
+            _this.$store.commit('showMessage', { 
+              text: 'Failed to load settings', 
+              color: 'red' 
+            });
+          }
+          // Mark initial load as complete even on error to enable auto-save watchers
+          _this.isLoading = false;
+          _this.initialLoadComplete = true;
+        });
+        
       } catch (error) {
         console.error('Failed to load settings:', error);
         this.$store.commit('showMessage', { 
           text: 'Failed to load settings', 
           color: 'red' 
         });
+        // Mark initial load as complete even on error to enable auto-save watchers
+        this.isLoading = false;
+        this.initialLoadComplete = true;
       }
     },
     
@@ -1108,25 +1168,59 @@ export default {
         
         this.saving[sectionName] = true;
         
-        // TODO: Save to backend when implemented
-        console.log(`Saving ${sectionName} settings:`, this.settings[sectionName]);
+        // Prepare settings data based on section
+        let settingsData = { ...this.settings[sectionName] };
         
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Add email lists for access section
+        if (sectionName === 'access') {
+          settingsData.blacklistedEmails = this.blacklistedEmailsList;
+          settingsData.whitelistedEmails = this.whitelistedEmailsList;
+        }
         
-        /*
-        const currentUser = this.$store.getters.user;
-        const response = await axios.post('/api/admin/general-settings', {
-          section: sectionName,
-          settings: this.settings[sectionName]
-        }, {
-          headers: { Authorization: `Bearer ${currentUser.loginToken}` }
-        });
-        */
+        // Add alert emails for notifications section
+        if (sectionName === 'notifications') {
+          settingsData.alertEmails = this.alertEmailsList;
+        }
         
-        this.$store.commit('showMessage', { 
-          text: `${this.getSectionDisplayName(sectionName)} settings saved successfully`, 
-          color: 'green' 
+        let _this = this;
+        let currentUser = this.$store.getters.user;
+
+        axios({
+          method: "post",
+          url: this.AppSettings.APIServer.admin.save_general_settings,
+          data: {
+            section: sectionName,
+            settings: settingsData
+          },
+          headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            // Show success notification
+            _this.$store.commit('showMessage', { 
+              text: `${_this.getSectionDisplayName(sectionName)} settings saved successfully!`, 
+              color: 'green' 
+            });
+          } else {
+            console.log(`Failed to save ${sectionName} settings...`);
+            _this.$store.commit('showMessage', { 
+              text: response.data.message || `There was an error saving ${_this.getSectionDisplayName(sectionName)} settings.`, 
+              color: "red" 
+            });
+          }
+          _this.saving[sectionName] = false;
+        })
+        .catch(function (error) {
+          console.error(`Failed to save ${sectionName} settings:`, error);
+          if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          } else {
+            _this.$store.commit('showMessage', { 
+              text: `Failed to save ${_this.getSectionDisplayName(sectionName)} settings`, 
+              color: 'red' 
+            });
+          }
+          _this.saving[sectionName] = false;
         });
         
       } catch (error) {
@@ -1135,7 +1229,6 @@ export default {
           text: `Failed to save ${this.getSectionDisplayName(sectionName)} settings`, 
           color: 'red' 
         });
-      } finally {
         this.saving[sectionName] = false;
       }
     },
@@ -1152,25 +1245,45 @@ export default {
       try {
         this.sendingTest = true;
         
-        // TODO: Send test email via backend when implemented
         console.log(`Sending test email to: ${this.testEmail}`);
         
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        /*
-        const currentUser = this.$store.getters.user;
-        await axios.post('/api/admin/send-test-email', {
-          email: this.testEmail,
-          smtpSettings: this.settings.email
-        }, {
-          headers: { Authorization: `Bearer ${currentUser.loginToken}` }
-        });
-        */
-        
-        this.$store.commit('showMessage', { 
-          text: `Test email sent successfully to ${this.testEmail}`, 
-          color: 'green' 
+        let _this = this;
+        let currentUser = this.$store.getters.user;
+
+        axios({
+          method: "post",
+          url: this.AppSettings.APIServer.admin.test_email,
+          data: {
+            email: this.testEmail
+          },
+          headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            _this.$store.commit('showMessage', { 
+              text: `Test email sent successfully to ${_this.testEmail}`, 
+              color: 'green' 
+            });
+          } else {
+            console.log("Failed to send test email...");
+            _this.$store.commit('showMessage', { 
+              text: response.data.message || 'Failed to send test email', 
+              color: "red" 
+            });
+          }
+          _this.sendingTest = false;
+        })
+        .catch(function (error) {
+          console.error('Failed to send test email:', error);
+          if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          } else {
+            _this.$store.commit('showMessage', { 
+              text: 'Failed to send test email', 
+              color: 'red' 
+            });
+          }
+          _this.sendingTest = false;
         });
         
       } catch (error) {
@@ -1179,7 +1292,6 @@ export default {
           text: 'Failed to send test email', 
           color: 'red' 
         });
-      } finally {
         this.sendingTest = false;
       }
     },
@@ -1393,6 +1505,47 @@ export default {
         minute: '2-digit',
         second: '2-digit'
       }).format(date);
+    },
+
+    // Updated email list management methods to auto-save
+    async saveEmailLists() {
+      // Don't save during initial loading to prevent spurious notifications
+      if (!this.initialLoadComplete || this.isLoading) {
+        return;
+      }
+      // Save access settings including email lists
+      await this.saveSection('access');
+    },
+
+    async saveAlertEmails() {
+      // Don't save during initial loading to prevent spurious notifications
+      if (!this.initialLoadComplete || this.isLoading) {
+        return;
+      }
+      // Save notification settings including alert emails
+      await this.saveSection('notifications');
+    }
+  },
+
+  watch: {
+    // Auto-save when container alerts checkbox is toggled
+    'settings.notifications.containerAlertsEnabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.containerAlertsEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveAlertEmails();
+      }
+    },
+
+    // Auto-save when access control checkboxes are toggled
+    'settings.access.blacklistEnabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.blacklistEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveEmailLists();
+      }
+    },
+
+    'settings.access.whitelistEnabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.whitelistEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveEmailLists();
+      }
     }
   }
 }

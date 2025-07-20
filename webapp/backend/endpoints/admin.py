@@ -128,3 +128,26 @@ async def getServersForMonitoring(token: str = Depends(oauth2_scheme)):
     ForceAuthentication(token, "admin")
     return functionality.getServersForMonitoring()
 
+# General admin settings endpoints
+class GeneralSettingsData(BaseModel):
+    section: str
+    settings: Dict[str, Any]
+
+class TestEmailData(BaseModel):
+    email: str
+
+@router.get("/general-settings")
+async def getGeneralSettings(token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.getGeneralSettings()
+
+@router.post("/general-settings")
+async def saveGeneralSettings(data: GeneralSettingsData, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.saveGeneralSettings(data.section, data.settings)
+
+@router.post("/test-email")
+async def sendTestEmail(data: TestEmailData, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.sendTestEmail(data.email)
+

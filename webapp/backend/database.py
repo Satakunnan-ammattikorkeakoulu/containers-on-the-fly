@@ -266,6 +266,23 @@ class ServerLogs(Base):
     
     computer = relationship("Computer")
 
+class UserBlacklist(Base):
+  __tablename__ = "UserBlacklist"
+
+  userBlacklistId = Column(Integer, primary_key = True, autoincrement = True)
+  email = Column(Text, nullable = True, unique = True)
+
+class SystemSetting(Base):
+  __tablename__ = "SystemSetting"
+  
+  systemSettingId = Column(Integer, primary_key = True, autoincrement = True)
+  settingKey = Column(Text, nullable = False, unique = True)
+  settingValue = Column(Text, nullable = True)  # Store as JSON for complex values
+  dataType = Column(Text, nullable = False)  # 'boolean', 'integer', 'text', 'email', 'json'
+  description = Column(Text, nullable = True)  # Optional description of what this setting does
+  createdAt = Column(DateTime(timezone=True), server_default=func.now())
+  updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
+
 # Create session to interact with the database
 from sqlalchemy.orm import sessionmaker
 Session = sessionmaker(bind = engine)

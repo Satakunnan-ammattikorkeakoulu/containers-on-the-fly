@@ -26,6 +26,87 @@
       </v-row>
     </v-row>
 
+    <!-- Statistics Cards -->
+    <!-- Status Statistics -->
+    <v-row class="mb-4 justify-center">
+      <v-col cols="12" sm="6" md="2">
+        <v-card outlined>
+          <v-card-text class="text-center">
+            <v-icon size="24" color="blue-grey" class="mb-2">mdi-chart-bar</v-icon>
+            <div class="text-h6 font-weight-bold">{{ stats.total }}</div>
+            <div class="text-subtitle-2">Total</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="2">
+        <v-card outlined>
+          <v-card-text class="text-center">
+            <v-icon size="24" color="green" class="mb-2">mdi-play-circle</v-icon>
+            <div class="text-h6 font-weight-bold text--primary" style="color: #4CAF50 !important;">{{ stats.started }}</div>
+            <div class="text-subtitle-2">Running</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="2">
+        <v-card outlined>
+          <v-card-text class="text-center">
+            <v-icon size="24" color="orange" class="mb-2">mdi-stop-circle</v-icon>
+            <div class="text-h6 font-weight-bold" style="color: #FF9800 !important;">{{ stats.stopped }}</div>
+            <div class="text-subtitle-2">Stopped</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="2">
+        <v-card outlined>
+          <v-card-text class="text-center">
+            <v-icon size="24" color="red" class="mb-2">mdi-alert-circle</v-icon>
+            <div class="text-h6 font-weight-bold" style="color: #F44336 !important;">{{ stats.error }}</div>
+            <div class="text-subtitle-2">Errored</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <!-- Time-based Statistics -->
+    <v-row class="mb-6 justify-center">
+      <v-col cols="12" sm="6" md="2">
+        <v-card outlined>
+          <v-card-text class="text-center">
+            <v-icon size="24" color="primary" class="mb-2">mdi-calendar-today</v-icon>
+            <div class="text-h6 font-weight-bold text-primary">{{ stats.today }}</div>
+            <div class="text-subtitle-2">Today</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="2">
+        <v-card outlined>
+          <v-card-text class="text-center">
+            <v-icon size="24" color="primary" class="mb-2">mdi-calendar-week</v-icon>
+            <div class="text-h6 font-weight-bold text-primary">{{ stats.lastWeek }}</div>
+            <div class="text-subtitle-2">Week</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="2">
+        <v-card outlined>
+          <v-card-text class="text-center">
+            <v-icon size="24" color="primary" class="mb-2">mdi-calendar-month</v-icon>
+            <div class="text-h6 font-weight-bold text-primary">{{ stats.lastMonth }}</div>
+            <div class="text-subtitle-2">Month</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="2">
+        <v-card outlined>
+          <v-card-text class="text-center">
+            <v-icon size="24" color="primary" class="mb-2">mdi-calendar-range</v-icon>
+            <div class="text-h6 font-weight-bold text-primary">{{ stats.lastMonth }}</div>
+            <div class="text-subtitle-2">3 Months</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
     <v-row v-if="!isFetchingReservations">
         <v-col cols="12">
           <v-slide-x-transition mode="out-in">
@@ -71,6 +152,15 @@
       modalConnectionDetailsVisible: false,
       modalConnectionDetailsReservationId: null,
       filters: { status: { text: "All", value: "All" } },
+      stats: {
+        total: 0,
+        started: 0,
+        stopped: 0,
+        error: 0,
+        today: 0,
+        lastWeek: 0,
+        lastMonth: 0
+      }
     }),
     mounted () {
       if (localStorage.getItem("justReserved") === "true") {
@@ -128,6 +218,7 @@
             // Success
             if (response.data.status == true) {
               _this.reservations = response.data.data.reservations
+              _this.updateStats()
             }
             // Fail
             else {
@@ -295,6 +386,32 @@
       showReservationDetails(reservationId) {
         this.modalConnectionDetailsVisible = true
         this.modalConnectionDetailsReservationId = reservationId
+      },
+      updateStats() {
+        const now = new Date()
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+        this.stats.total = this.reservations.length
+        this.stats.started = this.reservations.filter(r => r.status === 'started').length
+        this.stats.stopped = this.reservations.filter(r => r.status === 'stopped').length
+        this.stats.error = this.reservations.filter(r => r.status === 'error').length
+        
+        this.stats.today = this.reservations.filter(r => {
+          const startDate = new Date(r.startDate)
+          return startDate >= today
+        }).length
+
+        this.stats.lastWeek = this.reservations.filter(r => {
+          const startDate = new Date(r.startDate)
+          return startDate >= weekAgo
+        }).length
+
+        this.stats.lastMonth = this.reservations.filter(r => {
+          const startDate = new Date(r.startDate)
+          return startDate >= monthAgo
+        }).length
       }
     },
     beforeDestroy() {

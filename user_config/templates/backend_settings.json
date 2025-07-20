@@ -43,7 +43,6 @@
       "port_range_end": {{DOCKER_RESERVATION_PORT_RANGE_END}},
       "enabled": true,
       "shm_size": "{{DOCKER_SHM_SIZE}}",
-      "generalText": "{{EMAIL_GENERAL_TEXT}}",
       "extraMounts": {{DOCKER_EXTRA_MOUNTS_JSON}}
     }
   } 

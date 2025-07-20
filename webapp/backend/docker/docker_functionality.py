@@ -303,8 +303,11 @@ def get_email_container_started(image, ip, ports, password, includeEmailDetails,
 
 
     generalText = ""
-    if "generalText" in settings.docker:
-        generalText = settings.docker["generalText"]
+    try:
+        from helpers.tables.SystemSetting import getSetting
+        generalText = getSetting('instructions.email', '')
+    except Exception:
+        pass
 
     webAddress = ""
     if "clientUrl" in settings.app and includeEmailDetails:

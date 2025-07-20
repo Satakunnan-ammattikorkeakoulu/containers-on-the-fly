@@ -130,8 +130,6 @@ SESSION_TIMEOUT_MINUTES=1440
 # ADVANCED SETTINGS
 ###
 
-# Optional text added to the beginning of notification emails
-EMAIL_GENERAL_TEXT=""
 
 # Can be used to set an additional port for the backend that the frontend connects to when making API calls from the browser.
 # Useful when the backend is running in development environment port (like 8000)

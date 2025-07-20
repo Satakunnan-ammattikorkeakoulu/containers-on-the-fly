@@ -2,13 +2,6 @@
  * Global app settings.
  */
  var AppSettings = {};
-
- /**
- * General settings for the app.
- */
- AppSettings.General = {
-  appName: "{{APP_NAME}}",
- }
  
  /**
  * API urls

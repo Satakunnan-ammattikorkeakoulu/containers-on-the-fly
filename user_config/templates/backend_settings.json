@@ -44,16 +44,7 @@
       "port_range_end": {{DOCKER_RESERVATION_PORT_RANGE_END}},
       "enabled": true,
       "shm_size": "{{DOCKER_SHM_SIZE}}",
-      "sendEmail": {{ENABLE_EMAIL_NOTIFICATIONS}},
       "generalText": "{{EMAIL_GENERAL_TEXT}}",
       "extraMounts": {{DOCKER_EXTRA_MOUNTS_JSON}}
-    },
-    "email": {
-      "sendEmail": {{ENABLE_EMAIL_NOTIFICATIONS}},
-      "smtpAddress": "{{SMTP_SERVER}}",
-      "smtpPort": {{SMTP_PORT}},
-      "emailAddress": "{{SMTP_USERNAME}}",
-      "smtpPassword": "{{SMTP_PASSWORD}}",
-      "helpEmailAddress": "{{CONTACT_EMAIL}}"
     }
   } 

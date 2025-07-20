@@ -93,7 +93,7 @@ class SettingsApplier:
         # Convert boolean strings to proper JSON boolean values
         bool_settings = [
             'USE_WHITELIST', 'DATABASE_DEBUG', 'ADD_TEST_DATA', 
-            'ENABLE_EMAIL_NOTIFICATIONS', 'MAIN_SERVER_WEB_HTTPS'
+            'MAIN_SERVER_WEB_HTTPS'
         ]
         
         for setting in bool_settings:
@@ -108,7 +108,7 @@ class SettingsApplier:
         numeric_settings = [
             'RESERVATION_MIN_DURATION', 'RESERVATION_MAX_DURATION',
             'SESSION_TIMEOUT_MINUTES', 'BACKEND_PORT', 'FRONTEND_PORT',
-            'SMTP_PORT', 'DOCKER_REGISTRY_PORT', 
+            'DOCKER_REGISTRY_PORT', 
             'DOCKER_RESERVATION_PORT_RANGE_START', 'DOCKER_RESERVATION_PORT_RANGE_END'
         ]
         

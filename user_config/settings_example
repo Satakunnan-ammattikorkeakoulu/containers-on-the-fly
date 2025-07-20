@@ -76,21 +76,6 @@ MARIADB_DB_USER="containerflyuser"
 MARIADB_DB_USER_PASSWORD="password"
 
 ###
-# EMAIL CONFIGURATION
-###
-
-# Email address which is shown for support contacts
-CONTACT_EMAIL="support@foo.com"
-
-# SMTP settings for sending notification emails (optional)
-# Set ENABLE_EMAIL_NOTIFICATIONS to true to enable email notifications
-ENABLE_EMAIL_NOTIFICATIONS=false
-SMTP_SERVER="smtp.office365.com"
-SMTP_PORT=587
-SMTP_USERNAME="email@test.com"
-SMTP_PASSWORD="abc123"
-
-###
 # DOCKER CONFIGURATIONS
 ###
 
@@ -115,13 +100,6 @@ DOCKER_RESERVATION_PORT_RANGE_END=3000
 # If you are just creating your main server, then leave this as the default value "server1"
 # If you are creating another container server, then you can change this value to something else, like "server2"
 DOCKER_SERVER_NAME="server1"
-
-# Additionally, if you want your users to persistently store files and folders,
-# you can specify here the full path in the host operating system where the files are stored at.
-# Each user will have a folder in this location for saving persistent data, with the user's email (special characters removed) as the folder name.
-# For example: "/home/containerfly/persistent_mounts"
-# It could then store user test@foo.com data as: "/home/containerfly/persistent_mounts/test_foo_com/"
-DOCKER_USER_MOUNT_LOCATION=""
 
 ###
 # AUTHENTICATION SETTINGS

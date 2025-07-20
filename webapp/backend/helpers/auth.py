@@ -135,7 +135,7 @@ def create_password(length = 40):
     (string) the generated password
   '''
   possible_chars = string.ascii_letters + string.digits
-  random_password = "".join(secrets.choice(possible_chars) for i in range(length))
+  random_password = "".join(secrets.choice(possible_chars) for _ in range(length))
   return random_password
 
 def GetLDAPUser(username, password):
@@ -180,6 +180,5 @@ def GetLDAPUser(username, password):
       return False, "Wrong username or password."
     except ldap.SERVER_DOWN:
       return False, "Failed to connect to LDAP authentication service: Timeout."
-    except Exception as e:
+    except Exception:
       return False, "Unknown error with the LDAP login!"
-    return False, "Unknown error."

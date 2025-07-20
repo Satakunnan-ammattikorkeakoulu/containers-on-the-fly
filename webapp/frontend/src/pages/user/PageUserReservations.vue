@@ -406,7 +406,7 @@
     },
     computed: {
       globalTimezone() {
-        return Intl.DateTimeFormat().resolvedOptions().timeZone;
+        return this.$store.getters.appTimezone;
       }
     },
     beforeDestroy() {

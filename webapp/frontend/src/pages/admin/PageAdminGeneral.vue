@@ -1060,7 +1060,7 @@ export default {
     
     async loadSettings() {
       try {
-        console.log('Loading settings from backend...');
+        //console.log('Loading settings from backend...');
         this.isLoading = true; // Set loading flag
         
         let _this = this;
@@ -1194,13 +1194,25 @@ export default {
           },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
-        .then(function (response) {
+        .then(async function (response) {
           if (response.data.status == true) {
             // Show success notification
             _this.$store.commit('showMessage', { 
               text: `${_this.getSectionDisplayName(sectionName)} settings saved successfully!`, 
               color: 'green' 
             });
+            
+            // Reload app config for sections that affect public settings
+            if (sectionName === 'general' || sectionName === 'contact') {
+              try {
+                await _this.$store.dispatch('loadAppConfig');
+                //console.log('App configuration reloaded after saving', sectionName, 'settings');
+              } catch (error) {
+                console.error('Failed to reload app config:', error);
+                // Don't show error to user as the save was successful
+              }
+            }
+            
           } else {
             console.log(`Failed to save ${sectionName} settings...`);
             _this.$store.commit('showMessage', { 
@@ -1319,7 +1331,7 @@ export default {
       try {
         this.loadingServers = true;
         
-        console.log('Loading available servers...');
+        //console.log('Loading available servers...');
         
         let _this = this;
         let currentUser = this.$store.getters.user;

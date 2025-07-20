@@ -18,6 +18,18 @@
             <h1 style="margin-bottom: 10px;">Reserve Server</h1>
             <p>When do you want to start the reservation?</p>
             
+            <!-- Reservation Page Instructions -->
+            <v-col cols="12" v-if="reservationPageInstructions && reservationPageInstructions.trim()" class="mb-4">
+              <v-alert 
+                type="info" 
+                outlined
+                class="mx-auto text-left"
+                style="max-width: 800px;"
+              >
+                <div v-html="reservationPageInstructions.replace(/\n/g, '<br>')"></div>
+              </v-alert>
+            </v-col>
+            
             <v-btn large @click="reserveNow" style="margin-bottom: 20px; margin-top: 30px;" color="green">Reserve Now</v-btn>
             <p class="dim" style="font-weight: 17px;">OR</p>
             <p class="dim">To reserve into future, click on the time in the calendar.</p>
@@ -259,11 +271,6 @@
       hardwareData: null, // Contains hardware data for the currently selected computer
       selectedHardwareSpecs: {}, // Selected hardware specs for the current computer
       isSubmittingReservation: false, // Set to true when user is submitting the reservation
-      minimumDurationDays: 0, // TODO: Grab from server settings
-      maximumDurationDays: 4,  // TODO: Grab from server settings      
-      minimumDurationHours: 0, // TODO: Grab from server settings
-      maximumDurationHours: 24,  // TODO: Grab from server settings
-      minimumDuration: 5, // TODO: Grab from server settings
       rules: {
         maxLength50: value => !value || value.length <= 50 || "Description must be 50 characters or less"
       }
@@ -276,15 +283,12 @@
         hours.push( { "text": i + " hours", "value": i } )
       }
       this.reservableHours = hours
-      //this.duration = { "text": "8 hours", "value": 8 }
 
-      // If is admin, set days to 60
-      if (this.isAdmin) {
-        this.maximumDurationDays = 60
-      }
-
+      // If is admin, set days to higher max
+      let maxDays = this.isAdmin() ? 60 : this.maximumDurationDays
+      
       let days = []
-      for (let i = this.minimumDurationDays; i <= this.maximumDurationDays; i++) {
+      for (let i = this.minimumDurationDays; i <= maxDays; i++) {
         days.push( { "text": i + " days", "value": i } )
       }
       this.reservableDays = days
@@ -382,7 +386,7 @@
 
         // If going back to step 2 (select reservation duration), reset all selected containers, computers and hardware specs
         if (this.step == 2) {
-          this.container = null
+      
           this.computer = null
         }
       },
@@ -464,8 +468,6 @@
             // Success
             if (response.data.status == true) {
               _this.allReservations = response.data.data.reservations
-              //console.log(_this.allReservations)
-              _this.fetchingReservations = false
             }
             // Fail
             else {
@@ -509,6 +511,7 @@
             if (response.data.status == true) {
               _this.allComputers = response.data.data.computers
               _this.allContainers = response.data.data.containers
+        
               let computers = []
               _this.allComputers.forEach((computer) => {
                 computers.push({ "value": computer.computerId, "text": computer.name })
@@ -633,8 +636,29 @@
         return dayjs(this.reserveDate).format("DD.MM.YYYY HH:mm")
       },
       globalTimezone() {
-        return AppSettings.General.timezone
+        return this.$store.getters.appTimezone
       },
+      minimumDuration() {
+        return this.$store.getters.reservationMinDuration
+      },
+      maximumDuration() {
+        return this.$store.getters.reservationMaxDuration
+      },
+      minimumDurationDays() {
+        return 0
+      },
+      maximumDurationDays() {
+        return Math.floor(this.maximumDuration / 24)
+      },
+      minimumDurationHours() {
+        return 0
+      },
+      maximumDurationHours() {
+        return 24
+      },
+      reservationPageInstructions() {
+        return this.$store.getters.reservationPageInstructions
+      }
     },
   }
 </script>
@@ -646,5 +670,25 @@
   
   .spec-row {
     margin-bottom: 10px;
+  }
+
+  .section {
+    margin: 30px 0px;
+  }
+
+  .color-violet {
+    color: #6d4c7d;
+  }
+
+  .dim {
+    opacity: 0.8;
+  }
+
+  .color-green {
+    color: green;
+  }
+
+  .refresh-tip {
+    margin-top: 30px;
   }
 </style>

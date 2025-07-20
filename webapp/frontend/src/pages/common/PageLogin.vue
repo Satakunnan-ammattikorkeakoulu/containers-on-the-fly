@@ -16,6 +16,18 @@
         <p class="color-violet dim" style="margin-top: 10px; font-size: 90%;">{{loginText}}</p>
       </v-col>
 
+      <!-- Login Page Instructions -->
+      <v-col cols="12" v-if="loginPageInfo && loginPageInfo.trim()">
+        <v-alert 
+          type="info" 
+          outlined
+          class="mx-auto"
+          style="max-width: 600px;"
+        >
+          <div v-html="loginPageInfo.replace(/\n/g, '<br>')"></div>
+        </v-alert>
+      </v-col>
+
       <v-col class="mb-5" cols="12">
         <v-form ref="form" v-model="form['valid']" lazy-validation>
           <v-text-field v-on:keyup.enter="submitLoginForm" type="text" style="max-width: 300px; margin: 0 auto;" :label="usernameField" v-model="form['email']" :rules="validation['email']" required></v-text-field>
@@ -29,7 +41,6 @@
 
 <script>
   const axios = require('axios').default;
-  import AppSettings from '/src/AppSettings.js'
   
   export default {
     name: 'PageLogin',
@@ -62,16 +73,19 @@
         return this.$store.getters.isLoggedIn || false;
       },
       appName() {
-        return AppSettings.General.appName
+        return this.$store.getters.appName
       },
       loginText() {
-        return AppSettings.Login.loginText || ""
+        return this.$store.getters.loginText
       },
       usernameField() {
-        return AppSettings.Login.usernameField || "Username"
+        return this.$store.getters.usernameField
       },
       passwordField() {
-        return AppSettings.Login.passwordField || "Password"
+        return this.$store.getters.passwordField
+      },
+      loginPageInfo() {
+        return this.$store.getters.loginPageInfo
       }
     },
     methods: {
@@ -125,3 +139,12 @@
     }
   }
 </script>
+
+<style scoped>
+  .color-violet {
+    color: #6d4c7d;
+  }
+  .dim {
+    opacity: 0.8;
+  }
+</style>

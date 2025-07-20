@@ -5,22 +5,10 @@ import AppSettings from '/src/AppSettings.js';
 
 Vue.use(Vuex);
 
-/* Usage of getters (nextTick is only necessary if wanting to pause execution of the component):
-
-  this.$nextTick(function () {
-    _this.$store.commit("setUser", { loginToken: loginToken, callback: (res) => {
-      if (res.success)
-        {
-          console.log("Login succesfull..")
-        }
-        else
-        {
-          console.log("Could not login user with the given loginToken.")
-        }
-      }
-    });
-  });
-*/
+// Helper function for responses
+function Response(success, message) {
+  return { success, message };
+}
 
 // Global VUEX store
 export const store = new Vuex.Store({
@@ -44,7 +32,30 @@ export const store = new Vuex.Store({
       email: "",
       role: "",
       loggedinAt: null
-    }
+    },
+    // App configuration from backend
+    appConfig: {
+      app: {
+        name: "",
+        timezone: "",
+        contactEmail: ""
+      },
+      reservation: {
+        minimumDuration: 5,
+        maximumDuration: 72
+      },
+      instructions: {
+        login: "",
+        reservation: "",
+        email: ""
+      },
+      login: {
+        loginText: "Login with your credentials.",
+        usernameField: "Username",
+        passwordField: "Password"
+      }
+    },
+    configLoaded: false
   },
   // ###########
   // # GETTERS #
@@ -63,6 +74,20 @@ export const store = new Vuex.Store({
     isInitializing: state => {
       return state.initializing
     },
+    // App configuration getters
+    appConfig: state => state.appConfig,
+    isConfigLoaded: state => state.configLoaded,
+    appName: state => state.appConfig.app.name || AppSettings.General.appName,
+    appTimezone: state => state.appConfig.app.timezone || AppSettings.General.timezone,
+    contactEmail: state => state.appConfig.app.contactEmail || AppSettings.General.contactEmail,
+    reservationMinDuration: state => state.appConfig.reservation.minimumDuration,
+    reservationMaxDuration: state => state.appConfig.reservation.maximumDuration,
+    loginPageInfo: state => state.appConfig.instructions.login,
+    reservationPageInstructions: state => state.appConfig.instructions.reservation,
+    emailInstructions: state => state.appConfig.instructions.email,
+    loginText: state => state.appConfig.login.loginText,
+    usernameField: state => state.appConfig.login.usernameField,
+    passwordField: state => state.appConfig.login.passwordField
   },
   // #############
   // # MUTATIONS #
@@ -70,27 +95,40 @@ export const store = new Vuex.Store({
   mutations: {
     // eslint-disable-next-line
     initialiseStore(state, payload) {
-      // Apply all permanent localStorage items to store here
-      try {
-        let user = localStorage.getItem("user")
-        if (user) {
-          user = JSON.parse(user)
-          this.commit("setUser", {
-            "loginToken": user.loginToken,
-            "email": user.email,
-            "role": user.role,
-            "loggedinAt": user.loggedinAt
-          });
+      // Load app configuration first, then check for user login
+      this.dispatch('loadAppConfig').then(() => {
+        // Apply all permanent localStorage items to store here
+        try {
+          let user = localStorage.getItem("user")
+          if (user) {
+            user = JSON.parse(user)
+            this.commit("setUser", {
+              "loginToken": user.loginToken,
+              "email": user.email,
+              "role": user.role,
+              "loggedinAt": user.loggedinAt
+            });
+          }
+          else {
+            state.initializing = false
+          }
         }
-        else {
+        // eslint-disable-next-line
+        catch (e) {
+          console.log("Error parsing initializeStore items:", e)
           state.initializing = false
         }
-      }
-      // eslint-disable-next-line
-      catch (e) {
-        console.log("Error parsing initializeStore items:", e)
-      }
+      }).catch(() => {
+        // Even if config loading fails, continue with user initialization
+        state.initializing = false
+      });
     },
+    
+    setAppConfig(state, config) {
+      state.appConfig = { ...state.appConfig, ...config };
+      state.configLoaded = true;
+    },
+    
     // Sets currently logged-in user data
     setUser(state, payload) {
       if (!payload.callback) payload.callback = () => { };
@@ -139,21 +177,17 @@ export const store = new Vuex.Store({
             return payload.callback(Response(false, "Unknown error."));
           }
       });
-
-      /*state.user.token = payload.loginToken
-      state.user.email = payload.email
-      localStorage.setItem("user", state.user)
-      payload.callback(Response(true, "User details updated.", { "user": state.user }));*/
     },
-    // Logs out the currently logged-in user, if any.
-    logoutUser(state, payload) {
-      if (payload && !payload.callback) payload.callback = () => { };
+    
+    // Logs out currently logged in user
+    logoutUser(state) {
+      localStorage.removeItem("user")
       state.user.loginToken = ""
       state.user.email = ""
-      state.user.loggedinAt = ""
-      localStorage.removeItem("user")
-      payload.callback(Response(true, "User logged out succesfully", {  }));
+      state.user.role = ""
+      state.user.loggedinAt = null
     },
+    
     // Shows global snackbar message
     showMessage(state, payload) {
       state.snackbar.text = payload.text;
@@ -171,32 +205,29 @@ export const store = new Vuex.Store({
 
       state.snackbar.visible = true;
     },
-    // Closes global snackbar message
+    
+    // Closes the global snackbar
     closeMessage(state) {
       state.snackbar.visible = false;
-      state.snackbar.multiline = false;
-      state.snackbar.timeout = 5000;
-      state.snackbar.text = null;
-    },
+    }
   },
+  
+  // ###########
+  // # ACTIONS #
+  // ###########
+  actions: {
+    async loadAppConfig({ commit }) {
+      try {
+        const response = await axios.get(AppSettings.APIServer.app.get_config);
+        if (response.data.status) {
+          commit('setAppConfig', response.data.data);
+        } else {
+          console.error('Failed to load app config:', response.data.message);
+        }
+      } catch (error) {
+        console.error('Error loading app config:', error);
+        // Don't throw error to prevent blocking app initialization
+      }
+    }
+  }
 })
-
-// ###################
-// # LOCAL FUNCTIONS #
-// ###################
-
-// For generating callback responses from mutations
-function Response(success, message, ...extraObjects) {
-  if (success === undefined) { console.log("success on vaadittu kenttä Staten responselle."); return undefined; }
-  if (!message) { console.log("message on vaadittu kenttä Staten responselle."); return undefined; }
-
-  let returnObj = {
-    success,
-    message,
-    "responseCreatedAt": new Date()
-  }
-  if (extraObjects && extraObjects != null && typeof extraObjects === 'object' && Object.keys(extraObjects).length > 0) {
-    returnObj.data = extraObjects[0];
-  }
-  return returnObj;
-}

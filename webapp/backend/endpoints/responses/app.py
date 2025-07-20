@@ -14,6 +14,8 @@ def getPublicConfig() -> object:
         
         # Define public settings keys that don't require admin access
         setting_keys = [
+            'general.applicationName',
+            'general.timezone',
             'instructions.login',
             'instructions.reservation', 
             'instructions.email',
@@ -28,8 +30,8 @@ def getPublicConfig() -> object:
         # Build response with public configuration
         config_data = {
             "app": {
-                "name": settings.app["name"],
-                "timezone": settings.app["timezone"],
+                "name": settings_dict.get('general.applicationName', 'Containers on the Fly'),
+                "timezone": settings_dict.get('general.timezone', 'UTC'),
                 "contactEmail": settings_dict.get('email.contactEmail', '')
             },
             "reservation": {

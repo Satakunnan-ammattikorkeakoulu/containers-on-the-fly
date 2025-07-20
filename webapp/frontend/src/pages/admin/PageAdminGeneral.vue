@@ -21,6 +21,49 @@
             <v-expansion-panel-content>
               <v-form ref="generalForm" v-model="forms.general.valid">
                 
+                <!-- Application Configuration ---->
+                <div class="mb-6">
+                  <h6 class="text-h6 mb-2">Application Configuration</h6>
+                  <p class="body-2 grey--text mb-4">
+                    Configure the basic application settings displayed throughout the system.
+                  </p>
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.general.applicationName"
+                        label="Application Name"
+                        placeholder="Containers on the Fly"
+                        outlined
+                        required
+                        :rules="[rules.required]"
+                        hide-details
+                      ></v-text-field>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <v-select
+                        v-model="settings.general.timezone"
+                        :items="timezoneOptions"
+                        label="System Timezone"
+                        outlined
+                        required
+                        :rules="[rules.required]"
+                        hide-details
+                        :search-input.sync="timezoneSearch"
+                        item-text="label"
+                        item-value="value"
+                        filterable
+                      >
+                        <template v-slot:item="{ item }">
+                          <div>
+                            <div class="font-weight-medium">{{ item.value }}</div>
+                            <div class="caption grey--text">{{ item.description }}</div>
+                          </div>
+                        </template>
+                      </v-select>
+                    </v-col>
+                  </v-row>
+                </div>
+                
                 <!-- Login Page Information -->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Login Page Instructions</h6>
@@ -102,7 +145,7 @@
                       @click="saveSection('general')"
                     >
                       <v-icon left>mdi-content-save</v-icon>
-                      Save Instructions
+                      Save General Settings
                     </v-btn>
                   </v-col>
                 </v-row>
@@ -879,6 +922,9 @@ export default {
     newWhitelistEmail: '',
     newAlertEmail: '',
     
+    // Timezone search
+    timezoneSearch: '',
+    
     // Form validation states
     forms: {
       general: { valid: true },
@@ -924,6 +970,89 @@ export default {
       { text: 'Once per day', value: 'daily' }
     ],
     
+    // Timezone options - comprehensive list of TZ identifiers
+    timezoneOptions: [
+      // UTC and GMT
+      { value: 'UTC', label: 'UTC', description: 'Coordinated Universal Time' },
+      { value: 'GMT', label: 'GMT', description: 'Greenwich Mean Time' },
+      
+      // Africa
+      { value: 'Africa/Abidjan', label: 'Africa/Abidjan', description: 'Côte d\'Ivoire' },
+      { value: 'Africa/Accra', label: 'Africa/Accra', description: 'Ghana' },
+      { value: 'Africa/Addis_Ababa', label: 'Africa/Addis_Ababa', description: 'Ethiopia' },
+      { value: 'Africa/Algiers', label: 'Africa/Algiers', description: 'Algeria' },
+      { value: 'Africa/Cairo', label: 'Africa/Cairo', description: 'Egypt' },
+      { value: 'Africa/Casablanca', label: 'Africa/Casablanca', description: 'Morocco' },
+      { value: 'Africa/Johannesburg', label: 'Africa/Johannesburg', description: 'South Africa' },
+      { value: 'Africa/Lagos', label: 'Africa/Lagos', description: 'Nigeria' },
+      { value: 'Africa/Nairobi', label: 'Africa/Nairobi', description: 'Kenya' },
+      
+      // America
+      { value: 'America/New_York', label: 'America/New_York', description: 'US Eastern Time' },
+      { value: 'America/Chicago', label: 'America/Chicago', description: 'US Central Time' },
+      { value: 'America/Denver', label: 'America/Denver', description: 'US Mountain Time' },
+      { value: 'America/Los_Angeles', label: 'America/Los_Angeles', description: 'US Pacific Time' },
+      { value: 'America/Toronto', label: 'America/Toronto', description: 'Canada Eastern' },
+      { value: 'America/Vancouver', label: 'America/Vancouver', description: 'Canada Pacific' },
+      { value: 'America/Mexico_City', label: 'America/Mexico_City', description: 'Mexico' },
+      { value: 'America/Sao_Paulo', label: 'America/Sao_Paulo', description: 'Brazil' },
+      { value: 'America/Argentina/Buenos_Aires', label: 'America/Argentina/Buenos_Aires', description: 'Argentina' },
+      { value: 'America/Bogota', label: 'America/Bogota', description: 'Colombia' },
+      { value: 'America/Lima', label: 'America/Lima', description: 'Peru' },
+      { value: 'America/Santiago', label: 'America/Santiago', description: 'Chile' },
+      
+      // Asia
+      { value: 'Asia/Tokyo', label: 'Asia/Tokyo', description: 'Japan' },
+      { value: 'Asia/Shanghai', label: 'Asia/Shanghai', description: 'China' },
+      { value: 'Asia/Hong_Kong', label: 'Asia/Hong_Kong', description: 'Hong Kong' },
+      { value: 'Asia/Singapore', label: 'Asia/Singapore', description: 'Singapore' },
+      { value: 'Asia/Bangkok', label: 'Asia/Bangkok', description: 'Thailand' },
+      { value: 'Asia/Jakarta', label: 'Asia/Jakarta', description: 'Indonesia' },
+      { value: 'Asia/Manila', label: 'Asia/Manila', description: 'Philippines' },
+      { value: 'Asia/Seoul', label: 'Asia/Seoul', description: 'South Korea' },
+      { value: 'Asia/Taipei', label: 'Asia/Taipei', description: 'Taiwan' },
+      { value: 'Asia/Kolkata', label: 'Asia/Kolkata', description: 'India' },
+      { value: 'Asia/Dubai', label: 'Asia/Dubai', description: 'UAE' },
+      { value: 'Asia/Riyadh', label: 'Asia/Riyadh', description: 'Saudi Arabia' },
+      { value: 'Asia/Tehran', label: 'Asia/Tehran', description: 'Iran' },
+      { value: 'Asia/Jerusalem', label: 'Asia/Jerusalem', description: 'Israel' },
+      { value: 'Asia/Istanbul', label: 'Asia/Istanbul', description: 'Turkey' },
+      
+      // Australia & Pacific
+      { value: 'Australia/Sydney', label: 'Australia/Sydney', description: 'Australia Eastern' },
+      { value: 'Australia/Melbourne', label: 'Australia/Melbourne', description: 'Australia Eastern' },
+      { value: 'Australia/Brisbane', label: 'Australia/Brisbane', description: 'Australia Eastern (no DST)' },
+      { value: 'Australia/Perth', label: 'Australia/Perth', description: 'Australia Western' },
+      { value: 'Australia/Adelaide', label: 'Australia/Adelaide', description: 'Australia Central' },
+      { value: 'Pacific/Auckland', label: 'Pacific/Auckland', description: 'New Zealand' },
+      { value: 'Pacific/Fiji', label: 'Pacific/Fiji', description: 'Fiji' },
+      { value: 'Pacific/Honolulu', label: 'Pacific/Honolulu', description: 'Hawaii' },
+      
+      // Europe
+      { value: 'Europe/London', label: 'Europe/London', description: 'United Kingdom' },
+      { value: 'Europe/Dublin', label: 'Europe/Dublin', description: 'Ireland' },
+      { value: 'Europe/Paris', label: 'Europe/Paris', description: 'France' },
+      { value: 'Europe/Berlin', label: 'Europe/Berlin', description: 'Germany' },
+      { value: 'Europe/Madrid', label: 'Europe/Madrid', description: 'Spain' },
+      { value: 'Europe/Rome', label: 'Europe/Rome', description: 'Italy' },
+      { value: 'Europe/Amsterdam', label: 'Europe/Amsterdam', description: 'Netherlands' },
+      { value: 'Europe/Brussels', label: 'Europe/Brussels', description: 'Belgium' },
+      { value: 'Europe/Vienna', label: 'Europe/Vienna', description: 'Austria' },
+      { value: 'Europe/Zurich', label: 'Europe/Zurich', description: 'Switzerland' },
+      { value: 'Europe/Stockholm', label: 'Europe/Stockholm', description: 'Sweden' },
+      { value: 'Europe/Oslo', label: 'Europe/Oslo', description: 'Norway' },
+      { value: 'Europe/Copenhagen', label: 'Europe/Copenhagen', description: 'Denmark' },
+      { value: 'Europe/Helsinki', label: 'Europe/Helsinki', description: 'Finland' },
+      { value: 'Europe/Warsaw', label: 'Europe/Warsaw', description: 'Poland' },
+      { value: 'Europe/Prague', label: 'Europe/Prague', description: 'Czech Republic' },
+      { value: 'Europe/Budapest', label: 'Europe/Budapest', description: 'Hungary' },
+      { value: 'Europe/Bucharest', label: 'Europe/Bucharest', description: 'Romania' },
+      { value: 'Europe/Athens', label: 'Europe/Athens', description: 'Greece' },
+      { value: 'Europe/Moscow', label: 'Europe/Moscow', description: 'Russia (Moscow)' },
+      { value: 'Europe/Kiev', label: 'Europe/Kiev', description: 'Ukraine' },
+      { value: 'Europe/Lisbon', label: 'Europe/Lisbon', description: 'Portugal' }
+    ],
+    
     // Email lists - remove example data, will be loaded from backend
     blacklistedEmailsList: [],
     whitelistedEmailsList: [],
@@ -932,6 +1061,8 @@ export default {
     // Settings data structure
     settings: {
       general: {
+        applicationName: 'Containers on the Fly',
+        timezone: 'UTC',
         loginPageInfo: '',
         reservationPageInstructions: '',
         emailInstructions: '',
@@ -1106,6 +1237,8 @@ export default {
             const data = response.data.data;
             
             // Update settings from backend (update individual properties)
+            _this.settings.general.applicationName = data.general.applicationName || 'Containers on the Fly';
+            _this.settings.general.timezone = data.general.timezone || 'UTC';
             _this.settings.general.loginPageInfo = data.general.loginPageInfo || '';
             _this.settings.general.reservationPageInstructions = data.general.reservationPageInstructions || '';
             _this.settings.general.emailInstructions = data.general.emailInstructions || '';

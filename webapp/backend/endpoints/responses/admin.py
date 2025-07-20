@@ -779,6 +779,8 @@ def getGeneralSettings() -> object:
         
         # Define all settings with their defaults
         setting_keys = [
+            'general.applicationName',
+            'general.timezone',
             'instructions.login',
             'instructions.reservation', 
             'instructions.email',
@@ -815,6 +817,8 @@ def getGeneralSettings() -> object:
         # Build response with defaults
         response_data = {
             "general": {
+                "applicationName": settings_dict.get('general.applicationName', 'Containers on the Fly'),
+                "timezone": settings_dict.get('general.timezone', 'UTC'),
                 "loginPageInfo": settings_dict.get('instructions.login', ''),
                 "reservationPageInstructions": settings_dict.get('instructions.reservation', ''),
                 "emailInstructions": settings_dict.get('instructions.email', ''),
@@ -862,6 +866,12 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
         from helpers.tables.UserAccessControl import setBlacklistedEmails, setWhitelistedEmails
         
         if section == "general":
+            # Save general application settings
+            if 'applicationName' in settings:
+                setSetting('general.applicationName', settings['applicationName'], 'text', 'Application name displayed throughout the system')
+            if 'timezone' in settings:
+                setSetting('general.timezone', settings['timezone'], 'text', 'System timezone for proper scheduling and logging')
+            
             # Save instruction settings using new naming scheme
             if 'loginPageInfo' in settings:
                 setSetting('instructions.login', settings['loginPageInfo'], 'text', 'Information displayed on login page')

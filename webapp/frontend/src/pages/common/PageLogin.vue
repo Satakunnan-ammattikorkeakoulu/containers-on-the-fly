@@ -13,19 +13,7 @@
       <v-col class="mb-4">
         <h3 class="color-violet dim">Login to</h3>
         <h1 class="color-violet">{{appName}}</h1>
-        <p class="color-violet dim" style="margin-top: 10px; font-size: 90%;">{{loginText}}</p>
-      </v-col>
-
-      <!-- Login Page Instructions -->
-      <v-col cols="12" v-if="loginPageInfo && loginPageInfo.trim()">
-        <v-alert 
-          type="info" 
-          outlined
-          class="mx-auto"
-          style="max-width: 600px;"
-        >
-          <div v-html="loginPageInfo.replace(/\n/g, '<br>')"></div>
-        </v-alert>
+        <p class="color-violet dim" style="margin-top: 10px;" v-if="loginPageInfo && loginPageInfo.trim()" v-html="loginPageInfo.replace(/\n/g, '<br>')"></p>
       </v-col>
 
       <v-col class="mb-5" cols="12">

@@ -6,6 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
 
 from sqlalchemy import Column, Integer, Text, Float, ForeignKey, DateTime, UniqueConstraint, Boolean, BigInteger
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -256,7 +257,7 @@ class ServerLogs(Base):
     computerId = Column(ForeignKey("Computer.computerId"), nullable=False)
     logType = Column(Text, nullable=False)  # 'backend', 'frontend', 'docker_utility'
     
-    logContent = Column(Text, nullable=True)  # Store last N lines
+    logContent = Column(LONGTEXT, nullable=True)  # Store last N lines
     logLines = Column(Integer, nullable=True)  # How many lines stored
     
     lastUpdatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -27,85 +27,87 @@
     </v-row>
 
     <!-- Statistics Cards -->
-    <!-- Status Statistics -->
-    <v-row class="mb-4 justify-center">
-      <v-col cols="12" sm="6" md="2">
-        <v-card outlined>
-          <v-card-text class="text-center">
-            <v-icon size="24" color="blue-grey" class="mb-2">mdi-chart-bar</v-icon>
-            <div class="text-h6 font-weight-bold">{{ stats.total }}</div>
-            <div class="text-subtitle-2">Total</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="2">
-        <v-card outlined>
-          <v-card-text class="text-center">
-            <v-icon size="24" color="green" class="mb-2">mdi-play-circle</v-icon>
-            <div class="text-h6 font-weight-bold text--primary" style="color: #4CAF50 !important;">{{ stats.started }}</div>
-            <div class="text-subtitle-2">Running</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="2">
-        <v-card outlined>
-          <v-card-text class="text-center">
-            <v-icon size="24" color="orange" class="mb-2">mdi-stop-circle</v-icon>
-            <div class="text-h6 font-weight-bold" style="color: #FF9800 !important;">{{ stats.stopped }}</div>
-            <div class="text-subtitle-2">Stopped</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="2">
-        <v-card outlined>
-          <v-card-text class="text-center">
-            <v-icon size="24" color="red" class="mb-2">mdi-alert-circle</v-icon>
-            <div class="text-h6 font-weight-bold" style="color: #F44336 !important;">{{ stats.error }}</div>
-            <div class="text-subtitle-2">Errored</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+    <div v-if="!isFetchingReservations">
+      <!-- Status Statistics -->
+      <v-row class="mb-4 justify-center">
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="blue-grey" class="mb-2">mdi-chart-bar</v-icon>
+              <div class="text-h6 font-weight-bold">{{ stats.total }}</div>
+              <div class="text-subtitle-2">Total</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="green" class="mb-2">mdi-play-circle</v-icon>
+              <div class="text-h6 font-weight-bold text--primary" style="color: #4CAF50 !important;">{{ stats.started }}</div>
+              <div class="text-subtitle-2">Running</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="orange" class="mb-2">mdi-stop-circle</v-icon>
+              <div class="text-h6 font-weight-bold" style="color: #FF9800 !important;">{{ stats.stopped }}</div>
+              <div class="text-subtitle-2">Stopped</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="red" class="mb-2">mdi-alert-circle</v-icon>
+              <div class="text-h6 font-weight-bold" style="color: #F44336 !important;">{{ stats.error }}</div>
+              <div class="text-subtitle-2">Errored</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
 
-    <!-- Time-based Statistics -->
-    <v-row class="mb-6 justify-center">
-      <v-col cols="12" sm="6" md="2">
-        <v-card outlined>
-          <v-card-text class="text-center">
-            <v-icon size="24" color="primary" class="mb-2">mdi-calendar-today</v-icon>
-            <div class="text-h6 font-weight-bold text-primary">{{ stats.today }}</div>
-            <div class="text-subtitle-2">Today</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="2">
-        <v-card outlined>
-          <v-card-text class="text-center">
-            <v-icon size="24" color="primary" class="mb-2">mdi-calendar-week</v-icon>
-            <div class="text-h6 font-weight-bold text-primary">{{ stats.lastWeek }}</div>
-            <div class="text-subtitle-2">Week</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="2">
-        <v-card outlined>
-          <v-card-text class="text-center">
-            <v-icon size="24" color="primary" class="mb-2">mdi-calendar-month</v-icon>
-            <div class="text-h6 font-weight-bold text-primary">{{ stats.lastMonth }}</div>
-            <div class="text-subtitle-2">Month</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-      <v-col cols="12" sm="6" md="2">
-        <v-card outlined>
-          <v-card-text class="text-center">
-            <v-icon size="24" color="primary" class="mb-2">mdi-calendar-range</v-icon>
-            <div class="text-h6 font-weight-bold text-primary">{{ stats.lastMonth }}</div>
-            <div class="text-subtitle-2">3 Months</div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+      <!-- Time-based Statistics -->
+      <v-row class="mb-6 justify-center">
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-today</v-icon>
+              <div class="text-h6 font-weight-bold text-primary">{{ stats.today }}</div>
+              <div class="text-subtitle-2">Today</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-week</v-icon>
+              <div class="text-h6 font-weight-bold text-primary">{{ stats.lastWeek }}</div>
+              <div class="text-subtitle-2">Week</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-month</v-icon>
+              <div class="text-h6 font-weight-bold text-primary">{{ stats.lastMonth }}</div>
+              <div class="text-subtitle-2">Month</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-range</v-icon>
+              <div class="text-h6 font-weight-bold text-primary">{{ stats.lastThreeMonths }}</div>
+              <div class="text-subtitle-2">3 Months</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </div>
 
     <v-row v-if="!isFetchingReservations">
         <v-col cols="12">
@@ -159,7 +161,8 @@
         error: 0,
         today: 0,
         lastWeek: 0,
-        lastMonth: 0
+        lastMonth: 0,
+        lastThreeMonths: 0
       }
     }),
     mounted () {
@@ -392,6 +395,7 @@
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
 
         this.stats.total = this.reservations.length
         this.stats.started = this.reservations.filter(r => r.status === 'started').length
@@ -411,6 +415,11 @@
         this.stats.lastMonth = this.reservations.filter(r => {
           const startDate = new Date(r.startDate)
           return startDate >= monthAgo
+        }).length
+
+        this.stats.lastThreeMonths = this.reservations.filter(r => {
+          const startDate = new Date(r.startDate)
+          return startDate >= threeMonthsAgo
         }).length
       }
     },

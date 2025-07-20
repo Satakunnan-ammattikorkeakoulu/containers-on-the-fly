@@ -60,7 +60,6 @@ class Settings:
         # login
         if not hasattr(s, 'login'): die("login")
         if "loginType" not in s.login: die("login.loginType")
-        if "useWhitelist" not in s.login: die("login.useWhitelist")
         # session
         if not hasattr(s, 'session'): die("session")
         if "timeoutMinutes" not in s.session: die("session.timeoutMinutes")

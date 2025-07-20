@@ -1,4 +1,5 @@
 from database import User, Session, UserWhitelist
+from helpers.tables.SystemSetting import getSetting
 from helpers.server import Response, ORMObjectToDict
 from settings import settings
 from helpers.auth import CreateLoginToken, HashPassword, IsCorrectPassword, CheckToken, GetLDAPUser, GetRole
@@ -25,7 +26,7 @@ def login(username, password):
   with Session() as session:
     user = None
     loginType = settings.login["loginType"]
-    useWhitelisting = settings.login["useWhitelist"]
+    useWhitelisting = getSetting('access.whitelistEnabled', False, 'boolean')
 
     if loginType == "password":
       user = session.query(User).filter( User.email == username).first()

@@ -121,8 +121,7 @@ LOGIN_TYPE="password"
 # LDAP_ACCOUNT_FIELD="sAMAccountName"
 # LDAP_EMAIL_FIELD="mail"
 
-# If enabled, user email will need to be found in Whitelist table in the server to login.
-USE_WHITELIST=false
+# Email whitelist is now configured through the admin interface in the database
 
 # Minutes how long the user is logged in until logged out automatically
 SESSION_TIMEOUT_MINUTES=1440

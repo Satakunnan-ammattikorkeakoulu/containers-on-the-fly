@@ -92,7 +92,7 @@ class SettingsApplier:
             
         # Convert boolean strings to proper JSON boolean values
         bool_settings = [
-            'USE_WHITELIST', 'DATABASE_DEBUG', 'ADD_TEST_DATA', 
+            'DATABASE_DEBUG', 'ADD_TEST_DATA', 
             'MAIN_SERVER_WEB_HTTPS'
         ]
         

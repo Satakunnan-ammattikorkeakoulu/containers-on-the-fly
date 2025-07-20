@@ -5,6 +5,7 @@ import hmac
 import random
 import string
 from database import User, Session, UserWhitelist
+from helpers.tables.SystemSetting import getSetting
 import helpers.server
 #import ldap3 as ldap
 import ldap
@@ -139,7 +140,7 @@ def create_password(length = 40):
 
 def GetLDAPUser(username, password):
   set = settings.login["ldap"]
-  useWhitelisting = settings.login["useWhitelist"]
+  useWhitelisting = getSetting('access.whitelistEnabled', False, 'boolean')
   # Disable certificate checks
   ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
   l = ldap.initialize(set["ldap_url"])

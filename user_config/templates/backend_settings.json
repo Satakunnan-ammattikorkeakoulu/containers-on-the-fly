@@ -16,7 +16,6 @@
     },
     "login": {
       "loginType": "{{LOGIN_TYPE}}",
-      "useWhitelist": {{USE_WHITELIST}},
       "ldap": {
         "ldap_url": "{{LDAP_URL}}",
         "usernameFormat": "{{LDAP_USERNAME_FORMAT}}",

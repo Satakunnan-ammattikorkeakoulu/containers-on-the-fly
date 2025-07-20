@@ -28,10 +28,23 @@ export default {
     },
     configErrorMessage() {
       return this.$store.getters.configErrorMessage;
+    },
+    appName() {
+      return this.$store.getters.appName;
     }
   },
   data: () => ({
   }),
+  watch: {
+    appName: {
+      handler(newAppName) {
+        if (newAppName) {
+          document.title = newAppName;
+        }
+      },
+      immediate: true
+    }
+  },
 };
 </script>
 

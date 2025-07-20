@@ -17,6 +17,8 @@ def getPublicConfig() -> object:
             'instructions.login',
             'instructions.reservation', 
             'instructions.email',
+            'instructions.usernameFieldLabel',
+            'instructions.passwordFieldLabel',
             'email.contactEmail'
         ]
         
@@ -37,7 +39,9 @@ def getPublicConfig() -> object:
             "instructions": {
                 "login": settings_dict.get('instructions.login', ''),
                 "reservation": settings_dict.get('instructions.reservation', ''),
-                "email": settings_dict.get('instructions.email', '')
+                "email": settings_dict.get('instructions.email', ''),
+                "usernameFieldLabel": settings_dict.get('instructions.usernameFieldLabel', 'Username'),
+                "passwordFieldLabel": settings_dict.get('instructions.passwordFieldLabel', 'Password')
             },
             "login": {
                 "loginText": "Login with your credentials.",

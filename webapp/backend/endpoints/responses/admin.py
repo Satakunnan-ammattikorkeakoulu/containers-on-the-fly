@@ -782,6 +782,8 @@ def getGeneralSettings() -> object:
             'instructions.login',
             'instructions.reservation', 
             'instructions.email',
+            'instructions.usernameFieldLabel',
+            'instructions.passwordFieldLabel',
             'access.blacklistEnabled',
             'access.whitelistEnabled',
             'email.smtpServer',
@@ -815,7 +817,9 @@ def getGeneralSettings() -> object:
             "general": {
                 "loginPageInfo": settings_dict.get('instructions.login', ''),
                 "reservationPageInstructions": settings_dict.get('instructions.reservation', ''),
-                "emailInstructions": settings_dict.get('instructions.email', '')
+                "emailInstructions": settings_dict.get('instructions.email', ''),
+                "usernameFieldLabel": settings_dict.get('instructions.usernameFieldLabel', 'Username'),
+                "passwordFieldLabel": settings_dict.get('instructions.passwordFieldLabel', 'Password')
             },
             "access": {
                 "blacklistEnabled": settings_dict.get('access.blacklistEnabled', False),
@@ -865,6 +869,10 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
                 setSetting('instructions.reservation', settings['reservationPageInstructions'], 'text', 'Instructions on reservation page')
             if 'emailInstructions' in settings:
                 setSetting('instructions.email', settings['emailInstructions'], 'text', 'Instructions included in emails')
+            if 'usernameFieldLabel' in settings:
+                setSetting('instructions.usernameFieldLabel', settings['usernameFieldLabel'], 'text', 'Username field label on login page')
+            if 'passwordFieldLabel' in settings:
+                setSetting('instructions.passwordFieldLabel', settings['passwordFieldLabel'], 'text', 'Password field label on login page')
                 
         elif section == "access":
             # Save access control settings

@@ -66,6 +66,34 @@
                   ></v-textarea>
                 </div>
                 
+                <!-- Login Form Field Labels -->
+                <div class="mb-6">
+                  <h6 class="text-h6 mb-2">Login Form Field Labels</h6>
+                  <p class="body-2 grey--text mb-3">
+                    Customize the labels for username and password fields on the login page.
+                  </p>
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.general.usernameFieldLabel"
+                        label="Username Field Label"
+                        placeholder="Username"
+                        outlined
+                        hide-details
+                      ></v-text-field>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.general.passwordFieldLabel"
+                        label="Password Field Label"
+                        placeholder="Password"
+                        outlined
+                        hide-details
+                      ></v-text-field>
+                    </v-col>
+                  </v-row>
+                </div>
+                
                 <v-row>
                   <v-col cols="12">
                     <v-btn 
@@ -906,7 +934,9 @@ export default {
       general: {
         loginPageInfo: '',
         reservationPageInstructions: '',
-        emailInstructions: ''
+        emailInstructions: '',
+        usernameFieldLabel: '',
+        passwordFieldLabel: ''
       },
       access: {
         blacklistEnabled: false, 
@@ -1079,6 +1109,8 @@ export default {
             _this.settings.general.loginPageInfo = data.general.loginPageInfo || '';
             _this.settings.general.reservationPageInstructions = data.general.reservationPageInstructions || '';
             _this.settings.general.emailInstructions = data.general.emailInstructions || '';
+            _this.settings.general.usernameFieldLabel = data.general.usernameFieldLabel || '';
+            _this.settings.general.passwordFieldLabel = data.general.passwordFieldLabel || '';
             
             _this.settings.access.blacklistEnabled = data.access.blacklistEnabled || false;
             _this.settings.access.whitelistEnabled = data.access.whitelistEnabled || false;

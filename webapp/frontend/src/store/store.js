@@ -47,7 +47,9 @@ export const store = new Vuex.Store({
       instructions: {
         login: "",
         reservation: "",
-        email: ""
+        email: "",
+        usernameFieldLabel: "",
+        passwordFieldLabel: ""
       },
       login: {
         loginText: "Login with your credentials.",
@@ -90,8 +92,8 @@ export const store = new Vuex.Store({
     reservationPageInstructions: state => state.appConfig.instructions.reservation,
     emailInstructions: state => state.appConfig.instructions.email,
     loginText: state => state.appConfig.login.loginText,
-    usernameField: state => state.appConfig.login.usernameField,
-    passwordField: state => state.appConfig.login.passwordField
+    usernameField: state => state.appConfig.instructions.usernameFieldLabel || state.appConfig.login.usernameField || AppSettings.Login.usernameField,
+    passwordField: state => state.appConfig.instructions.passwordFieldLabel || state.appConfig.login.passwordField || AppSettings.Login.passwordField
   },
   // #############
   // # MUTATIONS #

@@ -55,7 +55,9 @@ export const store = new Vuex.Store({
         passwordField: "Password"
       }
     },
-    configLoaded: false
+    configLoaded: false,
+    configError: false,
+    configErrorMessage: ""
   },
   // ###########
   // # GETTERS #
@@ -77,6 +79,8 @@ export const store = new Vuex.Store({
     // App configuration getters
     appConfig: state => state.appConfig,
     isConfigLoaded: state => state.configLoaded,
+    hasConfigError: state => state.configError,
+    configErrorMessage: state => state.configErrorMessage,
     appName: state => state.appConfig.app.name || AppSettings.General.appName,
     appTimezone: state => state.appConfig.app.timezone || AppSettings.General.timezone,
     contactEmail: state => state.appConfig.app.contactEmail || AppSettings.General.contactEmail,
@@ -97,29 +101,32 @@ export const store = new Vuex.Store({
     initialiseStore(state, payload) {
       // Load app configuration first, then check for user login
       this.dispatch('loadAppConfig').then(() => {
-        // Apply all permanent localStorage items to store here
-        try {
-          let user = localStorage.getItem("user")
-          if (user) {
-            user = JSON.parse(user)
-            this.commit("setUser", {
-              "loginToken": user.loginToken,
-              "email": user.email,
-              "role": user.role,
-              "loggedinAt": user.loggedinAt
-            });
+        // Only continue if config loaded successfully (no error state)
+        if (!state.configError) {
+          // Apply all permanent localStorage items to store here
+          try {
+            let user = localStorage.getItem("user")
+            if (user) {
+              user = JSON.parse(user)
+              this.commit("setUser", {
+                "loginToken": user.loginToken,
+                "email": user.email,
+                "role": user.role,
+                "loggedinAt": user.loggedinAt
+              });
+            }
+            else {
+              state.initializing = false
+            }
           }
-          else {
+          catch (e) {
+            console.log("Error parsing initializeStore items:", e)
             state.initializing = false
           }
         }
-        // eslint-disable-next-line
-        catch (e) {
-          console.log("Error parsing initializeStore items:", e)
-          state.initializing = false
-        }
+        // If config error exists, initialization stops and error page shows
       }).catch(() => {
-        // Even if config loading fails, continue with user initialization
+        // This catch should not be reached now since we handle errors in loadAppConfig
         state.initializing = false
       });
     },
@@ -127,6 +134,19 @@ export const store = new Vuex.Store({
     setAppConfig(state, config) {
       state.appConfig = { ...state.appConfig, ...config };
       state.configLoaded = true;
+      state.configError = false;
+      state.configErrorMessage = "";
+    },
+    
+    setConfigError(state, errorMessage) {
+      state.configError = true;
+      state.configErrorMessage = errorMessage;
+      state.configLoaded = false;
+    },
+    
+    clearConfigError(state) {
+      state.configError = false;
+      state.configErrorMessage = "";
     },
     
     // Sets currently logged-in user data
@@ -223,10 +243,14 @@ export const store = new Vuex.Store({
           commit('setAppConfig', response.data.data);
         } else {
           console.error('Failed to load app config:', response.data.message);
+          commit('setConfigError', response.data.message || 'Failed to load application configuration');
+          return; // Don't continue with user initialization
         }
       } catch (error) {
         console.error('Error loading app config:', error);
-        // Don't throw error to prevent blocking app initialization
+        const errorMessage = error.response?.data?.message || error.message || 'Unable to connect to server';
+        commit('setConfigError', `Error loading app configuration: ${errorMessage}`);
+        return; // Don't continue with user initialization
       }
     }
   }

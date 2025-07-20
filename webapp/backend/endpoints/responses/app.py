@@ -49,4 +49,5 @@ def getPublicConfig() -> object:
         return Response(True, "Public configuration retrieved successfully", config_data)
         
     except Exception as e:
-        return Response(False, f"Error retrieving public configuration: {str(e)}")
+        print(f"Error retrieving application settings: {str(e)}")
+        return Response(False, f"Error retrieving public configurations")

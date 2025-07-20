@@ -1,7 +1,13 @@
 <template>
   <v-app>
     <v-main>
-      <transition name="fade">
+      <!-- Show error template if config loading failed -->
+      <ErrorTemplate 
+        v-if="hasConfigError" 
+        :error-message="configErrorMessage"
+      />
+      <!-- Normal app content -->
+      <transition name="fade" v-else>
         <router-view/>
       </transition>
     </v-main>
@@ -9,10 +15,21 @@
 </template>
 
 <script>
+import ErrorTemplate from '@/components/global/ErrorTemplate.vue'
 
 export default {
   name: 'App',
-
+  components: {
+    ErrorTemplate
+  },
+  computed: {
+    hasConfigError() {
+      return this.$store.getters.hasConfigError;
+    },
+    configErrorMessage() {
+      return this.$store.getters.configErrorMessage;
+    }
+  },
   data: () => ({
   }),
 };

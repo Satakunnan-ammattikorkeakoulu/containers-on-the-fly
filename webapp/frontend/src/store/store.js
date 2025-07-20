@@ -50,11 +50,6 @@ export const store = new Vuex.Store({
         email: "",
         usernameFieldLabel: "",
         passwordFieldLabel: ""
-      },
-      login: {
-        loginText: "Login with your credentials.",
-        usernameField: "Username",
-        passwordField: "Password"
       }
     },
     configLoaded: false,
@@ -84,16 +79,16 @@ export const store = new Vuex.Store({
     hasConfigError: state => state.configError,
     configErrorMessage: state => state.configErrorMessage,
     appName: state => state.appConfig.app.name || AppSettings.General.appName,
-    appTimezone: state => state.appConfig.app.timezone || AppSettings.General.timezone,
-    contactEmail: state => state.appConfig.app.contactEmail || AppSettings.General.contactEmail,
+    appTimezone: state => state.appConfig.app.timezone,
+    contactEmail: state => state.appConfig.app.contactEmail,
     reservationMinDuration: state => state.appConfig.reservation.minimumDuration,
     reservationMaxDuration: state => state.appConfig.reservation.maximumDuration,
     loginPageInfo: state => state.appConfig.instructions.login,
     reservationPageInstructions: state => state.appConfig.instructions.reservation,
     emailInstructions: state => state.appConfig.instructions.email,
-    loginText: state => state.appConfig.login.loginText,
-    usernameField: state => state.appConfig.instructions.usernameFieldLabel || state.appConfig.login.usernameField || AppSettings.Login.usernameField,
-    passwordField: state => state.appConfig.instructions.passwordFieldLabel || state.appConfig.login.passwordField || AppSettings.Login.passwordField
+    loginText: state => state.appConfig.instructions.login,
+    usernameField: state => state.appConfig.instructions.usernameFieldLabel,
+    passwordField: state => state.appConfig.instructions.passwordFieldLabel
   },
   // #############
   // # MUTATIONS #

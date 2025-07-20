@@ -111,6 +111,12 @@ alembic upgrade head   # Apply database migrations
 
 ## Important Development Guidelines
 
+### Post-Development Workflow
+After making code changes, especially to frontend/backend configuration or business logic:
+```bash
+pm2 restart all    # Restart all services to apply changes
+```
+
 ### Database Migrations
 ```bash
 # Create migration after model changes

@@ -12,7 +12,6 @@
 # THESE ARE ALL MANDATORY TO BE SET
 ###
 
-
 # The IP address of this server.
 SERVER_IP_ADDRESS="YOUR_IP_HERE"
 

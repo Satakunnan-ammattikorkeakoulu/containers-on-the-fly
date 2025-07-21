@@ -89,29 +89,6 @@ DOCKER_RESERVATION_PORT_RANGE_END=3000
 DOCKER_SERVER_NAME="server1"
 
 ###
-# AUTHENTICATION SETTINGS
-###
-
-# Authentication method: "password" or "ldap"
-# If "password", logins are executed directly with email and password combination
-# If "LDAP", logins are done against an (external) LDAP server
-LOGIN_TYPE="password"
-
-# Below are the settings for LDAP authentication, which you can use if you want to use LDAP for authentication.
-# LDAP settings
-# LOGIN_TYPE="LDAP"
-# LDAP_URL="ldaps://your-ldap-server-address"
-# LDAP_USERNAME_FORMAT="{username}@ad.local"
-# LDAP_PASSWORD_FORMAT="{password}"
-# LDAP_DOMAIN="dc=ad,dc=local"
-# LDAP_SEARCH_METHOD="(sAMAccountName={username})"
-# LDAP_ACCOUNT_FIELD="sAMAccountName"
-# LDAP_EMAIL_FIELD="mail"
-
-# Minutes how long the user is logged in until logged out automatically
-SESSION_TIMEOUT_MINUTES=1440
-
-###
 # ADVANCED SETTINGS
 ###
 

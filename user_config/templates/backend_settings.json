@@ -8,21 +8,6 @@
       "production": true,
       "addTestDataInDevelopment": {{ADD_TEST_DATA}}
     },
-    "login": {
-      "loginType": "{{LOGIN_TYPE}}",
-      "ldap": {
-        "ldap_url": "{{LDAP_URL}}",
-        "usernameFormat": "{{LDAP_USERNAME_FORMAT}}",
-        "passwordFormat": "{{LDAP_PASSWORD_FORMAT}}",
-        "ldapDomain": "{{LDAP_DOMAIN}}",
-        "searchMethod": "{{LDAP_SEARCH_METHOD}}",
-        "accountField": "{{LDAP_ACCOUNT_FIELD}}",
-        "emailField": "{{LDAP_EMAIL_FIELD}}"
-      }
-    },
-    "session": {
-      "timeoutMinutes": {{SESSION_TIMEOUT_MINUTES}}
-    },
     "database": {
       "engineUri": "{{DATABASE_URI}}",
       "debugPrinting": {{DATABASE_DEBUG}}

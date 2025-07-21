@@ -106,7 +106,7 @@ class SettingsApplier:
                     
         # Validate numeric settings (keep as strings for template replacement)
         numeric_settings = [
-            'SESSION_TIMEOUT_MINUTES', 'BACKEND_PORT', 'FRONTEND_PORT',
+            'BACKEND_PORT', 'FRONTEND_PORT',
             'DOCKER_REGISTRY_PORT', 
             'DOCKER_RESERVATION_PORT_RANGE_START', 'DOCKER_RESERVATION_PORT_RANGE_END'
         ]

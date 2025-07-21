@@ -22,8 +22,8 @@ def login(username, password):
   if password == "" or password is None: raise HTTPException(status_code=400, detail="password cannot be empty.")
 
   with Session() as session:
-    # Get auth settings from database if they exist, otherwise use config file
-    loginType = getSetting('auth.loginType', settings.login["loginType"], 'text')
+    # Get auth settings from database
+    loginType = getSetting('auth.loginType', 'password', 'text')
     useWhitelisting = getSetting('access.whitelistEnabled', False, 'boolean')
     useBlacklisting = getSetting('access.blacklistEnabled', False, 'boolean')
 

@@ -54,40 +54,6 @@ class Settings:
         if "port" not in s.app: die("app.port")
         if "production" not in s.app: die("app.production")
         if "addTestDataInDevelopment" not in s.app: die("app.addTestDataInDevelopment")
-        # login (now managed via database, create default if missing)
-        if not hasattr(s, 'login'):
-            s.login = {
-                "loginType": "password",
-                "ldap": {
-                    "ldap_url": "",
-                    "usernameFormat": "",
-                    "passwordFormat": "",
-                    "ldapDomain": "",
-                    "searchMethod": "",
-                    "accountField": "",
-                    "emailField": ""
-                }
-            }
-        if "loginType" not in s.login:
-            s.login["loginType"] = "password"
-        if "ldap" not in s.login:
-            s.login["ldap"] = {
-                "ldap_url": "",
-                "usernameFormat": "",
-                "passwordFormat": "",
-                "ldapDomain": "",
-                "searchMethod": "",
-                "accountField": "",
-                "emailField": ""
-            }
-        if s.login["loginType"] not in ["password", "LDAP", "hybrid"]: 
-            print("Warning: login.loginType must be 'password', 'LDAP', or 'hybrid'. Defaulting to 'password'.")
-            s.login["loginType"] = "password"
-        # session (now managed via database, create default if missing)
-        if not hasattr(s, 'session'):
-            s.session = {"timeoutMinutes": 1440}
-        if "timeoutMinutes" not in s.session:
-            s.session["timeoutMinutes"] = 1440
         # database
         if not hasattr(s, 'database'): die("database")
         if "engineUri" not in s.database: die("database.engineUri")
@@ -99,13 +65,6 @@ class Settings:
         if "shm_size" not in s.docker: die("docker.shm_size")
         if "port_range_start" not in s.docker: die("docker.port_range_start")
         if "port_range_end" not in s.docker: die("docker.port_range_end")
-        if "sendEmail" not in s.docker: 
-            s.docker["sendEmail"] = False  # Default to False if missing
-        # email (now managed via database, create default if missing)
-        if not hasattr(s, 'email'):
-            s.email = {"helpEmailAddress": "admin@localhost"}
-        if "helpEmailAddress" not in s.email:
-            s.email["helpEmailAddress"] = "admin@localhost"
 
     def __enter__(self):
         return self
@@ -123,63 +82,9 @@ class Settings:
     
     def load_settings_from_database(self):
         '''
-        Overrides settings from the database if they exist.
-        This allows settings to be changed through the admin interface.
+        Legacy method - all settings are now loaded directly from database when needed.
+        This method is kept for compatibility but does nothing.
         '''
-        try:
-            # Import here to avoid circular imports
-            # This may fail during database initialization/migration
-            import sys
-            if 'database' in sys.modules and hasattr(sys.modules['database'], 'SystemSetting'):
-                from helpers.tables.SystemSetting import getSetting
-            else:
-                # Database not fully initialized yet, skip database settings
-                return
-            
-            # Override login type from database if it exists
-            login_type = getSetting('auth.loginType', None, 'text')
-            if login_type is not None:
-                self.login["loginType"] = login_type
-                
-            # Override session timeout from database if it exists
-            session_timeout = getSetting('auth.sessionTimeoutMinutes', None, 'integer')
-            if session_timeout is not None:
-                self.session["timeoutMinutes"] = session_timeout
-                
-            # Override LDAP settings from database if they exist
-            if self.login["loginType"] in ["LDAP", "hybrid"]:
-                ldap_url = getSetting('auth.ldap.url', None, 'text')
-                if ldap_url is not None and ldap_url != '':
-                    self.login["ldap"]["ldap_url"] = ldap_url
-                    
-                username_format = getSetting('auth.ldap.usernameFormat', None, 'text')
-                if username_format is not None and username_format != '':
-                    self.login["ldap"]["usernameFormat"] = username_format
-                    
-                password_format = getSetting('auth.ldap.passwordFormat', None, 'text')
-                if password_format is not None and password_format != '':
-                    self.login["ldap"]["passwordFormat"] = password_format
-                    
-                ldap_domain = getSetting('auth.ldap.domain', None, 'text')
-                if ldap_domain is not None and ldap_domain != '':
-                    self.login["ldap"]["ldapDomain"] = ldap_domain
-                    
-                search_method = getSetting('auth.ldap.searchMethod', None, 'text')
-                if search_method is not None and search_method != '':
-                    self.login["ldap"]["searchMethod"] = search_method
-                    
-                account_field = getSetting('auth.ldap.accountField', None, 'text')
-                if account_field is not None and account_field != '':
-                    self.login["ldap"]["accountField"] = account_field
-                    
-                email_field = getSetting('auth.ldap.emailField', None, 'text')
-                if email_field is not None and email_field != '':
-                    self.login["ldap"]["emailField"] = email_field
-        except Exception as e:
-            # This is expected during database initialization/migration due to circular imports
-            # Just continue with file-based settings
-            if "circular import" not in str(e).lower():
-                print(f"Warning: Could not load database settings: {str(e)}")
-            pass
+        pass
 
 settings = Settings()

@@ -80,7 +80,9 @@ def CheckToken(token : str) -> object:
   if token == "" or token is None: return helpers.server.Response(False, "Token cannot be empty.")
 
   def timeNow(): return datetime.datetime.now(datetime.timezone.utc)
-  minStartDate = timeNow() - timedelta(minutes=settings.session["timeoutMinutes"])
+  from helpers.tables.SystemSetting import getSetting
+  session_timeout = getSetting('auth.sessionTimeoutMinutes', 1440, 'integer')
+  minStartDate = timeNow() - timedelta(minutes=session_timeout)
 
   with Session() as session:
     user = session.query(User).filter( User.loginToken == token, User.loginTokenCreatedAt > minStartDate ).first()
@@ -139,11 +141,25 @@ def create_password(length = 40):
   return random_password
 
 def GetLDAPUser(username, password):
-  set = settings.login["ldap"]
+  from helpers.tables.SystemSetting import getSetting
+  
+  # Get LDAP settings from database
+  ldap_url = getSetting('auth.ldap.url', '', 'text')
+  username_format = getSetting('auth.ldap.usernameFormat', '', 'text')
+  password_format = getSetting('auth.ldap.passwordFormat', '', 'text') 
+  ldap_domain = getSetting('auth.ldap.domain', '', 'text')
+  search_method = getSetting('auth.ldap.searchMethod', '', 'text')
+  account_field = getSetting('auth.ldap.accountField', '', 'text')
+  email_field = getSetting('auth.ldap.emailField', '', 'text')
+  
+  # Check if LDAP is properly configured
+  if not all([ldap_url, username_format, password_format, ldap_domain, search_method, account_field, email_field]):
+    return False, "LDAP is not properly configured"
+    
   useWhitelisting = getSetting('access.whitelistEnabled', False, 'boolean')
   # Disable certificate checks
   ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
-  l = ldap.initialize(set["ldap_url"])
+  l = ldap.initialize(ldap_url)
   l.set_option(ldap.OPT_NETWORK_TIMEOUT, 6)
   l.set_option(ldap.OPT_TIMEOUT, 6)
   l.set_option(ldap.OPT_REFERRALS, ldap.OPT_OFF)
@@ -152,13 +168,13 @@ def GetLDAPUser(username, password):
 
   with Session() as session:
     try:
-      l.simple_bind_s(set["usernameFormat"].replace("{username}", username), set["passwordFormat"].replace("{password}", password))
-      result = l.search_s(set["ldapDomain"], ldap.SCOPE_SUBTREE, set["searchMethod"].replace("{username}", username), [set["accountField"], set["emailField"]])
-      account = result[0][1][set["accountField"]][0].decode("utf-8")
+      l.simple_bind_s(username_format.replace("{username}", username), password_format.replace("{password}", password))
+      result = l.search_s(ldap_domain, ldap.SCOPE_SUBTREE, search_method.replace("{username}", username), [account_field, email_field])
+      account = result[0][1][account_field][0].decode("utf-8")
       if account != username:
         return False, "Wrong username / ldap username association"
       
-      email = result[0][1][set["emailField"]][0].decode("utf-8")
+      email = result[0][1][email_field][0].decode("utf-8")
 
       whitelistEmail = session.query(UserWhitelist).filter( UserWhitelist.email == email ).first()
       if useWhitelisting and whitelistEmail == None:

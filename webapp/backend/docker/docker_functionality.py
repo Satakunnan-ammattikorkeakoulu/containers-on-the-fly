@@ -274,8 +274,11 @@ def get_email_container_started(image, ip, ports, password, includeEmailDetails,
     linesep = os.linesep
 
     helpText = ""
-    if "helpEmailAddress" in settings.email and includeEmailDetails:
-        helpText = f"If you need help, contact: {settings.email['helpEmailAddress']}{linesep}{linesep}"
+    if includeEmailDetails:
+        from helpers.tables.SystemSetting import getSetting
+        contact_email = getSetting('email.contactEmail', '')
+        if contact_email:
+            helpText = f"If you need help, contact: {contact_email}{linesep}{linesep}"
 
     helpTextSSH = ""
     foundItem = None

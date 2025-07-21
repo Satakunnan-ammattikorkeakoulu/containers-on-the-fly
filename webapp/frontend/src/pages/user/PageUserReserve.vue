@@ -278,20 +278,22 @@
     mounted() {
       let d = new Date()
 
-      let hours = []
-      for (let i = this.minimumDurationHours; i <= this.maximumDurationHours; i++) {
-        hours.push( { "text": i + " hours", "value": i } )
-      }
-      this.reservableHours = hours
-
-      // If is admin, set days to higher max
+      // Generate days dropdown from minimum to maximum
       let maxDays = this.isAdmin() ? 60 : this.maximumDurationDays
+      let minDays = this.minimumDurationDays
       
       let days = []
-      for (let i = this.minimumDurationDays; i <= maxDays; i++) {
+      for (let i = minDays; i <= maxDays; i++) {
         days.push( { "text": i + " days", "value": i } )
       }
       this.reservableDays = days
+
+      // Generate initial hours dropdown and set default values
+      this.updateHoursDropdown(minDays)
+      
+      // Set initial default values to minimum allowed
+      this.reserveDurationDays = minDays
+      this.reserveDurationHours = this.minimumDurationHours
 
       let dayHours = []
       for (let i = 0; i < 24; i++) {
@@ -374,6 +376,9 @@
         if (this.step == 2 && duration < this.minimumDuration) {
           return this.$store.commit('showMessage', { text: "Minimum duration is "+this.minimumDuration+" hours.", color: "red" })
         }
+        if (this.step == 2 && duration > this.maximumDuration) {
+          return this.$store.commit('showMessage', { text: "Maximum duration is "+this.maximumDuration+" hours.", color: "red" })
+        }
 
         this.step = this.step + 1
       },
@@ -395,7 +400,7 @@
        * Checks if there is enough hardware resources from current time + minimumHours
        */
        reserveNow() {
-        checkHardwareAvailability(dayjs().toISOString(), this.minimumDurationHours, this.$store.getters.user.loginToken).then(res => {
+        checkHardwareAvailability(dayjs().toISOString(), this.minimumDuration, this.$store.getters.user.loginToken).then(res => {
           if (res !== null) {
             return this.$store.commit('showMessage', { text: res, color: "red" })
           }
@@ -412,7 +417,7 @@
        * @param {Date} time The selected time slot
        */
       slotSelected(time) {
-        checkHardwareAvailability(time, this.minimumDurationHours, this.$store.getters.user.loginToken).then(res => {
+        checkHardwareAvailability(time, this.minimumDuration, this.$store.getters.user.loginToken).then(res => {
           if (res !== null) {
             return this.$store.commit('showMessage', { text: res, color: "red" })
           }
@@ -622,6 +627,41 @@
             _this.refreshTip = true;
         });
       },
+      /**
+       * Updates the hours dropdown based on selected days to respect min/max duration limits
+       * @param {number} selectedDays The currently selected number of days
+       */
+      updateHoursDropdown(selectedDays) {
+        let hours = []
+        let minHours = 0
+        let maxHours = 23
+        
+        // If at minimum days, start from minimum hours
+        if (selectedDays === this.minimumDurationDays) {
+          minHours = this.minimumDurationHours
+        }
+        
+        // If at maximum days, limit to maximum hours
+        if (selectedDays === this.maximumDurationDays) {
+          maxHours = this.maximumDurationHours
+        }
+        
+        // Special case: if we're at max days and max hours is 0, only allow 0 hours
+        if (selectedDays === this.maximumDurationDays && this.maximumDurationHours === 0) {
+          maxHours = 0
+        }
+        
+        for (let i = minHours; i <= maxHours; i++) {
+          hours.push( { "text": i + " hours", "value": i } )
+        }
+        
+        this.reservableHours = hours
+        
+        // Reset hour selection if current value is not in the new range
+        if (this.reserveDurationHours < minHours || this.reserveDurationHours > maxHours) {
+          this.reserveDurationHours = minHours
+        }
+      },
     },
     computed: {
       getContainerDescription() {
@@ -645,21 +685,31 @@
         return this.$store.getters.reservationMaxDuration
       },
       minimumDurationDays() {
-        return 0
+        return Math.floor(this.minimumDuration / 24)
       },
       maximumDurationDays() {
         return Math.floor(this.maximumDuration / 24)
       },
       minimumDurationHours() {
-        return 0
+        return this.minimumDuration % 24
       },
       maximumDurationHours() {
-        return 24
+        return this.maximumDuration % 24
       },
       reservationPageInstructions() {
         return this.$store.getters.reservationPageInstructions
       }
     },
+    watch: {
+      /**
+       * Watch for changes in selected days and update hours dropdown accordingly
+       */
+      reserveDurationDays(newDays) {
+        if (newDays !== null && newDays !== undefined) {
+          this.updateHoursDropdown(newDays)
+        }
+      }
+    }
   }
 </script>
 

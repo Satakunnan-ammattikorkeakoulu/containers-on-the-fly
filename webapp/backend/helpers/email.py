@@ -1,4 +1,5 @@
 import smtplib
+import socket
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from helpers.tables.SystemSetting import getSetting
@@ -38,5 +39,6 @@ def send_email(to, mail_subject, mail_body):
         connection.login(username,password)
         connection.send_message(mimemsg)
         connection.quit()
-    except (smtplib.SMTPConnectError, smtplib.SMTPAuthenticationError) as e:
+    except (smtplib.SMTPConnectError, smtplib.SMTPAuthenticationError, socket.gaierror, socket.error, Exception) as e:
         print(f"Something went wrong sending email: {e}")
+        return

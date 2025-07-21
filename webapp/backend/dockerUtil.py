@@ -18,6 +18,31 @@ computerId : int = None
 def timeNow():
   return datetime.now(timezone.utc)
 
+def readVersionFile():
+    """Read version information from .version file"""
+    try:
+        import os
+        # Look for .version file in project root (3 levels up from this script)
+        version_file_path = os.path.join(os.path.dirname(__file__), '..', '..', '.version')
+        
+        if os.path.exists(version_file_path):
+            with open(version_file_path, 'r') as f:
+                content = f.read().strip()
+                
+            # Parse the version file content
+            version_info = {}
+            for line in content.split('\n'):
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    version_info[key.strip()] = value.strip()
+            
+            return version_info.get('version'), version_info.get('updated')
+        else:
+            return None, None
+    except Exception as e:
+        print(f"Error reading version file: {e}")
+        return None, None
+
 def updateServerMonitoring():
     """Update server monitoring data in database"""
     try:
@@ -85,6 +110,24 @@ def updateServerMonitoring():
                 status.systemUptimeSeconds = int(time.time() - psutil.boot_time())
             except:
                 pass
+            
+            # Update software version information
+            try:
+                version, updated_str = readVersionFile()
+                if version:
+                    status.softwareVersion = version
+                    
+                    # Parse the updated timestamp if provided
+                    if updated_str:
+                        try:
+                            # Parse UTC timestamp format: "2025-07-21 15:12:10 UTC"
+                            updated_str = updated_str.replace(' UTC', '')
+                            updated_dt = datetime.strptime(updated_str, '%Y-%m-%d %H:%M:%S')
+                            status.versionUpdatedAt = updated_dt.replace(tzinfo=timezone.utc)
+                        except:
+                            pass
+            except Exception as e:
+                print(f"Error updating version info: {e}")
             
             session.commit()
             

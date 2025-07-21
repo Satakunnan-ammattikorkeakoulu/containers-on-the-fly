@@ -733,6 +733,12 @@ def getServerMonitoring(computer_id: int) -> object:
                 },
                 "lastUpdated": status.lastUpdatedAt.isoformat() if status.lastUpdatedAt else None
             }
+            
+            # Add software version information
+            monitoring_data["version"] = {
+                "software": status.softwareVersion,
+                "updated": status.versionUpdatedAt.isoformat() if status.versionUpdatedAt else None
+            }
         
         # Add logs
         for log in logs:

@@ -34,8 +34,8 @@ class Settings:
         sys.exit("COULD NOT LOAD THE SETTINGS.JSON FILE")
       # Check that the settings are valid
       self.CheckRequiredSettings()
-      # Override settings from database if they exist
-      self.load_settings_from_database()
+      # Database settings will be loaded on-demand when needed
+      self._database_settings_loaded = False
 
     def CheckRequiredSettings(self):
         '''
@@ -46,8 +46,6 @@ class Settings:
 
         # TODO: Could probably do a loop and then match all these against a dictionary array
 
-        v = ""
-
         # app
         if not hasattr(s, 'app'): die("app")
         if "logoUrl" not in s.app: die("app.logoUrl")
@@ -56,15 +54,40 @@ class Settings:
         if "port" not in s.app: die("app.port")
         if "production" not in s.app: die("app.production")
         if "addTestDataInDevelopment" not in s.app: die("app.addTestDataInDevelopment")
-        # login
-        if not hasattr(s, 'login'): die("login")
-        if "loginType" not in s.login: die("login.loginType")
+        # login (now managed via database, create default if missing)
+        if not hasattr(s, 'login'):
+            s.login = {
+                "loginType": "password",
+                "ldap": {
+                    "ldap_url": "",
+                    "usernameFormat": "",
+                    "passwordFormat": "",
+                    "ldapDomain": "",
+                    "searchMethod": "",
+                    "accountField": "",
+                    "emailField": ""
+                }
+            }
+        if "loginType" not in s.login:
+            s.login["loginType"] = "password"
+        if "ldap" not in s.login:
+            s.login["ldap"] = {
+                "ldap_url": "",
+                "usernameFormat": "",
+                "passwordFormat": "",
+                "ldapDomain": "",
+                "searchMethod": "",
+                "accountField": "",
+                "emailField": ""
+            }
         if s.login["loginType"] not in ["password", "LDAP", "hybrid"]: 
             print("Warning: login.loginType must be 'password', 'LDAP', or 'hybrid'. Defaulting to 'password'.")
             s.login["loginType"] = "password"
-        # session
-        if not hasattr(s, 'session'): die("session")
-        if "timeoutMinutes" not in s.session: die("session.timeoutMinutes")
+        # session (now managed via database, create default if missing)
+        if not hasattr(s, 'session'):
+            s.session = {"timeoutMinutes": 1440}
+        if "timeoutMinutes" not in s.session:
+            s.session["timeoutMinutes"] = 1440
         # database
         if not hasattr(s, 'database'): die("database")
         if "engineUri" not in s.database: die("database.engineUri")
@@ -72,15 +95,17 @@ class Settings:
         # docker
         if not hasattr(s, 'docker'): die("docker")
         if "enabled" not in s.docker: die("docker.enabled")
-        if "mountUser" not in s.docker: die("docker.mountUser")
-        if "mountGroup" not in s.docker: die("docker.mountGroup")
+        # mountUser and mountGroup are hardcoded in docker_functionality.py, not used from settings
         if "shm_size" not in s.docker: die("docker.shm_size")
         if "port_range_start" not in s.docker: die("docker.port_range_start")
         if "port_range_end" not in s.docker: die("docker.port_range_end")
-        if "sendEmail" not in s.docker: die("docker.sendEmail")
-        # email
-        if not hasattr(s, 'email'): die("email")
-        if "helpEmailAddress" not in s.email: die("email.helpEmailAddress")
+        if "sendEmail" not in s.docker: 
+            s.docker["sendEmail"] = False  # Default to False if missing
+        # email (now managed via database, create default if missing)
+        if not hasattr(s, 'email'):
+            s.email = {"helpEmailAddress": "admin@localhost"}
+        if "helpEmailAddress" not in s.email:
+            s.email["helpEmailAddress"] = "admin@localhost"
 
     def __enter__(self):
         return self
@@ -88,6 +113,14 @@ class Settings:
     def __exit__(self, exc_type, exc_value, traceback):
         json.dump(self.__dict__, open(self._config_location, 'w'))
         
+    def ensure_database_settings_loaded(self):
+        '''
+        Ensures database settings are loaded, but only loads them once on-demand.
+        '''
+        if not self._database_settings_loaded:
+            self.load_settings_from_database()
+            self._database_settings_loaded = True
+    
     def load_settings_from_database(self):
         '''
         Overrides settings from the database if they exist.
@@ -95,7 +128,13 @@ class Settings:
         '''
         try:
             # Import here to avoid circular imports
-            from helpers.tables.SystemSetting import getSetting
+            # This may fail during database initialization/migration
+            import sys
+            if 'database' in sys.modules and hasattr(sys.modules['database'], 'SystemSetting'):
+                from helpers.tables.SystemSetting import getSetting
+            else:
+                # Database not fully initialized yet, skip database settings
+                return
             
             # Override login type from database if it exists
             login_type = getSetting('auth.loginType', None, 'text')
@@ -137,8 +176,10 @@ class Settings:
                 if email_field is not None and email_field != '':
                     self.login["ldap"]["emailField"] = email_field
         except Exception as e:
-            # Log the error but continue with file-based settings
-            print(f"Error loading settings from database: {str(e)}")
+            # This is expected during database initialization/migration due to circular imports
+            # Just continue with file-based settings
+            if "circular import" not in str(e).lower():
+                print(f"Warning: Could not load database settings: {str(e)}")
             pass
 
 settings = Settings()

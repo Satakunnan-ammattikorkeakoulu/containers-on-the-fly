@@ -998,6 +998,26 @@
                       </v-col>
                     </v-row>
                     
+                    <!-- Software Version Info -->
+                    <v-row class="mt-4">
+                      <v-col cols="12" md="6">
+                        <v-card outlined class="pa-3">
+                          <div class="d-flex align-center mb-2">
+                            <v-icon class="mr-2" color="indigo">mdi-tag</v-icon>
+                            <span class="font-weight-medium">Software Version</span>
+                          </div>
+                          <div class="text-center">
+                            <div class="text-h6 mb-1">
+                              {{ version.software || 'Unknown' }}
+                            </div>
+                            <div class="caption grey--text">
+                              {{ version.updated ? `Updated: ${formatTimestamp(new Date(version.updated))}` : 'No data' }}
+                            </div>
+                          </div>
+                        </v-card>
+                      </v-col>
+                    </v-row>
+                    
                   </div>
                   
                   <v-divider class="mb-6"></v-divider>
@@ -1382,6 +1402,12 @@ export default {
         running: 0,
         total: 0
       }
+    },
+    
+    // Version information
+    version: {
+      software: null,
+      updated: null
     }
   }),
   
@@ -1417,6 +1443,12 @@ export default {
         backend: '',
         frontend: '',
         backendDockerUtil: ''
+      };
+      
+      // Clear version info
+      this.version = {
+        software: null,
+        updated: null
       };
       
       // Clear timestamps
@@ -1833,6 +1865,14 @@ export default {
               if (data.metrics.lastUpdated) {
                 _this.lastMetricsUpdate = new Date(data.metrics.lastUpdated);
               }
+            }
+            
+            // Update version information
+            if (data.version) {
+              _this.version = {
+                software: data.version.software,
+                updated: data.version.updated
+              };
             }
             
             // Update logs (reverse order so latest are on top)

@@ -245,6 +245,10 @@ class ServerStatus(Base):
     # Uptime (in seconds)
     systemUptimeSeconds = Column(BigInteger, nullable=True)
     
+    # Software version info
+    softwareVersion = Column(Text, nullable=True)
+    versionUpdatedAt = Column(DateTime(timezone=True), nullable=True)
+    
     # Last update timestamp
     lastUpdatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     

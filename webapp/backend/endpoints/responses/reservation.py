@@ -191,8 +191,11 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
 
 def getOwnReservationDetails(reservationId : int, userId : int) -> object:
   with Session() as session:
-    # Check that the reservation exists and is owned by the current user
-    reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
+    # Check that the reservation exists and is owned by the current user (admins can view any reservation)
+    if IsAdmin(userId):
+      reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
+    else:
+      reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
     if (reservation == None):
       return Response(False, "Reservation not found.")
 

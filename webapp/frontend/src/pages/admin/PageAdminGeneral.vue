@@ -132,9 +132,9 @@
                 
                 <!-- Email Template Instructions -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Email Template Instructions</h6>
+                  <h6 class="text-h6 mb-2">Container Reserved Instructions</h6>
                   <p class="body-2 grey--text mb-3">
-                    Guidelines and instructions included in reservation confirmation emails sent to users (at the end of the email).
+                    Guidelines and instructions included in reservation confirmation emails sent to users (at the end of the email) and displayed when clicking "Show Details" on reservations.
                   </p>
                   <v-textarea
                     v-model="settings.general.emailInstructions"

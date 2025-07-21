@@ -350,12 +350,6 @@ IP address of the machine: {ip}
 
 {generalText}
 
-Every server contains the same two folders in home folder: persistent and datasets.
-
-persistent: Files and folders in the persistent folder are saved after container stops, so save trained networks, your code, checkpoint files, logs, your datasets etc. to that folder.
-
-datasets: This folder is read-only. This folder contains existing datasets and scripts which you can utilize.
-
 {noReply}{webAddress}{helpText}{non_critical_errors}
 """
 

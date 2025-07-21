@@ -42,8 +42,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		EXISTING_SERVER_IP=$$(grep "^SERVER_IP_ADDRESS=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_WEB_HTTPS=$$(grep "^MAIN_SERVER_WEB_HTTPS=" user_config/settings | cut -d'=' -f2); \
-		EXISTING_MIN_DURATION=$$(grep "^RESERVATION_MIN_DURATION=" user_config/settings | cut -d'=' -f2); \
-		EXISTING_MAX_DURATION=$$(grep "^RESERVATION_MAX_DURATION=" user_config/settings | cut -d'=' -f2); \
 		\
 		if [ "$$EXISTING_WEB_HTTPS" = "true" ]; then \
 			EXISTING_WEB_ADDRESS="https://$$EXISTING_WEB_HOST"; \
@@ -55,7 +53,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "  - Server IP: $(GREEN)$$EXISTING_SERVER_IP$(RESET)"; \
 		echo "  - Web Host: $(GREEN)$$EXISTING_WEB_HOST$(RESET)"; \
 		echo "  - Web Address: $(GREEN)$$EXISTING_WEB_ADDRESS$(RESET)"; \
-		echo "  - Reservation Duration: $(GREEN)$$EXISTING_MIN_DURATION - $$EXISTING_MAX_DURATION hours$(RESET)"; \
 		echo ""; \
 		echo "What would you like to do?"; \
 		echo "  $(GREEN)1$(RESET) - Use these settings and start main server setup"; \
@@ -171,21 +168,7 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		fi; \
 		\
 		\
-		echo ""; \
-		echo "$(GREEN)$(BOLD)Container Reservation Duration:$(RESET)"; \
-		echo "Set the minimum and maximum duration (hours) users can reserve containers."; \
-		echo "This can prevent super short bookings and stops people from reserving containers forever."; \
-		echo ""; \
-		echo -n "Minimum reservation duration in hours (or empty for $(GREEN)5$(RESET)): "; \
-		read MIN_DURATION; \
-		if [ -z "$$MIN_DURATION" ]; then \
-			MIN_DURATION="5"; \
-		fi; \
-		echo -n "Maximum reservation duration in hours (or empty for $(GREEN)72$(RESET)): "; \
-		read MAX_DURATION; \
-		if [ -z "$$MAX_DURATION" ]; then \
-			MAX_DURATION="72"; \
-		fi; \
+		# Reservation duration settings are now stored in the database \
 		\
 		if [ "$$FIRST_TIME_SETUP" = "true" ]; then \
 			DB_PASSWORD=$$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15); \
@@ -193,8 +176,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			sed -i "s/SERVER_IP_ADDRESS=\"YOUR_IP_HERE\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HOST=\"YOUR_IP_OR_DOMAIN_HERE\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HTTPS=false/MAIN_SERVER_WEB_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
-			sed -i "s/RESERVATION_MIN_DURATION=5/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
-			sed -i "s/RESERVATION_MAX_DURATION=72/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
 			DB_PASSWORD_ESCAPED=$$(printf '%s\n' "$$DB_PASSWORD" | sed 's/[\/&]/\\&/g'); \
 			sed -i "s/^MARIADB_DB_USER_PASSWORD=.*/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD_ESCAPED\"/" user_config/settings; \
 		else \
@@ -202,8 +183,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			sed -i "s/SERVER_IP_ADDRESS=\"[^\"]*\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HOST=\"[^\"]*\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HTTPS=[^[:space:]]*/MAIN_SERVER_WEB_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
-			sed -i "s/RESERVATION_MIN_DURATION=[^[:space:]]*/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
-			sed -i "s/RESERVATION_MAX_DURATION=[^[:space:]]*/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
 			# Only update DB password if it's not already set \
 			if [ -z "$$EXISTING_DB_PASSWORD" ]; then \
 				DB_PASSWORD=$$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15); \
@@ -229,8 +208,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		UPDATED_SERVER_IP=$$(grep "^SERVER_IP_ADDRESS=" user_config/settings | cut -d'"' -f2); \
 		UPDATED_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
 		UPDATED_WEB_HTTPS=$$(grep "^MAIN_SERVER_WEB_HTTPS=" user_config/settings | cut -d'=' -f2); \
-		UPDATED_MIN_DURATION=$$(grep "^RESERVATION_MIN_DURATION=" user_config/settings | cut -d'=' -f2); \
-		UPDATED_MAX_DURATION=$$(grep "^RESERVATION_MAX_DURATION=" user_config/settings | cut -d'=' -f2); \
 		\
 		if [ "$$UPDATED_WEB_HTTPS" = "true" ]; then \
 			UPDATED_WEB_ADDRESS="https://$$UPDATED_WEB_HOST"; \
@@ -241,7 +218,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "  - Server IP: $(GREEN)$$UPDATED_SERVER_IP$(RESET)"; \
 		echo "  - Web Host: $(GREEN)$$UPDATED_WEB_HOST$(RESET)"; \
 		echo "  - Web Address: $(GREEN)$$UPDATED_WEB_ADDRESS$(RESET)"; \
-		echo "  - Reservation Duration: $(GREEN)$$UPDATED_MIN_DURATION - $$UPDATED_MAX_DURATION hours$(RESET)"; \
 		echo ""; \
 		echo "What would you like to do?"; \
 		echo "  $(GREEN)1$(RESET) - Proceed with installation using these settings"; \

@@ -188,6 +188,179 @@
               </v-form>
             </v-expansion-panel-content>
           </v-expansion-panel>
+          
+          <!-- Authentication Section -->
+          <v-expansion-panel>
+            <v-expansion-panel-header>
+              <v-icon class="mr-3">mdi-account-key</v-icon>
+              <span class="font-weight-medium">Authentication</span>
+            </v-expansion-panel-header>
+            <v-expansion-panel-content>
+              <v-form ref="authForm" v-model="forms.auth.valid">
+                
+                <!-- Login Type Settings -->
+                <div class="mb-6">
+                  <h6 class="text-h6 mb-2">Login Method</h6>
+                  <p class="body-2 grey--text mb-4">
+                    Choose how users authenticate with the system.
+                  </p>
+                  <v-radio-group
+                    v-model="settings.auth.loginType"
+                    row
+                    class="mt-0"
+                  >
+                    <v-radio
+                      label="Password Only"
+                      value="password"
+                      color="primary"
+                    ></v-radio>
+                    <v-radio
+                      label="Password + LDAP"
+                      value="hybrid"
+                      color="primary"
+                    ></v-radio>
+                  </v-radio-group>
+                  
+                  <!-- Password + LDAP explanation -->
+                  <v-alert
+                    v-if="settings.auth.loginType === 'hybrid'"
+                    text
+                    type="info"
+                    class="mt-2 mb-4"
+                    outlined
+                  >
+                    <p class="body-2 mb-0">
+                      <strong>Password + LDAP Mode</strong>: If a user has a password set, it will try password authentication first. 
+                      If the password is incorrect or not set, it will attempt LDAP authentication. Users can still log in with their password even if LDAP is enabled.
+                    </p>
+                  </v-alert>
+                </div>
+                
+                <!-- Session Timeout -->
+                <div class="mb-6">
+                  <h6 class="text-h6 mb-2">Session Settings</h6>
+                  <p class="body-2 grey--text mb-4">
+                    Configure how long user sessions remain active before requiring re-login.
+                  </p>
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.auth.sessionTimeoutMinutes"
+                        label="Session Timeout (minutes)"
+                        type="number"
+                        min="5"
+                        outlined
+                        required
+                        :rules="[rules.required, rules.positiveNumber]"
+                        hide-details
+                        placeholder="1440"
+                      ></v-text-field>
+                    </v-col>
+                  </v-row>
+                </div>
+                
+                <!-- LDAP Configuration -->
+                <div class="mb-6" v-if="settings.auth.loginType === 'hybrid'">
+                  <h6 class="text-h6 mb-2">LDAP Server Configuration</h6>
+                  <p class="body-2 grey--text mb-4">
+                    Configure connection to your LDAP directory server for user authentication.
+                  </p>
+                  
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.auth.ldap.url"
+                        label="LDAP Server URL"
+                        placeholder="ldaps://your-ldap-server-address"
+                        outlined
+                        required
+                        :rules="[rules.required]"
+                      ></v-text-field>
+                    </v-col>
+                    
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.auth.ldap.domain"
+                        label="LDAP Domain"
+                        placeholder="dc=ad,dc=local"
+                        outlined
+                        required
+                        :rules="[rules.required]"
+                      ></v-text-field>
+                    </v-col>
+                    
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.auth.ldap.usernameFormat"
+                        label="LDAP Username Format"
+                        placeholder="{username}@ad.local"
+                        outlined
+                        required
+                        :rules="[rules.required]"
+                      ></v-text-field>
+                    </v-col>
+                    
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.auth.ldap.passwordFormat"
+                        label="LDAP Password Format"
+                        placeholder="{password}"
+                        outlined
+                        required
+                        :rules="[rules.required]"
+                      ></v-text-field>
+                    </v-col>
+                    
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.auth.ldap.searchMethod"
+                        label="LDAP Search Method"
+                        placeholder="(sAMAccountName={username})"
+                        outlined
+                        required
+                        :rules="[rules.required]"
+                      ></v-text-field>
+                    </v-col>
+                    
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.auth.ldap.accountField"
+                        label="LDAP Account Field"
+                        placeholder="sAMAccountName"
+                        outlined
+                        required
+                        :rules="[rules.required]"
+                      ></v-text-field>
+                    </v-col>
+                    
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.auth.ldap.emailField"
+                        label="LDAP Email Field"
+                        placeholder="mail"
+                        outlined
+                        required
+                        :rules="[rules.required]"
+                      ></v-text-field>
+                    </v-col>
+                  </v-row>
+                </div>
+                
+                <v-row>
+                  <v-col cols="12">
+                    <v-btn 
+                      color="primary" 
+                      :loading="saving.auth"
+                      @click="saveSection('auth')"
+                    >
+                      <v-icon left>mdi-content-save</v-icon>
+                      Save Authentication Settings
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-form>
+            </v-expansion-panel-content>
+          </v-expansion-panel>
 
           <!-- User Access Control Section -->
           <v-expansion-panel>
@@ -968,6 +1141,7 @@ export default {
       email: { valid: true },
       contact: { valid: true },  // Add contact form state
       notifications: { valid: true },
+      auth: { valid: true },
       monitoring: { valid: true }
     },
     
@@ -978,6 +1152,7 @@ export default {
       email: false,
       contact: false,  // Added contact saving state
       notifications: false,
+      auth: false,
       monitoring: false // Added monitoring saving state
     },
     
@@ -1142,6 +1317,19 @@ export default {
       },
       notifications: {
         containerAlertsEnabled: false
+      },
+      auth: {
+        loginType: 'password',
+        sessionTimeoutMinutes: 1440,
+        ldap: {
+          url: '',
+          usernameFormat: '',
+          passwordFormat: '',
+          domain: '',
+          searchMethod: '',
+          accountField: '',
+          emailField: ''
+        }
       },
       monitoring: {
         // Placeholder for monitoring settings if any
@@ -1545,6 +1733,7 @@ export default {
         email: 'Email Configuration',
         contact: 'Contact Information',  // Added contact
         notifications: 'System Notifications',
+        auth: 'Authentication',
         monitoring: 'Monitoring' // Added monitoring
       };
       return names[sectionName] || sectionName;

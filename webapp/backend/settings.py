@@ -6,6 +6,9 @@ import os
 import sys
 import re
 
+# Import SystemSetting when needed, not at module level to avoid circular imports
+# Circular imports can occur because helpers.tables modules may import settings
+
 # Example taken from here: https://gist.github.com/nadya-p/b25519cf3a74d1bed86ed9b1d8c71692
 # Handler for loading the settings.json file
 # Initialized class can be used with:
@@ -31,6 +34,8 @@ class Settings:
         sys.exit("COULD NOT LOAD THE SETTINGS.JSON FILE")
       # Check that the settings are valid
       self.CheckRequiredSettings()
+      # Override settings from database if they exist
+      self.load_settings_from_database()
 
     def CheckRequiredSettings(self):
         '''
@@ -54,6 +59,9 @@ class Settings:
         # login
         if not hasattr(s, 'login'): die("login")
         if "loginType" not in s.login: die("login.loginType")
+        if s.login["loginType"] not in ["password", "LDAP", "hybrid"]: 
+            print("Warning: login.loginType must be 'password', 'LDAP', or 'hybrid'. Defaulting to 'password'.")
+            s.login["loginType"] = "password"
         # session
         if not hasattr(s, 'session'): die("session")
         if "timeoutMinutes" not in s.session: die("session.timeoutMinutes")
@@ -79,5 +87,58 @@ class Settings:
 
     def __exit__(self, exc_type, exc_value, traceback):
         json.dump(self.__dict__, open(self._config_location, 'w'))
+        
+    def load_settings_from_database(self):
+        '''
+        Overrides settings from the database if they exist.
+        This allows settings to be changed through the admin interface.
+        '''
+        try:
+            # Import here to avoid circular imports
+            from helpers.tables.SystemSetting import getSetting
+            
+            # Override login type from database if it exists
+            login_type = getSetting('auth.loginType', None, 'text')
+            if login_type is not None:
+                self.login["loginType"] = login_type
+                
+            # Override session timeout from database if it exists
+            session_timeout = getSetting('auth.sessionTimeoutMinutes', None, 'integer')
+            if session_timeout is not None:
+                self.session["timeoutMinutes"] = session_timeout
+                
+            # Override LDAP settings from database if they exist
+            if self.login["loginType"] in ["LDAP", "hybrid"]:
+                ldap_url = getSetting('auth.ldap.url', None, 'text')
+                if ldap_url is not None and ldap_url != '':
+                    self.login["ldap"]["ldap_url"] = ldap_url
+                    
+                username_format = getSetting('auth.ldap.usernameFormat', None, 'text')
+                if username_format is not None and username_format != '':
+                    self.login["ldap"]["usernameFormat"] = username_format
+                    
+                password_format = getSetting('auth.ldap.passwordFormat', None, 'text')
+                if password_format is not None and password_format != '':
+                    self.login["ldap"]["passwordFormat"] = password_format
+                    
+                ldap_domain = getSetting('auth.ldap.domain', None, 'text')
+                if ldap_domain is not None and ldap_domain != '':
+                    self.login["ldap"]["ldapDomain"] = ldap_domain
+                    
+                search_method = getSetting('auth.ldap.searchMethod', None, 'text')
+                if search_method is not None and search_method != '':
+                    self.login["ldap"]["searchMethod"] = search_method
+                    
+                account_field = getSetting('auth.ldap.accountField', None, 'text')
+                if account_field is not None and account_field != '':
+                    self.login["ldap"]["accountField"] = account_field
+                    
+                email_field = getSetting('auth.ldap.emailField', None, 'text')
+                if email_field is not None and email_field != '':
+                    self.login["ldap"]["emailField"] = email_field
+        except Exception as e:
+            # Log the error but continue with file-based settings
+            print(f"Error loading settings from database: {str(e)}")
+            pass
 
 settings = Settings()

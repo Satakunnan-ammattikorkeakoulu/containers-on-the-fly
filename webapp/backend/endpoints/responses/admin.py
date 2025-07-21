@@ -179,6 +179,7 @@ def getUsers() -> object:
             addable["email"] = user.email
             addable["roles"] = [role.name for role in user.roles]
             addable["createdAt"] = user.userCreatedAt  # Added createdAt field
+            addable["hasPassword"] = user.password is not None and user.password != ""
             data.append(addable)
 
     return Response(True, "Users fetched successfully", {"users": data})
@@ -797,7 +798,16 @@ def getGeneralSettings() -> object:
             'email.fromEmail',
             'email.contactEmail',
             'notifications.containerAlertsEnabled',
-            'notifications.alertEmails'
+            'notifications.alertEmails',
+            'auth.loginType',
+            'auth.sessionTimeoutMinutes',
+            'auth.ldap.url',
+            'auth.ldap.usernameFormat',
+            'auth.ldap.passwordFormat',
+            'auth.ldap.domain',
+            'auth.ldap.searchMethod',
+            'auth.ldap.accountField',
+            'auth.ldap.emailField'
         ]
         
         # Get all settings
@@ -846,6 +856,19 @@ def getGeneralSettings() -> object:
             "notifications": {
                 "containerAlertsEnabled": settings_dict.get('notifications.containerAlertsEnabled', False),
                 "alertEmails": alert_emails
+            },
+            "auth": {
+                "loginType": settings_dict.get('auth.loginType', 'password'),
+                "sessionTimeoutMinutes": settings_dict.get('auth.sessionTimeoutMinutes', 1440),
+                "ldap": {
+                    "url": settings_dict.get('auth.ldap.url', ''),
+                    "usernameFormat": settings_dict.get('auth.ldap.usernameFormat', ''),
+                    "passwordFormat": settings_dict.get('auth.ldap.passwordFormat', ''),
+                    "domain": settings_dict.get('auth.ldap.domain', ''),
+                    "searchMethod": settings_dict.get('auth.ldap.searchMethod', ''),
+                    "accountField": settings_dict.get('auth.ldap.accountField', ''),
+                    "emailField": settings_dict.get('auth.ldap.emailField', '')
+                }
             }
         }
         
@@ -859,7 +882,7 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
     Saves general admin settings for a specific section.
     
     Args:
-        section: The section to save (general, access, email, notifications)
+        section: The section to save (general, access, email, notifications, auth)
         settings: Dictionary of settings to save
         
     Returns:
@@ -929,6 +952,32 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
                 setSetting('notifications.containerAlertsEnabled', settings['containerAlertsEnabled'], 'boolean', 'Enable container failure alerts')
             if 'alertEmails' in settings:
                 setSetting('notifications.alertEmails', settings['alertEmails'], 'json', 'Email addresses for alerts')
+        
+        elif section == "auth":
+            # Save authentication settings
+            if 'loginType' in settings:
+                setSetting('auth.loginType', settings['loginType'], 'text', 'Authentication method (password, LDAP, hybrid)')
+            if 'sessionTimeoutMinutes' in settings:
+                timeout = 1440 if not settings['sessionTimeoutMinutes'] else settings['sessionTimeoutMinutes']
+                setSetting('auth.sessionTimeoutMinutes', timeout, 'integer', 'Session timeout in minutes')
+                
+            # Save LDAP settings if they exist
+            if 'ldap' in settings and isinstance(settings['ldap'], dict):
+                ldap_settings = settings['ldap']
+                if 'url' in ldap_settings:
+                    setSetting('auth.ldap.url', ldap_settings['url'], 'text', 'LDAP server URL')
+                if 'usernameFormat' in ldap_settings:
+                    setSetting('auth.ldap.usernameFormat', ldap_settings['usernameFormat'], 'text', 'LDAP username format')
+                if 'passwordFormat' in ldap_settings:
+                    setSetting('auth.ldap.passwordFormat', ldap_settings['passwordFormat'], 'text', 'LDAP password format')
+                if 'domain' in ldap_settings:
+                    setSetting('auth.ldap.domain', ldap_settings['domain'], 'text', 'LDAP domain')
+                if 'searchMethod' in ldap_settings:
+                    setSetting('auth.ldap.searchMethod', ldap_settings['searchMethod'], 'text', 'LDAP search method')
+                if 'accountField' in ldap_settings:
+                    setSetting('auth.ldap.accountField', ldap_settings['accountField'], 'text', 'LDAP account field')
+                if 'emailField' in ldap_settings:
+                    setSetting('auth.ldap.emailField', ldap_settings['emailField'], 'text', 'LDAP email field')
                 
         else:
             return Response(False, f"Unknown section: {section}")

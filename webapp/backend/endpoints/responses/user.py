@@ -1,4 +1,4 @@
-from database import User, Session, UserWhitelist
+from database import User, Session, UserWhitelist, UserBlacklist
 from helpers.tables.SystemSetting import getSetting
 from helpers.server import Response, ORMObjectToDict
 from settings import settings
@@ -27,14 +27,22 @@ def login(username, password):
     # Get auth settings from database if they exist, otherwise use config file
     loginType = getSetting('auth.loginType', settings.login["loginType"], 'text')
     useWhitelisting = getSetting('access.whitelistEnabled', False, 'boolean')
+    useBlacklisting = getSetting('access.blacklistEnabled', False, 'boolean')
 
     # Look up user by email first for any auth type
     user = session.query(User).filter(User.email == username).first()
+    
+    # Check blacklist first - this overrides whitelist and denies access immediately
+    if useBlacklisting:
+      blacklistEmail = session.query(UserBlacklist).filter(UserBlacklist.email == username).first()
+      if blacklistEmail is not None:
+        return Response(False, "You are not allowed to login (blacklisted).")
 
     # Check whitelist if enabled
-    whitelistEmail = session.query(UserWhitelist).filter(UserWhitelist.email == username).first()
-    if useWhitelisting and whitelistEmail is None:
-      return Response(False, "You are not allowed to login (not whitelisted).")
+    if useWhitelisting:
+      whitelistEmail = session.query(UserWhitelist).filter(UserWhitelist.email == username).first()
+      if whitelistEmail is None:
+        return Response(False, "You are not allowed to login (not whitelisted).")
 
     # Helper function to create login token
     def create_successful_login(user):

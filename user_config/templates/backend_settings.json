@@ -8,10 +8,6 @@
       "production": true,
       "addTestDataInDevelopment": {{ADD_TEST_DATA}}
     },
-    "reservation": {
-      "minimumDuration": {{RESERVATION_MIN_DURATION}},
-      "maximumDuration": {{RESERVATION_MAX_DURATION}}
-    },
     "login": {
       "loginType": "{{LOGIN_TYPE}}",
       "ldap": {

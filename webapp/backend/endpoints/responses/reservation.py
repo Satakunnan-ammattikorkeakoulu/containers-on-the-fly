@@ -290,10 +290,19 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
       return Response(False, "You can only have one queued or started reservation.")
 
     # Check that the duration is between minimum and maximum lengths
-    if (duration < settings.reservation["minimumDuration"]):
-      return Response(False, f"Minimum duration is {settings.reservation['minimumDuration']} hours.")
-    if (duration > settings.reservation["maximumDuration"]) and isAdmin == False:
-      return Response(False, f"Maximum duration is {settings.reservation['maximumDuration']} hours.")
+    try:
+        from helpers.tables.SystemSetting import getSetting
+        min_duration = getSetting('reservation.minimumDuration', 5)
+        max_duration = getSetting('reservation.maximumDuration', 72)
+    except Exception:
+        # Fallback to default values if database is unavailable
+        min_duration = 5
+        max_duration = 72
+    
+    if (duration < min_duration):
+      return Response(False, f"Minimum duration is {min_duration} hours.")
+    if (duration > max_duration) and isAdmin == False:
+      return Response(False, f"Maximum duration is {max_duration} hours.")
 
     userId = user.userId
 

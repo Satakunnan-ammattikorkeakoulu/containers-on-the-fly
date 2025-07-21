@@ -51,10 +51,6 @@ class Settings:
         if "port" not in s.app: die("app.port")
         if "production" not in s.app: die("app.production")
         if "addTestDataInDevelopment" not in s.app: die("app.addTestDataInDevelopment")
-        # reservation
-        if not hasattr(s, 'reservation'): die("reservation")
-        if "minimumDuration" not in s.reservation: die("reservation.minimumDuration")
-        if "maximumDuration" not in s.reservation: die("reservation.maximumDuration")
         # login
         if not hasattr(s, 'login'): die("login")
         if "loginType" not in s.login: die("login.loginType")

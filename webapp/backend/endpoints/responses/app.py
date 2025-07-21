@@ -1,5 +1,4 @@
 from helpers.server import Response
-from settings import settings
 
 def getPublicConfig() -> object:
     '''
@@ -16,6 +15,8 @@ def getPublicConfig() -> object:
         setting_keys = [
             'general.applicationName',
             'general.timezone',
+            'reservation.minimumDuration',
+            'reservation.maximumDuration',
             'instructions.login',
             'instructions.reservation', 
             'instructions.email',
@@ -35,8 +36,8 @@ def getPublicConfig() -> object:
                 "contactEmail": settings_dict.get('email.contactEmail', '')
             },
             "reservation": {
-                "minimumDuration": settings.reservation["minimumDuration"],
-                "maximumDuration": settings.reservation["maximumDuration"]
+                "minimumDuration": settings_dict.get('reservation.minimumDuration', 5),
+                "maximumDuration": settings_dict.get('reservation.maximumDuration', 72)
             },
             "instructions": {
                 "login": settings_dict.get('instructions.login', ''),

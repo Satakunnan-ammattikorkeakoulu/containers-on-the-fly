@@ -1,22 +1,31 @@
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from settings import settings
+from helpers.tables.SystemSetting import getSetting
 
 def send_email(to, mail_subject, mail_body):
 
-    if "sendEmail" not in settings.email or settings.email["sendEmail"] is False:
+    # Check if email sending is enabled
+    if not getSetting('email.sendEmail', False):
         return
 
-    if "emailAddress" not in settings.email or "smtpPassword" not in settings.email or "smtpAddress" not in settings.email or "smtpPort" not in settings.email:
-        print("Email settings are not set in the settings file. Email not sent.")
+    # Get SMTP settings from database
+    smtp_server = getSetting('email.smtpServer', '')
+    smtp_port = getSetting('email.smtpPort', 587)
+    smtp_username = getSetting('email.smtpUsername', '')
+    smtp_password = getSetting('email.smtpPassword', '')
+    from_email = getSetting('email.fromEmail', '')
+
+    # Check if all required settings are configured
+    if not all([smtp_server, smtp_port, smtp_username, smtp_password, from_email]):
+        print("Email settings are incomplete in the database. Email not sent.")
         return
 
-    username = settings.email["emailAddress"]
-    mail_from = settings.email["emailAddress"]
-    password = settings.email["smtpPassword"]
-    smtpAddress = settings.email["smtpAddress"]
-    smtpPort = settings.email["smtpPort"]
+    username = smtp_username
+    mail_from = from_email
+    password = smtp_password
+    smtpAddress = smtp_server
+    smtpPort = smtp_port
 
     mimemsg = MIMEMultipart()
     mimemsg['From'] = mail_from

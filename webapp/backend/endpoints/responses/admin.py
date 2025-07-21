@@ -803,6 +803,7 @@ def getGeneralSettings() -> object:
             'email.smtpPassword',
             'email.fromEmail',
             'email.contactEmail',
+            'email.sendEmail',
             'notifications.containerAlertsEnabled',
             'notifications.alertEmails',
             'auth.loginType',
@@ -858,6 +859,9 @@ def getGeneralSettings() -> object:
                 "smtpPassword": settings_dict.get('email.smtpPassword', ''),
                 "fromEmail": settings_dict.get('email.fromEmail', ''),
                 "contactEmail": settings_dict.get('email.contactEmail', '')
+            },
+            "emailEnable": {
+                "sendEmail": settings_dict.get('email.sendEmail', False)
             },
             "notifications": {
                 "containerAlertsEnabled": settings_dict.get('notifications.containerAlertsEnabled', False),
@@ -951,6 +955,11 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
             # Save contact email separately
             if 'contactEmail' in settings:
                 setSetting('email.contactEmail', settings['contactEmail'], 'email', 'Admin contact email')
+                
+        elif section == "emailEnable":
+            # Save email enable setting
+            if 'sendEmail' in settings:
+                setSetting('email.sendEmail', settings['sendEmail'], 'boolean', 'Enable sending emails from the system')
                 
         elif section == "notifications":
             # Save notification settings

@@ -179,7 +179,8 @@ def startDockerContainer(reservationId: str):
       reservation.reservedContainer.sshPassword = cont_password
       reservation.reservedContainer.startedAt = timeNow()
       # Send the email
-      if (settings.docker["sendEmail"] == True):
+      from helpers.tables.SystemSetting import getSetting
+      if getSetting('email.sendEmail', False):
         body =  get_email_container_started(
           imageName,
           reservation.computer.ip,
@@ -206,11 +207,85 @@ def startDockerContainer(reservationId: str):
       session.commit()
 
       # Send email about the error
-      if (settings.docker["sendEmail"] == True):
+      from helpers.tables.SystemSetting import getSetting
+      if getSetting('email.sendEmail', False):
         body = f"Your AI server reservation did not start as there was an error. {os.linesep}{os.linesep}"
         body += f"The error was: {os.linesep}{os.linesep}{errors}{os.linesep}{os.linesep}"
         body += "Please do not reply to this email, this email is sent from a noreply email address."
         send_email(reservation.user.email, "AI Server did not start", body)
+
+        # Send container failure alerts to admin emails if enabled
+        try:
+          from helpers.tables.SystemSetting import getSetting
+          import smtplib
+          from email.mime.multipart import MIMEMultipart
+          from email.mime.text import MIMEText
+          
+          alerts_enabled = getSetting('notifications.containerAlertsEnabled', False, 'boolean')
+          
+          if alerts_enabled:
+            alert_emails = getSetting('notifications.alertEmails', [], 'json')
+            
+            if alert_emails and len(alert_emails) > 0:
+              # Get SMTP settings from database
+              smtp_server = getSetting('email.smtpServer', '')
+              smtp_port = getSetting('email.smtpPort', 587)
+              smtp_username = getSetting('email.smtpUsername', '')
+              smtp_password = getSetting('email.smtpPassword', '')
+              from_email = getSetting('email.fromEmail', '')
+              
+              # Check if SMTP is configured
+              if not all([smtp_server, smtp_port, smtp_username, smtp_password, from_email]):
+                print("Container failure alerts enabled but SMTP configuration is incomplete")
+              else:
+                # Create list of recipients (avoiding duplicates)
+                recipients = set(alert_emails)  # Use set to avoid duplicates
+                
+                # Remove user's email if it's in the alert list to prevent duplicate
+                if reservation.user.email in recipients:
+                  recipients.remove(reservation.user.email)
+                
+                # Send alert email to admin recipients
+                if recipients:  # Only send if there are remaining recipients
+                  admin_body = f"Container Failure Alert{os.linesep}{os.linesep}"
+                  admin_body += f"A container reservation failed to start for user: {reservation.user.email}{os.linesep}"
+                  admin_body += f"Reservation ID: {reservation.id}{os.linesep}"
+                  admin_body += f"Container Image: {reservation.reservedContainer.containerImage.imageName}{os.linesep}"
+                  admin_body += f"Server: {reservation.reservedContainer.computer.name}{os.linesep}"
+                  admin_body += f"Error: {errors}{os.linesep}{os.linesep}"
+                  admin_body += "This is an automated notification from the container management system."
+                  
+                  # Send to all admin recipients using database-based SMTP settings
+                  successful_sends = 0
+                  for admin_email in recipients:
+                    try:
+                      # Create message
+                      msg = MIMEMultipart()
+                      msg['From'] = from_email
+                      msg['To'] = admin_email
+                      msg['Subject'] = "Container Failure Alert"
+                      msg.attach(MIMEText(admin_body, 'plain'))
+                      
+                      # Send email
+                      with smtplib.SMTP(smtp_server, smtp_port) as server:
+                        server.starttls()
+                        server.login(smtp_username, smtp_password)
+                        server.send_message(msg)
+                        successful_sends += 1
+                        
+                    except Exception as email_error:
+                      print(f"Failed to send alert to {admin_email}: {email_error}")
+                  
+                  if successful_sends > 0:
+                    print(f"Container failure alerts sent to {successful_sends}/{len(recipients)} admin(s)")
+                  else:
+                    print(f"Failed to send container failure alerts to any of {len(recipients)} admin(s)")
+                else:
+                  print("Container failure alerts enabled but no additional recipients (user already notified)")
+            else:
+              print("Container failure alerts enabled but no alert emails configured")
+        except Exception as e:
+          print(f"Warning: Failed to send container failure alerts: {e}")
 
       print("Container was not started. Logged the error to ReservedContainer.")
 

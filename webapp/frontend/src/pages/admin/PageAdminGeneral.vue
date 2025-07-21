@@ -527,9 +527,63 @@
             </v-expansion-panel-header>
             <v-expansion-panel-content>
               
+              <!-- Contact Information Section with its own separate form -->
+              <v-form ref="contactForm" v-model="forms.contact.valid">
+                <div class="mb-6">
+                  <h6 class="text-h6 mb-2">Contact Email</h6>
+                  <p class="body-2 grey--text mb-4">
+                    Configure the admin contact email address displayed to users throughout the system.
+                  </p>
+                  
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.contact.contactEmail"
+                        label="Admin Contact Email"
+                        placeholder="admin@yourdomain.com"
+                        outlined
+                        required
+                        :rules="[rules.required, rules.email]"
+                      ></v-text-field>
+                    </v-col>
+                  </v-row>
+                  
+                  <!-- Save Contact Info Button -->
+                  <v-row>
+                    <v-col cols="12">
+                      <v-btn 
+                        color="primary" 
+                        :loading="saving.contact"
+                        @click="saveSection('contact')"
+                      >
+                        <v-icon left>mdi-content-save</v-icon>
+                        Save Contact Email
+                      </v-btn>
+                    </v-col>
+                  </v-row>
+                </div>
+              </v-form>
+              
+              <!-- Master Email Enable Section with its own form -->
+              <v-form ref="emailEnableForm" v-model="forms.emailEnable.valid">
+                <div class="mb-6">
+                  <h6 class="text-h6 mb-2">Email System</h6>
+                  <p class="body-2 grey--text mb-4">
+                    Enable or disable email sending from the system. When disabled, no emails will be sent for reservations or notifications.
+                  </p>
+                  
+                  <v-checkbox
+                    v-model="settings.emailEnable.sendEmail"
+                    label="Enable sending emails from the system"
+                    color="primary"
+                    class="mt-0"
+                  ></v-checkbox>
+                </div>
+              </v-form>
+              
               <!-- SMTP Settings Section with its own form -->
               <v-form ref="emailForm" v-model="forms.email.valid">
-                <div class="mb-6">
+                <div class="mb-6" v-if="settings.emailEnable.sendEmail">
                   <h6 class="text-h6 mb-2">SMTP Server Configuration</h6>
                   <p class="body-2 grey--text mb-4">
                     Configure the SMTP server settings for sending system emails like reservation confirmations and notifications.
@@ -610,45 +664,8 @@
                 </div>
               </v-form>
               
-              <!-- Contact Information Section with its own separate form -->
-              <v-form ref="contactForm" v-model="forms.contact.valid">
-                <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Contact Email</h6>
-                  <p class="body-2 grey--text mb-4">
-                    Configure the admin contact email address displayed to users throughout the system.
-                  </p>
-                  
-                  <v-row>
-                    <v-col cols="12" md="6">
-                      <v-text-field
-                        v-model="settings.contact.contactEmail"
-                        label="Admin Contact Email"
-                        placeholder="admin@yourdomain.com"
-                        outlined
-                        required
-                        :rules="[rules.required, rules.email]"
-                      ></v-text-field>
-                    </v-col>
-                  </v-row>
-                  
-                  <!-- Save Contact Info Button -->
-                  <v-row>
-                    <v-col cols="12">
-                      <v-btn 
-                        color="primary" 
-                        :loading="saving.contact"
-                        @click="saveSection('contact')"
-                      >
-                        <v-icon left>mdi-content-save</v-icon>
-                        Save Contact Email
-                      </v-btn>
-                    </v-col>
-                  </v-row>
-                </div>
-              </v-form>
-              
               <!-- Test Email Delivery Section (no form needed, just uses validation) -->
-              <div class="mb-6">
+              <div class="mb-6" v-if="settings.emailEnable.sendEmail">
                 <h6 class="text-h6 mb-2">Test Email Delivery</h6>
                 <p class="body-2 grey--text mb-4">
                   Send a test email to verify that your SMTP configuration is working correctly.
@@ -1141,7 +1158,8 @@ export default {
     settingsInitialized: {
       blacklistEnabled: false,
       whitelistEnabled: false,
-      containerAlertsEnabled: false
+      containerAlertsEnabled: false,
+      sendEmail: false
     }, // Track which settings have been initialized from backend
     testEmail: '',
     sendingTest: false,
@@ -1159,6 +1177,7 @@ export default {
       general: { valid: true },
       access: { valid: true },
       email: { valid: true },
+      emailEnable: { valid: true },  // Add emailEnable form state
       contact: { valid: true },  // Add contact form state
       notifications: { valid: true },
       auth: { valid: true },
@@ -1170,6 +1189,7 @@ export default {
       general: false,
       access: false,
       email: false,
+      emailEnable: false,  // Added emailEnable saving state
       contact: false,  // Added contact saving state
       notifications: false,
       auth: false,
@@ -1331,6 +1351,9 @@ export default {
         smtpUsername: '',
         smtpPassword: '',
         fromEmail: ''
+      },
+      emailEnable: {
+        sendEmail: false
       },
       contact: {
         contactEmail: ''
@@ -1542,11 +1565,17 @@ export default {
               contactEmail: data.email.contactEmail || data.contact?.contactEmail || ''
             };
             
+            // Update email enable setting
+            _this.settings.emailEnable = {
+              sendEmail: data.emailEnable?.sendEmail || false
+            };
+            
             // Mark settings as initialized after a small delay to ensure watchers don't fire during load
             setTimeout(() => {
               _this.settingsInitialized.blacklistEnabled = true;
               _this.settingsInitialized.whitelistEnabled = true;
               _this.settingsInitialized.containerAlertsEnabled = true;
+              _this.settingsInitialized.sendEmail = true;
             }, 200);
             
             // Update email lists
@@ -1763,6 +1792,7 @@ export default {
         general: 'General Information',
         access: 'Access Control',
         email: 'Email Configuration',
+        emailEnable: 'Email System',  // Added emailEnable
         contact: 'Contact Information',  // Added contact
         notifications: 'System Notifications',
         auth: 'Authentication',
@@ -2010,6 +2040,13 @@ export default {
     'settings.access.whitelistEnabled': function(newValue, oldValue) {
       if (this.settingsInitialized.whitelistEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
         this.saveEmailLists();
+      }
+    },
+
+    // Auto-save when email enable checkbox is toggled
+    'settings.emailEnable.sendEmail': function(newValue, oldValue) {
+      if (this.settingsInitialized.sendEmail && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveSection('emailEnable');
       }
     }
   }

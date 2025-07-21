@@ -7,7 +7,6 @@ from dateutil.relativedelta import *
 import datetime
 from datetime import timezone, timedelta
 from docker.dockerUtils import stop_container
-from settings import settings
 from endpoints.models.reservation import ReservationFilters
 from sqlalchemy.orm import joinedload
 
@@ -355,7 +354,8 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     session.add(reservation)
     session.commit()
 
-    informByEmail = settings.docker["sendEmail"]
+    from helpers.tables.SystemSetting import getSetting
+    informByEmail = getSetting('email.sendEmail', False)
 
     return Response(True, "Reservation created succesfully!", { "informByEmail": informByEmail })
 

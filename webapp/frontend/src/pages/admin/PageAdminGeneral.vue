@@ -92,7 +92,7 @@
                         min="1"
                         outlined
                         required
-                        :rules="[rules.required, rules.positiveNumber, rules.maxGreaterThanMin]"
+                        :rules="[rules.required, rules.positiveNumber, ...(initialLoadComplete ? [rules.maxGreaterThanMin] : [])]"
                         hide-details
                         placeholder="72"
                       ></v-text-field>
@@ -994,11 +994,19 @@ export default {
         const num = parseInt(value)
         return (num > 0) || 'Must be a positive number'
       },
-      maxGreaterThanMin: value => {
+      maxGreaterThanMin: function(value) {
         if (!value) return 'This field is required'
-        const maxDuration = parseInt(value)
-        const minDuration = parseInt(this.settings.general.reservationMinDuration)
-        return (maxDuration >= minDuration) || 'Maximum duration must be greater than or equal to minimum duration'
+        try {
+          // Use function instead of arrow function to access this correctly
+          const maxDuration = parseInt(value)
+          // Safely handle settings not being loaded yet
+          if (!this || !this.settings || !this.settings.general) return true
+          const minDuration = parseInt(this.settings.general.reservationMinDuration || 5)
+          return (maxDuration >= minDuration) || 'Maximum duration must be greater than or equal to minimum duration'
+        } catch (error) {
+          console.warn('Error in maxGreaterThanMin validation:', error)
+          return true  // Don't block validation if there's an error
+        }
       }
     },
     

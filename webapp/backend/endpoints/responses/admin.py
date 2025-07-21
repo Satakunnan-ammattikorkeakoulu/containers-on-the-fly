@@ -876,9 +876,11 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
             if 'timezone' in settings:
                 setSetting('general.timezone', settings['timezone'], 'text', 'System timezone for proper scheduling and logging')
             if 'reservationMinDuration' in settings:
-                setSetting('reservation.minimumDuration', settings['reservationMinDuration'], 'integer', 'Minimum duration for container reservations in hours')
+                min_duration = 5 if not settings['reservationMinDuration'] else settings['reservationMinDuration']
+                setSetting('reservation.minimumDuration', min_duration, 'integer', 'Minimum duration for container reservations in hours')
             if 'reservationMaxDuration' in settings:
-                setSetting('reservation.maximumDuration', settings['reservationMaxDuration'], 'integer', 'Maximum duration for container reservations in hours')
+                max_duration = 72 if not settings['reservationMaxDuration'] else settings['reservationMaxDuration']
+                setSetting('reservation.maximumDuration', max_duration, 'integer', 'Maximum duration for container reservations in hours')
             
             # Save instruction settings using new naming scheme
             if 'loginPageInfo' in settings:

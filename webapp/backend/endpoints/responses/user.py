@@ -1,12 +1,10 @@
 from database import User, Session, UserWhitelist, UserBlacklist
 from helpers.tables.SystemSetting import getSetting
-from helpers.server import Response, ORMObjectToDict
+from helpers.server import Response
 from settings import settings
 from helpers.auth import CreateLoginToken, HashPassword, IsCorrectPassword, CheckToken, GetLDAPUser, GetRole
 from fastapi import HTTPException, status
-from datetime import datetime
-from logger import log
-import hashlib
+from datetime import datetime, timezone
 import base64
 
 def login(username, password):
@@ -47,7 +45,7 @@ def login(username, password):
     # Helper function to create login token
     def create_successful_login(user):
       user.loginToken = CreateLoginToken()
-      user.loginTokenCreatedAt = datetime.utcnow()
+      user.loginTokenCreatedAt = datetime.now(timezone.utc)
       session.commit()
       return {
         "access_token": user.loginToken,

@@ -11,7 +11,6 @@
           <a href="/admin/reservations">Reservations</a>
           <a href="/admin/users">Users</a>
           <a href="/admin/roles">Roles</a>
-          <a href="/admin/hardware">Hardware</a>
           <a href="/admin/computers">Computers</a>
           <a href="/admin/containers">Containers</a>
         </div>

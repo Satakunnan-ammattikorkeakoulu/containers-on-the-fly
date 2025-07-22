@@ -161,7 +161,7 @@
                       :class="{ 'selected-card': computer === computerItem.value }"
                       @click="computer = computerItem.value; computerChanged()"
                       hover
-                      style="cursor: pointer; min-height: 200px;"
+                      style="cursor: pointer; min-height: 220px;"
                       :outlined="computer !== computerItem.value"
                       :color="computer === computerItem.value ? 'primary' : ''"
                     >
@@ -220,12 +220,26 @@
 
               <v-col cols="12">
                 <h3>GPUs</h3>
-                <v-col cols="6" style="margin: 0 auto">
-                  <v-select v-model="selectedgpus" :items="hardwareDataOnlyGPUs()" attach chips label="GPUs" v-on:input="gpuLimit" :menu-props="{ auto: true }" multiple></v-select>
+                <v-col cols="12" style="margin: 0 auto">
+                  <div style="margin-bottom: 30px;" v-if="hardwareDataOnlyGPUs().length === 0" class="text-center text--secondary">
+                    No GPUs Available
+                  </div>
+                  <div v-else class="d-flex flex-wrap" style="margin-bottom: 30px; justify-content: center;">
+                    <v-checkbox
+                      v-for="gpu in hardwareDataOnlyGPUs()"
+                      :key="gpu.value"
+                      :value="gpu.value"
+                      v-model="selectedgpus"
+                      :label="gpu.text"
+                      @change="gpuLimit"
+                      class="mr-4 mb-2"
+                      hide-details
+                    ></v-checkbox>
+                  </div>
                 </v-col>
               </v-col>
 
-              <v-row v-for="spec in hardwareDataNoGPUs()" :key="spec.name" class="spec-row">
+              <v-row v-for="spec in hardwareDataNoGPUs()" :key="spec.hardwareSpecId" class="spec-row">
                 <v-col cols="12">
                   <h3>{{ spec.type }}</h3>
                 </v-col>
@@ -422,14 +436,23 @@
        * Limits the amount of selected GPUs to the maximum amount allowed.
        */
       gpuLimit() {
+        // Allow admins to select unlimited GPUs
+        if (this.isAdmin()) {
+          return
+        }
+
         let max = 1;
         this.hardwareData.forEach((spec) => {
-          if (spec.type === "gpus") max = spec.maximumAmountForUser
+          if (spec.type === "gpu") {
+            // Use the individual GPU limit, not the summary
+            max = spec.maximumAmountForUser
+          }
         })
 
         if (this.selectedgpus.length > max) {
           this.$store.commit('showMessage', { text: `Maximum of ${max} GPUs can be selected.`, color: "red" })
-          this.selectedgpus.pop()
+          // Remove the last selected GPU to stay within the limit
+          this.selectedgpus.splice(-1, 1)
         }
       },
       /**
@@ -439,7 +462,7 @@
       hardwareDataNoGPUs() {
         let data = []
         this.hardwareData.forEach((spec) => {
-          if (spec.type != "gpu" && spec.type !== "gpus") data.push(spec)
+          if (spec.type !== "gpus" && spec.type !== "gpu") data.push(spec)
         })
         return data.sort((a, b) => a.type.localeCompare(b.type))
       },
@@ -450,8 +473,8 @@
       hardwareDataOnlyGPUs() {
         let data = []
         this.hardwareData.forEach((spec) => {
-          if (spec.type == "gpu") {
-            // Only add GPUs that are reservable
+          if (spec.type === "gpu") {
+            // Only add individual GPUs that are reservable (not the summary "gpus" type)
             if (spec.maximumAmountForUser > 0) {
               let obj = { text: `${spec.internalId}: ${spec.format}`, value: spec.hardwareSpecId }
               data.push(obj)
@@ -838,11 +861,12 @@
         
         // Group specs by type
         let gpuSpecs = specs.filter(spec => spec.type === "gpu")
-        let otherSpecs = specs.filter(spec => spec.type !== "gpu").sort((a, b) => a.type.localeCompare(b.type))
+        let otherSpecs = specs.filter(spec => spec.type !== "gpus" && spec.type !== "gpu").sort((a, b) => a.type.localeCompare(b.type))
         
         // Add GPU info
         if (gpuSpecs.length > 0) {
-          let gpuCount = gpuSpecs.reduce((sum, spec) => sum + spec.maximumAmountForUser, 0)
+          // Count actual GPUs (number of GPU specs), not total reservable slots
+          let gpuCount = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
           if (gpuCount > 0) {
             formattedSpecs.push(`${gpuCount} GPU${gpuCount > 1 ? 's' : ''}`)
           }
@@ -877,15 +901,16 @@
         let hardwareList = []
         
         // Group specs by type - GPUs first, then others alphabetically (matching hardware selection order)
-        let gpuSpecs = specs.filter(spec => spec.type === "gpu" || spec.type === "gpus")
-        let otherSpecs = specs.filter(spec => spec.type !== "gpu" && spec.type !== "gpus")
+        let gpuSpecs = specs.filter(spec => spec.type === "gpu")
+        let otherSpecs = specs.filter(spec => spec.type !== "gpus" && spec.type !== "gpu")
         
         // Add GPUs first (matching the order in hardware selection)
         if (gpuSpecs.length > 0) {
-          let gpuCount = gpuSpecs.reduce((sum, spec) => sum + spec.maximumAmountForUser, 0)
+          // Count actual GPUs (number of GPU specs), not total reservable slots
+          let gpuCount = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
           hardwareList.push({ 
             id: 'gpu', 
-            text: `${gpuCount} GPUs`
+            text: `${gpuCount} GPU${gpuCount > 1 ? 's' : ''}`
           })
         }
         

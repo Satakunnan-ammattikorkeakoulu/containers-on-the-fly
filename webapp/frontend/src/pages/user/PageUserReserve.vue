@@ -99,7 +99,7 @@
                       :class="{ 'selected-card': container === containerItem.value }"
                       @click="container = containerItem.value"
                       hover
-                      style="cursor: pointer; min-height: 165px;"
+                      style="cursor: pointer; min-height: 200px;"
                       :outlined="container !== containerItem.value"
                       :color="container === containerItem.value ? 'primary' : ''"
                     >
@@ -118,6 +118,27 @@
                               :style="{ color: container === containerItem.value ? 'white' : '' }"
                             >
                               {{ containerItem.text }}
+                            </div>
+                            <div 
+                              class="text-body-2 mt-1"
+                              :style="{ 
+                                color: container === containerItem.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.7)',
+                                fontSize: '12px',
+                                fontFamily: 'monospace'
+                              }"
+                            >
+                              {{ getContainerImageById(containerItem.value) || 'No image specified' }}
+                            </div>
+                            <div 
+                              v-if="!getContainerPublicById(containerItem.value) && isAdmin()"
+                              class="text-body-2 mt-1"
+                              :style="{ 
+                                color: container === containerItem.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,165,0,0.9)',
+                                fontSize: '11px',
+                                fontWeight: '500'
+                              }"
+                            >
+                              Private
                             </div>
                           </div>
                           <div class="flex-grow-1">
@@ -647,10 +668,7 @@
               _this.allContainers.forEach((container) => {
                 if (container.removed == true) return
                 if (!_this.isAdmin() && container.public == false) return
-                let name = container.name
-                if (container.public == false) name = name + " (private)"
-
-                containers.push({ "value": container.containerId, "text": name })
+                containers.push({ "value": container.containerId, "text": container.name })
               });
               _this.containers = containers
               _this.nextStep()
@@ -835,6 +853,30 @@
           if (container) return container.description
         }
         return ""
+      },
+      /**
+       * Gets the container image name for a specific container ID
+       * @param {number} containerId The container ID to get the image name for
+       * @returns {string} The container image name
+       */
+      getContainerImageById(containerId) {
+        if (this.allContainers) {
+          let container = this.allContainers.find(x => x.containerId == containerId)
+          if (container) return container.imageName
+        }
+        return ""
+      },
+      /**
+       * Gets the container public status for a specific container ID
+       * @param {number} containerId The container ID to get the public status for
+       * @returns {boolean} Whether the container is public
+       */
+      getContainerPublicById(containerId) {
+        if (this.allContainers) {
+          let container = this.allContainers.find(x => x.containerId == containerId)
+          if (container) return container.public
+        }
+        return true // Default to public if not found
       },
       /**
        * Gets the hardware specs for a specific computer ID

@@ -668,8 +668,23 @@
               _this.allContainers.forEach((container) => {
                 if (container.removed == true) return
                 if (!_this.isAdmin() && container.public == false) return
-                containers.push({ "value": container.containerId, "text": container.name })
+                containers.push({ 
+                  "value": container.containerId, 
+                  "text": container.name,
+                  "isPublic": container.public 
+                })
               });
+              
+              // Sort containers: public first (alphabetically), then private (alphabetically)
+              containers.sort((a, b) => {
+                if (a.isPublic === b.isPublic) {
+                  // Same visibility, sort by name
+                  return a.text.localeCompare(b.text)
+                }
+                // Different visibility, public containers first
+                return b.isPublic - a.isPublic
+              })
+              
               _this.containers = containers
               _this.nextStep()
             }

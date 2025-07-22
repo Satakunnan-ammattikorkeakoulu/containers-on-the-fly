@@ -161,24 +161,49 @@
                       :class="{ 'selected-card': computer === computerItem.value }"
                       @click="computer = computerItem.value; computerChanged()"
                       hover
-                      style="cursor: pointer; min-height: 120px;"
+                      style="cursor: pointer; min-height: 200px;"
                       :outlined="computer !== computerItem.value"
                       :color="computer === computerItem.value ? 'primary' : ''"
                     >
-                      <v-card-body style="padding-top: 30px !important;" class="d-flex align-center justify-center pa-4">
-                        <div class="text-center">
-                          <v-icon 
-                            size="32" 
-                            class="mb-2"
-                            :color="computer === computerItem.value ? 'white' : 'primary'"
-                          >
-                            mdi-server
-                          </v-icon>
-                          <div 
-                            class="font-weight-medium"
-                            :style="{ color: computer === computerItem.value ? 'white' : '' }"
-                          >
-                            {{ computerItem.text }}
+                      <v-card-body class="pa-4" style="height: 100%;">
+                        <div class="d-flex flex-column h-100">
+                          <div class="text-center mb-3">
+                            <v-icon 
+                              size="32" 
+                              class="mb-2"
+                              :color="computer === computerItem.value ? 'white' : 'primary'"
+                            >
+                              mdi-server
+                            </v-icon>
+                            <div 
+                              class="font-weight-medium text-h6"
+                              :style="{ color: computer === computerItem.value ? 'white' : '' }"
+                            >
+                              {{ computerItem.text }}
+                            </div>
+                          </div>
+                          <div class="flex-grow-1">
+                            <div 
+                              class="text-body-2 font-weight-medium mb-2"
+                              :style="{ 
+                                color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
+                                fontSize: '12px'
+                              }"
+                            >
+                              Available Hardware
+                            </div>
+                            <div 
+                              v-for="spec in getComputerHardwareList(computerItem.value)" 
+                              :key="spec.id"
+                              class="text-body-2"
+                              :style="{ 
+                                color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
+                                fontSize: '11px',
+                                lineHeight: '1.4'
+                              }"
+                            >
+                              • {{ spec.text }}
+                            </div>
                           </div>
                         </div>
                       </v-card-body>
@@ -787,6 +812,102 @@
           if (container) return container.description
         }
         return ""
+      },
+      /**
+       * Gets the hardware specs for a specific computer ID
+       * @param {number} computerId The computer ID to get the hardware specs for
+       * @returns {Array} The hardware specs array
+       */
+      getComputerHardwareById(computerId) {
+        if (this.allComputers) {
+          let computer = this.allComputers.find(x => x.computerId == computerId)
+          if (computer) return computer.hardwareSpecs
+        }
+        return []
+      },
+      /**
+       * Formats hardware specs for display in computer cards
+       * @param {number} computerId The computer ID to get the formatted specs for
+       * @returns {string} Formatted hardware specs string
+       */
+      getFormattedHardwareSpecs(computerId) {
+        let specs = this.getComputerHardwareById(computerId)
+        if (!specs || specs.length === 0) return "No hardware specs available"
+        
+        let formattedSpecs = []
+        
+        // Group specs by type
+        let gpuSpecs = specs.filter(spec => spec.type === "gpu")
+        let otherSpecs = specs.filter(spec => spec.type !== "gpu").sort((a, b) => a.type.localeCompare(b.type))
+        
+        // Add GPU info
+        if (gpuSpecs.length > 0) {
+          let gpuCount = gpuSpecs.reduce((sum, spec) => sum + spec.maximumAmountForUser, 0)
+          if (gpuCount > 0) {
+            formattedSpecs.push(`${gpuCount} GPU${gpuCount > 1 ? 's' : ''}`)
+          }
+        }
+        
+        // Add other specs (limit to first 2-3 most important ones)
+        let prioritySpecs = otherSpecs.slice(0, 2)
+        prioritySpecs.forEach(spec => {
+          if (spec.maximumAmountForUser > 0) {
+            // Clean up the display format
+            let displayName = spec.type
+            if (spec.type === "cpus") displayName = "CPUs"
+            else if (spec.type === "memory") displayName = "RAM"
+            else if (spec.type === "storage") displayName = "Storage"
+            else displayName = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
+            
+            formattedSpecs.push(`${spec.maximumAmountForUser} ${spec.format} ${displayName}`)
+          }
+        })
+        
+        return formattedSpecs.length > 0 ? formattedSpecs.join(" • ") : "No resources available"
+      },
+      /**
+       * Gets a list of hardware specs formatted for display in computer cards
+       * @param {number} computerId The computer ID to get the hardware list for
+       * @returns {Array} Array of formatted hardware spec objects
+       */
+      getComputerHardwareList(computerId) {
+        let specs = this.getComputerHardwareById(computerId)
+        if (!specs || specs.length === 0) return [{ id: 'none', text: 'No hardware specs available' }]
+        
+        let hardwareList = []
+        
+        // Group specs by type
+        let gpuSpecs = specs.filter(spec => spec.type === "gpu")
+        let otherSpecs = specs.filter(spec => spec.type !== "gpu").sort((a, b) => a.type.localeCompare(b.type))
+        
+        // Add GPU specs first
+        if (gpuSpecs.length > 0) {
+          let gpuCount = gpuSpecs.reduce((sum, spec) => sum + spec.maximumAmountForUser, 0)
+          if (gpuCount > 0) {
+            hardwareList.push({ 
+              id: 'gpu', 
+              text: `${gpuCount} GPU${gpuCount > 1 ? 's' : ''}` 
+            })
+          }
+        }
+        
+        // Add other specs
+        otherSpecs.forEach(spec => {
+          if (spec.maximumAmountForUser > 0) {
+            let displayName = spec.type
+            if (spec.type === "cpus") displayName = ""
+            else if (spec.type === "memory") displayName = "RAM"
+            else if (spec.type === "storage") displayName = "Storage"
+            else displayName = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
+            
+            hardwareList.push({ 
+              id: spec.hardwareSpecId, 
+              text: `${spec.maximumAmountForUser} ${spec.format} ${displayName}` 
+            })
+          }
+        })
+        
+        return hardwareList.length > 0 ? hardwareList : [{ id: 'none', text: 'No resources available' }]
       },
     },
     computed: {

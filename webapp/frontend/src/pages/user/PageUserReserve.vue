@@ -876,35 +876,44 @@
         
         let hardwareList = []
         
-        // Group specs by type
-        let gpuSpecs = specs.filter(spec => spec.type === "gpu")
-        let otherSpecs = specs.filter(spec => spec.type !== "gpu").sort((a, b) => a.type.localeCompare(b.type))
+        // Group specs by type - GPUs first, then others alphabetically (matching hardware selection order)
+        let gpuSpecs = specs.filter(spec => spec.type === "gpu" || spec.type === "gpus")
+        let otherSpecs = specs.filter(spec => spec.type !== "gpu" && spec.type !== "gpus")
         
-        // Add GPU specs first
+        // Add GPUs first (matching the order in hardware selection)
         if (gpuSpecs.length > 0) {
           let gpuCount = gpuSpecs.reduce((sum, spec) => sum + spec.maximumAmountForUser, 0)
-          if (gpuCount > 0) {
-            hardwareList.push({ 
-              id: 'gpu', 
-              text: `${gpuCount} GPU${gpuCount > 1 ? 's' : ''}` 
-            })
-          }
+          hardwareList.push({ 
+            id: 'gpu', 
+            text: `${gpuCount} GPUs`
+          })
         }
         
-        // Add other specs
-        otherSpecs.forEach(spec => {
-          if (spec.maximumAmountForUser > 0) {
-            let displayName = spec.type
-            if (spec.type === "cpus") displayName = ""
-            else if (spec.type === "memory") displayName = "RAM"
-            else if (spec.type === "storage") displayName = "Storage"
-            else displayName = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
-            
-            hardwareList.push({ 
-              id: spec.hardwareSpecId, 
-              text: `${spec.maximumAmountForUser} ${spec.format} ${displayName}` 
-            })
+        // Add other specs sorted alphabetically (matching hardwareDataNoGPUs method)
+        let sortedOtherSpecs = [...otherSpecs].sort((a, b) => a.type.localeCompare(b.type))
+        
+        sortedOtherSpecs.forEach(spec => {
+          let displayName = spec.type
+          let text = ""
+          
+          if (spec.type === "cpus") {
+            displayName = "CPUs"
+            text = `${spec.maximumAmountForUser} ${displayName}`
+          } else if (spec.type === "memory") {
+            displayName = "RAM"
+            text = `${spec.maximumAmountForUser} ${spec.format} ${displayName}`
+          } else if (spec.type === "storage") {
+            displayName = "Storage"
+            text = `${spec.maximumAmountForUser} ${spec.format} ${displayName}`
+          } else {
+            displayName = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
+            text = `${spec.maximumAmountForUser} ${spec.format} ${displayName}`
           }
+          
+          hardwareList.push({ 
+            id: spec.hardwareSpecId || spec.type, 
+            text: text
+          })
         })
         
         return hardwareList.length > 0 ? hardwareList : [{ id: 'none', text: 'No resources available' }]

@@ -463,6 +463,7 @@
           // Initialize duration defaults when step 2 becomes active
           this.initializeDurationDefaultsIfNeeded()
       
+          this.container = null
           this.computer = null
         }
       },

@@ -34,10 +34,53 @@ async def getOwnReservations(reservationId: int, token: str = Depends(oauth2_sch
 @router.post("/create_reservation")
 async def CreateReservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", token: str = Depends(oauth2_scheme)):
   ForceAuthentication(token)
+  
+  # Validate date parameter
+  if not date or not isinstance(date, str) or len(date) > 50:
+    return Response(False, "Invalid date parameter.")
+  
+  # Validate duration
+  if not isinstance(duration, int) or duration <= 0 or duration > 8760:  # Max 1 year
+    return Response(False, "Invalid duration parameter.")
+  
+  # Validate computer and container IDs
+  if not isinstance(computerId, int) or computerId <= 0:
+    return Response(False, "Invalid computer ID.")
+  if not isinstance(containerId, int) or containerId <= 0:
+    return Response(False, "Invalid container ID.")
+  
+  # Validate and sanitize email
+  if adminReserveUserEmail:
+    adminReserveUserEmail = str(adminReserveUserEmail).strip()
+    if len(adminReserveUserEmail) > 255:
+      return Response(False, "Admin email address too long.")
+    # Basic email validation
+    import re
+    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', adminReserveUserEmail):
+      return Response(False, "Invalid admin email format.")
+  
+  # Validate and sanitize description
+  if description:
+    description = str(description).strip()
+    if len(description) > 50:
+      return Response(False, "Description too long (max 50 characters).")
+    # Remove potentially harmful characters
+    description = re.sub(r'[<>"\']', '', description)
+  
+  # Validate hardwareSpecs JSON
   try:
     hardwareSpecs = json.loads(hardwareSpecs)
-  except:
-    return Response(False, "Error.")
+    if not isinstance(hardwareSpecs, dict):
+      return Response(False, "Hardware specs must be a valid JSON object.")
+    
+    # Validate each hardware spec
+    for key, val in hardwareSpecs.items():
+      if not isinstance(key, str) or not key.isdigit():
+        return Response(False, "Invalid hardware spec ID format.")
+      if not isinstance(val, (int, float)) or val < 0:
+        return Response(False, "Invalid hardware spec amount.")
+  except (json.JSONDecodeError, ValueError, TypeError):
+    return Response(False, "Invalid hardware specs JSON format.")
   
   userId = CheckToken(token)["data"]["userId"]
   return functionality.createReservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description)

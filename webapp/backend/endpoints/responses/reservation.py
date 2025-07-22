@@ -93,6 +93,12 @@ def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = Non
     for computer in computers:
       for spec in computer["hardwareSpecs"]:
         spec["maximumAmountForUser"] = spec["maximumAmount"]
+  else:
+    # Enforce GPU limit for non-admin users (max 1 GPU)
+    for computer in computers:
+      for spec in computer["hardwareSpecs"]:
+        if spec["type"] == "gpu" and spec["maximumAmountForUser"] > 1:
+          spec["maximumAmountForUser"] = 1
 
   for computer in computers:
     for spec in computer["hardwareSpecs"]:
@@ -282,6 +288,10 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     container = session.query(Container).filter( Container.containerId == containerId ).first()
     if (container == None):
       return Response(False, "Container not found.")
+    
+    # Verify user can access this container
+    if container.public == False and not isAdmin:
+      return Response(False, "Access denied to private container.")
 
     # Make sure that user can only have one queued / started server at once (admins can have unlimited)
     userActiveReservations = session.query(Reservation).filter(
@@ -331,14 +341,35 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
 
     reservation = Reservation(**reservation_data)
 
-    # Append all reserved hardware specs inside the reservation
+    # Add GPU count validation
+    total_gpus_requested = 0
     for key, val in hardwareSpecs.items():
+      hardwareSpec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
+      if hardwareSpec and hardwareSpec.type == "gpu" and val > 0:
+        total_gpus_requested += val
+    
+    # Validate total GPU count for non-admins (max 1 GPU per reservation)
+    if not isAdmin and total_gpus_requested > 1:
+      return Response(False, "You can only reserve 1 GPU at a time.")
+    
+    # Enhanced hardware specification validation
+    for key, val in hardwareSpecs.items():
+      # Validate hardware spec exists
+      hardwareSpec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
+      if not hardwareSpec:
+        return Response(False, f"Invalid hardware specification ID: {key}")
+      
+      # Validate amount bounds
+      if val < 0:
+        return Response(False, f"Invalid negative amount for {hardwareSpec.type}")
+      if val > hardwareSpec.maximumAmount:
+        return Response(False, f"Requested amount exceeds available resources for {hardwareSpec.type}: {val} > {hardwareSpec.maximumAmount}")
+      
       # Check that the amount does not exceed user limits for the given hardware
       # Skipped for admins
-      hardwareSpec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
-      
       if val > hardwareSpec.maximumAmountForUser and isAdmin == False:
         return Response(False, f"Trying to utilize hardware specs above the user maximum amount for {hardwareSpec.type} {hardwareSpec.format}: {val} > {hardwareSpec.maximumAmountForUser}")
+      
       # Only add resources over 0
       if val > 0:
         reservation.reservedHardwareSpecs.append(

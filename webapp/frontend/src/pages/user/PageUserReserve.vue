@@ -252,12 +252,14 @@
       pickedDate: (new Date(Date.now() - (new Date()).getTimezoneOffset() * 60000)).toISOString().substr(0, 10),
       pickedHour: {},
       reservableHours: [],
+      reservableDays: [],
       adminReserveUserEmail: null,
       reservationDescription: "", // Description for the reservation
       hours: [],
       refreshTip: false, // True if there were not enough resources for reservation, shows a tip to refresh hardware data
       reserveDurationDays: null,
       reserveDurationHours: null,
+      initializingDefaults: false, // Flag to prevent watchers from interfering during initialization
       fetchingReservations: false, // True if we are fetching all current and upcoming reservations
       allReservations: null, // Contains all current reservations
       fetchingComputers: false, // True if we are fetching computers and their hardware data from the server
@@ -278,22 +280,11 @@
     mounted() {
       let d = new Date()
 
-      // Generate days dropdown from minimum to maximum
-      let maxDays = this.isAdmin() ? 60 : this.maximumDurationDays
-      let minDays = this.minimumDurationDays
-      
-      let days = []
-      for (let i = minDays; i <= maxDays; i++) {
-        days.push( { "text": i + " days", "value": i } )
+      // Initialize duration defaults if store config is already loaded
+      if (this.$store.state.configLoaded) {
+        this.initializeDurationDefaults()
       }
-      this.reservableDays = days
-
-      // Generate initial hours dropdown and set default values
-      this.updateHoursDropdown(minDays)
-      
-      // Set initial default values to minimum allowed
-      this.reserveDurationDays = minDays
-      this.reserveDurationHours = this.minimumDurationHours
+      // Otherwise, the watcher will handle initialization when config loads
 
       let dayHours = []
       for (let i = 0; i < 24; i++) {
@@ -391,6 +382,8 @@
 
         // If going back to step 2 (select reservation duration), reset all selected containers, computers and hardware specs
         if (this.step == 2) {
+          // Initialize duration defaults when step 2 becomes active
+          this.initializeDurationDefaultsIfNeeded()
       
           this.computer = null
         }
@@ -406,8 +399,8 @@
           }
           this.reserveDate = dayjs().toISOString()
           this.reserveType = "now"
-          this.reserveDurationDays = 0
-          this.reserveDurationHours = 0
+          this.reserveDurationDays = this.minimumDurationDays
+          this.reserveDurationHours = this.minimumDurationHours
           this.nextStep()
         })
       },
@@ -422,8 +415,8 @@
             return this.$store.commit('showMessage', { text: res, color: "red" })
           }
           this.reserveDate = time.toISOString()
-          this.reserveDurationDays = 0
-          this.reserveDurationHours = 0
+          this.reserveDurationDays = this.minimumDurationDays
+          this.reserveDurationHours = this.minimumDurationHours
           this.nextStep()
         })
       },
@@ -657,9 +650,51 @@
         
         this.reservableHours = hours
         
-        // Reset hour selection if current value is not in the new range
-        if (this.reserveDurationHours < minHours || this.reserveDurationHours > maxHours) {
+        // Reset hour selection if current value is not in the new range or is null
+        if (this.reserveDurationHours === null || this.reserveDurationHours < minHours || this.reserveDurationHours > maxHours) {
           this.reserveDurationHours = minHours
+        }
+      },
+      /**
+       * Initialize duration defaults when store data is available
+       */
+      initializeDurationDefaults() {
+        this.initializingDefaults = true
+        
+        // Generate days dropdown from minimum to maximum
+        let maxDays = this.isAdmin() ? 60 : this.maximumDurationDays
+        let minDays = this.minimumDurationDays
+        
+        let days = []
+        for (let i = minDays; i <= maxDays; i++) {
+          let text = i === 1 ? i + " day" : i + " days"
+          days.push( { "text": text, "value": i } )
+        }
+        this.reservableDays = days
+
+        // Generate initial hours dropdown first
+        this.updateHoursDropdown(minDays)
+        
+        // Then set initial default values to minimum allowed (this will trigger the watcher)
+        this.reserveDurationDays = minDays
+        this.reserveDurationHours = this.minimumDurationHours
+        
+        // Use nextTick to ensure watchers complete before clearing the flag
+        this.$nextTick(() => {
+          this.initializingDefaults = false
+        })
+      },
+      /**
+       * Initialize duration defaults only if they haven't been set yet and config is loaded
+       */
+      initializeDurationDefaultsIfNeeded() {
+        if (!this.$store.state.configLoaded) {
+          return
+        }
+        
+        // Only set defaults if no values are currently selected
+        if (this.reserveDurationDays === null || this.reserveDurationHours === null) {
+          this.initializeDurationDefaults()
         }
       },
     },
@@ -705,10 +740,31 @@
        * Watch for changes in selected days and update hours dropdown accordingly
        */
       reserveDurationDays(newDays) {
+        // Don't interfere if we're currently initializing defaults
+        if (this.initializingDefaults) {
+          return
+        }
+        
         if (newDays !== null && newDays !== undefined) {
           this.updateHoursDropdown(newDays)
         }
-      }
+      },
+      /**
+       * Watch for when app config is loaded from store
+       */
+      '$store.state.configLoaded'(isLoaded) {
+        if (isLoaded && this.reservableDays.length === 0) {
+          this.initializeDurationDefaults()
+        }
+      },
+      /**
+       * Watch for step changes to initialize defaults when step 2 becomes active
+       */
+      step(newStep) {
+        if (newStep === 2) {
+          this.initializeDurationDefaultsIfNeeded()
+        }
+      },
     }
   }
 </script>

@@ -1,7 +1,6 @@
 from database import User, Session, UserWhitelist, UserBlacklist
-from helpers.tables.SystemSetting import getSetting
+from settings_handler import getSetting
 from helpers.server import Response
-from settings import settings
 from helpers.auth import CreateLoginToken, HashPassword, IsCorrectPassword, CheckToken, GetLDAPUser, GetRole
 from fastapi import HTTPException, status
 from datetime import datetime, timezone
@@ -23,9 +22,9 @@ def login(username, password):
 
   with Session() as session:
     # Get auth settings from database
-    loginType = getSetting('auth.loginType', 'password', 'text')
-    useWhitelisting = getSetting('access.whitelistEnabled', False, 'boolean')
-    useBlacklisting = getSetting('access.blacklistEnabled', False, 'boolean')
+    loginType = getSetting('auth.loginType')
+    useWhitelisting = getSetting('access.whitelistEnabled')
+    useBlacklisting = getSetting('access.blacklistEnabled')
 
     # Look up user by email first for any auth type
     user = session.query(User).filter(User.email == username).first()

@@ -5,11 +5,10 @@ import hmac
 import random
 import string
 from database import User, Session, UserWhitelist
-from helpers.tables.SystemSetting import getSetting
+from settings_handler import getSetting
 import helpers.server
 #import ldap3 as ldap
 import ldap
-from settings import settings
 from datetime import timedelta
 import datetime
 import string
@@ -80,8 +79,8 @@ def CheckToken(token : str) -> object:
   if token == "" or token is None: return helpers.server.Response(False, "Token cannot be empty.")
 
   def timeNow(): return datetime.datetime.now(datetime.timezone.utc)
-  from helpers.tables.SystemSetting import getSetting
-  session_timeout = getSetting('auth.sessionTimeoutMinutes', 1440, 'integer')
+  from settings_handler import getSetting
+  session_timeout = getSetting('auth.sessionTimeoutMinutes')
   minStartDate = timeNow() - timedelta(minutes=session_timeout)
 
   with Session() as session:
@@ -141,22 +140,22 @@ def create_password(length = 40):
   return random_password
 
 def GetLDAPUser(username, password):
-  from helpers.tables.SystemSetting import getSetting
+  from settings_handler import getSetting
   
   # Get LDAP settings from database
-  ldap_url = getSetting('auth.ldap.url', '', 'text')
-  username_format = getSetting('auth.ldap.usernameFormat', '', 'text')
-  password_format = getSetting('auth.ldap.passwordFormat', '', 'text') 
-  ldap_domain = getSetting('auth.ldap.domain', '', 'text')
-  search_method = getSetting('auth.ldap.searchMethod', '', 'text')
-  account_field = getSetting('auth.ldap.accountField', '', 'text')
-  email_field = getSetting('auth.ldap.emailField', '', 'text')
+  ldap_url = getSetting('auth.ldap.url')
+  username_format = getSetting('auth.ldap.usernameFormat')
+  password_format = getSetting('auth.ldap.passwordFormat') 
+  ldap_domain = getSetting('auth.ldap.domain')
+  search_method = getSetting('auth.ldap.searchMethod')
+  account_field = getSetting('auth.ldap.accountField')
+  email_field = getSetting('auth.ldap.emailField')
   
   # Check if LDAP is properly configured
   if not all([ldap_url, username_format, password_format, ldap_domain, search_method, account_field, email_field]):
     return False, "LDAP is not properly configured"
     
-  useWhitelisting = getSetting('access.whitelistEnabled', False, 'boolean')
+  useWhitelisting = getSetting('access.whitelistEnabled')
   # Disable certificate checks
   ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
   l = ldap.initialize(ldap_url)

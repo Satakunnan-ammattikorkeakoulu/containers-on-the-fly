@@ -9,7 +9,7 @@ def getPublicConfig() -> object:
         object: Response object with public configuration data.
     '''
     try:
-        from helpers.tables.SystemSetting import getMultipleSettings
+        from settings_handler import getMultipleSettings
         
         # Define public settings keys that don't require admin access
         setting_keys = [

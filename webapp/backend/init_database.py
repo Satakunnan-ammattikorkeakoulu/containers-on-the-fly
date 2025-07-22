@@ -5,7 +5,7 @@ Database initialization script that handles both new and existing environments
 import sys
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
-from settings import settings
+from settings_handler import settings_handler
 import subprocess
 import os
 from database import Base, engine, Session  # Import Session as well

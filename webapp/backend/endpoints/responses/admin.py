@@ -781,7 +781,7 @@ def getGeneralSettings() -> object:
         object: Response object with all settings organized by section.
     '''
     try:
-        from helpers.tables.SystemSetting import getSetting, getMultipleSettings
+        from settings_handler import getSetting, getMultipleSettings
         from helpers.tables.UserAccessControl import getBlacklistedEmails, getWhitelistedEmails
         
         # Define all settings with their defaults
@@ -899,40 +899,40 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
         object: Response object indicating success/failure
     '''
     try:
-        from helpers.tables.SystemSetting import setSetting
+        from settings_handler import setSetting
         from helpers.tables.UserAccessControl import setBlacklistedEmails, setWhitelistedEmails
         
         if section == "general":
             # Save general application settings
             if 'applicationName' in settings:
-                setSetting('general.applicationName', settings['applicationName'], 'text', 'Application name displayed throughout the system')
+                setSetting('general.applicationName', settings['applicationName'])
             if 'timezone' in settings:
-                setSetting('general.timezone', settings['timezone'], 'text', 'System timezone for proper scheduling and logging')
+                setSetting('general.timezone', settings['timezone'])
             if 'reservationMinDuration' in settings:
                 min_duration = 5 if not settings['reservationMinDuration'] else settings['reservationMinDuration']
-                setSetting('reservation.minimumDuration', min_duration, 'integer', 'Minimum duration for container reservations in hours')
+                setSetting('reservation.minimumDuration', min_duration)
             if 'reservationMaxDuration' in settings:
                 max_duration = 72 if not settings['reservationMaxDuration'] else settings['reservationMaxDuration']
-                setSetting('reservation.maximumDuration', max_duration, 'integer', 'Maximum duration for container reservations in hours')
+                setSetting('reservation.maximumDuration', max_duration)
             
             # Save instruction settings using new naming scheme
             if 'loginPageInfo' in settings:
-                setSetting('instructions.login', settings['loginPageInfo'], 'text', 'Information displayed on login page')
+                setSetting('instructions.login', settings['loginPageInfo'])
             if 'reservationPageInstructions' in settings:
-                setSetting('instructions.reservation', settings['reservationPageInstructions'], 'text', 'Instructions on reservation page')
+                setSetting('instructions.reservation', settings['reservationPageInstructions'])
             if 'emailInstructions' in settings:
-                setSetting('instructions.email', settings['emailInstructions'], 'text', 'Instructions included in emails')
+                setSetting('instructions.email', settings['emailInstructions'])
             if 'usernameFieldLabel' in settings:
-                setSetting('instructions.usernameFieldLabel', settings['usernameFieldLabel'], 'text', 'Username field label on login page')
+                setSetting('instructions.usernameFieldLabel', settings['usernameFieldLabel'])
             if 'passwordFieldLabel' in settings:
-                setSetting('instructions.passwordFieldLabel', settings['passwordFieldLabel'], 'text', 'Password field label on login page')
+                setSetting('instructions.passwordFieldLabel', settings['passwordFieldLabel'])
                 
         elif section == "access":
             # Save access control settings
             if 'blacklistEnabled' in settings:
-                setSetting('access.blacklistEnabled', settings['blacklistEnabled'], 'boolean', 'Enable email blacklist')
+                setSetting('access.blacklistEnabled', settings['blacklistEnabled'])
             if 'whitelistEnabled' in settings:
-                setSetting('access.whitelistEnabled', settings['whitelistEnabled'], 'boolean', 'Enable email whitelist')
+                setSetting('access.whitelistEnabled', settings['whitelistEnabled'])
             if 'blacklistedEmails' in settings:
                 setBlacklistedEmails(settings['blacklistedEmails'])
             if 'whitelistedEmails' in settings:
@@ -941,58 +941,58 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
         elif section == "email":
             # Save email configuration
             if 'smtpServer' in settings:
-                setSetting('email.smtpServer', settings['smtpServer'], 'text', 'SMTP server address')
+                setSetting('email.smtpServer', settings['smtpServer'])
             if 'smtpPort' in settings:
-                setSetting('email.smtpPort', settings['smtpPort'], 'integer', 'SMTP server port')
+                setSetting('email.smtpPort', settings['smtpPort'])
             if 'smtpUsername' in settings:
-                setSetting('email.smtpUsername', settings['smtpUsername'], 'text', 'SMTP username')
+                setSetting('email.smtpUsername', settings['smtpUsername'])
             if 'smtpPassword' in settings:
-                setSetting('email.smtpPassword', settings['smtpPassword'], 'text', 'SMTP password')
+                setSetting('email.smtpPassword', settings['smtpPassword'])
             if 'fromEmail' in settings:
-                setSetting('email.fromEmail', settings['fromEmail'], 'email', 'From email address')
+                setSetting('email.fromEmail', settings['fromEmail'])
                 
         elif section == "contact":
             # Save contact email separately
             if 'contactEmail' in settings:
-                setSetting('email.contactEmail', settings['contactEmail'], 'email', 'Admin contact email')
+                setSetting('email.contactEmail', settings['contactEmail'])
                 
         elif section == "emailEnable":
             # Save email enable setting
             if 'sendEmail' in settings:
-                setSetting('email.sendEmail', settings['sendEmail'], 'boolean', 'Enable sending emails from the system')
+                setSetting('email.sendEmail', settings['sendEmail'])
                 
         elif section == "notifications":
             # Save notification settings
             if 'containerAlertsEnabled' in settings:
-                setSetting('notifications.containerAlertsEnabled', settings['containerAlertsEnabled'], 'boolean', 'Enable container failure alerts')
+                setSetting('notifications.containerAlertsEnabled', settings['containerAlertsEnabled'])
             if 'alertEmails' in settings:
-                setSetting('notifications.alertEmails', settings['alertEmails'], 'json', 'Email addresses for alerts')
+                setSetting('notifications.alertEmails', settings['alertEmails'])
         
         elif section == "auth":
             # Save authentication settings
             if 'loginType' in settings:
-                setSetting('auth.loginType', settings['loginType'], 'text', 'Authentication method (password, LDAP, hybrid)')
+                setSetting('auth.loginType', settings['loginType'])
             if 'sessionTimeoutMinutes' in settings:
                 timeout = 1440 if not settings['sessionTimeoutMinutes'] else settings['sessionTimeoutMinutes']
-                setSetting('auth.sessionTimeoutMinutes', timeout, 'integer', 'Session timeout in minutes')
+                setSetting('auth.sessionTimeoutMinutes', timeout)
                 
             # Save LDAP settings if they exist
             if 'ldap' in settings and isinstance(settings['ldap'], dict):
                 ldap_settings = settings['ldap']
                 if 'url' in ldap_settings:
-                    setSetting('auth.ldap.url', ldap_settings['url'], 'text', 'LDAP server URL')
+                    setSetting('auth.ldap.url', ldap_settings['url'])
                 if 'usernameFormat' in ldap_settings:
-                    setSetting('auth.ldap.usernameFormat', ldap_settings['usernameFormat'], 'text', 'LDAP username format')
+                    setSetting('auth.ldap.usernameFormat', ldap_settings['usernameFormat'])
                 if 'passwordFormat' in ldap_settings:
-                    setSetting('auth.ldap.passwordFormat', ldap_settings['passwordFormat'], 'text', 'LDAP password format')
+                    setSetting('auth.ldap.passwordFormat', ldap_settings['passwordFormat'])
                 if 'domain' in ldap_settings:
-                    setSetting('auth.ldap.domain', ldap_settings['domain'], 'text', 'LDAP domain')
+                    setSetting('auth.ldap.domain', ldap_settings['domain'])
                 if 'searchMethod' in ldap_settings:
-                    setSetting('auth.ldap.searchMethod', ldap_settings['searchMethod'], 'text', 'LDAP search method')
+                    setSetting('auth.ldap.searchMethod', ldap_settings['searchMethod'])
                 if 'accountField' in ldap_settings:
-                    setSetting('auth.ldap.accountField', ldap_settings['accountField'], 'text', 'LDAP account field')
+                    setSetting('auth.ldap.accountField', ldap_settings['accountField'])
                 if 'emailField' in ldap_settings:
-                    setSetting('auth.ldap.emailField', ldap_settings['emailField'], 'text', 'LDAP email field')
+                    setSetting('auth.ldap.emailField', ldap_settings['emailField'])
                 
         else:
             return Response(False, f"Unknown section: {section}")
@@ -1013,17 +1013,17 @@ def sendTestEmail(email: str) -> object:
         object: Response object indicating success/failure
     '''
     try:
-        from helpers.tables.SystemSetting import getSetting
+        from settings_handler import getSetting
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
         
         # Get SMTP settings
-        smtp_server = getSetting('email.smtpServer', '')
-        smtp_port = getSetting('email.smtpPort', 587)
-        smtp_username = getSetting('email.smtpUsername', '')
-        smtp_password = getSetting('email.smtpPassword', '')
-        from_email = getSetting('email.fromEmail', '')
+        smtp_server = getSetting('email.smtpServer')
+        smtp_port = getSetting('email.smtpPort')
+        smtp_username = getSetting('email.smtpUsername')
+        smtp_password = getSetting('email.smtpPassword')
+        from_email = getSetting('email.fromEmail')
         
         if not all([smtp_server, smtp_port, smtp_username, smtp_password, from_email]):
             return Response(False, "SMTP configuration is incomplete. Please configure all SMTP settings first.")

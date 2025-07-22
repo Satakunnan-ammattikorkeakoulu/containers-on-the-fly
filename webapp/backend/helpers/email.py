@@ -2,20 +2,20 @@ import smtplib
 import socket
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from helpers.tables.SystemSetting import getSetting
+from settings_handler import getSetting
 
 def send_email(to, mail_subject, mail_body):
 
     # Check if email sending is enabled
-    if not getSetting('email.sendEmail', False):
+    if not getSetting('email.sendEmail'):
         return
 
     # Get SMTP settings from database
-    smtp_server = getSetting('email.smtpServer', '')
-    smtp_port = getSetting('email.smtpPort', 587)
-    smtp_username = getSetting('email.smtpUsername', '')
-    smtp_password = getSetting('email.smtpPassword', '')
-    from_email = getSetting('email.fromEmail', '')
+    smtp_server = getSetting('email.smtpServer')
+    smtp_port = getSetting('email.smtpPort')
+    smtp_username = getSetting('email.smtpUsername')
+    smtp_password = getSetting('email.smtpPassword')
+    from_email = getSetting('email.fromEmail')
 
     # Check if all required settings are configured
     if not all([smtp_server, smtp_port, smtp_username, smtp_password, from_email]):

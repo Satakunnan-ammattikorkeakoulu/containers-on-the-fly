@@ -1,6 +1,6 @@
 from docker.dockerUtils import stopOrphanDockerContainer, getRunningReservedDockerContainers, getComputerId, getContainerInformation, getRunningReservations, getReservationsRequiringStart, getReservationsRequiringStop, stopDockerContainer, startDockerContainer, getReservationsRequiringRestart, restartDockerContainer
 from time import sleep
-from settings import settings
+from settings_handler import settings_handler
 import datetime
 from datetime import timezone, datetime, timedelta
 import sys
@@ -48,11 +48,11 @@ def updateServerMonitoring():
     try:
         with Session() as session:
             computer = session.query(Computer).filter(
-                Computer.name == settings.docker["serverName"]
+                Computer.name == settings_handler.getSetting("docker.serverName")
             ).first()
             
             if not computer:
-                print(f"Warning: Computer '{settings.docker['serverName']}' not found in database")
+                print(f"Warning: Computer '{settings_handler.getSetting('docker.serverName')}' not found in database")
                 return
             
             # Get or create status record
@@ -252,7 +252,7 @@ def stopFinishedServers():
   global computerId
   reservations = getReservationsRequiringStop(computerId)
   for reservation in reservations:
-    if settings.docker["enabled"] == True:
+    if settings_handler.getSetting("docker.enabled") == True:
       print(timeNow(), ": Stopping Docker server for reservation with reservationId: ",  reservation.reservationId)
       stopDockerContainer(reservation.reservationId)
 
@@ -264,7 +264,7 @@ def startNewServers():
   global computerId
   reservations = getReservationsRequiringStart(computerId)
   for reservation in reservations:
-    if settings.docker["enabled"] == True:
+    if settings_handler.getSetting("docker.enabled") == True:
       print(timeNow(), ": Starting Docker server for reservation with reservationId: ",  reservation.reservationId)
       startDockerContainer(reservation.reservationId)
 
@@ -276,7 +276,7 @@ def restartCrashedServers():
   global computerId
   reservations = getRunningReservations(computerId)
   for reservation in reservations:
-    if settings.docker["enabled"] == True:
+    if settings_handler.getSetting("docker.enabled") == True:
       try:
         containerName, containerState = getContainerInformation(reservation.reservationId)
         #print(containerName, containerState)
@@ -300,7 +300,7 @@ def restartServersRequiringRestart():
   reservations = getReservationsRequiringRestart(computerId)
 
   for reservation in reservations:
-    if settings.docker["enabled"] == True:
+    if settings_handler.getSetting("docker.enabled") == True:
       try:
         restartDockerContainer(reservation.reservationId)
       except Exception as e:
@@ -316,12 +316,12 @@ if __name__ == "__main__":
   print("This software will run infinitely and start / stop servers for reservations." + linesep)
 
   # Check that docker support has been enabled
-  if (settings.docker['enabled'] != True):
+  if (settings_handler.getSetting("docker.enabled") != True):
     print("!!! Docker support has not been enabled, so this script does nothing. Enable it with settings.json setting docker.enabled: true !!!" + linesep)
 
   # Get ID of the computer from the database based on the settings.json key docker.serverName.
   # Exit on any errors
-  serverName = settings.docker["serverName"]
+  serverName = settings_handler.getSetting("docker.serverName")
   if not serverName:
     print("!!! You need to specify the name of the server in settings.json file, in key docker.serverName. The name should be exactly the same as in database !!! Exiting." + linesep)
     sys.exit()

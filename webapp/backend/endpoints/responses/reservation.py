@@ -293,9 +293,9 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
 
     # Check that the duration is between minimum and maximum lengths
     try:
-        from helpers.tables.SystemSetting import getSetting
-        min_duration = getSetting('reservation.minimumDuration', 5)
-        max_duration = getSetting('reservation.maximumDuration', 72)
+        from settings_handler import getSetting
+        min_duration = getSetting('reservation.minimumDuration')
+        max_duration = getSetting('reservation.maximumDuration')
     except Exception:
         # Fallback to default values if database is unavailable
         min_duration = 5
@@ -357,8 +357,8 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     session.add(reservation)
     session.commit()
 
-    from helpers.tables.SystemSetting import getSetting
-    informByEmail = getSetting('email.sendEmail', False)
+    from settings_handler import getSetting
+    informByEmail = getSetting('email.sendEmail')
 
     return Response(True, "Reservation created succesfully!", { "informByEmail": informByEmail })
 

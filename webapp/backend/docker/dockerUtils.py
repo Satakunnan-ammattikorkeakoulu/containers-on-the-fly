@@ -8,7 +8,7 @@ from helpers.email import send_email
 from datetime import timezone
 import datetime
 from helpers.auth import create_password
-from settings import settings
+from settings_handler import settings_handler
 from docker.docker_functionality import get_email_container_started, start_container, stop_container, restart_container
 import random
 import socket
@@ -33,8 +33,8 @@ def get_available_port():
       for usedPort in reservation.reservedContainer.reservedContainerPorts:
         #print("Used port:", usedPort.outsidePort)
         portsInUse.append(usedPort.outsidePort)
-    min = settings.docker["port_range_start"]
-    max = settings.docker["port_range_end"]
+    min = settings_handler.getSetting("docker.port_range_start")
+    max = settings_handler.getSetting("docker.port_range_end")
     availablePorts = []
     for port in range(min, max):
       if port not in portsInUse:
@@ -111,7 +111,7 @@ def startDockerContainer(reservationId: str):
       "cpus": int(hwSpecs['cpus']["amount"]),
       "gpus": gpusString,
       "memory": f"{hwSpecs['ram']['amount']}g",
-      "shm_size": settings.docker["shm_size"],
+      "shm_size": settings_handler.getSetting("docker.shm_size"),
       "ports": portsForContainer,
       "password": sshPassword,
       "dbUserId": reservation.userId,
@@ -179,8 +179,8 @@ def startDockerContainer(reservationId: str):
       reservation.reservedContainer.sshPassword = cont_password
       reservation.reservedContainer.startedAt = timeNow()
       # Send the email
-      from helpers.tables.SystemSetting import getSetting
-      if getSetting('email.sendEmail', False):
+      from settings_handler import getSetting
+      if getSetting('email.sendEmail'):
         body =  get_email_container_started(
           imageName,
           reservation.computer.ip,
@@ -207,8 +207,8 @@ def startDockerContainer(reservationId: str):
       session.commit()
 
       # Send email about the error
-      from helpers.tables.SystemSetting import getSetting
-      if getSetting('email.sendEmail', False):
+      from settings_handler import getSetting
+      if getSetting('email.sendEmail'):
         body = f"Your AI server reservation did not start as there was an error. {os.linesep}{os.linesep}"
         body += f"The error was: {os.linesep}{os.linesep}{errors}{os.linesep}{os.linesep}"
         body += "Please do not reply to this email, this email is sent from a noreply email address."
@@ -216,23 +216,23 @@ def startDockerContainer(reservationId: str):
 
         # Send container failure alerts to admin emails if enabled
         try:
-          from helpers.tables.SystemSetting import getSetting
+          from settings_handler import getSetting
           import smtplib
           from email.mime.multipart import MIMEMultipart
           from email.mime.text import MIMEText
           
-          alerts_enabled = getSetting('notifications.containerAlertsEnabled', False, 'boolean')
+          alerts_enabled = getSetting('notifications.containerAlertsEnabled')
           
           if alerts_enabled:
-            alert_emails = getSetting('notifications.alertEmails', [], 'json')
+            alert_emails = getSetting('notifications.alertEmails')
             
             if alert_emails and len(alert_emails) > 0:
               # Get SMTP settings from database
-              smtp_server = getSetting('email.smtpServer', '')
-              smtp_port = getSetting('email.smtpPort', 587)
-              smtp_username = getSetting('email.smtpUsername', '')
-              smtp_password = getSetting('email.smtpPassword', '')
-              from_email = getSetting('email.fromEmail', '')
+              smtp_server = getSetting('email.smtpServer')
+              smtp_port = getSetting('email.smtpPort')
+              smtp_username = getSetting('email.smtpUsername')
+              smtp_password = getSetting('email.smtpPassword')
+              from_email = getSetting('email.fromEmail')
               
               # Check if SMTP is configured
               if not all([smtp_server, smtp_port, smtp_username, smtp_password, from_email]):

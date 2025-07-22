@@ -14,13 +14,13 @@ from database import (
     Container, ContainerPort, ReservedContainer, ReservedContainerPort,
     Reservation, Computer, HardwareSpec, ReservedHardwareSpec
 )
-from settings import settings
+from settings_handler import settings_handler
 
 # this is the Alembic Config object
 config = context.config
 
 # Configure the database URL from our settings
-config.set_main_option("sqlalchemy.url", settings.database["engineUri"])
+config.set_main_option("sqlalchemy.url", settings_handler.getSetting("database.engineUri"))
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:

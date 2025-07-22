@@ -3,7 +3,7 @@ from python_on_whales import docker
 from helpers.auth import create_password
 from helpers.Utils import removeSpecialCharacters
 from datetime import datetime
-from settings import settings
+from settings_handler import settings_handler
 from python_on_whales.exceptions import NoSuchContainer
 import os
 import shutil
@@ -155,7 +155,7 @@ def start_container(pars):
                 else:
                     volumes.append((host_path, container_path))
 
-        full_image_name = f"{settings.docker['registryAddress']}/{pars['image']}:{pars['image_version']}"
+        full_image_name = f"{settings_handler.getSetting('docker.registryAddress')}/{pars['image']}:{pars['image_version']}"
 
         # RAM disk
         mount_path = "/home/user/ram_disk"
@@ -275,8 +275,8 @@ def get_email_container_started(image, ip, ports, password, includeEmailDetails,
 
     helpText = ""
     if includeEmailDetails:
-        from helpers.tables.SystemSetting import getSetting
-        contact_email = getSetting('email.contactEmail', '')
+        from settings_handler import getSetting
+        contact_email = getSetting('email.contactEmail')
         if contact_email:
             helpText = f"If you need help, contact: {contact_email}{linesep}{linesep}"
 
@@ -307,22 +307,23 @@ def get_email_container_started(image, ip, ports, password, includeEmailDetails,
 
     generalText = ""
     try:
-        from helpers.tables.SystemSetting import getSetting
-        generalText = getSetting('instructions.email', '')
+        from settings_handler import getSetting
+        generalText = getSetting('instructions.email')
     except Exception:
         pass
 
     webAddress = ""
-    if "clientUrl" in settings.app and includeEmailDetails:
-        webAddress = f"You can access your reservations through: {settings.app['clientUrl']}{linesep}{linesep}"
+    client_url = settings_handler.getSetting("app.clientUrl")
+    if client_url and includeEmailDetails:
+        webAddress = f"You can access your reservations through: {client_url}{linesep}{linesep}"
     
     endDateText = ""
     if endDate is not None:
         # Get timezone from database settings
         timezone_name = "UTC"  # Default timezone
         try:
-            from helpers.tables.SystemSetting import getSetting
-            timezone_name = getSetting('general.timezone', 'UTC')
+            from settings_handler import getSetting
+            timezone_name = getSetting('general.timezone')
         except Exception:
             pass
         

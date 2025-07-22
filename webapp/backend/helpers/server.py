@@ -7,7 +7,7 @@ from database import User, Session
 import requests
 import json
 from os import sys
-from settings import settings
+from settings_handler import settings_handler
 
 def Response(status, message, extraData = None):
   response = {
@@ -66,8 +66,9 @@ def ORMObjectToDict(self):
     return dict_
 
 def CheckIp(ip):
-  if "allowedIpAddresses" in settings.admincli: # Check whether the list exists
-    if len(settings.admincli["allowedIpAddresses"])>0 and ip not in settings.admincli["allowedIpAddresses"]:
+  allowed_ips = settings_handler.getSetting("admincli.allowedIpAddresses")
+  if allowed_ips: # Check whether the list exists
+    if len(allowed_ips) > 0 and ip not in allowed_ips:
       raise HTTPException(
         status_code = status.HTTP_403_FORBIDDEN,
         detail = "IP not found in allowed ip list in settings.json. Refusing access.",
@@ -78,15 +79,16 @@ def CheckIp(ip):
 def CallAdminAPI(method, endpoint, token = "", params = {}, data = {}, headers=True):
   if headers == True: headers = {"Authorization": "Bearer " + token}
   else: headers = {}
-  if "address" not in settings.admincli: # Check whether the address exists in settings
+  admin_address = settings_handler.getSetting("admincli.address")
+  if not admin_address: # Check whether the address exists in settings
     print("\nAdmin API Call Failed Exiting App...")
     print("No address specified in settings.json")
     sys.exit()
   if method == "get":
-    response = requests.get("http://" + settings.admincli["address"] + "/api/" + endpoint,
+    response = requests.get("http://" + admin_address + "/api/" + endpoint,
                             params=params, headers=headers)
   elif method == "post":
-    response = requests.post("http://" + settings.admincli["address"] + "/api/" + endpoint,
+    response = requests.post("http://" + admin_address + "/api/" + endpoint,
                             data=data, headers=headers)
   #print(response.text)
   if response.ok != True:

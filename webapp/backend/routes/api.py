@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from endpoints import user, reservation, admin, app
-from settings import settings
+from settings_handler import settings_handler
 from helpers.auth import HashPassword
 from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, UserStorage, Container
 import base64
@@ -15,7 +15,7 @@ router.include_router(app.router)
 
 # Run code here when server starts
 
-if settings.app["production"] == True:
+if settings_handler.getSetting("app.production") == True:
   print("Running server in production mode")
 else:
   print("Running server in development mode")
@@ -40,7 +40,7 @@ with Session() as session:
     ))
     session.commit()
 
-if settings.app["addTestDataInDevelopment"]:    
+if settings_handler.getSetting("app.addTestDataInDevelopment"):    
     # Admin user
     adminUser = session.query(User).filter( User.email == "admin@foo.com" ).first()
     if adminUser is None:
@@ -75,7 +75,7 @@ if settings.app["addTestDataInDevelopment"]:
     computer = session.query(Computer).filter( Computer.name == "server1" ).first()
     if computer is None:
       print("Creating test data: computer named server1")
-      computer = Computer( name = "server1", ip = settings.app["serverIp"], public = True )
+      computer = Computer( name = "server1", ip = settings_handler.getSetting("app.serverIp"), public = True )
       session.add(computer)
       session.commit()
 

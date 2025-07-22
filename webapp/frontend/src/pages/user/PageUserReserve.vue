@@ -904,15 +904,12 @@
         let gpuSpecs = specs.filter(spec => spec.type === "gpu")
         let otherSpecs = specs.filter(spec => spec.type !== "gpus" && spec.type !== "gpu")
         
-        // Add GPUs first (matching the order in hardware selection)
-        if (gpuSpecs.length > 0) {
-          // Count actual GPUs (number of GPU specs), not total reservable slots
-          let gpuCount = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
-          hardwareList.push({ 
-            id: 'gpu', 
-            text: `${gpuCount} GPU${gpuCount > 1 ? 's' : ''}`
-          })
-        }
+        // Always add GPUs first (matching the order in hardware selection)
+        let gpuCount = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
+        hardwareList.push({ 
+          id: 'gpu', 
+          text: `${gpuCount} GPU${gpuCount !== 1 ? 's' : ''}`
+        })
         
         // Add other specs sorted alphabetically (matching hardwareDataNoGPUs method)
         let sortedOtherSpecs = [...otherSpecs].sort((a, b) => a.type.localeCompare(b.type))

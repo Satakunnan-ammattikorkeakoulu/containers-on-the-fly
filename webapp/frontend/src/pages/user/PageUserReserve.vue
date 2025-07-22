@@ -85,35 +85,113 @@
         <v-row v-if="reserveDate != null && reserveDurationDays !== null && reserveDurationHours !== null && !fetchingComputers && allComputers">
           <v-col cols="12">
             <h2>Select Container</h2>
-            <v-row>
-              <v-col cols="6" style="margin: 0 auto">
-                <v-select v-model="container" :items="containers" item-text="text" item-value="value" label="Container"></v-select>
+            <v-row justify="center">
+              <v-col cols="10">
+                <v-row>
+                  <v-col 
+                    v-for="containerItem in containers" 
+                    :key="containerItem.value" 
+                    cols="12" 
+                    sm="6" 
+                    md="4"
+                  >
+                    <v-card 
+                      :class="{ 'selected-card': container === containerItem.value }"
+                      @click="container = containerItem.value"
+                      hover
+                      style="cursor: pointer; min-height: 165px;"
+                      :outlined="container !== containerItem.value"
+                      :color="container === containerItem.value ? 'primary' : ''"
+                    >
+                      <v-card-body class="pa-4" style="height: 100%;">
+                        <div class="d-flex flex-column h-100">
+                          <div class="text-center mb-3">
+                            <v-icon 
+                              size="32" 
+                              class="mb-2"
+                              :color="container === containerItem.value ? 'white' : 'primary'"
+                            >
+                              mdi-docker
+                            </v-icon>
+                            <div 
+                              class="font-weight-medium text-h6"
+                              :style="{ color: container === containerItem.value ? 'white' : '' }"
+                            >
+                              {{ containerItem.text }}
+                            </div>
+                          </div>
+                          <div class="flex-grow-1">
+                            <div 
+                              class="text-body-2"
+                              :style="{ 
+                                color: container === containerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
+                                fontSize: '13px',
+                                lineHeight: '1.3'
+                              }"
+                            >
+                              {{ getContainerDescriptionById(containerItem.value) || 'No description available' }}
+                            </div>
+                          </div>
+                        </div>
+                      </v-card-body>
+                    </v-card>
+                  </v-col>
+                </v-row>
               </v-col>
             </v-row>
           </v-col>
         </v-row>
 
-        <v-row v-if="container">
-          <v-col cols="6" style="margin: 0 auto;">
-            <!-- Readonly v-textarea, text should come from function getContainerDescription() -->
-            <v-textarea :readonly="true" :value="getContainerDescription" :style="{ userSelect: 'none' }" label="Container Description"></v-textarea>
-          </v-col>
-        </v-row>
 
         <!-- Select computer, hardware specs & submit -->
         <v-row v-if="reserveDate != null && reserveDurationDays !== null && reserveDurationHours !== null && !fetchingComputers && allComputers && container" class="section">      
           <v-col cols="12">
             <h2 style="margin-top: 30px;">Select Computer</h2>
-            <v-row>
-              <v-col cols="6" style="margin: 0 auto">
-                <v-select v-model="computer" v-on:change="computerChanged" :items="computers" item-text="text" item-value="value" label="Computer"></v-select>
+            <v-row justify="center">
+              <v-col cols="10">
+                <v-row style="justify-content: center !important;">
+                  <v-col 
+                    v-for="computerItem in computers" 
+                    :key="computerItem.value" 
+                    cols="12" 
+                    sm="6" 
+                    md="4"
+                  >
+                    <v-card 
+                      :class="{ 'selected-card': computer === computerItem.value }"
+                      @click="computer = computerItem.value; computerChanged()"
+                      hover
+                      style="cursor: pointer; min-height: 120px;"
+                      :outlined="computer !== computerItem.value"
+                      :color="computer === computerItem.value ? 'primary' : ''"
+                    >
+                      <v-card-body style="padding-top: 30px !important;" class="d-flex align-center justify-center pa-4">
+                        <div class="text-center">
+                          <v-icon 
+                            size="32" 
+                            class="mb-2"
+                            :color="computer === computerItem.value ? 'white' : 'primary'"
+                          >
+                            mdi-server
+                          </v-icon>
+                          <div 
+                            class="font-weight-medium"
+                            :style="{ color: computer === computerItem.value ? 'white' : '' }"
+                          >
+                            {{ computerItem.text }}
+                          </div>
+                        </div>
+                      </v-card-body>
+                    </v-card>
+                  </v-col>
+                </v-row>
               </v-col>
             </v-row>
           </v-col>
 
           <v-row v-if="computer && hardwareData">
             <v-col cols="12">
-              <h2>Select Hardware</h2>
+              <h2 style="margin-top: 15px;">Select Hardware</h2>
 
               <v-col cols="12">
                 <h3>GPUs</h3>
@@ -697,6 +775,18 @@
           this.initializeDurationDefaults()
         }
       },
+      /**
+       * Gets the container description for a specific container ID
+       * @param {number} containerId The container ID to get the description for
+       * @returns {string} The container description
+       */
+      getContainerDescriptionById(containerId) {
+        if (this.allContainers) {
+          let container = this.allContainers.find(x => x.containerId == containerId)
+          if (container) return container.description
+        }
+        return ""
+      },
     },
     computed: {
       getContainerDescription() {
@@ -796,5 +886,20 @@
 
   .refresh-tip {
     margin-top: 30px;
+  }
+
+  .selected-card {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    transform: translateY(-2px);
+    transition: all 0.3s ease;
+  }
+
+  .v-card:hover {
+    transform: translateY(-1px);
+    transition: all 0.3s ease;
+  }
+
+  .selected-card:hover {
+    transform: translateY(-3px);
   }
 </style>

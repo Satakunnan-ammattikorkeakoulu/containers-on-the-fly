@@ -112,6 +112,11 @@ DATABASE_DEBUG=false
 # Recommended to always keep this on, and then manually remove the test data after setup.
 ADD_TEST_DATA=true
 
+# Set to true to skip actual GPU device dedication (for testing without real GPUs)
+# When enabled, GPU reservation logic runs but containers won't have GPU access
+# Default: false (production mode - actually dedicates GPUs to containers)
+DEBUG_SKIP_GPU_DEDICATION=false
+
 # Docker container shared memory size (e.g., "1g")
 DOCKER_SHM_SIZE="1g"
 

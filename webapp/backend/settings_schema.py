@@ -97,18 +97,6 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.FILE, SettingType.TEXT, required=True,
         description="Name identifier for this container server"
     ),
-    "docker.userMountLocation": SettingSetting(
-        SettingSource.FILE, SettingType.TEXT, required=True,
-        description="Host path for user data mounting"
-    ),
-    "docker.mountUser": SettingSetting(
-        SettingSource.FILE, SettingType.TEXT, required=True,
-        description="System user for container file permissions"
-    ),
-    "docker.mountGroup": SettingSetting(
-        SettingSource.FILE, SettingType.TEXT, required=True,
-        description="System group for container file permissions"
-    ),
     "docker.port_range_start": SettingSetting(
         SettingSource.FILE, SettingType.INTEGER, default=20000,
         description="Start of port range for container services"
@@ -125,19 +113,9 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.FILE, SettingType.TEXT, default="1g",
         description="Shared memory size for containers"
     ),
-    "docker.extraMounts": SettingSetting(
-        SettingSource.FILE, SettingType.JSON, default=[],
-        description="Additional mount points for containers"
-    ),
-    
-    # Admin CLI Configuration (for server-to-server communication)
-    "admincli.address": SettingSetting(
-        SettingSource.FILE, SettingType.TEXT, required=False,
-        description="Admin CLI server address for remote administration"
-    ),
-    "admincli.allowedIpAddresses": SettingSetting(
-        SettingSource.FILE, SettingType.JSON, default=[],
-        description="List of IP addresses allowed for admin CLI access"
+    "docker.debugSkipGpuDedication": SettingSetting(
+        SettingSource.FILE, SettingType.BOOLEAN, default=False,
+        description="Skip actual GPU device dedication for testing (GPU reservation logic still runs)"
     ),
     
     # ===== DATABASE-BASED SETTINGS (User-Configurable) =====

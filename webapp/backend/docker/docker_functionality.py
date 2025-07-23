@@ -101,7 +101,13 @@ def start_container(pars):
         #print(pars["gpus"])
         gpus = None
         if pars["gpus"] != None:
-            gpus = f'"{pars["gpus"]}"'
+            # Check if GPU debug mode is enabled
+            debug_skip_gpu = settings_handler.getSetting("docker.debugSkipGpuDedication")
+            if debug_skip_gpu:
+                print(f"DEBUG: GPU debug mode enabled - skipping GPU dedication for: {pars['gpus']}")
+                gpus = None
+            else:
+                gpus = f'"{pars["gpus"]}"'
 
         # Add volumes and mounts
         volumes = []

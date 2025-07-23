@@ -93,7 +93,7 @@ class SettingsApplier:
         # Convert boolean strings to proper JSON boolean values
         bool_settings = [
             'DATABASE_DEBUG', 'ADD_TEST_DATA', 
-            'MAIN_SERVER_WEB_HTTPS'
+            'MAIN_SERVER_WEB_HTTPS', 'DEBUG_SKIP_GPU_DEDICATION'
         ]
         
         for setting in bool_settings:
@@ -103,6 +103,10 @@ class SettingsApplier:
                     self.settings[setting] = 'true'  # JSON boolean
                 else:
                     self.settings[setting] = 'false'  # JSON boolean
+            else:
+                # Set default value for missing boolean settings
+                if setting == 'DEBUG_SKIP_GPU_DEDICATION':
+                    self.settings[setting] = 'false'  # Default to false (production mode)
                     
         # Validate numeric settings (keep as strings for template replacement)
         numeric_settings = [

@@ -441,7 +441,7 @@ setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-cre
 	@echo "2. Run $(BOLD)make start-docker-utility$(RESET)$(GREEN) to start the Docker utility.$(RESET)\n"
 	@rm -f .server_type
 
-start-docker-utility: apply-settings install-backend-deps init-database ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
+start-docker-utility: apply-settings install-backend-deps ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
 	@echo ""
 	@echo "Verifying that connection to the database can be established..."
 	@CONNECTION_URI=$$(grep '"engineUri"' webapp/backend/settings.json | sed 's/.*"engineUri": "\(.*\)".*/\1/') && \
@@ -499,7 +499,7 @@ start-dev-frontend: apply-settings
 start-dev-backend: apply-settings install-backend-deps init-database
 	cd webapp/backend && $(PYTHON) main.py
 
-start-dev-docker-utility: apply-settings install-backend-deps init-database
+start-dev-docker-utility: apply-settings install-backend-deps
 	cd webapp/backend && $(PYTHON) dockerUtil.py
 
 interactive-docker-settings-creation: # Creates Docker utility settings interactively

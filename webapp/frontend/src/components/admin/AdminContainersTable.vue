@@ -8,6 +8,17 @@
       :sort-desc="true"
       class="elevation-1">
 
+      <!-- Public status with colored labels -->
+      <template v-slot:item.public="{item}">
+        <v-chip
+          :color="item.public ? 'green' : 'orange'"
+          text-color="white"
+          small
+        >
+          {{ item.public ? 'Public' : 'Private' }}
+        </v-chip>
+      </template>
+
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
         <a class="link-action" @click="emitEditContainer(item.containerId)">Edit Container</a>

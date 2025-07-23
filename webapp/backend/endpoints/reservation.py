@@ -5,6 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import reservation as functionality
 from endpoints.models.reservation import ReservationFilters
 import json
+import re
 
 router = APIRouter(
     prefix="/api/reservation",
@@ -55,7 +56,6 @@ async def CreateReservation(date: str, duration: int, computerId: int, container
     if len(adminReserveUserEmail) > 255:
       return Response(False, "Admin email address too long.")
     # Basic email validation
-    import re
     if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', adminReserveUserEmail):
       return Response(False, "Invalid admin email format.")
   

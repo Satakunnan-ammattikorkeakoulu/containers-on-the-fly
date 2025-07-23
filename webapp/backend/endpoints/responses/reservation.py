@@ -419,7 +419,9 @@ def extendReservation(userId : int, reservationId: str, duration: int):
       reservationCheck = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
       if reservationCheck is None: return Response(False, "No reservation found for this user.")
 
-    reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
+    reservation = session.query(Reservation)\
+      .options(joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec))\
+      .filter( Reservation.reservationId == reservationId ).first()
     if reservation is None: return Response(False, "No reservation found.")
     
     if reservation.status != "started":
@@ -429,12 +431,33 @@ def extendReservation(userId : int, reservationId: str, duration: int):
     if duration < 0 or duration > 24:
       return Response(False, "Duration must be between 0 and 24 hours.")
 
+    # First check if specific GPUs are still available during the extension period
+    endTimeString = reservation.endDate.strftime("%Y-%m-%d %H:%M:%S")
+    extendedEndDate = reservation.endDate + relativedelta(hours=+duration)
+    
+    # Check for GPU conflicts specifically
+    for spec in reservation.reservedHardwareSpecs:
+      if spec.hardwareSpec.type == "gpu" and spec.amount > 0:
+        # Check if this specific GPU is reserved by another reservation during the extension period
+        conflictingReservation = session.query(Reservation)\
+          .join(ReservedHardwareSpec)\
+          .filter(
+            ReservedHardwareSpec.hardwareSpecId == spec.hardwareSpecId,
+            ReservedHardwareSpec.amount > 0,
+            Reservation.reservationId != reservationId,
+            Reservation.startDate < extendedEndDate,
+            Reservation.endDate > reservation.endDate,
+            (Reservation.status == "reserved") | (Reservation.status == "started")
+          ).first()
+        
+        if conflictingReservation:
+          return Response(False, f"Cannot extend reservation: GPU {spec.hardwareSpec.format} (ID: {spec.hardwareSpec.internalId}) is already reserved by another user during the requested extension period.")
+
     # Check that there are enough resources for the reservation extension
     # Reducable specs comes from the current reservation
     reducableSpecs = {}
     for spec in reservation.reservedHardwareSpecs:
       reducableSpecs[spec.hardwareSpecId] = spec.amount
-    endTimeString = reservation.endDate.strftime("%Y-%m-%d %H:%M:%S")
     getAvailableHardwareResponse = getAvailableHardware(endTimeString, duration, reducableSpecs, False, reservation.reservationId)
     if getAvailableHardwareResponse["status"]:
       # Extend the reservation

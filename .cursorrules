@@ -110,6 +110,17 @@
 - Follow existing Make targets for deployment
 - Consider backwards compatibility for existing installations
 
+# Backend Settings Architecture:
+- Settings handler: webapp/backend/settings_handler.py (unified interface)
+- Settings schema: webapp/backend/settings_schema.py (all settings definitions)
+- Two types of settings:
+  * File-based: Infrastructure config in settings.json (ports, IPs, paths)
+  * Database: Runtime config in SystemSetting table (emails, features)
+- Always add new settings to settings_schema.py with proper type and default
+- Access settings: settings_handler.getSetting("category.settingName")
+- File settings workflow: settings_example → apply_settings.py → backend_settings.json
+- Boolean settings need to be added to bool_settings list in apply_settings.py
+
 ### Development Commands
 # Common development workflows:
 - `make start-dev-frontend` - Start frontend development server

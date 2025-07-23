@@ -103,6 +103,35 @@ alembic upgrade head   # Apply database migrations
 - Backend settings: Generated as `webapp/backend/settings.json`
 - Frontend settings: Generated as `webapp/frontend/public/settings.js`
 
+### Backend Settings Architecture
+The backend uses a unified settings system that handles both file-based and database settings:
+
+- **Settings Handler**: `webapp/backend/settings_handler.py` - Unified interface for all settings
+- **Settings Schema**: `webapp/backend/settings_schema.py` - Defines all settings with types, defaults, and validation
+- **Two Types of Settings**:
+  1. **File-based settings**: Infrastructure config (ports, IPs, paths) stored in `settings.json`
+  2. **Database settings**: Runtime config (emails, features) stored in `SystemSetting` table
+
+### Adding New Settings
+When adding a new setting, you must:
+1. Add it to `webapp/backend/settings_schema.py` with proper type and default value
+2. For file-based settings:
+   - Add to `user_config/settings_example`
+   - Add to `user_config/templates/backend_settings.json` if needed by backend
+   - Add to boolean/numeric lists in `scripts/apply_settings.py` if applicable
+3. Access settings using: `settings_handler.getSetting("category.settingName")`
+
+Example:
+```python
+# In settings_schema.py
+"docker.debugSkipGpuDedication": SettingSetting(
+    SettingSource.FILE, SettingType.BOOLEAN, default=False,
+    description="Skip GPU dedication for testing"
+)
+
+# In code
+debug_mode = settings_handler.getSetting("docker.debugSkipGpuDedication")
+
 ### Multi-Server Architecture
 - **Main Server**: Web interface, database, Docker registry
 - **Container Servers**: Remote Docker hosts for container execution

@@ -14,14 +14,11 @@
     <!-- Reservation Calendar -->
     <v-row v-if="showCalendar" class="section">
       <v-col cols="12">
-        <h3 style="margin-bottom: 20px;">Reservation Calendar</h3>
-        <div style="text-align: right; margin-bottom: 10px;">
-          <p style="margin-bottom: 0px;"><small>All times are in timezone <strong>{{globalTimezone}}</strong></small></p>
-          <p><small><a @click="refreshCalendarReservations">Refresh reservations</a></small></p>
-        </div>
+        <h3 style="margin-bottom: 10px;">Reservation Calendar</h3>
+        <p style="margin-bottom: 20px; color: #666; font-size: 14px;">All times are in timezone <strong>{{globalTimezone}}</strong></p>
         <CalendarReservations 
-          v-if="allReservations" 
-          :propReservations="allReservations" 
+          v-if="showCalendar" 
+          :propReservations="allReservations || []" 
           :readOnly="true"
           @slotSelected="handleSlotSelected"
           @reservationsRefreshed="handleReservationsRefreshed"
@@ -115,7 +112,7 @@
       modalConnectionDetailsVisible: false,
       modalConnectionDetailsReservationId: null,
       showCalendar: false,
-      allReservations: [],
+      allReservations: null,
       fetchingAllReservations: false,
       AppSettings: AppSettings
     }),
@@ -349,12 +346,21 @@
         this.modalConnectionDetailsReservationId = reservationId
       },
       toggleCalendarView() {
+        console.log('[DEBUG] toggleCalendarView called, current state:', this.showCalendar)
         this.showCalendar = !this.showCalendar;
+        console.log('[DEBUG] New calendar state:', this.showCalendar)
+        
         if (this.showCalendar) {
-          this.fetchAllReservations();
+          console.log('[DEBUG] Calendar shown, will fetch all reservations')
+          // Use nextTick to ensure calendar component is mounted before fetching
+          this.$nextTick(() => {
+            console.log('[DEBUG] nextTick - fetching all reservations')
+            this.fetchAllReservations();
+          });
         }
       },
       fetchAllReservations() {
+        console.log('[DEBUG] fetchAllReservations called')
         let _this = this;
         _this.fetchingAllReservations = true;
         let currentUser = this.$store.getters.user;
@@ -365,10 +371,11 @@
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
-          //console.log(response)
+          console.log('[DEBUG] fetchAllReservations response:', response)
             // Success
             if (response.data.status == true) {
-              _this.allReservations = response.data.data.reservations;
+              _this.allReservations = response.data.data.reservations || [];
+              console.log('[DEBUG] allReservations set to:', _this.allReservations)
             }
             // Fail
             else {

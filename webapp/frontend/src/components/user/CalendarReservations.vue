@@ -41,15 +41,14 @@
             </v-btn>
           </v-btn-toggle>
           <v-btn
-            v-if="viewMode === 'availability'"
             small
-            color="primary"
+            outlined
             class="ma-2"
-            @click="forceFetchAvailability"
+            @click="refreshCalendarData"
           >
-            🔄 Debug Refresh
+            <v-icon small left>mdi-refresh</v-icon>
+            Refresh
           </v-btn>
-          <v-spacer></v-spacer>
           <v-spacer></v-spacer>
           <v-toolbar-title v-if="$refs.calendar">
             {{ $refs.calendar.title }}
@@ -65,12 +64,14 @@
           :event-color="getEventColor"
           :type="type"
           :weekdays="weekdays"
-          @mouseup:time="selectSlot"
+          @click:time="selectSlot"
           event-overlap-mode="column"
-          first-interval="0"
-          interval-minutes="30"
-          interval-count="48"
+          :event-overlap-threshold="30"
+          :first-interval="0"
+          :interval-minutes="30"
+          :interval-count="48"
           :interval-format="intervalFormat"
+          :event-more="false"
         >
           <template #event="event">
             <div v-if="event.eventParsed.input.type === 'availability'" class="availability-event-content">
@@ -157,14 +158,22 @@
       colors: ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue',
                'light-blue', 'cyan', 'teal', 'green', 'light-green darken-1',
                'lime darken-2', 'yellow darken-3', 'amber darken-2', 'orange darken-3', 'deep-orange', 'brown', 'grey', 'blue-grey'],
+      reservationColorMap: {},
     }),
     mounted () {
-      console.log('🚀 Calendar component mounted')
-      console.log('🚀 Initial viewMode:', this.viewMode)
-      console.log('🚀 Initial propReservations:', this.propReservations.length)
-      console.log('🚀 Initial events:', this.events.length)
-      console.log('🚀 Initial availabilityEvents:', this.availabilityEvents.length)
-      this.$refs.calendar.checkChange()
+      console.log('[DEBUG] CalendarReservations mounted')
+      console.log('[DEBUG] Initial propReservations:', this.propReservations)
+      console.log('[DEBUG] Calendar ref exists:', !!this.$refs.calendar)
+      
+      if (this.$refs.calendar) {
+        this.$refs.calendar.checkChange()
+      }
+      
+      // Always trigger initial data fetch on mount
+      console.log('[DEBUG] Triggering initial calendar data fetch')
+      this.$nextTick(() => {
+        this.fetchAllReservationsForCalendar()
+      })
     },
     methods: {
       intervalFormat(interval) {
@@ -205,16 +214,12 @@
         return returnData
       },
       formatResourcesWithIndicators(availabilityEvent) {
-        console.log('🎨 formatResourcesWithIndicators called with:', availabilityEvent)
         if (!availabilityEvent.availableSpecs) {
-          console.log('❌ No availableSpecs, falling back to resourceText:', availabilityEvent.resourceText)
           return availabilityEvent.resourceText
         }
         
         let html = ''
         const specs = availabilityEvent.availableSpecs
-        
-        console.log('Formatting resources, availableSpecs:', specs)
         
         Object.values(specs).forEach(spec => {
           // Calculate availability ratio for this specific resource
@@ -222,8 +227,6 @@
           let indicatorClass = 'resource-low'
           if (ratio > 0.75) indicatorClass = 'resource-high'
           else if (ratio > 0.25) indicatorClass = 'resource-medium'
-          
-          console.log(`Resource type='${spec.type}': available=${spec.available}, max=${spec.maximum}, ratio=${ratio}, class=${indicatorClass}`)
           
           let displayText = ''
           if (spec.type.toLowerCase() === 'gpu' || spec.type.toLowerCase() === 'gpus') {
@@ -242,7 +245,6 @@
           </div>`
         })
         
-        console.log('Generated HTML:', html)
         return html
       },
       viewDay ({ date }) {
@@ -265,9 +267,7 @@
         return Math.floor((b - a + 1) * Math.random()) + a
       },
       async fetchAvailabilityData() {
-        console.log('🔍 fetchAvailabilityData called, viewMode:', this.viewMode)
         if (this.viewMode !== 'availability') {
-          console.log('❌ Early return - not in availability mode')
           return
         }
         
@@ -299,12 +299,6 @@
             break;
         }
         
-        console.log('📅 Calendar type:', this.type)
-        console.log('📅 Calendar focus:', this.focus)
-        console.log('📅 Focus date used:', focusDate.format('YYYY-MM-DD'))
-        console.log('📅 Calculated calendarStart:', calendarStart.format('YYYY-MM-DD HH:mm:ss'))
-        console.log('📅 Calculated calendarEnd:', calendarEnd.format('YYYY-MM-DD HH:mm:ss'))
-        console.log('📅 Fetching availability for:', calendarStart.format('YYYY-MM-DD HH:mm:ss'), 'to', calendarEnd.format('YYYY-MM-DD HH:mm:ss'))
         
         try {
           const response = await axios({
@@ -317,10 +311,9 @@
             }
           })
           
-          console.log('📊 Availability API response:', response.data)
-          
           if (response.data.status) {
-            this.availabilityEvents = response.data.data.events.map(event => ({
+            this.availabilityEvents = response.data.data.events.map((event, index) => ({
+              id: `availability-${event.computerId}-${index}`,
               name: event.name,
               start: new Date(event.start),
               end: new Date(event.end),
@@ -333,10 +326,7 @@
               resourceText: event.resourceText,
               availableSpecs: event.availableSpecs
             }))
-            console.log('✅ Processed availability events:', this.availabilityEvents.length, this.availabilityEvents)
             this.updateDisplayedEvents()
-          } else {
-            console.log('❌ API returned failure status')
           }
         } catch (error) {
           console.error('Error fetching availability data:', error)
@@ -396,112 +386,60 @@
         }
       },
       updateDisplayedEvents() {
-        console.log('🔄 updateDisplayedEvents called, viewMode:', this.viewMode)
+        console.log('[DEBUG] updateDisplayedEvents called, viewMode:', this.viewMode)
+        console.log('[DEBUG] propReservations:', this.propReservations)
+        
         if (this.viewMode === 'availability') {
-          console.log('📈 Setting availability events to calendar:', this.availabilityEvents.length)
-          console.log('📈 Availability events detail:', this.availabilityEvents)
           this.events = this.availabilityEvents
-          console.log('📈 Calendar events now set to:', this.events.length, this.events)
         } else {
           // Show reservation events
-          console.log('📅 Setting reservation events to calendar from propReservations:', this.propReservations.length)
           let events = []
           this.propReservations.forEach((res) => {
-            let color = this.colors[this.rnd(0, this.colors.length - 1)]
-            events.push({
+            // Use consistent color for each reservation based on ID
+            if (!this.reservationColorMap[res.reservationId]) {
+              this.reservationColorMap[res.reservationId] = this.colors[res.reservationId % this.colors.length]
+            }
+            let color = this.reservationColorMap[res.reservationId]
+            
+            const startDate = dayjs(TimestampToLocalTimeZone(res.startDate))
+            const endDate = dayjs(TimestampToLocalTimeZone(res.endDate))
+            
+            // Check for invalid dates
+            if (endDate.isBefore(startDate)) {
+              console.warn('[DEBUG] Invalid reservation dates - end before start:', res.reservationId, 'start:', startDate.format(), 'end:', endDate.format())
+            }
+            
+            const eventData = {
+              id: `reservation-${res.reservationId}`,
               name: "Reservation #" + res.reservationId,
               reservationId: res.reservationId,
-              start: dayjs(TimestampToLocalTimeZone(res.startDate)).toDate(),
-              end: dayjs(TimestampToLocalTimeZone(res.endDate)).toDate(),
+              start: startDate.toDate(),
+              end: endDate.toDate(),
               color: color,
               timed: true,
-            })
+            }
+            console.log('[DEBUG] Creating event:', eventData, 'start:', startDate.format('YYYY-MM-DD HH:mm'), 'end:', endDate.format('YYYY-MM-DD HH:mm'))
+            events.push(eventData)
           })
-          console.log('📅 Calendar events now set to:', events.length, events)
+          console.log('[DEBUG] Total events created:', events.length)
           this.events = events
+          
+          // Check for overlapping events
+          for (let i = 0; i < events.length; i++) {
+            for (let j = i + 1; j < events.length; j++) {
+              const event1 = events[i]
+              const event2 = events[j]
+              if (event1.start < event2.end && event2.start < event1.end) {
+                console.log('[DEBUG] Overlapping events detected:', event1.name, 'and', event2.name)
+              }
+            }
+          }
         }
       },
       // Method to be called by parent component for refresh
       async refreshCalendarData() {
         await this.fetchAllReservationsForCalendar()
       },
-      // Debug method to force fetch availability data
-      async forceFetchAvailability() {
-        console.log('🚨 FORCE FETCH AVAILABILITY - Debug button clicked')
-        console.log('🚨 Current viewMode:', this.viewMode)
-        console.log('🚨 Current availabilityEvents count:', this.availabilityEvents.length)
-        console.log('🚨 Current events count:', this.events.length)
-        console.log('🚨 Calendar ref exists:', !!this.$refs.calendar)
-        
-        // Force fetch regardless of viewMode check
-        let calendarStart, calendarEnd;
-        
-        // Get the current focus date from the calendar
-        const focusDate = this.focus ? dayjs(this.focus) : dayjs();
-        
-        // Calculate range based on calendar type
-        switch (this.type) {
-          case 'month':
-            calendarStart = focusDate.startOf('month');
-            calendarEnd = focusDate.endOf('month').add(1, 'day');
-            break;
-          case 'week':
-            calendarStart = focusDate.startOf('week');
-            calendarEnd = focusDate.endOf('week').add(1, 'day');
-            break;
-          case '4day':
-            calendarStart = focusDate.startOf('day');
-            calendarEnd = focusDate.add(3, 'days').endOf('day').add(1, 'day');
-            break;
-          case 'day':
-          default:
-            calendarStart = focusDate.startOf('day');
-            calendarEnd = focusDate.endOf('day').add(1, 'day');
-            break;
-        }
-        
-        console.log('🚨 Calendar type:', this.type)
-        console.log('🚨 Calendar focus:', this.focus)
-        console.log('🚨 Focus date used:', focusDate.format('YYYY-MM-DD'))
-        console.log('🚨 Calculated calendarStart:', calendarStart.format('YYYY-MM-DD HH:mm:ss'))
-        console.log('🚨 Calculated calendarEnd:', calendarEnd.format('YYYY-MM-DD HH:mm:ss'))
-        console.log('🚨 Forcing availability fetch for:', calendarStart.format('YYYY-MM-DD HH:mm:ss'), 'to', calendarEnd.format('YYYY-MM-DD HH:mm:ss'))
-        
-        try {
-          const response = await axios({
-            method: "get",
-            url: "/api/reservation/get_availability_timeline",
-            headers: {"Authorization" : `Bearer ${this.$store.state.user.loginToken}`},
-            params: {
-              startDate: calendarStart.format('YYYY-MM-DD HH:mm:ss'),
-              endDate: calendarEnd.format('YYYY-MM-DD HH:mm:ss')
-            }
-          })
-          
-          console.log('🚨 Force fetch API response:', response.data)
-          
-          if (response.data.status) {
-            this.availabilityEvents = response.data.data.events.map(event => ({
-              name: event.name,
-              start: new Date(event.start),
-              end: new Date(event.end),
-              color: event.color,
-              timed: event.timed,
-              type: event.type,
-              computerId: event.computerId,
-              computerName: event.computerName,
-              availabilityLevel: event.availabilityLevel,
-              resourceText: event.resourceText,
-              availableSpecs: event.availableSpecs
-            }))
-            console.log('🚨 Force processed availability events:', this.availabilityEvents.length)
-            this.events = this.availabilityEvents
-            console.log('🚨 Force set events to:', this.events.length)
-          }
-        } catch (error) {
-          console.error('🚨 Force fetch error:', error)
-        }
-      }
     },
     watch: {
       propReservations: {
@@ -512,16 +450,13 @@
       },
       viewMode: {
         immediate: true,
-        handler (newMode, oldMode) {
-          console.log('🔀 viewMode changed from', oldMode, 'to', newMode)
+        handler (newMode) {
           if (newMode === 'availability') {
-            console.log('🔀 Switching to availability mode, calling fetchAvailabilityData')
             // Use nextTick to ensure calendar is ready
             this.$nextTick(() => {
               this.fetchAvailabilityData()
             })
           } else {
-            console.log('🔀 Switching to reservation mode, calling updateDisplayedEvents')
             this.updateDisplayedEvents()
           }
         }
@@ -529,7 +464,6 @@
       focus: {
         handler () {
           // Refetch availability data when calendar navigation changes
-          console.log('📅 Focus changed, refetching availability if needed')
           this.$nextTick(() => {
             if (this.viewMode === 'availability') {
               this.fetchAvailabilityData()
@@ -540,7 +474,6 @@
       type: {
         handler () {
           // Refetch availability data when calendar type changes
-          console.log('📅 Type changed, refetching availability if needed')
           this.$nextTick(() => {
             if (this.viewMode === 'availability') {
               this.fetchAvailabilityData()
@@ -548,17 +481,16 @@
           })
         }
       },
-      events: {
-        handler (newEvents, oldEvents) {
-          console.log('📊 Events array changed from', oldEvents?.length || 0, 'to', newEvents?.length || 0)
-          console.log('📊 New events:', newEvents)
-        }
-      }
     }
     }
 </script>
 
 <style scoped lang="scss">
+// Calendar container styling
+.v-calendar-daily__day {
+  position: relative !important;
+}
+
 .v-event {
   &.availability-event {
     opacity: 0.9;

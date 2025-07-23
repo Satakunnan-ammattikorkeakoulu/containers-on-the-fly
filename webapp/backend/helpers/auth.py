@@ -14,6 +14,7 @@ import datetime
 import string
 import secrets
 from sqlalchemy.orm import joinedload
+from fastapi import HTTPException, status
 
 def IsAdmin(userIdOrEmail) -> bool:
   '''
@@ -92,6 +93,29 @@ def CheckToken(token : str) -> object:
     return helpers.server.Response(True, "Token OK.", { "userId": user.userId, "email": user.email, "role": userRole })
   else:
     return helpers.server.Response(False, "Invalid token.")
+
+def get_authenticated_user_id(token: str) -> int:
+  '''
+  Authenticates the provided token and returns the user ID.
+  This combines token validation and user ID extraction in one call.
+  
+  Parameters:
+    token: The authentication token
+  
+  Returns:
+    The authenticated user's ID
+    
+  Raises:
+    HTTPException: If the token is invalid or expired
+  '''
+  auth_result = CheckToken(token)
+  if not auth_result["status"]:
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail=auth_result["message"],
+      headers={"WWW-Authenticate": "Bearer"},
+    )
+  return auth_result["data"]["userId"]
 
 def CreateLoginToken() -> str:
   '''

@@ -22,6 +22,7 @@
           :readOnly="true"
           @slotSelected="handleSlotSelected"
           @reservationsRefreshed="handleReservationsRefreshed"
+          @requestRefresh="fetchAllReservations"
           ref="calendarComponent"
         />
         <Loading v-if="fetchingAllReservations" />
@@ -346,21 +347,15 @@
         this.modalConnectionDetailsReservationId = reservationId
       },
       toggleCalendarView() {
-        console.log('[DEBUG] toggleCalendarView called, current state:', this.showCalendar)
         this.showCalendar = !this.showCalendar;
-        console.log('[DEBUG] New calendar state:', this.showCalendar)
-        
         if (this.showCalendar) {
-          console.log('[DEBUG] Calendar shown, will fetch all reservations')
           // Use nextTick to ensure calendar component is mounted before fetching
           this.$nextTick(() => {
-            console.log('[DEBUG] nextTick - fetching all reservations')
             this.fetchAllReservations();
           });
         }
       },
       fetchAllReservations() {
-        console.log('[DEBUG] fetchAllReservations called')
         let _this = this;
         _this.fetchingAllReservations = true;
         let currentUser = this.$store.getters.user;
@@ -371,11 +366,9 @@
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
-          console.log('[DEBUG] fetchAllReservations response:', response)
             // Success
             if (response.data.status == true) {
               _this.allReservations = response.data.data.reservations || [];
-              console.log('[DEBUG] allReservations set to:', _this.allReservations)
             }
             // Fail
             else {

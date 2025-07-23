@@ -64,14 +64,12 @@
           :event-color="getEventColor"
           :type="type"
           :weekdays="weekdays"
-          @click:time="selectSlot"
+          @mouseup:time="selectSlot"
           event-overlap-mode="column"
-          :event-overlap-threshold="30"
-          :first-interval="0"
-          :interval-minutes="30"
-          :interval-count="48"
+          first-interval="0"
+          interval-minutes="30"
+          interval-count="48"
           :interval-format="intervalFormat"
-          :event-more="false"
         >
           <template #event="event">
             <div v-if="event.eventParsed.input.type === 'availability'" class="availability-event-content">
@@ -161,19 +159,9 @@
       reservationColorMap: {},
     }),
     mounted () {
-      console.log('[DEBUG] CalendarReservations mounted')
-      console.log('[DEBUG] Initial propReservations:', this.propReservations)
-      console.log('[DEBUG] Calendar ref exists:', !!this.$refs.calendar)
-      
       if (this.$refs.calendar) {
         this.$refs.calendar.checkChange()
       }
-      
-      // Always trigger initial data fetch on mount
-      console.log('[DEBUG] Triggering initial calendar data fetch')
-      this.$nextTick(() => {
-        this.fetchAllReservationsForCalendar()
-      })
     },
     methods: {
       intervalFormat(interval) {
@@ -386,8 +374,6 @@
         }
       },
       updateDisplayedEvents() {
-        console.log('[DEBUG] updateDisplayedEvents called, viewMode:', this.viewMode)
-        console.log('[DEBUG] propReservations:', this.propReservations)
         
         if (this.viewMode === 'availability') {
           this.events = this.availabilityEvents
@@ -404,10 +390,6 @@
             const startDate = dayjs(TimestampToLocalTimeZone(res.startDate))
             const endDate = dayjs(TimestampToLocalTimeZone(res.endDate))
             
-            // Check for invalid dates
-            if (endDate.isBefore(startDate)) {
-              console.warn('[DEBUG] Invalid reservation dates - end before start:', res.reservationId, 'start:', startDate.format(), 'end:', endDate.format())
-            }
             
             const eventData = {
               id: `reservation-${res.reservationId}`,
@@ -418,27 +400,15 @@
               color: color,
               timed: true,
             }
-            console.log('[DEBUG] Creating event:', eventData, 'start:', startDate.format('YYYY-MM-DD HH:mm'), 'end:', endDate.format('YYYY-MM-DD HH:mm'))
             events.push(eventData)
           })
-          console.log('[DEBUG] Total events created:', events.length)
           this.events = events
-          
-          // Check for overlapping events
-          for (let i = 0; i < events.length; i++) {
-            for (let j = i + 1; j < events.length; j++) {
-              const event1 = events[i]
-              const event2 = events[j]
-              if (event1.start < event2.end && event2.start < event1.end) {
-                console.log('[DEBUG] Overlapping events detected:', event1.name, 'and', event2.name)
-              }
-            }
-          }
         }
       },
       // Method to be called by parent component for refresh
       async refreshCalendarData() {
-        await this.fetchAllReservationsForCalendar()
+        // Don't fetch all reservations - just ask parent to refresh
+        this.$emit('requestRefresh')
       },
     },
     watch: {
@@ -486,11 +456,6 @@
 </script>
 
 <style scoped lang="scss">
-// Calendar container styling
-.v-calendar-daily__day {
-  position: relative !important;
-}
-
 .v-event {
   &.availability-event {
     opacity: 0.9;

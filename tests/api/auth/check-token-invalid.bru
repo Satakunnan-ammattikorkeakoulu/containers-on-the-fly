@@ -1,0 +1,26 @@
+meta {
+  name: Check Token - Invalid
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{root_url}}/user/check_token
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: invalid_token_123
+}
+
+tests {
+  test("Status code is 401", function() {
+    expect(res.status).to.equal(401);
+  });
+  
+  test("Response has error detail", function() {
+    expect(res.body).to.have.property('detail');
+    expect(res.body.detail).to.equal('Invalid authentication credentials');
+  });
+}

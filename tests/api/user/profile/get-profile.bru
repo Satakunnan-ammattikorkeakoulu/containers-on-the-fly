@@ -1,0 +1,43 @@
+meta {
+  name: Get User Profile
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{root_url}}/user/profile
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has user data", function() {
+    expect(res.body).to.have.property('data');
+    const data = res.body.data;
+    expect(data).to.have.property('email');
+    expect(data).to.have.property('firstName');
+    expect(data).to.have.property('lastName');
+    expect(data).to.have.property('roles');
+  });
+  
+  test("Email matches expected user", function() {
+    expect(res.body.data.email).to.equal('user@foo.com');
+  });
+  
+  test("Roles is an array", function() {
+    expect(res.body.data.roles).to.be.an('array');
+  });
+}

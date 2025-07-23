@@ -1,0 +1,17 @@
+{
+  "version": "1",
+  "name": "Containers on the Fly API",
+  "type": "collection",
+  "proxy": {
+    "enabled": false
+  },
+  "presets": {
+    "requestType": "http",
+    "requestUrl": "{{root_url}}",
+    "requestTimeout": 30000
+  },
+  "scripts": {
+    "preRequest": "",
+    "postResponse": ""
+  }
+}

@@ -1,0 +1,52 @@
+meta {
+  name: Get General Settings
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{root_url}}/admin/general-settings
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has settings data", function() {
+    expect(res.body).to.have.property('data');
+    const data = res.body.data;
+    expect(data).to.have.property('email');
+    expect(data).to.have.property('features');
+  });
+  
+  test("Email settings have required fields", function() {
+    const email = res.body.data.email;
+    expect(email).to.have.property('smtpEnabled');
+    expect(email).to.have.property('smtpHost');
+    expect(email).to.have.property('smtpPort');
+    expect(email).to.have.property('smtpUser');
+    expect(email).to.have.property('smtpFrom');
+    expect(email).to.have.property('smtpSsl');
+    expect(email).to.have.property('reservationCreatedSubject');
+    expect(email).to.have.property('reservationCreatedBody');
+  });
+  
+  test("Feature settings have required fields", function() {
+    const features = res.body.data.features;
+    expect(features).to.have.property('calendarEnabled');
+    expect(features).to.have.property('emailNotifications');
+    expect(features).to.have.property('emailTestAddress');
+  });
+}

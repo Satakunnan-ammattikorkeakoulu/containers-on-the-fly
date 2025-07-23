@@ -1,0 +1,44 @@
+meta {
+  name: Login - Success
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{root_url}}/user/login
+  body: formUrlEncoded
+  auth: none
+}
+
+body:form-urlencoded {
+  username: {{admin_email}}
+  password: {{admin_password}}
+}
+
+script:post-response {
+  if (res.status === 200) {
+    const token = res.body.access_token;
+    bru.setEnvVar("auth_token", token);
+    bru.setEnvVar("admin_token", token);
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response has access_token", function() {
+    expect(res.body).to.have.property('access_token');
+  });
+  
+  test("Response has token_type", function() {
+    expect(res.body).to.have.property('token_type');
+    expect(res.body.token_type).to.equal('bearer');
+  });
+  
+  test("Access token is a string", function() {
+    expect(res.body.access_token).to.be.a('string');
+    expect(res.body.access_token.length).to.be.greaterThan(0);
+  });
+}

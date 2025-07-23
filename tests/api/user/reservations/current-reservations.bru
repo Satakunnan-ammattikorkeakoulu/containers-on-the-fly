@@ -1,0 +1,43 @@
+meta {
+  name: Get Current Reservations
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{root_url}}/reservation/get_current_reservations
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has reservation data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.be.an('array');
+  });
+  
+  test("Active reservation items have required fields", function() {
+    if (res.body.data.length > 0) {
+      const reservation = res.body.data[0];
+      expect(reservation).to.have.property('reservationId');
+      expect(reservation).to.have.property('containerName');
+      expect(reservation).to.have.property('ports');
+      expect(reservation).to.have.property('endDate');
+      expect(reservation).to.have.property('canExtend');
+      expect(reservation.ports).to.be.an('array');
+    }
+  });
+}

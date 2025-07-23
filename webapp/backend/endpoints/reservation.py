@@ -20,6 +20,16 @@ async def getAvailableHardware(date : str, duration: int, token: str = Depends(o
   userId = CheckToken(token)["data"]["userId"]
   return functionality.getAvailableHardware(date, duration, None, IsAdmin(userId))
 
+@router.get("/get_availability_timeline")
+async def getAvailabilityTimeline(startDate: str, endDate: str, token: str = Depends(oauth2_scheme)):
+  userId = CheckToken(token)["data"]["userId"]
+  return functionality.getAvailabilityTimeline(startDate, endDate, IsAdmin(userId))
+
+@router.get("/get_all_reservations_for_calendar")
+async def getAllReservationsForCalendar(startDate: str, endDate: str, token: str = Depends(oauth2_scheme)):
+  ForceAuthentication(token)
+  return functionality.getAllReservationsForCalendar(startDate, endDate)
+
 @router.post("/get_own_reservations")
 async def getOwnReservations(filters : ReservationFilters, token: str = Depends(oauth2_scheme)):
   ForceAuthentication(token)

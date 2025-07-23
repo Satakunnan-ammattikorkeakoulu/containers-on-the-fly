@@ -39,10 +39,17 @@
           <v-col class="section">
             <div style="text-align: right">
               <p style="margin-bottom: 0px;"><small>All times are in timezone <strong>{{globalTimezone}}</strong></small></p>
-              <p><small><a @click="fetchReservations">Refresh reservations</a></small></p>
+              <p><small><a @click="refreshCalendarReservations">Refresh reservations</a></small></p>
             </div>
             <div style="text-align: center;">
-              <CalendarReservations v-if="allReservations" :propReservations="allReservations" :readOnly="false" @slotSelected="slotSelected" />
+              <CalendarReservations 
+                v-if="allReservations" 
+                :propReservations="allReservations" 
+                :readOnly="false" 
+                @slotSelected="slotSelected" 
+                @reservationsRefreshed="handleReservationsRefreshed"
+                ref="calendarComponent"
+              />
             </div>
           </v-col>
         </v-row>
@@ -997,6 +1004,14 @@
         
         return hardwareList.length > 0 ? hardwareList : [{ id: 'none', text: 'No resources available' }]
       },
+      async refreshCalendarReservations() {
+        if (this.$refs.calendarComponent) {
+          await this.$refs.calendarComponent.refreshCalendarData();
+        }
+      },
+      handleReservationsRefreshed(reservations) {
+        this.allReservations = reservations;
+      }
     },
     computed: {
       getContainerDescription() {

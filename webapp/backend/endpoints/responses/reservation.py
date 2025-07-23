@@ -480,14 +480,245 @@ def restartContainer(userId : int, reservationId: str):
       .filter( Reservation.reservationId == reservationId )
     if IsAdmin(userId) == False:
       reservation = reservation.filter(Reservation.userId == userId )
+    
+    reservation = reservation.first()
+    if reservation is None: 
+      session.close()
+      return Response(False, "No reservation found.")
+
+    if (reservation.status == "started"):
+      reservation.status = "restart"
+      session.commit()
+      session.close()
+      return Response(True, "Container will be restarted.")
+    else:
+      session.close()
+      return Response(False, "Reservation is not currently started, so cannot restart the container.")
+
+def getAvailabilityTimeline(startDate: str, endDate: str, isAdmin = False) -> object:
+  '''
+  Returns availability timeline data for all servers between the given dates.
+  This creates continuous availability events showing remaining resources for each server.
+  
+  Args:
+    startDate (str): Start date for the timeline
+    endDate (str): End date for the timeline  
+    isAdmin (bool): Whether the user is an admin
+    
+  Returns:
+    object: Response object with timeline events for each server
+  '''
+  try:
+    start_date = parser.parse(startDate)
+    end_date = parser.parse(endDate)
+  except:
+    return Response(False, "Invalid date format.")
+  
+  # Fetch all computers and reservations in the time range
+  with Session() as session:
+    computers = session.query(Computer)\
+      .options(joinedload(Computer.hardwareSpecs))\
+      .filter(Computer.removed.isnot(True), Computer.public.is_(True))\
+      .all()
+    
+    reservations = session.query(Reservation)\
+      .options(
+        joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec),
+        joinedload(Reservation.computer)
+      )\
+      .filter(
+        Reservation.startDate < end_date,
+        Reservation.endDate > start_date,
+        (Reservation.status == "reserved") | (Reservation.status == "started")
+      ).all()
+    
+    # Process all data before closing session
+    timeline_events = []
+    
+    for computer in computers:
+      # Get all time points where availability changes for this computer (reservation start/end times)
+      time_points = set([start_date, end_date])
+      for res in reservations:
+        if res.computer.computerId == computer.computerId:
+          if res.startDate > start_date:
+            time_points.add(res.startDate)
+          if res.endDate < end_date:
+            time_points.add(res.endDate)
+          if res.startDate < start_date and res.endDate > start_date:
+            time_points.add(start_date)
+          if res.startDate < end_date and res.endDate > end_date:
+            time_points.add(end_date)
+      
+      time_points = sorted(list(time_points))
+      
+      # If there are no reservations for this computer, we still want to show full availability
+      # So we'll have at least one period from start_date to end_date
+      if len(time_points) == 2:  # Only start_date and end_date
+        time_points = [start_date, end_date]
+      
+      # Create availability periods between time points
+      for i in range(len(time_points) - 1):
+        period_start = time_points[i]
+        period_end = time_points[i + 1]
+        
+        # Calculate available resources for this period
+        available_specs = {}
+        # Group specs by type, consolidating GPUs without internalId
+        spec_groups = {}
+        
+        for spec in computer.hardwareSpecs:
+          # For GPUs, only include those without internalId (consolidated view)
+          if spec.type == 'gpu' and spec.internalId is not None:
+            continue
+            
+          if spec.type not in spec_groups:
+            spec_groups[spec.type] = {
+              'type': spec.type,
+              'format': spec.format,
+              'available': 0,
+              'maximum': 0,
+              'hardwareSpecIds': []
+            }
+          
+          spec_groups[spec.type]['available'] += spec.maximumAmount
+          spec_groups[spec.type]['maximum'] += spec.maximumAmount
+          spec_groups[spec.type]['hardwareSpecIds'].append(spec.hardwareSpecId)
+        
+        # Convert groups back to available_specs format
+        for group_key, group_data in spec_groups.items():
+          # Use the first hardwareSpecId as the key for this group
+          primary_spec_id = group_data['hardwareSpecIds'][0]
+          available_specs[primary_spec_id] = {
+            'type': group_data['type'],
+            'format': group_data['format'],
+            'available': group_data['available'],
+            'maximum': group_data['maximum'],
+            'relatedSpecIds': group_data['hardwareSpecIds']
+          }
+        
+        # Subtract resources used by overlapping reservations
+        for res in reservations:
+          if (res.computer.computerId == computer.computerId and 
+              res.startDate < period_end and res.endDate > period_start):
+            for reserved_spec in res.reservedHardwareSpecs:
+              spec_id = reserved_spec.hardwareSpecId
+              
+              # Find which group this spec_id belongs to
+              for group_spec_id, group_data in available_specs.items():
+                if spec_id in group_data.get('relatedSpecIds', [group_spec_id]):
+                  available_specs[group_spec_id]['available'] -= reserved_spec.amount
+                  if available_specs[group_spec_id]['available'] < 0:
+                    available_specs[group_spec_id]['available'] = 0
+                  break
+        
+        # Create display text for available resources (no server name in resource text)
+        resource_text = ""
+        total_capacity = 0
+        available_capacity = 0
+        
+        for spec_data in available_specs.values():
+          if spec_data['type'] == 'gpu':
+            resource_text += f"GPU: {int(spec_data['available'])}/{int(spec_data['maximum'])}<br>"
+          elif spec_data['type'] == 'cpu':
+            resource_text += f"CPU: {int(spec_data['available'])}/{int(spec_data['maximum'])}<br>"
+          elif spec_data['type'] == 'ram':
+            resource_text += f"RAM: {int(spec_data['available'])}/{int(spec_data['maximum'])} {spec_data['format']}<br>"
+          else:
+            resource_text += f"{spec_data['type'].upper()}: {int(spec_data['available'])}/{int(spec_data['maximum'])}<br>"
+          
+          total_capacity += spec_data['maximum']
+          available_capacity += spec_data['available']
+        
+        # Determine availability level for color coding
+        availability_ratio = available_capacity / max(total_capacity, 1)
+        if availability_ratio > 0.75:
+          availability_level = 'high'
+        elif availability_ratio > 0.25:
+          availability_level = 'medium'
+        else:
+          availability_level = 'low'
+        
+        # Generate consistent color for server based on server name hash
+        import hashlib
+        server_hash = int(hashlib.md5(computer.name.encode()).hexdigest(), 16)
+        server_colors = ['#1976D2', '#388E3C', '#F57C00', '#7B1FA2', '#D32F2F', '#0097A7', '#5D4037', '#455A64', '#E64A19', '#303F9F']
+        server_color = server_colors[server_hash % len(server_colors)]
+        
+        timeline_events.append({
+          'name': f"{computer.name} - {availability_level.title()} Availability",
+          'start': period_start.isoformat(),
+          'end': period_end.isoformat(),
+          'color': server_color,
+          'timed': True,
+          'type': 'availability',
+          'computerId': computer.computerId,
+          'computerName': computer.name,
+          'availabilityLevel': availability_level,
+          'availabilityRatio': availability_ratio,
+          'resourceText': resource_text.rstrip('<br>'),
+          'availableSpecs': available_specs
+        })
+    
     session.close()
   
-  reservation = reservation.first()
-  if reservation is None: return Response(False, "No reservation found.")
+  return Response(True, "Availability timeline fetched.", {'events': timeline_events})
 
-  if (reservation.status == "started"):
-    reservation.status = "restart"
-    session.commit()
-    return Response(True, "Container will be restarted.")
-  else:
-    return Response(False, "Reservation is not currently started, so cannot restart the container.")
+def getAllReservationsForCalendar(startDate: str, endDate: str) -> object:
+  '''
+  Returns all reservations within a date range for calendar display.
+  This includes all reservations regardless of status (reserved, started, stopped, etc.)
+  
+  Args:
+    startDate (str): Start date for the query
+    endDate (str): End date for the query
+    
+  Returns:
+    object: Response object with all reservations in the date range
+  '''
+  try:
+    start_date = parser.parse(startDate)
+    end_date = parser.parse(endDate)
+  except:
+    return Response(False, "Invalid date format.")
+  
+  reservations = []
+
+  with Session() as session:
+    query = session.query(Reservation)\
+      .options(
+        joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec),
+        joinedload(Reservation.computer)
+      )\
+      .filter(
+        Reservation.startDate < end_date,
+        Reservation.endDate > start_date
+      )
+    
+    for reservation in query:
+      specs = []
+      for spec in reservation.reservedHardwareSpecs:
+        if spec.amount > 0:
+          # Add also internalId for GPUs
+          if spec.hardwareSpec.type == "gpu":
+            format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
+          else:
+            format = spec.hardwareSpec.format
+
+          specs.append({
+            "type": spec.hardwareSpec.type,
+            "format": format,
+            "amount": spec.amount
+          })
+      
+      reservations.append({
+        "reservationId": reservation.reservationId,
+        "startDate": reservation.startDate.isoformat(),
+        "endDate": reservation.endDate.isoformat(),
+        "computerName": reservation.computer.name,
+        "hardwareSpecs": specs,
+        "status": reservation.status
+      })
+    
+    session.close()
+  
+  return Response(True, "All reservations fetched.", {"reservations": reservations})

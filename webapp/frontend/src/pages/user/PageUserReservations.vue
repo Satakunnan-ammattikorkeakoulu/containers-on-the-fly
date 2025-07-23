@@ -17,13 +17,15 @@
         <h3 style="margin-bottom: 20px;">Reservation Calendar</h3>
         <div style="text-align: right; margin-bottom: 10px;">
           <p style="margin-bottom: 0px;"><small>All times are in timezone <strong>{{globalTimezone}}</strong></small></p>
-          <p><small><a @click="fetchAllReservations">Refresh reservations</a></small></p>
+          <p><small><a @click="refreshCalendarReservations">Refresh reservations</a></small></p>
         </div>
         <CalendarReservations 
           v-if="allReservations" 
           :propReservations="allReservations" 
           :readOnly="true"
-          @slotSelected="handleSlotSelected" 
+          @slotSelected="handleSlotSelected"
+          @reservationsRefreshed="handleReservationsRefreshed"
+          ref="calendarComponent"
         />
         <Loading v-if="fetchingAllReservations" />
       </v-col>
@@ -402,6 +404,14 @@
          } else {
            this.$store.commit('showMessage', { text: "You can only have one reserved or started reservation at a time. Cancel the current reservation if you need a new.", color: "red" });
          }
+       },
+       async refreshCalendarReservations() {
+         if (this.$refs.calendarComponent) {
+           await this.$refs.calendarComponent.refreshCalendarData();
+         }
+       },
+       handleReservationsRefreshed(reservations) {
+         this.allReservations = reservations;
        }
     },
     computed: {

@@ -170,6 +170,8 @@ make start-main-server
 
 That's it! Now you should be able to access the web interface using a browser. There will be more information printed on your console after running the `make start-main-server` command. If the servers crash or something happens, then you should only need to run the `make start-main-server` command again.
 
+You should start by logging in as an administrator (default username ``admin@foo.com`` and password ``test``), and start configuring the settings for the application.
+
 ### Automatic Installation: Container Server
 
 > Heads up! The automatic installation script for the **container server** only works with Ubuntu Linux 24.04. It is HIGHLY RECOMMENDED (or even mandatory) to use a fresh Ubuntu installation, due to various software being installed and configured.

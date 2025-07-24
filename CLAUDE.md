@@ -140,6 +140,17 @@ debug_mode = settings_handler.getSetting("docker.debugSkipGpuDedication")
 
 ## Important Development Guidelines
 
+### Version Management
+The project maintains a `.version` file in the root directory to track releases:
+- Format: `version: X.Y.Z` and `updated: YYYY-MM-DD HH:MM:SS UTC`
+- **When to update**: After making significant changes, ask if the version should be updated
+- **Version increment rules**:
+  - Patch version (Z): Increment by 0.0.1 for bug fixes and minor changes
+  - Can exceed 9 (e.g., 1.0.26 is valid) but max is 99
+  - When reaching 100, roll over to next minor version (1.0.100 → 1.1.0)
+  - Minor version (Y): For new features or significant improvements
+  - Major version (X): For breaking changes or major releases
+
 ### Post-Development Workflow
 After making code changes, especially to frontend/backend configuration or business logic:
 ```bash

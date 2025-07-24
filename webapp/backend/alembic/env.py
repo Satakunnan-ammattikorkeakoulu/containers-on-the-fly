@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import ALL models so they register with Base.metadata
 from database import (
-    Base, User, UserWhitelist, UserStorage, Role, UserRole,
+    Base, User, UserWhitelist, Role, UserRole,
     Container, ContainerPort, ReservedContainer, ReservedContainerPort,
     Reservation, Computer, HardwareSpec, ReservedHardwareSpec
 )

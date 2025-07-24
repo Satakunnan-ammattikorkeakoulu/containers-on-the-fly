@@ -30,7 +30,6 @@ class User(Base):
   userCreatedAt = Column(DateTime(timezone=True), server_default=func.now())
   userUpdatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 
-  userStorage = relationship("UserStorage", back_populates = "user")
   roles = relationship("Role", secondary = "UserRole", back_populates = "users", single_parent=True)
   reservations = relationship("Reservation", back_populates = "user")
 
@@ -40,20 +39,6 @@ class UserWhitelist(Base):
 
   userWhitelistId = Column(Integer, primary_key = True, autoincrement = True)
   email = Column(Text, nullable = True, unique = True)
-
-class UserStorage(Base):
-  __tablename__ = "UserStorage"
-
-  userStorageId = Column(Integer, primary_key = True, autoincrement = True)
-  userId = Column(ForeignKey('User.userId'), unique = True, nullable = False)
-  #location = Column(Text, nullable = False) # TODO: Add to diagram
-  maxSpace = Column(Float, nullable = False)
-  maxSpaceFormat = Column(Text, nullable = False)
-  UniqueConstraint('userStorageId', 'userId', name='uniqueUserStorage')
-  createdAt = Column(DateTime(timezone=True), server_default=func.now())
-  updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
-
-  user = relationship("User", back_populates = "userStorage")
 
 class Role(Base):
   __tablename__ = "Role"

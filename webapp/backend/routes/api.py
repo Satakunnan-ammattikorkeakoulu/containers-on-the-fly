@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from endpoints import user, reservation, admin, app
 from settings_handler import settings_handler
 from helpers.auth import HashPassword
-from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, UserStorage, Container
+from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, Container
 import base64
 import sqlalchemy as sa
 
@@ -53,7 +53,6 @@ if settings_handler.getSetting("app.addTestDataInDevelopment"):
       )
       adminRole = session.query(Role).filter( Role.name == "admin" ).first()
       adminUser.roles.append(adminRole)
-      adminUser.userStorage.append(UserStorage( maxSpace = "10000", maxSpaceFormat = "mb" ))
       session.add(adminUser)
       session.commit()
     
@@ -67,7 +66,6 @@ if settings_handler.getSetting("app.addTestDataInDevelopment"):
         password = base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
         passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
       )
-      normalUser.userStorage.append(UserStorage( maxSpace = "5000", maxSpaceFormat = "mb" ))
       session.add(normalUser)
       session.commit()
 

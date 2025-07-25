@@ -20,6 +20,7 @@
             v-on:emitEditRole="editRole" 
             v-on:emitRemoveRole="removeRole" 
             v-on:emitManageMounts="manageMounts" 
+            v-on:emitManageHardwareLimits="manageHardwareLimits"
             v-bind:propItems="roles" />
         </div>
         <p v-else class="dim text-center">No roles.</p>
@@ -45,6 +46,14 @@
       :roleName="selectedMountsRole.name"
       @emitModalClose="closeMountsDialog">
     </AdminRoleMountsModal>
+
+    <!-- Add the hardware limits modal -->
+    <AdminRoleHardwareLimitsModal 
+      v-if="selectedHardwareLimitsRole"
+      :roleId="selectedHardwareLimitsRole.roleId"
+      :roleName="selectedHardwareLimitsRole.name"
+      @emitModalClose="closeHardwareLimitsDialog">
+    </AdminRoleHardwareLimitsModal>
   </v-container>
 </template>
 
@@ -53,6 +62,7 @@ import Loading from '/src/components/global/Loading.vue';
 import AdminRolesTable from '/src/components/admin/AdminRolesTable.vue';
 import AdminManageRoleModal from '/src/components/admin/AdminManageRoleModal.vue';
 import AdminRoleMountsModal from '/src/components/admin/AdminRoleMountsModal.vue';
+import AdminRoleHardwareLimitsModal from '/src/components/admin/AdminRoleHardwareLimitsModal.vue';
 
 // Add axios back
 const axios = require('axios').default;
@@ -63,7 +73,8 @@ export default {
     Loading,
     AdminRolesTable,
     AdminManageRoleModal,
-    AdminRoleMountsModal
+    AdminRoleMountsModal,
+    AdminRoleHardwareLimitsModal
   },
   data: () => ({
     intervalFetch: null,
@@ -71,6 +82,7 @@ export default {
     roles: [],
     selectedItem: undefined,
     selectedMountsRole: null,
+    selectedHardwareLimitsRole: null,
     showRoleModal: false,
     dialogKey: new Date().getTime(),
     tableName: "roles",
@@ -173,6 +185,15 @@ export default {
     },
     closeMountsDialog(shouldRefresh) {
       this.selectedMountsRole = null;
+      if (shouldRefresh) {
+        this.fetch();
+      }
+    },
+    manageHardwareLimits(role) {
+      this.selectedHardwareLimitsRole = role;
+    },
+    closeHardwareLimitsDialog(shouldRefresh) {
+      this.selectedHardwareLimitsRole = null;
       if (shouldRefresh) {
         this.fetch();
       }

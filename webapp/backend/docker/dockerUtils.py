@@ -98,6 +98,7 @@ def startDockerContainer(reservationId: str):
         gpusString = gpusString + gpu + ","
       # Remove the trailing , from gpuSpecs, if it exists
       if gpusString[-1] == ",": gpusString = gpusString[:-1]
+    
 
     # Create the port string to be passed to Docker
     portsForContainer = []
@@ -109,7 +110,7 @@ def startDockerContainer(reservationId: str):
       "image": imageName,
       "username": "user",
       "cpus": int(hwSpecs['cpus']["amount"]),
-      "gpus": gpusString,
+      "gpus": gpusString if gpusString else None,  # Convert empty string to None
       "memory": f"{hwSpecs['ram']['amount']}g",
       "shm_size": settings_handler.getSetting("docker.shm_size"),
       "ports": portsForContainer,

@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload
 
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
 # TODO: Should also be able to only fail there is not enough resources any computer. Right now it fails if any of the computers are out of resources for the given time period.
-def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = None, isAdmin = False, ignoredReservationId : int = None) -> object:
+def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = None, isAdmin = False, ignoredReservationId : int = None, userId : int = None) -> object:
   '''
   Returns a list of all available hardware specs for the given date and duration.
   
@@ -88,16 +88,41 @@ def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = Non
   for container in allContainers:
     containers.append(ORMObjectToDict(container))
 
+  # Get user's roles and their hardware limits
+  user_role_limits = {}
+  if userId:
+    from database import RoleHardwareLimit, UserRole
+    with Session() as session:
+      # Get all roles for the user
+      user_roles = session.query(UserRole).filter(UserRole.userId == userId).all()
+      role_ids = [ur.roleId for ur in user_roles]
+      
+      # Get all hardware limits for user's roles
+      if role_ids:
+        role_limits = session.query(RoleHardwareLimit).filter(
+          RoleHardwareLimit.roleId.in_(role_ids)
+        ).all()
+        
+        # Build a dict of hardwareSpecId -> max limit across all roles
+        for limit in role_limits:
+          spec_id = limit.hardwareSpecId
+          if spec_id not in user_role_limits or limit.maximumAmountForRole > user_role_limits[spec_id]:
+            user_role_limits[spec_id] = limit.maximumAmountForRole
+
   # Set all user maximums to max for admins
   if (isAdmin == True):
     for computer in computers:
       for spec in computer["hardwareSpecs"]:
         spec["maximumAmountForUser"] = spec["maximumAmount"]
   else:
-    # Enforce GPU limit for non-admin users (max 1 GPU)
+    # Apply role-based limits or default limits
     for computer in computers:
       for spec in computer["hardwareSpecs"]:
-        if spec["type"] == "gpu" and spec["maximumAmountForUser"] > 1:
+        # Check if there's a role-based limit for this hardware spec
+        if spec["hardwareSpecId"] in user_role_limits:
+          spec["maximumAmountForUser"] = min(user_role_limits[spec["hardwareSpecId"]], spec["maximumAmount"])
+        # Otherwise, enforce GPU limit for non-admin users (max 1 GPU)
+        elif spec["type"] == "gpu" and spec["maximumAmountForUser"] > 1:
           spec["maximumAmountForUser"] = 1
 
   for computer in computers:
@@ -265,11 +290,6 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
   # Validate description length if provided
   if description and len(description) > 50:
     return Response(False, "Description must be 50 characters or less.")
-  
-  # Make sure that there are enough resources for the reservation
-  getAvailableHardwareResponse = getAvailableHardware(date, duration, hardwareSpecs)
-  if (getAvailableHardwareResponse["status"] == False):
-    return Response(False, getAvailableHardwareResponse["message"])
 
   date = parser.parse(date)
   endDate = date+relativedelta(hours=+duration)
@@ -316,14 +336,17 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     if (duration > max_duration) and isAdmin == False:
       return Response(False, f"Maximum duration is {max_duration} hours.")
 
-    userId = user.userId
-
     # If adminReserveUserEmail is given, check that the user exists
     if adminReserveUserEmail != None and adminReserveUserEmail != "" and isAdmin == True:
       anotherUser = session.query(User).filter( User.email == adminReserveUserEmail ).first()
       if (anotherUser == None):
         return Response(False, "User for which you tried to reserve for did not exist. Check the email address: " + adminReserveUserEmail)
       user = anotherUser
+
+    # Make sure that there are enough resources for the reservation
+    getAvailableHardwareResponse = getAvailableHardware(date.isoformat(), duration, hardwareSpecs, isAdmin, None, user.userId)
+    if (getAvailableHardwareResponse["status"] == False):
+      return Response(False, getAvailableHardwareResponse["message"])
 
     # Create the base reservation
     reservation_data = {
@@ -341,6 +364,23 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
 
     reservation = Reservation(**reservation_data)
 
+    # Get user's role-based hardware limits
+    user_role_limits = {}
+    from database import RoleHardwareLimit, UserRole
+    user_roles = session.query(UserRole).filter(UserRole.userId == user.userId).all()
+    role_ids = [ur.roleId for ur in user_roles]
+    
+    if role_ids and not isAdmin:
+      role_limits = session.query(RoleHardwareLimit).filter(
+        RoleHardwareLimit.roleId.in_(role_ids)
+      ).all()
+      
+      # Build a dict of hardwareSpecId -> max limit across all roles
+      for limit in role_limits:
+        spec_id = limit.hardwareSpecId
+        if spec_id not in user_role_limits or limit.maximumAmountForRole > user_role_limits[spec_id]:
+          user_role_limits[spec_id] = limit.maximumAmountForRole
+
     # Add GPU count validation
     total_gpus_requested = 0
     for key, val in hardwareSpecs.items():
@@ -350,7 +390,15 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     
     # Validate total GPU count for non-admins (max 1 GPU per reservation)
     if not isAdmin and total_gpus_requested > 1:
-      return Response(False, "You can only reserve 1 GPU at a time.")
+      # Check if any role allows more than 1 GPU
+      gpu_limit_from_roles = 1
+      for key, val in hardwareSpecs.items():
+        hardwareSpec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
+        if hardwareSpec and hardwareSpec.type == "gpu" and key in user_role_limits:
+          gpu_limit_from_roles = max(gpu_limit_from_roles, user_role_limits[key])
+      
+      if total_gpus_requested > gpu_limit_from_roles:
+        return Response(False, f"You can only reserve {gpu_limit_from_roles} GPU(s) at a time.")
     
     # Enhanced hardware specification validation
     for key, val in hardwareSpecs.items():
@@ -367,8 +415,14 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
       
       # Check that the amount does not exceed user limits for the given hardware
       # Skipped for admins
-      if val > hardwareSpec.maximumAmountForUser and isAdmin == False:
-        return Response(False, f"Trying to utilize hardware specs above the user maximum amount for {hardwareSpec.type} {hardwareSpec.format}: {val} > {hardwareSpec.maximumAmountForUser}")
+      if isAdmin == False:
+        # Use role-based limit if available, otherwise use default computer limit
+        effective_limit = hardwareSpec.maximumAmountForUser
+        if int(key) in user_role_limits:
+          effective_limit = min(user_role_limits[int(key)], hardwareSpec.maximumAmount)
+        
+        if val > effective_limit:
+          return Response(False, f"Trying to utilize hardware specs above the user maximum amount for {hardwareSpec.type} {hardwareSpec.format}: {val} > {effective_limit}")
       
       # Only add resources over 0
       if val > 0:
@@ -458,7 +512,7 @@ def extendReservation(userId : int, reservationId: str, duration: int):
     reducableSpecs = {}
     for spec in reservation.reservedHardwareSpecs:
       reducableSpecs[spec.hardwareSpecId] = spec.amount
-    getAvailableHardwareResponse = getAvailableHardware(endTimeString, duration, reducableSpecs, False, reservation.reservationId)
+    getAvailableHardwareResponse = getAvailableHardware(endTimeString, duration, reducableSpecs, False, reservation.reservationId, reservation.userId)
     if getAvailableHardwareResponse["status"]:
       # Extend the reservation
       reservation.endDate = reservation.endDate + relativedelta(hours=+duration)

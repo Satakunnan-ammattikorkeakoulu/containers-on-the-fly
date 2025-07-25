@@ -90,7 +90,16 @@ def CheckToken(token : str) -> object:
 
   if user is not None:
     userRole = GetRole(user.email)
-    return helpers.server.Response(True, "Token OK.", { "userId": user.userId, "email": user.email, "role": userRole })
+    # Get all user roles
+    userRoles = []
+    with Session() as session:
+      from database import UserRole, Role
+      user_roles = session.query(Role).join(UserRole).filter(UserRole.userId == user.userId).all()
+      for role in user_roles:
+        if role.name.lower() != 'everyone':  # Exclude 'everyone' role
+          userRoles.append(role.name)
+    
+    return helpers.server.Response(True, "Token OK.", { "userId": user.userId, "email": user.email, "role": userRole, "roles": userRoles })
   else:
     return helpers.server.Response(False, "Invalid token.")
 

@@ -650,6 +650,41 @@ def saveRoleMounts(roleId: int, mounts: list) -> object:
     except Exception as e:
         return Response(False, f"Error saving role mounts: {str(e)}")
 
+def getRoleHardwareLimits(roleId: int) -> object:
+    '''
+    Retrieves hardware limits for a specific role.
+    
+    Parameters:
+        roleId: The ID of the role
+        
+    Returns:
+        object: Response object with hardware limits data
+    '''
+    try:
+        from helpers.tables.Role import getRoleHardwareLimits as getRoleHardwareLimitsHelper
+        limits = getRoleHardwareLimitsHelper(roleId)
+        return Response(True, "Role hardware limits retrieved successfully", {"hardwareLimits": limits})
+    except Exception as e:
+        return Response(False, f"Error retrieving role hardware limits: {str(e)}")
+
+def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> object:
+    '''
+    Saves role hardware limits, replacing existing ones.
+    
+    Parameters:
+        roleId: The ID of the role
+        hardwareLimits: List of hardware limit dictionaries
+        
+    Returns:
+        object: Response object with status and message
+    '''
+    try:
+        from helpers.tables.Role import saveRoleHardwareLimits as saveRoleHardwareLimitsHelper
+        success, message = saveRoleHardwareLimitsHelper(roleId, hardwareLimits)
+        return Response(success, message)
+    except Exception as e:
+        return Response(False, f"Error saving role hardware limits: {str(e)}")
+
 def getServerMonitoring(computer_id: int) -> object:
     '''
     Returns monitoring data (metrics and logs) for a specific server.

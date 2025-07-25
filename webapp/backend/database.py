@@ -50,6 +50,7 @@ class Role(Base):
 
   users = relationship("User", secondary = "UserRole", back_populates = "roles", single_parent=True)
   mounts = relationship("RoleMount", back_populates="role")
+  hardwareLimits = relationship("RoleHardwareLimit", back_populates="role")
 
 class UserRole(Base):
   __tablename__ = "UserRole"
@@ -173,6 +174,7 @@ class HardwareSpec(Base):
 
   computer = relationship("Computer", back_populates = "hardwareSpecs")
   reservations = relationship("ReservedHardwareSpec", back_populates = "hardwareSpec")
+  roleLimits = relationship("RoleHardwareLimit", back_populates="hardwareSpec")
 
 class ReservedHardwareSpec(Base):
   __tablename__ = "ReservedHardwareSpec"
@@ -202,6 +204,23 @@ class RoleMount(Base):
 
     role = relationship("Role", back_populates="mounts")
     computer = relationship("Computer", back_populates="roleMounts")
+
+class RoleHardwareLimit(Base):
+    __tablename__ = "RoleHardwareLimit"
+    
+    roleHardwareLimitId = Column(Integer, primary_key=True, autoincrement=True)
+    roleId = Column(ForeignKey("Role.roleId"), nullable=False)
+    hardwareSpecId = Column(ForeignKey("HardwareSpec.hardwareSpecId"), nullable=False)
+    maximumAmountForRole = Column(Integer, nullable=True)
+    createdAt = Column(DateTime(timezone=True), server_default=func.now())
+    updatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint('roleId', 'hardwareSpecId', name='unique_role_hardware'),
+    )
+    
+    role = relationship("Role", back_populates="hardwareLimits")
+    hardwareSpec = relationship("HardwareSpec", back_populates="roleLimits")
 
 class ServerStatus(Base):
     __tablename__ = "ServerStatus"

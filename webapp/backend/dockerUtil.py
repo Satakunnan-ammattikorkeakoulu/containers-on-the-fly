@@ -224,7 +224,7 @@ def stopOrphanContainerReservations():
     # Get all containers marked as started in the database
     reservations = getRunningReservations(computerId)
     for reservation in reservations:
-      print(reservation.reservedContainer.containerDockerId)
+      pass  # containerDockerId might be None
     
     # Get all Docker container reservations (container name starting with "reservation-"") really running on this computer
     docker_reservation_containers = getRunningReservedDockerContainers()
@@ -329,5 +329,5 @@ if __name__ == "__main__":
   if not computerId:
     print("!!! Could not find computer with this name from the database. settings.json should contain docker.serverName and the name should be exactly the same as the computer in the database. !!! Exiting." + linesep)
     sys.exit()
-
+  
   main()

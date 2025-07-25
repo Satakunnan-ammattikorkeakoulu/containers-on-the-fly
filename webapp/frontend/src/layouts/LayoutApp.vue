@@ -18,6 +18,20 @@
           Logged in as
           <br />
           <span>{{userEmail}}</span>
+          <v-tooltip bottom v-if="userRoles.length > 0">
+            <template v-slot:activator="{ on, attrs }">
+              <v-chip
+                x-small
+                outlined
+                class="ml-2"
+                v-bind="attrs"
+                v-on="on"
+              >
+                {{ userRoles.length }} {{ userRoles.length === 1 ? 'role' : 'roles' }}
+              </v-chip>
+            </template>
+            <span>{{ userRoles.join(', ') }}</span>
+          </v-tooltip>
         </p>
       </v-app-bar>
 
@@ -83,6 +97,10 @@
       userEmail() {
         if (!this.$store.getters.user) return ""
         return this.$store.getters.user.email || ""
+      },
+      userRoles() {
+        if (!this.$store.getters.user) return []
+        return this.$store.getters.user.roles || []
       },
     },
     beforeRouteUpdate(to, from, next) {

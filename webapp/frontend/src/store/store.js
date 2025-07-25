@@ -31,6 +31,7 @@ export const store = new Vuex.Store({
       loginToken: "",
       email: "",
       role: "",
+      roles: [],  // Array of all user roles (excluding 'everyone')
       loggedinAt: null
     },
     // App configuration from backend
@@ -109,6 +110,7 @@ export const store = new Vuex.Store({
                 "loginToken": user.loginToken,
                 "email": user.email,
                 "role": user.role,
+                "roles": user.roles || [],
                 "loggedinAt": user.loggedinAt
               });
             }
@@ -164,6 +166,7 @@ export const store = new Vuex.Store({
             state.user.loginToken = payload.loginToken
             state.user.email = response.data.data.email
             state.user.role = response.data.data.role
+            state.user.roles = response.data.data.roles || []
             state.user.loggedinAt = new Date()
             localStorage.setItem("user", JSON.stringify(state.user))
             if (state.initializing) state.initializing = false
@@ -202,6 +205,7 @@ export const store = new Vuex.Store({
       state.user.loginToken = ""
       state.user.email = ""
       state.user.role = ""
+      state.user.roles = []
       state.user.loggedinAt = null
     },
     

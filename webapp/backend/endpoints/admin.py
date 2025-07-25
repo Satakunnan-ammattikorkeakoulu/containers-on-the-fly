@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from helpers.server import ForceAuthentication, Response
 from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import admin as functionality
-from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit, RoleMountsEdit
+from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit, RoleMountsEdit, RoleHardwareLimitsEdit
 from endpoints.models.reservation import ReservationFilters
 from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole, ServerStatus, ServerLogs
 from sqlalchemy import desc, Column, Integer, Text, Float, ForeignKey, DateTime, UniqueConstraint, Boolean, BigInteger, func
@@ -117,6 +117,16 @@ async def getRoleMounts(roleId: int, token: str = Depends(oauth2_scheme)):
 async def saveRoleMounts(roleMountsEdit: RoleMountsEdit, token: str = Depends(oauth2_scheme)):
     ForceAuthentication(token, "admin")
     return functionality.saveRoleMounts(roleMountsEdit.roleId, roleMountsEdit.mounts)
+
+@router.get("/role_hardware_limits")
+async def getRoleHardwareLimits(roleId: int, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.getRoleHardwareLimits(roleId)
+
+@router.post("/save_role_hardware_limits")
+async def saveRoleHardwareLimits(roleHardwareLimitsEdit: RoleHardwareLimitsEdit, token: str = Depends(oauth2_scheme)):
+    ForceAuthentication(token, "admin")
+    return functionality.saveRoleHardwareLimits(roleHardwareLimitsEdit.roleId, roleHardwareLimitsEdit.hardwareLimits)
 
 @router.get("/server/{computer_id}/monitoring")
 async def getServerMonitoring(computer_id: int, token: str = Depends(oauth2_scheme)):

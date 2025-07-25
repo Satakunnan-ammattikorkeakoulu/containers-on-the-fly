@@ -32,6 +32,9 @@
         </template>
         <!-- Mounts action available for all roles -->
         <a class="link-action" @click="emitManageMounts(item)">Mounts</a>
+        <br v-if="!isBuiltInRole(item.name)">
+        <!-- Hardware limits action not available for built-in roles -->
+        <a v-if="!isBuiltInRole(item.name)" class="link-action" @click="emitManageHardwareLimits(item)">Hardware Limits</a>
       </template>
 
       <!-- Format the timestamps -->
@@ -99,6 +102,9 @@ export default {
     },
     emitManageMounts(role) {
       this.$emit('emitManageMounts', role);
+    },
+    emitManageHardwareLimits(role) {
+      this.$emit('emitManageHardwareLimits', role);
     }
   },
 }

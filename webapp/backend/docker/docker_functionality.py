@@ -100,11 +100,15 @@ def start_container(pars):
 
         #print(pars["gpus"])
         gpus = None
-        if pars["gpus"] != None:
+        # Check if gpus parameter exists and is not empty
+        if pars.get("gpus") and pars["gpus"] != "":
             # Check if GPU debug mode is enabled
-            debug_skip_gpu = settings_handler.getSetting("docker.debugSkipGpuDedication")
+            try:
+                debug_skip_gpu = settings_handler.getSetting("docker.debugSkipGpuDedication")
+            except Exception as e:
+                debug_skip_gpu = False
+            
             if debug_skip_gpu:
-                print(f"DEBUG: GPU debug mode enabled - skipping GPU dedication for: {pars['gpus']}")
                 gpus = None
             else:
                 gpus = f'"{pars["gpus"]}"'
@@ -170,29 +174,31 @@ def start_container(pars):
         ram_mounts = [tmpfs_config]
         
         # Start the container
-        cont = docker.run(
-            full_image_name,
-            volumes = volumes,
-            mounts = [ram_mounts], # added this for ramdisk
-            gpus=gpus,
-            name = container_name,
-            memory = pars['memory'],
-            kernel_memory = pars['memory'],
-            shm_size = pars['shm_size'],
-            cpus = pars['cpus'],
-            publish = pars['ports'],
-            detach = True,
-            interactive = pars['interactive'],
-            
+        # Build the base parameters
+        run_params = {
+            'volumes': volumes,
+            'mounts': [ram_mounts], # added this for ramdisk
+            'name': container_name,
+            'memory': pars['memory'],
+            'kernel_memory': pars['memory'],
+            'shm_size': pars['shm_size'],
+            'cpus': pars['cpus'],
+            'publish': pars['ports'],
+            'detach': True,
+            'interactive': pars['interactive'],
             # Do not automatically remove the container as it will stop.
             # Removing a container will be handled manually in the stop_container() function.
             # If it would be removed, restarting or crashing a container would fully destroy it immediately.
-            remove = False,
+            'remove': False,
             # Looks every time if there is newer image in local registery
-            pull='always',
-
+            'pull': 'always',
             #user="1002:130"
-        )
+        }
+        
+        # Only add gpus parameter if we actually have GPUs to dedicate
+        if gpus is not None:
+            run_params['gpus'] = gpus
+        cont = docker.run(full_image_name, **run_params)
         #print("The running container: ", cont)
         #print("=== Stop printing running container")
         docker.execute(container=container_name, command=["/bin/bash","-c", f"/bin/echo 'user:{pars['password']}' | /usr/sbin/chpasswd"], user="root")

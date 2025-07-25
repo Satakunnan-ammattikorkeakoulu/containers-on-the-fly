@@ -18,7 +18,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login")
 @router.get("/get_available_hardware")
 async def getAvailableHardware(date : str, duration: int, token: str = Depends(oauth2_scheme)):
   userId = get_authenticated_user_id(token)
-  return functionality.getAvailableHardware(date, duration, None, IsAdmin(userId))
+  return functionality.getAvailableHardware(date, duration, None, IsAdmin(userId), None, userId)
 
 @router.get("/get_availability_timeline")
 async def getAvailabilityTimeline(startDate: str, endDate: str, token: str = Depends(oauth2_scheme)):

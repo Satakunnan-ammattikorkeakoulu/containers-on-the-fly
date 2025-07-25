@@ -28,3 +28,10 @@ class RoleMountsEdit(BaseModel):
     '''
     roleId: int
     mounts: List[Dict[str, Any]]
+
+class RoleHardwareLimitsEdit(BaseModel):
+    '''
+    For editing role hardware limits.
+    '''
+    roleId: int
+    hardwareLimits: List[Dict[str, Any]]

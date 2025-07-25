@@ -29,10 +29,10 @@
                 <h2 style="margin-bottom: 20px; margin-top: 40px;">vCPUs</h2>
                 <p class="help-text">Write the minimum amount of reservable vCPUs, maximum and the default selected for the user. This should be just an integer number for each, like: 3.</p>
                 <v-row>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.required]" v-model="data.hardware.cpu.minimumAmount" label="minimum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.required]" v-model="data.hardware.cpu.maximumAmount" label="maximum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.required]" v-model="data.hardware.cpu.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.required]" v-model="data.hardware.cpu.defaultAmountForUser" label="default*"></v-text-field></v-col>
+                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.minimumAmount" label="minimum*"></v-text-field></v-col>
+                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmount" label="maximum*"></v-text-field></v-col>
+                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
+                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.defaultAmountForUser" label="default*"></v-text-field></v-col>
                 </v-row>
               </v-col>
               <!-- RAM -->
@@ -40,10 +40,10 @@
                 <h2 style="margin-bottom: 20px; margin-top: 40px;">Ram Memory</h2>
                 <p class="help-text">Write the minimum amount of reservable RAM memory amount (in GBs), maximum and the default selected for the user. This should be just an integer number for each, like: 256.</p>
                 <v-row>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.required]" v-model="data.hardware.ram.minimumAmount" label="minimum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.required]" v-model="data.hardware.ram.maximumAmount" label="maximum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.required]" v-model="data.hardware.ram.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.required]" v-model="data.hardware.ram.defaultAmountForUser" label="default for user*"></v-text-field></v-col>
+                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.minimumAmount" label="minimum*"></v-text-field></v-col>
+                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmount" label="maximum*"></v-text-field></v-col>
+                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
+                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.defaultAmountForUser" label="default for user*"></v-text-field></v-col>
                 </v-row>
               </v-col>
               <!-- GPU Max -->
@@ -51,7 +51,7 @@
                 <h2 style="margin-bottom: 20px; margin-top: 40px;">GPU</h2>
                 <p class="help-text">Write the maximum amount of GPUs that user can reserve in integer. For example: 2</p>
                 <v-row>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.required]" v-model="data.hardware.gpu.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
+                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.gpu.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
                 </v-row>
               </v-col>
               <!-- GPUs -->
@@ -114,6 +114,7 @@
         dataName: "computer",
         rules: {
           required: value => !!value || "Required",
+          requiredNumber: value => value !== '' && value !== null && value !== undefined || "Required",
           newPassword: value => {
             if (!value || value == "" || value.trim() == "") return "Password cannot be empty.";
             if (value.length < 5) return "Password has to be over 4 characters long.";

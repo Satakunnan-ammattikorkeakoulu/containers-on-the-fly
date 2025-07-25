@@ -1,0 +1,35 @@
+meta {
+  name: Get Single Computer
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{root_url}}/admin/computer?computerId=1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has computer data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('data');
+    const computer = res.body.data.data;
+    expect(computer).to.have.property('name');
+    expect(computer).to.have.property('ip');
+    expect(computer).to.have.property('hardware');
+  });
+}

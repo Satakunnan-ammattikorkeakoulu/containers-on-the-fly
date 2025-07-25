@@ -1,0 +1,37 @@
+meta {
+  name: Get All Reservations for Calendar
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{root_url}}/reservation/get_all_reservations_for_calendar
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user_token}}
+}
+
+params:query {
+  startDate: 2025-02-01
+  endDate: 2025-02-28
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has reservations data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('reservations');
+    expect(res.body.data.reservations).to.be.an('array');
+  });
+}

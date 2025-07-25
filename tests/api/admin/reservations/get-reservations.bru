@@ -1,0 +1,42 @@
+meta {
+  name: Get All Reservations (Admin)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{root_url}}/admin/reservations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "filters": {
+      "startDate": "2025-01-01",
+      "endDate": "2025-12-31",
+      "status": "all"
+    }
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has reservations data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('reservations');
+    expect(res.body.data.reservations).to.be.an('array');
+  });
+}

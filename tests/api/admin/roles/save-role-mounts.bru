@@ -1,0 +1,39 @@
+meta {
+  name: Save Role Mounts
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{root_url}}/admin/save_role_mounts
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "roleId": 1,
+    "mounts": [
+      {
+        "containerPath": "/data",
+        "hostPath": "/mnt/shared/data",
+        "readOnly": false
+      }
+    ]
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal(true);
+  });
+}

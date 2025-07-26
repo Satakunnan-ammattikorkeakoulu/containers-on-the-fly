@@ -1867,7 +1867,7 @@ export default {
         this.fetchingMetrics = true;
         this.fetchingLogs = true;
         
-        console.log(`Fetching monitoring data for server ${this.selectedServer}`);
+        //console.log(`Fetching monitoring data for server ${this.selectedServer}`);
         
         let _this = this;
         let currentUser = this.$store.getters.user;

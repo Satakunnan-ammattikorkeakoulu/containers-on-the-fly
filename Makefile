@@ -268,6 +268,10 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 	@chmod +x scripts/apply_settings.py
 	@$(PYTHON) scripts/apply_settings.py
 
+apply-settings-main-server: # Applies settings for main server context
+	@chmod +x scripts/apply_settings.py
+	@CONTAINERFLY_CONTEXT=main-server $(PYTHON) scripts/apply_settings.py
+
 # Production targets
 
 check-root: # Checks if running with root privileges
@@ -338,7 +342,7 @@ setup-main-server: check-root check-os-ubuntu interactive-settings-creation appl
 	@echo "$(GREEN)2. Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
 	@rm -f .server_type
 
-start-main-server: verify-config-file-exists apply-settings install-backend-deps init-database ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
+start-main-server: verify-config-file-exists apply-settings-main-server install-backend-deps init-database ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
 	@echo ""
 	@echo "Moving Caddyfile to /etc/caddy/Caddyfile"
 	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile

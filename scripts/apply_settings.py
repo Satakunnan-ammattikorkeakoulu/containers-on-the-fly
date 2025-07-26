@@ -152,9 +152,8 @@ class SettingsApplier:
         custom_ssl = self.settings.get('CUSTOM_SSL_ENABLED', 'false').lower() == 'true'
         domain = self.settings.get('MAIN_SERVER_WEB_HOST', 'localhost')
         
-        # Check if we're running in main server context (Caddyfile will be generated)
-        caddyfile_template = self.templates_dir / 'Caddyfile'
-        is_main_server_context = caddyfile_template.exists()
+        # Check if we're running in main server context via environment variable
+        is_main_server_context = os.environ.get('CONTAINERFLY_CONTEXT') == 'main-server'
         
         if enable_https:
             if custom_ssl:

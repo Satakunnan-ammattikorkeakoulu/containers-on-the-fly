@@ -68,7 +68,7 @@ class Container(Base):
   public = Column(Boolean, nullable = False)
   imageName = Column(Text, unique = True, nullable = False)
   name = Column(Text, nullable = False)
-  removed = Column(Boolean, nullable = True) # TODO: Add to diagram
+  removed = Column(Boolean, nullable = True)
   description = Column(Text, nullable = True)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
@@ -132,7 +132,7 @@ class Reservation(Base):
   userId = Column(ForeignKey("User.userId"), nullable = False)
   startDate = Column(DateTime, nullable = False)
   endDate = Column(DateTime, nullable = False)
-  description = Column(Text, nullable = True) # TODO: add to database drawing
+  description = Column(Text, nullable = True)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
   status = Column(Text, nullable = False) # reserved, started, stopped, error, restart
@@ -148,7 +148,7 @@ class Computer(Base):
   computerId = Column(Integer, primary_key = True, autoincrement = True)
   public = Column(Boolean, nullable = False)
   name = Column(Text, nullable = False, unique = True)
-  removed = Column(Boolean, nullable = True) # TODO: Add to diagram
+  removed = Column(Boolean, nullable = True)
   ip = Column(Text, nullable = False)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
@@ -162,7 +162,7 @@ class HardwareSpec(Base):
 
   hardwareSpecId = Column(Integer, primary_key = True, autoincrement = True)
   computerId = Column(ForeignKey("Computer.computerId"), nullable = False)
-  internalId = Column(Text, nullable = True) # TODO: Add to diagram
+  internalId = Column(Text, nullable = True)
   type = Column(Text, nullable = False)
   maximumAmount = Column(Float, nullable = False)
   minimumAmount = Column(Float, nullable = False)
@@ -183,7 +183,6 @@ class ReservedHardwareSpec(Base):
   reservationId = Column(ForeignKey("Reservation.reservationId"), nullable = False)
   hardwareSpecId = Column(ForeignKey("HardwareSpec.hardwareSpecId"), nullable = False)
   amount = Column(Float, nullable = False)
-  #UniqueConstraint('reservationId', 'hardwareSpecId', name='uniqueHardwareSpec')
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 

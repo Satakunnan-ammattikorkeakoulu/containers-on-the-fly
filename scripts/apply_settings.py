@@ -152,6 +152,10 @@ class SettingsApplier:
         custom_ssl = self.settings.get('CUSTOM_SSL_ENABLED', 'false').lower() == 'true'
         domain = self.settings.get('MAIN_SERVER_WEB_HOST', 'localhost')
         
+        # Check if we're running in main server context (Caddyfile will be generated)
+        caddyfile_template = self.templates_dir / 'Caddyfile'
+        is_main_server_context = caddyfile_template.exists()
+        
         if enable_https:
             if custom_ssl:
                 # HTTPS mode with custom certificates
@@ -163,28 +167,33 @@ class SettingsApplier:
                     self.settings['CADDY_TLS_CONFIG'] = f"\n\ttls {cert_path} {key_path}"
                     self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode - custom certificates)"
                     self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
-                    print(f"Caddy mode: HTTPS enabled for domain '{domain}' (custom SSL certificates)")
+                    if is_main_server_context:
+                        print(f"Caddy mode: HTTPS enabled for domain '{domain}' (custom SSL certificates)")
                 else:
-                    print(f"Warning: Custom SSL enabled but certificate paths not specified. Falling back to Let's Encrypt.")
+                    if is_main_server_context:
+                        print(f"Warning: Custom SSL enabled but certificate paths not specified. Falling back to Let's Encrypt.")
                     self.settings['CADDY_SITE_BLOCK'] = domain
                     self.settings['CADDY_TLS_CONFIG'] = ""
                     self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode - Let's Encrypt fallback)"
                     self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
-                    print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
+                    if is_main_server_context:
+                        print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
             else:
                 # HTTPS mode - automatic Let's Encrypt certificates
                 self.settings['CADDY_SITE_BLOCK'] = domain
                 self.settings['CADDY_TLS_CONFIG'] = ""
                 self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode - Let's Encrypt)"
                 self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
-                print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
+                if is_main_server_context:
+                    print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
         else:
             # HTTP mode - no SSL certificates
             self.settings['CADDY_SITE_BLOCK'] = f"http://{domain}"
             self.settings['CADDY_TLS_CONFIG'] = ""
             self.settings['CADDY_SECURITY_HEADERS'] = " (HTTP mode)"
             self.settings['CADDY_HSTS_HEADER'] = ""
-            print(f"Caddy mode: HTTP only for '{domain}' (no SSL certificates)")
+            if is_main_server_context:
+                print(f"Caddy mode: HTTP only for '{domain}' (no SSL certificates)")
                     
     def apply_templates(self):
         """Apply settings to all template files."""
@@ -284,8 +293,16 @@ class SettingsApplier:
             print("\n✅ Settings applied successfully!")
             print(f"Generated files:")
             print(f"  - Backend settings: webapp/backend/settings.json")
-            print(f"  - Frontend settings: webapp/frontend/src/AppSettings.js")  
-            print(f"  - Caddy config: user_config/Caddyfile")
+            
+            # Only show frontend settings if the template exists
+            frontend_template = self.templates_dir / 'frontend_settings.js'
+            if frontend_template.exists():
+                print(f"  - Frontend settings: webapp/frontend/src/AppSettings.js")
+            
+            # Only show Caddy config if the template exists
+            caddyfile_template = self.templates_dir / 'Caddyfile'
+            if caddyfile_template.exists():
+                print(f"  - Caddy config: user_config/Caddyfile")
             
         except Exception as e:
             print(f"\n❌ Error applying settings: {e}")

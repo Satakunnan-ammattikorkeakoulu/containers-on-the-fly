@@ -64,7 +64,7 @@
           :event-color="getEventColor"
           :type="type"
           :weekdays="weekdays"
-          @mouseup:time="selectSlot"
+          @click:time="selectSlot"
           event-overlap-mode="column"
           first-interval="0"
           interval-minutes="30"
@@ -170,8 +170,14 @@
         return interval.time
       },
       selectSlot( event ) {
-        // If calendar is in read-only mode or availability mode, don't allow slot selection
-        if (this.readOnly || this.viewMode === 'availability') {
+        // If calendar is in read-only mode, don't allow slot selection
+        if (this.readOnly) {
+          return
+        }
+        
+        // Only allow time selection in day, week, or 4day views (not month view)
+        if (this.type === 'month') {
+          this.$store.commit('showMessage', { text: "Switch to week, day, or 4-day view to select a specific time.", color: "info" })
           return
         }
         

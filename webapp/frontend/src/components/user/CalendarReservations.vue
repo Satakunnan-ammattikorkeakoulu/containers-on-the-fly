@@ -120,10 +120,12 @@
   const axios = require('axios').default;
   var utc = require('dayjs/plugin/utc')
   var timezone = require('dayjs/plugin/timezone')
+  var isoWeek = require('dayjs/plugin/isoWeek')
   dayjs.extend(utc)
   var customParseFormat = require('dayjs/plugin/customParseFormat')
   dayjs.extend(timezone)
   dayjs.extend(customParseFormat)
+  dayjs.extend(isoWeek)
 
   export default {
     name: 'CalendarReservations',
@@ -272,8 +274,9 @@
             calendarEnd = focusDate.endOf('month').add(1, 'day');
             break;
           case 'week':
-            calendarStart = focusDate.startOf('week');
-            calendarEnd = focusDate.endOf('week').add(1, 'day');
+            // Use isoWeek to ensure Monday is the first day of the week
+            calendarStart = focusDate.startOf('isoWeek');
+            calendarEnd = focusDate.endOf('isoWeek').add(1, 'day');
             break;
           case '4day':
             // 4-day view shows current day + 3 more days
@@ -335,8 +338,9 @@
             calendarEnd = focusDate.endOf('month').add(1, 'day');
             break;
           case 'week':
-            calendarStart = focusDate.startOf('week');
-            calendarEnd = focusDate.endOf('week').add(1, 'day');
+            // Use isoWeek to ensure Monday is the first day of the week
+            calendarStart = focusDate.startOf('isoWeek');
+            calendarEnd = focusDate.endOf('isoWeek').add(1, 'day');
             break;
           case '4day':
             calendarStart = focusDate.startOf('day');

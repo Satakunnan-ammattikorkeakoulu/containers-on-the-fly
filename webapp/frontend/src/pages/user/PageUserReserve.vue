@@ -521,7 +521,8 @@
         if (this.step == 2 && duration < this.minimumDuration) {
           return this.$store.commit('showMessage', { text: "Minimum duration is "+this.minimumDuration+" hours.", color: "red" })
         }
-        if (this.step == 2 && duration > this.maximumDuration) {
+        // Skip maximum duration check for admins
+        if (this.step == 2 && duration > this.maximumDuration && !this.isAdmin()) {
           return this.$store.commit('showMessage', { text: "Maximum duration is "+this.maximumDuration+" hours.", color: "red" })
         }
 
@@ -1032,7 +1033,8 @@
         return this.$store.getters.reservationMinDuration
       },
       maximumDuration() {
-        return this.$store.getters.reservationMaxDuration
+        // Admins have no maximum duration limit (60 days * 24 hours)
+        return this.isAdmin() ? 60 * 24 : this.$store.getters.reservationMaxDuration
       },
       minimumDurationDays() {
         return Math.floor(this.minimumDuration / 24)

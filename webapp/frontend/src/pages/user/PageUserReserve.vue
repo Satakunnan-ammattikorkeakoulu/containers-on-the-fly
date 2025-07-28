@@ -37,9 +37,8 @@
         </v-row>
         <v-row>
           <v-col class="section">
-            <div style="text-align: right">
-              <p style="margin-bottom: 0px;"><small>All times are in timezone <strong>{{globalTimezone}}</strong></small></p>
-              <p><small><a @click="refreshCalendarReservations">Refresh reservations</a></small></p>
+            <div style="text-align: left">
+              <p style="margin-bottom: 10px;"><small>All times are in timezone <strong>{{globalTimezone}}</strong></small></p>
             </div>
             <div style="text-align: center;">
               <CalendarReservations 

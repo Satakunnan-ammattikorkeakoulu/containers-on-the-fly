@@ -230,7 +230,7 @@
           } else if (spec.type.toLowerCase() === 'cpu' || spec.type.toLowerCase() === 'cpus') {
             displayText = `CPU: ${Math.round(spec.available)}/${Math.round(spec.maximum)}`
           } else if (spec.type.toLowerCase() === 'ram') {
-            displayText = `RAM: ${Math.round(spec.available)}/${Math.round(spec.maximum)} ${spec.format}`
+            displayText = `RAM: ${Math.round(spec.available)}/${Math.round(spec.maximum)}`
           } else {
             displayText = `${spec.type.toUpperCase()}: ${Math.round(spec.available)}/${Math.round(spec.maximum)}`
           }

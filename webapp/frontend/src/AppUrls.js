@@ -51,6 +51,8 @@ function createUrls(baseAddress) {
     URLS.admin.save_role_mounts = baseAdminUrl + "save_role_mounts"
     URLS.admin.get_role_hardware_limits = baseAdminUrl + "role_hardware_limits"
     URLS.admin.save_role_hardware_limits = baseAdminUrl + "save_role_hardware_limits"
+    URLS.admin.get_role_reservation_limits = baseAdminUrl + "role_reservation_limits"
+    URLS.admin.save_role_reservation_limits = baseAdminUrl + "save_role_reservation_limits"
 
     let baseAppUrl = baseUrl + "app/"
     URLS.app.get_config = baseAppUrl + "config"

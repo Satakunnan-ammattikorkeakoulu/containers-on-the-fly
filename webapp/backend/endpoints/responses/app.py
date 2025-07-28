@@ -15,8 +15,6 @@ def getPublicConfig() -> object:
         setting_keys = [
             'general.applicationName',
             'general.timezone',
-            'reservation.minimumDuration',
-            'reservation.maximumDuration',
             'instructions.login',
             'instructions.reservation', 
             'instructions.email',
@@ -34,10 +32,6 @@ def getPublicConfig() -> object:
                 "name": settings_dict.get('general.applicationName', 'Containers on the Fly'),
                 "timezone": settings_dict.get('general.timezone', 'UTC'),
                 "contactEmail": settings_dict.get('email.contactEmail', '')
-            },
-            "reservation": {
-                "minimumDuration": settings_dict.get('reservation.minimumDuration', 5),
-                "maximumDuration": settings_dict.get('reservation.maximumDuration', 72)
             },
             "instructions": {
                 "login": settings_dict.get('instructions.login', ''),

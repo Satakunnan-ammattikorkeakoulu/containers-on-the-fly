@@ -64,42 +64,6 @@
                   </v-row>
                 </div>
                 
-                <!-- Reservation Configuration -->
-                <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Reservation Configuration</h6>
-                  <p class="body-2 grey--text mb-4">
-                    Set the minimum and maximum duration limits for container reservations. These limits apply to all users (admins can exceed maximum).
-                  </p>
-                  <v-row>
-                    <v-col cols="12" md="6">
-                      <v-text-field
-                        v-model="settings.general.reservationMinDuration"
-                        label="Minimum Duration (hours)"
-                        type="number"
-                        min="1"
-                        outlined
-                        required
-                        :rules="[rules.required, rules.positiveNumber]"
-                        hide-details
-                        placeholder="5"
-                      ></v-text-field>
-                    </v-col>
-                    <v-col cols="12" md="6">
-                      <v-text-field
-                        v-model="settings.general.reservationMaxDuration"
-                        label="Maximum Duration (hours)"
-                        type="number"
-                        min="1"
-                        outlined
-                        required
-                        :rules="[rules.required, rules.positiveNumber, ...(initialLoadComplete ? [rules.maxGreaterThanMin] : [])]"
-                        hide-details
-                        placeholder="72"
-                      ></v-text-field>
-                    </v-col>
-                  </v-row>
-                </div>
-                
                 <!-- Login Page Information -->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Login Page Instructions</h6>
@@ -1208,20 +1172,6 @@ export default {
         if (!value) return 'This field is required'
         const num = parseInt(value)
         return (num > 0) || 'Must be a positive number'
-      },
-      maxGreaterThanMin: function(value) {
-        if (!value) return 'This field is required'
-        try {
-          // Use function instead of arrow function to access this correctly
-          const maxDuration = parseInt(value)
-          // Safely handle settings not being loaded yet
-          if (!this || !this.settings || !this.settings.general) return true
-          const minDuration = parseInt(this.settings.general.reservationMinDuration || 5)
-          return (maxDuration >= minDuration) || 'Maximum duration must be greater than or equal to minimum duration'
-        } catch (error) {
-          console.warn('Error in maxGreaterThanMin validation:', error)
-          return true  // Don't block validation if there's an error
-        }
       }
     },
     
@@ -1333,8 +1283,6 @@ export default {
       general: {
         applicationName: 'Containers on the Fly',
         timezone: 'UTC',
-        reservationMinDuration: 5,
-        reservationMaxDuration: 72,
         loginPageInfo: '',
         reservationPageInstructions: '',
         emailInstructions: '',
@@ -1539,8 +1487,6 @@ export default {
             // Update settings from backend (update individual properties)
             _this.settings.general.applicationName = data.general.applicationName || 'Containers on the Fly';
             _this.settings.general.timezone = data.general.timezone || 'UTC';
-            _this.settings.general.reservationMinDuration = data.general.reservationMinDuration || 5;
-            _this.settings.general.reservationMaxDuration = data.general.reservationMaxDuration || 72;
             _this.settings.general.loginPageInfo = data.general.loginPageInfo || '';
             _this.settings.general.reservationPageInstructions = data.general.reservationPageInstructions || '';
             _this.settings.general.emailInstructions = data.general.emailInstructions || '';

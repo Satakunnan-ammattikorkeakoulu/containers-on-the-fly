@@ -4,8 +4,8 @@
       <v-col>
         <v-btn color="success" large @click="createReservation">Reserve Server</v-btn>
         <br>
-        <p style="color: grey; font-size: 13px; margin-top: 8px; margin-bottom: 0px;">or</p>
-        <a @click="toggleCalendarView" style="margin-top: 8px; display: inline-block; font-size: 13px;">
+        <p style="color: grey; font-size: 13px; margin-top: 8px; margin-bottom: 0px;">{{ activeReservationCount }} of {{ maxActiveReservations }} active reservations</p>
+        <a @click="toggleCalendarView" style="margin-top: 15px; display: inline-block; font-size: 13px;">
           {{ showCalendar ? 'hide reservation calendar' : 'show reservation calendar' }}
         </a>
       </v-col>
@@ -140,17 +140,17 @@
         this.modalConnectionDetailsVisible = false
       },
       createReservation() {
-        let hasActiveReservations = false
-        this.reservations.forEach((res) => {
-          if (res.status == "started" || res.status == "reserved") hasActiveReservations = true
-        })
+        // Check against the user's actual limit
+        if (this.activeReservationCount >= this.maxActiveReservations) {
+          this.$store.commit('showMessage', { 
+            text: `You have reached your maximum of ${this.maxActiveReservations} active reservation${this.maxActiveReservations === 1 ? '' : 's'}. Please wait for an existing reservation to complete before creating a new one.`, 
+            color: "red" 
+          })
+          return
+        }
 
-        let currentUser = this.$store.getters.user
-
-        if (!hasActiveReservations || currentUser.role == "admin")
-          this.$router.push("/user/reserve")
-        else
-          this.$store.commit('showMessage', { text: "You can only have one reserved or started reservation at a time. Cancel the current reservation if you need a new.", color: "red" })
+        // User has not reached their limit, allow navigation
+        this.$router.push("/user/reserve")
       },
       fetchReservations() {
         let _this = this
@@ -390,20 +390,17 @@
         });
       },
        handleSlotSelected() {
-         // Check if user already has active reservations
-         let hasActiveReservations = false;
-         this.reservations.forEach((res) => {
-           if (res.status == "started" || res.status == "reserved") hasActiveReservations = true;
-         });
-
-         let currentUser = this.$store.getters.user;
-
-         if (!hasActiveReservations || currentUser.role == "admin") {
-           // Navigate to reservation page and let it handle the selected time
-           this.$router.push("/user/reserve");
-         } else {
-           this.$store.commit('showMessage', { text: "You can only have one reserved or started reservation at a time. Cancel the current reservation if you need a new.", color: "red" });
+         // Check against the user's actual limit
+         if (this.activeReservationCount >= this.maxActiveReservations) {
+           this.$store.commit('showMessage', { 
+             text: `You have reached your maximum of ${this.maxActiveReservations} active reservation${this.maxActiveReservations === 1 ? '' : 's'}. Please wait for an existing reservation to complete before creating a new one.`, 
+             color: "red" 
+           })
+           return
          }
+
+         // User has not reached their limit, allow navigation
+         this.$router.push("/user/reserve");
        },
        async refreshCalendarReservations() {
          if (this.$refs.calendarComponent) {
@@ -417,6 +414,16 @@
     computed: {
       globalTimezone() {
         return this.$store.getters.appTimezone;
+      },
+      activeReservationCount() {
+        let count = 0;
+        this.reservations.forEach((res) => {
+          if (res.status == "started" || res.status == "reserved") count++;
+        });
+        return count;
+      },
+      maxActiveReservations() {
+        return this.$store.getters.userMaxActiveReservations;
       }
     },
     beforeDestroy() {

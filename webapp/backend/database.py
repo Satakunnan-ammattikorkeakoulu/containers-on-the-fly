@@ -51,6 +51,7 @@ class Role(Base):
   users = relationship("User", secondary = "UserRole", back_populates = "roles", single_parent=True)
   mounts = relationship("RoleMount", back_populates="role")
   hardwareLimits = relationship("RoleHardwareLimit", back_populates="role")
+  reservationLimits = relationship("RoleReservationLimit", back_populates="role", uselist=False)
 
 class UserRole(Base):
   __tablename__ = "UserRole"
@@ -220,6 +221,23 @@ class RoleHardwareLimit(Base):
     
     role = relationship("Role", back_populates="hardwareLimits")
     hardwareSpec = relationship("HardwareSpec", back_populates="roleLimits")
+
+class RoleReservationLimit(Base):
+    __tablename__ = "RoleReservationLimit"
+    
+    roleReservationLimitId = Column(Integer, primary_key=True, autoincrement=True)
+    roleId = Column(ForeignKey("Role.roleId"), nullable=False)
+    minDuration = Column(Integer, nullable=True)  # hours (NULL = use default)
+    maxDuration = Column(Integer, nullable=True)  # hours (NULL = use default)
+    maxActiveReservations = Column(Integer, nullable=True)  # count (NULL = use default)
+    createdAt = Column(DateTime(timezone=True), server_default=func.now())
+    updatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint('roleId', name='unique_role'),
+    )
+    
+    role = relationship("Role", back_populates="reservationLimits")
 
 class ServerStatus(Base):
     __tablename__ = "ServerStatus"

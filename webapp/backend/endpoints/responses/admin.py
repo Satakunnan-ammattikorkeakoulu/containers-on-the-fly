@@ -685,6 +685,41 @@ def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> object:
     except Exception as e:
         return Response(False, f"Error saving role hardware limits: {str(e)}")
 
+def getRoleReservationLimits(roleId: int) -> object:
+    '''
+    Retrieves reservation limits for a specific role.
+    
+    Parameters:
+        roleId: The ID of the role
+        
+    Returns:
+        object: Response object with reservation limits data
+    '''
+    try:
+        from helpers.tables.Role import getRoleReservationLimits as getRoleReservationLimitsHelper
+        limits = getRoleReservationLimitsHelper(roleId)
+        return Response(True, "Role reservation limits retrieved successfully", {"reservationLimits": limits})
+    except Exception as e:
+        return Response(False, f"Error retrieving role reservation limits: {str(e)}")
+
+def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> object:
+    '''
+    Saves role reservation limits, replacing existing ones.
+    
+    Parameters:
+        roleId: The ID of the role
+        reservationLimits: Dictionary containing minDuration, maxDuration, and maxActiveReservations
+        
+    Returns:
+        object: Response object indicating success or failure
+    '''
+    try:
+        from helpers.tables.Role import saveRoleReservationLimits as saveRoleReservationLimitsHelper
+        success, message = saveRoleReservationLimitsHelper(roleId, reservationLimits)
+        return Response(success, message)
+    except Exception as e:
+        return Response(False, f"Error saving role reservation limits: {str(e)}")
+
 def getServerMonitoring(computer_id: int) -> object:
     '''
     Returns monitoring data (metrics and logs) for a specific server.
@@ -823,8 +858,6 @@ def getGeneralSettings() -> object:
         setting_keys = [
             'general.applicationName',
             'general.timezone',
-            'reservation.minimumDuration',
-            'reservation.maximumDuration',
             'instructions.login',
             'instructions.reservation', 
             'instructions.email',
@@ -873,8 +906,6 @@ def getGeneralSettings() -> object:
             "general": {
                 "applicationName": settings_dict.get('general.applicationName', 'Containers on the Fly'),
                 "timezone": settings_dict.get('general.timezone', 'UTC'),
-                "reservationMinDuration": settings_dict.get('reservation.minimumDuration', 5),
-                "reservationMaxDuration": settings_dict.get('reservation.maximumDuration', 72),
                 "loginPageInfo": settings_dict.get('instructions.login', ''),
                 "reservationPageInstructions": settings_dict.get('instructions.reservation', ''),
                 "emailInstructions": settings_dict.get('instructions.email', ''),
@@ -943,12 +974,6 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
                 setSetting('general.applicationName', settings['applicationName'])
             if 'timezone' in settings:
                 setSetting('general.timezone', settings['timezone'])
-            if 'reservationMinDuration' in settings:
-                min_duration = 5 if not settings['reservationMinDuration'] else settings['reservationMinDuration']
-                setSetting('reservation.minimumDuration', min_duration)
-            if 'reservationMaxDuration' in settings:
-                max_duration = 72 if not settings['reservationMaxDuration'] else settings['reservationMaxDuration']
-                setSetting('reservation.maximumDuration', max_duration)
             
             # Save instruction settings using new naming scheme
             if 'loginPageInfo' in settings:

@@ -522,7 +522,7 @@
           return this.$store.commit('showMessage', { text: "Minimum duration is "+this.minimumDuration+" hours.", color: "red" })
         }
         // Skip maximum duration check for admins
-        if (this.step == 2 && duration > this.maximumDuration && !this.isAdmin()) {
+        if (this.step == 2 && duration > this.maximumDuration) {
           return this.$store.commit('showMessage', { text: "Maximum duration is "+this.maximumDuration+" hours.", color: "red" })
         }
 
@@ -830,7 +830,7 @@
         this.initializingDefaults = true
         
         // Generate days dropdown from minimum to maximum
-        let maxDays = this.isAdmin() ? 60 : this.maximumDurationDays
+        let maxDays = this.maximumDurationDays
         let minDays = this.minimumDurationDays
         
         let days = []
@@ -1030,11 +1030,12 @@
         return this.$store.getters.appTimezone
       },
       minimumDuration() {
-        return this.$store.getters.reservationMinDuration
+        // Get minimum duration from user's role-based limits in store
+        return this.$store.getters.userMinDuration || 1
       },
       maximumDuration() {
-        // Admins have no maximum duration limit (60 days * 24 hours)
-        return this.isAdmin() ? 60 * 24 : this.$store.getters.reservationMaxDuration
+        // Get maximum duration from user's role-based limits in store
+        return this.$store.getters.userMaxDuration || 48
       },
       minimumDurationDays() {
         return Math.floor(this.minimumDuration / 24)

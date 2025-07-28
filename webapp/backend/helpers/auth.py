@@ -67,6 +67,72 @@ def IsLoggedIn(token : str):
   if (tokenResponse["status"] == True): return True
   else: return False
 
+def GetUserReservationLimits(userId: int) -> dict:
+  '''
+  Gets the user's reservation limits based on their roles.
+  Applies the most permissive limits when user has multiple roles.
+  
+  Parameters:
+    userId: The user's ID
+  
+  Returns:
+    Dict with minDuration, maxDuration, and maxActiveReservations
+  '''
+  from database import UserRole, Role
+  from helpers.tables.Role import getRoleReservationLimits
+  
+  with Session() as session:
+    # Get all user roles explicitly assigned
+    user_roles = session.query(Role).join(UserRole).filter(UserRole.userId == userId).all()
+    
+    # Add the 'everyone' role since it applies to all users
+    everyone_role = session.query(Role).filter(Role.name == "everyone").first()
+    if everyone_role and everyone_role not in user_roles:
+      user_roles.append(everyone_role)
+    
+    # Check if user is admin
+    isAdmin = any(role.name == "admin" for role in user_roles)
+    
+    # Default values based on whether user is admin
+    default_min = 1  # 1 hour for all users
+    default_max = 1440 if isAdmin else 48  # 60 days for admin, 48 hours for others
+    default_active = 99 if isAdmin else 1
+    
+    # Start with the most restrictive defaults
+    min_duration = float('inf')
+    max_duration = 0
+    max_active_reservations = 0
+    
+    # Apply the most permissive limits from all roles
+    for role in user_roles:
+      limits = getRoleReservationLimits(role.roleId)
+      
+      # Use the lowest minimum duration (most permissive)
+      if limits['minDuration'] < min_duration:
+        min_duration = limits['minDuration']
+      
+      # Use the highest maximum duration (most permissive)
+      if limits['maxDuration'] > max_duration:
+        max_duration = limits['maxDuration']
+      
+      # Use the highest max active reservations (most permissive)
+      if limits['maxActiveReservations'] > max_active_reservations:
+        max_active_reservations = limits['maxActiveReservations']
+    
+    # If no roles found, use defaults
+    if min_duration == float('inf'):
+      min_duration = default_min
+    if max_duration == 0:
+      max_duration = default_max
+    if max_active_reservations == 0:
+      max_active_reservations = default_active
+    
+    return {
+      'minDuration': min_duration,
+      'maxDuration': max_duration,
+      'maxActiveReservations': max_active_reservations
+    }
+
 def CheckToken(token : str) -> object:
   '''
   Checks that the given token is valid and has not expired.
@@ -99,7 +165,16 @@ def CheckToken(token : str) -> object:
         if role.name.lower() != 'everyone':  # Exclude 'everyone' role
           userRoles.append(role.name)
     
-    return helpers.server.Response(True, "Token OK.", { "userId": user.userId, "email": user.email, "role": userRole, "roles": userRoles })
+    # Get user's reservation limits
+    reservationLimits = GetUserReservationLimits(user.userId)
+    
+    return helpers.server.Response(True, "Token OK.", { 
+      "userId": user.userId, 
+      "email": user.email, 
+      "role": userRole, 
+      "roles": userRoles,
+      "reservationLimits": reservationLimits
+    })
   else:
     return helpers.server.Response(False, "Invalid token.")
 

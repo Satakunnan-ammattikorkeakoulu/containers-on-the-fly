@@ -35,3 +35,10 @@ class RoleHardwareLimitsEdit(BaseModel):
     '''
     roleId: int
     hardwareLimits: List[Dict[str, Any]]
+
+class RoleReservationLimitsEdit(BaseModel):
+    '''
+    For editing role reservation limits.
+    '''
+    roleId: int
+    reservationLimits: Dict[str, Any]

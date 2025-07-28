@@ -32,7 +32,13 @@ export const store = new Vuex.Store({
       email: "",
       role: "",
       roles: [],  // Array of all user roles (excluding 'everyone')
-      loggedinAt: null
+      loggedinAt: null,
+      // User's reservation limits based on their roles
+      reservationLimits: {
+        minDuration: 1,
+        maxDuration: 48,
+        maxActiveReservations: 1
+      }
     },
     // App configuration from backend
     appConfig: {
@@ -82,14 +88,17 @@ export const store = new Vuex.Store({
     appName: state => state.appConfig.app.name || 'Containers on the Fly',
     appTimezone: state => state.appConfig.app.timezone,
     contactEmail: state => state.appConfig.app.contactEmail,
-    reservationMinDuration: state => state.appConfig.reservation.minimumDuration,
-    reservationMaxDuration: state => state.appConfig.reservation.maximumDuration,
     loginPageInfo: state => state.appConfig.instructions.login,
     reservationPageInstructions: state => state.appConfig.instructions.reservation,
     emailInstructions: state => state.appConfig.instructions.email,
     loginText: state => state.appConfig.instructions.login,
     usernameField: state => state.appConfig.instructions.usernameFieldLabel,
-    passwordField: state => state.appConfig.instructions.passwordFieldLabel
+    passwordField: state => state.appConfig.instructions.passwordFieldLabel,
+    // User reservation limits
+    userReservationLimits: state => state.user.reservationLimits,
+    userMinDuration: state => state.user.reservationLimits.minDuration,
+    userMaxDuration: state => state.user.reservationLimits.maxDuration,
+    userMaxActiveReservations: state => state.user.reservationLimits.maxActiveReservations
   },
   // #############
   // # MUTATIONS #
@@ -111,7 +120,12 @@ export const store = new Vuex.Store({
                 "email": user.email,
                 "role": user.role,
                 "roles": user.roles || [],
-                "loggedinAt": user.loggedinAt
+                "loggedinAt": user.loggedinAt,
+                "reservationLimits": user.reservationLimits || {
+                  minDuration: 1,
+                  maxDuration: 48,
+                  maxActiveReservations: 1
+                }
               });
             }
             else {
@@ -168,6 +182,10 @@ export const store = new Vuex.Store({
             state.user.role = response.data.data.role
             state.user.roles = response.data.data.roles || []
             state.user.loggedinAt = new Date()
+            // Set reservation limits from backend
+            if (response.data.data.reservationLimits) {
+              state.user.reservationLimits = response.data.data.reservationLimits
+            }
             localStorage.setItem("user", JSON.stringify(state.user))
             if (state.initializing) state.initializing = false
             return payload.callback(Response(true, "Login token OK!"));

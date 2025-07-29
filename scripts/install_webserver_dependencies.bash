@@ -151,7 +151,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Allow MariaDB to listen on all interfaces to allow remote connections
-# Don't worry, we have disabled by default all incoming connections to ports with UFW before this.
+# Don't worry, we have disabled by default all incoming connections to ports with iptables before this.
 # We just need to do this to in the future allow remote connections from possible container servers.
 sudo sed -i 's/^bind-address\s*=.*$/bind-address = 0.0.0.0/' "/etc/mysql/mariadb.conf.d/50-server.cnf"
 

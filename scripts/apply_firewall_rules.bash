@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ######
-# This script configures the ufw firewall rules for this server.
+# This script configures the iptables firewall rules for this server.
 ######
 
 CURRENT_DIR=$(pwd)
@@ -28,9 +28,9 @@ if [ -z "$SERVER_IP_ADDRESS" ] || [ "$SERVER_IP_ADDRESS" = "YOUR_IP_HERE" ]; the
     exit 1
 fi
 
-# Convert localhost to 127.0.0.1 for UFW compatibility
+# Convert localhost to 127.0.0.1 for compatibility
 if [ "$SERVER_IP_ADDRESS" = "localhost" ]; then
-    echo "Converting localhost to 127.0.0.1 for UFW compatibility"
+    echo "Converting localhost to 127.0.0.1 for compatibility"
     SERVER_IP_ADDRESS="127.0.0.1"
 fi
 
@@ -51,22 +51,49 @@ if [ "$EUID" -ne 0 ]; then
 fi
 echo "Running with sudo privileges."
 
-# Reset all UFW rules
-yes | sudo ufw reset
+# Install iptables-persistent for rule persistence
+if ! dpkg -l | grep -q "^ii.*iptables-persistent"; then
+    echo "Installing iptables-persistent for automatic rule restoration..."
+    # Pre-answer the interactive questions: save current rules
+    echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
+    echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
+    DEBIAN_FRONTEND=noninteractive apt-get update -qq
+    DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent
+    
+    # Enable and start the service
+    systemctl enable netfilter-persistent
+    systemctl start netfilter-persistent
+    echo "iptables-persistent installed and enabled"
+else
+    echo "iptables-persistent already installed"
+fi
 
-# Remove existing Docker UFW rules to prevent duplicates
-sudo sed -i '/# BEGIN UFW AND DOCKER/,/# END UFW AND DOCKER/d' /etc/ufw/after.rules
+# Flush all existing rules
+iptables -F
+iptables -X
+iptables -t nat -F
+iptables -t nat -X
+iptables -t mangle -F
+iptables -t mangle -X
 
-# Set defaults
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
+# Set default policies
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT ACCEPT
+
+# Allow loopback
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+# Allow established and related connections
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
 # SSH is always needed
-sudo ufw allow 22
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
 
 # Container ports are always needed
-sudo ufw allow $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END/tcp
-sudo ufw allow $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END/udp
+iptables -A INPUT -p tcp --dport $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END -j ACCEPT
+iptables -A INPUT -p udp --dport $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END -j ACCEPT
 
 # Allow additional custom ports if specified
 if [ -n "$FIREWALL_ADDITIONAL_PORTS" ]; then
@@ -75,7 +102,8 @@ if [ -n "$FIREWALL_ADDITIONAL_PORTS" ]; then
         port=$(echo "$port" | tr -d ' ')  # Remove spaces
         if [[ "$port" =~ ^[0-9]+$ ]]; then  # Validate it's a number
             echo "Allowing additional port: $port"
-            sudo ufw allow $port
+            iptables -A INPUT -p tcp --dport $port -j ACCEPT
+            iptables -A INPUT -p udp --dport $port -j ACCEPT
         fi
     done
 fi
@@ -83,51 +111,65 @@ fi
 # Main server specific rules
 if [ "$IS_MAIN_SERVER" = "true" ]; then
     echo "Configuring main server firewall rules..."
+    
     # Web interface ports
-    sudo ufw allow 80
-    sudo ufw allow 443
-    # Docker registry rules
-    sudo ufw allow from 127.0.0.1 to any port $DOCKER_REGISTRY_PORT
-    sudo ufw allow from $SERVER_IP_ADDRESS to any port $DOCKER_REGISTRY_PORT
-    sudo ufw route allow from $SERVER_IP_ADDRESS to any port $DOCKER_REGISTRY_PORT
-    sudo ufw route deny from any to any port $DOCKER_REGISTRY_PORT
+    iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+    iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+    
+    # Docker registry access control (port 5000)
+    echo "Configuring Docker registry access control..."
+    # Allow localhost and server IP to access Docker registry
+    iptables -A INPUT -s 127.0.0.1 -p tcp --dport $DOCKER_REGISTRY_PORT -j ACCEPT
+    iptables -A INPUT -s 127.0.0.1 -p udp --dport $DOCKER_REGISTRY_PORT -j ACCEPT
+    iptables -A INPUT -s $SERVER_IP_ADDRESS -p tcp --dport $DOCKER_REGISTRY_PORT -j ACCEPT
+    iptables -A INPUT -s $SERVER_IP_ADDRESS -p udp --dport $DOCKER_REGISTRY_PORT -j ACCEPT
+    
+    # Configure DOCKER-USER chain for container access control
+    iptables -N DOCKER-USER 2>/dev/null || true
+    iptables -I FORWARD 1 -j DOCKER-USER
+    
+    # Clean up existing Docker registry rules
+    iptables -D DOCKER-USER -p tcp --dport $DOCKER_REGISTRY_PORT -j DROP 2>/dev/null || true
+    iptables -D DOCKER-USER -p udp --dport $DOCKER_REGISTRY_PORT -j DROP 2>/dev/null || true
+    iptables -D DOCKER-USER -s $SERVER_IP_ADDRESS -p tcp --dport $DOCKER_REGISTRY_PORT -j ACCEPT 2>/dev/null || true
+    iptables -D DOCKER-USER -s $SERVER_IP_ADDRESS -p udp --dport $DOCKER_REGISTRY_PORT -j ACCEPT 2>/dev/null || true
+    iptables -D DOCKER-USER -s 127.0.0.1 -p tcp --dport $DOCKER_REGISTRY_PORT -j ACCEPT 2>/dev/null || true
+    iptables -D DOCKER-USER -s 127.0.0.1 -p udp --dport $DOCKER_REGISTRY_PORT -j ACCEPT 2>/dev/null || true
+    
+    # Add rules in correct order: ACCEPT rules first, then DROP rules
+    iptables -I DOCKER-USER -s 127.0.0.1 -p tcp --dport $DOCKER_REGISTRY_PORT -j ACCEPT
+    iptables -I DOCKER-USER -s 127.0.0.1 -p udp --dport $DOCKER_REGISTRY_PORT -j ACCEPT
+    iptables -I DOCKER-USER -s $SERVER_IP_ADDRESS -p tcp --dport $DOCKER_REGISTRY_PORT -j ACCEPT
+    iptables -I DOCKER-USER -s $SERVER_IP_ADDRESS -p udp --dport $DOCKER_REGISTRY_PORT -j ACCEPT
+    iptables -A DOCKER-USER -p tcp --dport $DOCKER_REGISTRY_PORT -j DROP
+    iptables -A DOCKER-USER -p udp --dport $DOCKER_REGISTRY_PORT -j DROP
+    
+    # Always allow DOCKER-USER to return to FORWARD chain at the end
+    iptables -A DOCKER-USER -j RETURN
 else
     echo "Configuring container server firewall rules..."
 fi
 
-# Common final rules - Remove the overly restrictive route deny rule
-# The default routing policy is already set to deny above
-#sudo ufw route deny from any to any  # This was blocking MariaDB access
-#sudo ufw route allow from any to any port $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END/tcp  # Only allow container ports TCP
-#sudo ufw route allow from any to any port $DOCKER_RESERVATION_PORT_RANGE_START:$DOCKER_RESERVATION_PORT_RANGE_END/udp  # Only allow container ports UDP
+# Docker FORWARD rules - allow container traffic
+iptables -A FORWARD -i docker0 -o docker0 -j ACCEPT
+iptables -A FORWARD -i docker0 ! -o docker0 -j ACCEPT
+iptables -A FORWARD -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
-# Enable (start) the UFW firewall
-yes | sudo ufw enable
-
-# Allow connections first to all Docker container ports (this is the default)
-sudo ufw route allow from any to any
-
-# Disable access to Docker container port 5000 (Docker registry)
-sudo iptables -I DOCKER-USER -p tcp --dport 5000 -j DROP
-sudo iptables -I DOCKER-USER -p udp --dport 5000 -j DROP
-
-# Allow localhost and server IP address to access Docker container port 5000 (Docker registry)
-sudo iptables -I DOCKER-USER -s $SERVER_IP_ADDRESS -p tcp --dport 5000 -j ACCEPT
-sudo iptables -I DOCKER-USER -s $SERVER_IP_ADDRESS -p udp --dport 5000 -j ACCEPT
-sudo iptables -I DOCKER-USER -s 127.0.0.1 -p tcp --dport 5000 -j ACCEPT
-sudo iptables -I DOCKER-USER -s 127.0.0.1 -p udp --dport 5000 -j ACCEPT
-
-sudo ufw reload
+# Save all iptables rules for persistence
+echo "Saving iptables rules for automatic restoration on reboot..."
+mkdir -p /etc/iptables
+iptables-save > /etc/iptables/rules.v4
+echo "Firewall rules saved successfully"
 
 # Print final configuration
 echo ""
-echo "Firewall configured successfully!"
+echo "Firewall configured successfully with iptables!"
 if [ "$IS_MAIN_SERVER" = "true" ]; then
     echo "Main server ports opened:"
     echo "  - SSH (22)"
     echo "  - HTTP (80)"
     echo "  - HTTPS (443)"
-    echo "  - Docker Registry ($DOCKER_REGISTRY_PORT)"
+    echo "  - Docker Registry ($DOCKER_REGISTRY_PORT) - restricted to localhost and $SERVER_IP_ADDRESS"
     echo "  - Container ports ($DOCKER_RESERVATION_PORT_RANGE_START-$DOCKER_RESERVATION_PORT_RANGE_END)"
 else
     echo "Container server ports opened:"
@@ -137,4 +179,5 @@ fi
 if [ -n "$FIREWALL_ADDITIONAL_PORTS" ]; then
     echo "  - Additional ports: $FIREWALL_ADDITIONAL_PORTS"
 fi
-echo "All other incoming connections will be blocked."
+echo "All other incoming connections are blocked by default."
+echo "Rules saved to /etc/iptables/rules.v4 and will be restored automatically on reboot."

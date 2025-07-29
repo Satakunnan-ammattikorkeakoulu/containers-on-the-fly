@@ -163,7 +163,7 @@ Suppose you have an external firewall in front of your server (for example, you 
 
 Install required APT packages:
 ```
-sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv ufw software-properties-common
+sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv software-properties-common
 ```
 
 #### Setup the Main Server
@@ -204,7 +204,7 @@ Suppose you have an external firewall in front of your server (for example, you 
 
 Install required APT packages:
 ```
-sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv ufw software-properties-common
+sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv software-properties-common
 ```
 
 #### Setup the Docker Utility

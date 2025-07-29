@@ -201,7 +201,7 @@ This project does not include automated tests. Manual testing workflows:
 ### Ubuntu 24.04 Deployment
 - Automated setup scripts for main server and container servers
 - Make-based deployment with interactive configuration
-- UFW firewall configuration included
+- iptables (iptables-persistent) firewall configuration included
 - pm2 process management with startup scripts
 - Caddy reverse proxy with automatic HTTPS via Let's Encrypt
 

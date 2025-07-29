@@ -30,7 +30,7 @@ help:
 
 # Helper targets
 
-apply-firewall-rules: # Applies ufw firewall rules to the server
+apply-firewall-rules: # Applies iptables firewall rules to the server
 	@chmod +x scripts/apply_firewall_rules.bash
 	@./scripts/apply_firewall_rules.bash
 
@@ -291,13 +291,12 @@ check-not-root: # Checks if NOT running with root privileges
 setup-main-server: check-root check-os-ubuntu interactive-settings-creation apply-settings ## Run this with sudo. Installs and configures all dependencies for main server. Call 'make start-main-server' after setup.
 	@echo ""
 	@echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"
-	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
+	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure iptables firewall rules to secure your server."
 	@echo "true" > /tmp/containerfly_server_type
 	@echo "This will:"
-	@echo "  - Enable UFW firewall with secure defaults"
+	@echo "  - Enable iptables firewall with secure defaults"
 	@echo "  - $(RED)BLOCK ALL incoming connections except:$(RESET)"
 	@echo "    - SSH (22), HTTP (80), HTTPS (443)"
-	@echo "    - Docker Registry (5000)"
 	@PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "2000"); \
 	PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "3000"); \
 	echo "    - Container ports ($$PORT_START-$$PORT_END)"; \
@@ -307,7 +306,7 @@ setup-main-server: check-root check-os-ubuntu interactive-settings-creation appl
 	fi; \
 	echo "  - Secure Docker registry and containers"
 	@echo ""
-	@echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing UFW firewall rules!"
+	@echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing iptables firewall rules!"
 	@echo ""
 	@echo "Configure firewall rules automatically?"
 	@echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"
@@ -378,9 +377,9 @@ setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-cre
 	if [ "$$IS_MAIN_SERVER" = "false" ]; then \
 		echo ""; \
 		echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"; \
-		echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."; \
+		echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure iptables firewall rules to secure your server."; \
 		echo "This will:"; \
-		echo "  - Enable UFW firewall with secure defaults"; \
+		echo "  - Enable iptables firewall with secure defaults"; \
 		echo "  - $(RED)BLOCK ALL incoming connections except:$(RESET)"; \
 		echo "    - SSH (22)"; \
 		PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "2000"); \
@@ -392,7 +391,7 @@ setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-cre
 		fi; \
 		echo "  - Secure Docker containers"; \
 		echo ""; \
-		echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing UFW firewall rules!"; \
+		echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing iptables firewall rules!"; \
 		echo ""; \
 		echo "Configure firewall rules automatically?"; \
 		echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"; \
@@ -486,10 +485,17 @@ allow-container-server: check-os-ubuntu ## Allows an external given container se
 		exit 1; \
 	fi; \
 	echo "Running as root, proceeding with firewall configuration"; \
-	sudo ufw route insert 1 allow from $(IP) to any
-	sudo ufw insert 1 allow from $(IP)
+	# Allow IP for general access
+	sudo iptables -I INPUT -s $(IP) -j ACCEPT
+	# Allow IP for Docker registry port 5000 access
 	sudo iptables -I DOCKER-USER -s $(IP) -p tcp --dport 5000 -j ACCEPT
 	sudo iptables -I DOCKER-USER -s $(IP) -p udp --dport 5000 -j ACCEPT
+	
+	# Save iptables rules to make them persistent
+	@echo "Saving iptables rules for persistence..."
+	@mkdir -p /etc/iptables
+	@iptables-save > /etc/iptables/rules.v4
+	@echo "iptables rules saved successfully"
 
 logs: ## View log entries for started servers (pm2)
 	pm2 logs --lines 10000

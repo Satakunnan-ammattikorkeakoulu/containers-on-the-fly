@@ -155,6 +155,10 @@ iptables -A FORWARD -i docker0 -o docker0 -j ACCEPT
 iptables -A FORWARD -i docker0 ! -o docker0 -j ACCEPT
 iptables -A FORWARD -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
 
+# Restart Docker to recreate its iptables chains (our flush commands destroyed them)
+echo "Restarting Docker to recreate its own iptables chains..."
+systemctl restart docker 2>/dev/null || echo "Could not restart Docker (may not be installed yet)"
+
 # Save all iptables rules for persistence
 echo "Saving iptables rules for automatic restoration on reboot..."
 mkdir -p /etc/iptables

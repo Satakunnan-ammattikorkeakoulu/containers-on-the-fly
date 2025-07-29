@@ -714,8 +714,9 @@ init-database: ## Initialize database (for both new and existing environments)
 	@cd $(BACKEND_PATH) && $(PYTHON) init_database.py
 	@echo "Stopping all pm2 processes to prevent database locks..."
 	@pm2 stop all || true
+	@echo ""
 	@echo "Running any pending migrations..."
-	@echo "$(RED)NOTE:$(RESET) If migration gets stuck here and does not proceed further, it may be due to container server(s) holding database connections."
+	@echo "$(BOLD)NOTE:$(RESET) If migration gets stuck here and does not proceed further, it may be due to container server(s) holding database connections."
 	@echo "    If that happens, then on each container server, run: $(BOLD)pm2 stop all$(RESET). Wait for migration to complete, then run: $(BOLD)pm2 restart all$(RESET) on each container server."
 	@echo ""
 	@cd $(BACKEND_PATH) && alembic upgrade head
@@ -724,7 +725,7 @@ init-database: ## Initialize database (for both new and existing environments)
 
 migrate-database: ## Run database migrations
 	@echo "Running database migrations..."
-	@echo "$(RED)NOTE:$(RESET) If migration gets stuck, it may be due to container server(s) holding database connections."
+	@echo "$(BOLD)NOTE:$(RESET) If migration gets stuck, it may be due to container server(s) holding database connections."
 	@echo "$(RED)      On each container server, run: pm2 stop all$(RESET)"
 	@echo "$(RED)      Wait for migration to complete, then run: pm2 restart all$(RESET)"
 	@echo ""

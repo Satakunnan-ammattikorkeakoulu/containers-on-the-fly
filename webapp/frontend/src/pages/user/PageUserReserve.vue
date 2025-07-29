@@ -93,7 +93,7 @@
             <h2>Select Container</h2>
             <v-row justify="center">
               <v-col cols="10">
-                <v-row>
+                <v-row style="justify-content: center !important;">
                   <v-col 
                     v-for="containerItem in containers" 
                     :key="containerItem.value" 
@@ -173,7 +173,7 @@
         <!-- Select computer, hardware specs & submit -->
         <v-row v-if="reserveDate != null && reserveDurationDays !== null && reserveDurationHours !== null && !fetchingComputers && allComputers && container" class="section">      
           <v-col cols="12">
-            <h2 style="margin-top: 30px;">Select Computer</h2>
+            <h2>Select Computer</h2>
             <v-row justify="center">
               <v-col cols="10">
                 <v-row style="justify-content: center !important;">

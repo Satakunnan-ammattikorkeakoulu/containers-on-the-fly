@@ -206,6 +206,10 @@ if [ "$RESULT" -eq 1 ]; then
     fi
   fi
   echo -e "${GREEN}Password verification successful.${RESET}"
+  # Ensure user has privileges on the current database
+  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'%';"
+  mysql -e "FLUSH PRIVILEGES;"
+  echo -e "${GREEN}Granted privileges on database $MARIADB_DB_NAME to user $MARIADB_DB_USER.${RESET}"
 else
   echo "User '$MARIADB_DB_USER' does not exist."
   mysql -e "CREATE USER IF NOT EXISTS '$MARIADB_DB_USER'@'%' IDENTIFIED BY '$MARIADB_DB_USER_PASSWORD';"

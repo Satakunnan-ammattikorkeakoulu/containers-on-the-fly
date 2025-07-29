@@ -101,9 +101,24 @@ make start-docker-utility
 To update the software to latest version:
 
 - Run ``git pull`` to pull latest changes to the application codebase
-- If there were new changes pulled, run first ``make start-main-server``. It will automatically run the database migration and update the main server and it's libraries.
-- After that, run ``make start-docker-utility`` in the main server. This will restart and apply changes to the docker utility.
-- After that, update each additional container server (if any). On each additional container server (if any), run first ``git pull``, and then run ``make start-docker-utility``.
+- If there were no changes pulled, then you don't need to proceed further. Otherwise, proceed further below
+
+##### In the main server:
+In the main server, run these:
+```
+sudo make setup-main-server
+sudo make setup-docker-utility
+make start-main-server
+make start-docker-utility
+```
+
+##### In each additional container server (if any)
+After that, update each additional container server (if any). On each additional container server (if any), run:
+```
+git pull
+sudo make setup-docker-utility
+make start-docker-utility
+```
 
 ### Installing Additional Container Servers
 

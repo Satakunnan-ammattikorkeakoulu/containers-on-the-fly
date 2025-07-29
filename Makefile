@@ -481,6 +481,8 @@ allow-container-server: check-os-ubuntu ## Allows an external given container se
 	echo "Running as root, proceeding with firewall configuration"; \
 	sudo ufw route insert 1 allow from $(IP) to any
 	sudo ufw insert 1 allow from $(IP)
+	sudo iptables -I DOCKER-USER -s $(IP) -p tcp --dport 5000 -j ACCEPT
+	sudo iptables -I DOCKER-USER -s $(IP) -p udp --dport 5000 -j ACCEPT
 
 logs: ## View log entries for started servers (pm2)
 	pm2 logs --lines 10000

@@ -104,31 +104,20 @@ fi
 # Enable (start) the UFW firewall
 yes | sudo ufw enable
 
-# Apply Docker specific UFW firewall rules if not applied yet
-# These are taken from here: https://github.com/chaifeng/ufw-docker
-{
-    echo "# BEGIN UFW AND DOCKER"
-    echo "*filter"
-    echo ":ufw-user-forward - [0:0]"
-    echo ":ufw-docker-logging-deny - [0:0]"
-    echo ":DOCKER-USER - [0:0]"
-    echo "-A DOCKER-USER -j ufw-user-forward"
-    echo "-A DOCKER-USER -j RETURN -s 10.0.0.0/8"
-    echo "-A DOCKER-USER -j RETURN -s 172.16.0.0/12"
-    echo "-A DOCKER-USER -j RETURN -s 192.168.0.0/16"
-    echo "-A DOCKER-USER -p udp -m udp --sport 53 --dport 1024:65535 -j RETURN"
-    echo "-A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 192.168.0.0/16"
-    echo "-A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 10.0.0.0/8"
-    echo "-A DOCKER-USER -j ufw-docker-logging-deny -p tcp -m tcp --tcp-flags FIN,SYN,RST,ACK SYN -d 172.16.0.0/12"
-    echo "-A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 192.168.0.0/16"
-    echo "-A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 10.0.0.0/8"
-    echo "-A DOCKER-USER -j ufw-docker-logging-deny -p udp -m udp --dport 0:32767 -d 172.16.0.0/12"
-    echo "-A DOCKER-USER -j RETURN"
-    echo "-A ufw-docker-logging-deny -m limit --limit 3/min --limit-burst 10 -j LOG --log-prefix \"[UFW DOCKER BLOCK] \""
-    echo "-A ufw-docker-logging-deny -j DROP"
-    echo "COMMIT"
-    echo "# END UFW AND DOCKER"
-} | sudo tee -a "/etc/ufw/after.rules" > /dev/null
+# Allow connections first to all Docker container ports (this is the default)
+sudo ufw route allow from any to any
+
+# Disable access to Docker container port 5000 (Docker registry)
+sudo iptables -I DOCKER-USER -p tcp --dport 5000 -j DROP
+sudo iptables -I DOCKER-USER -p udp --dport 5000 -j DROP
+
+# Allow localhost and server IP address to access Docker container port 5000 (Docker registry)
+sudo iptables -I DOCKER-USER -s $SERVER_IP_ADDRESS -p tcp --dport 5000 -j ACCEPT
+sudo iptables -I DOCKER-USER -s $SERVER_IP_ADDRESS -p udp --dport 5000 -j ACCEPT
+sudo iptables -I DOCKER-USER -s 127.0.0.1 -p tcp --dport 5000 -j ACCEPT
+sudo iptables -I DOCKER-USER -s 127.0.0.1 -p udp --dport 5000 -j ACCEPT
+
+sudo ufw reload
 
 # Print final configuration
 echo ""

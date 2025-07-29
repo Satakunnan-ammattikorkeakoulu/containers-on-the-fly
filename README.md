@@ -157,6 +157,7 @@ Suppose you have an external firewall in front of your server (for example, you 
 - `5000` (TCP/HTTP, for Docker Registry on the main server)
 - `80` and `443` for HTTP / HTTPS connection to the server web interface and possible Let's Encrypt SSL certificate renewal
 - `2000-3000` (default) or the range of ports from which you want to host the reserved servers, which can be configured in the settings file. These services can be any, usually SSH, but could be HTTP, HTTPS, etc...
+- `3306` (TCP, for MariaDB database connection to the main server from the container servers)
 
 #### Install Required APT Packages
 

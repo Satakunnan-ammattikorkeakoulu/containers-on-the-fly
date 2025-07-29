@@ -58,7 +58,7 @@ if ! dpkg -l | grep -q "^ii.*iptables-persistent"; then
     echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
     echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
     DEBIAN_FRONTEND=noninteractive apt-get update -qq
-    DEBIAN_FRONTEND=noninteractive apt-get install -y iptables-persistent
+    DEBIAN_FRONTEND=noninteractive apt-get install -y -qq iptables-persistent
     
     # Enable and start the service
     systemctl enable netfilter-persistent

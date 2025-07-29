@@ -209,11 +209,11 @@ class RoleHardwareLimit(Base):
     __tablename__ = "RoleHardwareLimit"
     
     roleHardwareLimitId = Column(Integer, primary_key=True, autoincrement=True)
-    roleId = Column(ForeignKey("Role.roleId"), nullable=False)
-    hardwareSpecId = Column(ForeignKey("HardwareSpec.hardwareSpecId"), nullable=False)
+    roleId = Column(ForeignKey("Role.roleId", name="fk_RoleHardwareLimit_roleId", ondelete="CASCADE"), nullable=False, index=True)
+    hardwareSpecId = Column(ForeignKey("HardwareSpec.hardwareSpecId", name="fk_RoleHardwareLimit_hardwareSpecId", ondelete="CASCADE"), nullable=False, index=True)
     maximumAmountForRole = Column(Integer, nullable=True)
-    createdAt = Column(DateTime(timezone=True), server_default=func.now())
-    updatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    createdAt = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updatedAt = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     
     __table_args__ = (
         UniqueConstraint('roleId', 'hardwareSpecId', name='unique_role_hardware'),

@@ -102,6 +102,8 @@ def start_container(pars):
         
         # Use provided percentage or default to 50%
         shm_percent = pars.get("shm_size_percent", 50)
+        # Enforce minimum 10% and maximum 90%
+        shm_percent = max(10, min(90, shm_percent))
         shm_mb = int(mem_mb * shm_percent / 100)
         pars["shm_size"] = f"{shm_mb}m"
 

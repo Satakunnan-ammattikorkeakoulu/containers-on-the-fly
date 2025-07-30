@@ -334,7 +334,7 @@
                           <p style="color: gray; font-size: 15px;">Shared memory for inter-process communication. Required for applications like PyTorch, databases, and parallel computing. Default: 50%</p>
                           <v-slider 
                             v-model="shmSizePercent" 
-                            :min="0" 
+                            :min="10" 
                             :max="90" 
                             :thumb-size="60" 
                             ticks="always" 

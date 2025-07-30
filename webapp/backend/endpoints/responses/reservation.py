@@ -293,6 +293,18 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
   # Validate description length if provided
   if description and len(description) > 50:
     return Response(False, "Description must be 50 characters or less.")
+  
+  # Validate SHM size percentage (minimum 10%, maximum 90%)
+  if shmSizePercent < 10:
+    return Response(False, "SHM size must be at least 10% of allocated memory.")
+  if shmSizePercent > 90:
+    return Response(False, "SHM size cannot exceed 90% of allocated memory.")
+  
+  # Validate RAM disk size percentage (minimum 0%, maximum 60%)
+  if ramDiskSizePercent < 0:
+    return Response(False, "RAM disk size cannot be negative.")
+  if ramDiskSizePercent > 60:
+    return Response(False, "RAM disk size cannot exceed 60% of allocated memory.")
 
   date = parser.parse(date)
   endDate = date+relativedelta(hours=+duration)

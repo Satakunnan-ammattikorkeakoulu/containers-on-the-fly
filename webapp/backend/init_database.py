@@ -80,6 +80,7 @@ def init_database():
                 return False
         
         print("Running any pending migrations...")
+        print("Note: if migration gets stuck here and does not proceed further, it may be due to container server(s) holding database connections. If that happens, then on each container server, run: pm2 stop all. Wait for migration to complete, then run: pm2 restart all on each container server.")
         success = run_alembic_command("upgrade head")
         if success:
             print("✓ Database schema is up-to-date")

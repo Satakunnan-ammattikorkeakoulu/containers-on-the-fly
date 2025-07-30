@@ -192,6 +192,9 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
     res["reservedContainer"] = ORMObjectToDict(reservation.reservedContainer)
     res["reservedContainer"]["container"] = ORMObjectToDict(reservation.reservedContainer.container)
     res["reservedContainer"]["reservedPorts"] = []
+    # Include SHM and RAM disk percentages
+    res["shmSizePercent"] = reservation.reservedContainer.shmSizePercent if reservation.reservedContainer.shmSizePercent is not None else 50
+    res["ramDiskSizePercent"] = reservation.reservedContainer.ramDiskSizePercent if reservation.reservedContainer.ramDiskSizePercent is not None else 0
     # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
     if reservation.status == "started":
       for reservedPort in reservation.reservedContainer.reservedContainerPorts:
@@ -286,7 +289,7 @@ def getCurrentReservations() -> object:
   
   return Response(True, "Current reservations fetched.", { "reservations": reservations })
 
-def createReservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None):
+def createReservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0):
   # Validate description length if provided
   if description and len(description) > 50:
     return Response(False, "Description must be 50 characters or less.")
@@ -459,6 +462,8 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     # Create the ReservedContainer
     reservation.reservedContainer = ReservedContainer(
       containerId = containerId,
+      shmSizePercent = shmSizePercent,
+      ramDiskSizePercent = ramDiskSizePercent,
     )
     #print(ORMObjectToDict(reservation))
     #print(ORMObjectToDict(reservation.reservedContainer))

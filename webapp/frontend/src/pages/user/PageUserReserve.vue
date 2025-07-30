@@ -105,12 +105,12 @@
                       :class="{ 'selected-card': container === containerItem.value }"
                       @click="container = containerItem.value"
                       hover
-                      style="cursor: pointer; min-height: 200px;"
+                      style="cursor: pointer; min-height: 260px;"
                       :outlined="container !== containerItem.value"
                       :color="container === containerItem.value ? 'primary' : ''"
                     >
                       <v-card-body class="pa-4" style="height: 100%;">
-                        <div class="d-flex flex-column h-100">
+                        <div class="d-flex flex-column h-100" style="padding: 15px;">
                           <div class="text-center mb-3">
                             <v-icon 
                               size="32" 
@@ -188,12 +188,12 @@
                       :class="{ 'selected-card': computer === computerItem.value }"
                       @click="computer = computerItem.value; computerChanged()"
                       hover
-                      style="cursor: pointer; min-height: 220px;"
+                      style="cursor: pointer; min-height: 260px;"
                       :outlined="computer !== computerItem.value"
                       :color="computer === computerItem.value ? 'primary' : ''"
                     >
                       <v-card-body class="pa-4" style="height: 100%;">
-                        <div class="d-flex flex-column h-100">
+                        <div class="d-flex flex-column h-100" style="padding: 15px;">
                           <div class="text-center mb-3">
                             <v-icon 
                               size="32" 
@@ -281,34 +281,111 @@
             </v-col>
           </v-row>
 
-          <!-- Admin extra task: reserve for another user -->
-          <v-col cols="12" v-if="isAdmin() && computer && hardwareData" style="margin-top: 30px;">
-              <h2>Reserve for another user</h2>
-              <v-row>
-                <v-col cols="3" style="margin: 0 auto">
-                  <p><span style="color: gray; font-size: 15px;">Admin only!</span> Write email address of another user, or leave empty to reserve for yourself.</p>
-                  <v-text-field v-model="adminReserveUserEmail" v-if="isAdmin" label="" placeholder="Email"></v-text-field>
-                </v-col>
-              </v-row>
-          </v-col>
-
-          <!-- Reservation Description -->
+          <!-- Advanced Settings -->
           <v-col cols="12" v-if="computer && hardwareData" style="margin-top: 30px;">
-              <h2>Reservation Description</h2>
-              <v-row>
-                <v-col cols="3" style="margin: 0 auto">
-                  <p style="color: gray; font-size: 15px; margin-bottom: 0px;">Optional description for your reservation.</p>
-                  <p style="color: gray; font-size: 15px;">(max 50 characters)</p>
-                  <v-text-field 
-                    v-model="reservationDescription" 
-                    label="Description (optional)"
-                    placeholder="Enter description..."
-                    counter="50"
-                    :rules="[rules.maxLength50]"
-                    maxlength="50">
-                  </v-text-field>
-                </v-col>
-              </v-row>
+            <v-expansion-panels>
+              <v-expansion-panel>
+                <v-expansion-panel-header style="background-color: #303030;">
+                  <div style="width: 100%; text-align: center;">
+                    <h2 style="margin: 0;">Advanced Settings</h2>
+                  </div>
+                </v-expansion-panel-header>
+                <v-expansion-panel-content>
+                  <!-- Admin extra task: reserve for another user -->
+                  <v-row v-if="isAdmin()" style="margin-top: 20px;">
+                    <v-col cols="12">
+                      <h3>Reserve for another user</h3>
+                      <v-row>
+                        <v-col cols="6" style="margin: 0 auto">
+                          <p><span style="color: gray; font-size: 15px;">Admin only!</span> Write email address of another user, or leave empty to reserve for yourself.</p>
+                          <v-text-field v-model="adminReserveUserEmail" label="" placeholder="Email"></v-text-field>
+                        </v-col>
+                      </v-row>
+                    </v-col>
+                  </v-row>
+
+                  <!-- Reservation Description -->
+                  <v-row style="margin-top: 20px;">
+                    <v-col cols="12">
+                      <h3>Reservation Description</h3>
+                      <v-row>
+                        <v-col cols="6" style="margin: 0 auto">
+                          <p style="color: gray; font-size: 15px; margin-bottom: 0px;">Optional description for your reservation.</p>
+                          <p style="color: gray; font-size: 15px;">(max 50 characters)</p>
+                          <v-text-field 
+                            v-model="reservationDescription" 
+                            label="Description (optional)"
+                            placeholder="Enter description..."
+                            counter="50"
+                            :rules="[rules.maxLength50]"
+                            maxlength="50">
+                          </v-text-field>
+                        </v-col>
+                      </v-row>
+                    </v-col>
+                  </v-row>
+
+                  <!-- SHM Size Configuration -->
+                  <v-row style="margin-top: 20px;">
+                    <v-col cols="12">
+                      <h3>Shared Memory (SHM) Size</h3>
+                      <v-row>
+                        <v-col cols="6" style="margin: 0 auto">
+                          <p style="color: gray; font-size: 15px;">Shared memory for inter-process communication. Required for applications like PyTorch, databases, and parallel computing. Default: 50%</p>
+                          <v-slider 
+                            v-model="shmSizePercent" 
+                            :min="0" 
+                            :max="90" 
+                            :thumb-size="60" 
+                            ticks="always" 
+                            thumb-label="always"
+>
+                            <template v-slot:thumb-label="{ value }">
+                              {{ value }}%
+                            </template>
+                          </v-slider>
+                          <p style="text-align: center; margin-top: 10px;">
+                            SHM Size: {{ shmSizePercent }}% of allocated memory
+                            <span v-if="selectedHardwareSpecs && getMemorySpecId()">
+                              (≈ {{ calculateShmSizeGB() }} GB)
+                            </span>
+                          </p>
+                        </v-col>
+                      </v-row>
+                    </v-col>
+                  </v-row>
+
+                  <!-- RAM Disk Size Configuration -->
+                  <v-row style="margin-top: 20px;">
+                    <v-col cols="12">
+                      <h3>RAM Disk Size</h3>
+                      <v-row>
+                        <v-col cols="6" style="margin: 0 auto">
+                          <p style="color: gray; font-size: 15px;">Mounts a high-speed RAM-based folder to your home directory. Ideal for caching, temp files, and I/O intensive operations. Default: 0%</p>
+                          <v-slider 
+                            v-model="ramDiskSizePercent" 
+                            :min="0" 
+                            :max="60" 
+                            :thumb-size="60" 
+                            ticks="always" 
+                            thumb-label="always">
+                            <template v-slot:thumb-label="{ value }">
+                              {{ value }}%
+                            </template>
+                          </v-slider>
+                          <p style="text-align: center; margin-top: 10px;">
+                            RAM Disk Size: {{ ramDiskSizePercent }}% of allocated memory
+                            <span v-if="selectedHardwareSpecs && getMemorySpecId()">
+                              (≈ {{ calculateRamDiskSizeGB() }} GB)
+                            </span>
+                          </p>
+                        </v-col>
+                      </v-row>
+                    </v-col>
+                  </v-row>
+                </v-expansion-panel-content>
+              </v-expansion-panel>
+            </v-expansion-panels>
           </v-col>
 
         </v-row>
@@ -404,6 +481,8 @@
       reserveDurationDays: null,
       reserveDurationHours: null,
       initializingDefaults: false, // Flag to prevent watchers from interfering during initialization
+      shmSizePercent: 50, // Default SHM size to 50% of memory
+      ramDiskSizePercent: 0, // Default RAM disk size to 0% of memory
       fetchingReservations: false, // True if we are fetching all current and upcoming reservations
       allReservations: null, // Contains all current reservations
       fetchingComputers: false, // True if we are fetching computers and their hardware data from the server
@@ -744,7 +823,9 @@
           "containerId": this.container,
           "hardwareSpecs": JSON.stringify(this.selectedHardwareSpecs),
           "adminReserveUserEmail": this.adminReserveUserEmail ? this.adminReserveUserEmail : "",
-          "description": this.reservationDescription && this.reservationDescription.trim() ? this.reservationDescription.trim() : ""
+          "description": this.reservationDescription && this.reservationDescription.trim() ? this.reservationDescription.trim() : "",
+          "shmSizePercent": this.shmSizePercent,
+          "ramDiskSizePercent": this.ramDiskSizePercent
         }
 
         axios({
@@ -1011,6 +1092,39 @@
       },
       handleReservationsRefreshed(reservations) {
         this.allReservations = reservations;
+      },
+      /**
+       * Gets the memory spec ID from the selected hardware specs
+       * @returns {string|null} The memory spec ID or null if not found
+       */
+      getMemorySpecId() {
+        if (!this.hardwareData) return null;
+        const memorySpec = this.hardwareData.find(spec => spec.type === "memory");
+        return memorySpec ? memorySpec.hardwareSpecId : null;
+      },
+      /**
+       * Calculates the actual SHM size in GB based on the percentage and selected memory
+       * @returns {string} The calculated SHM size in GB
+       */
+      calculateShmSizeGB() {
+        const memorySpecId = this.getMemorySpecId();
+        if (!memorySpecId || !this.selectedHardwareSpecs[memorySpecId]) return "0";
+        
+        const memoryGB = this.selectedHardwareSpecs[memorySpecId];
+        const shmGB = (memoryGB * this.shmSizePercent / 100).toFixed(1);
+        return shmGB;
+      },
+      /**
+       * Calculates the actual RAM disk size in GB based on the percentage and selected memory
+       * @returns {string} The calculated RAM disk size in GB
+       */
+      calculateRamDiskSizeGB() {
+        const memorySpecId = this.getMemorySpecId();
+        if (!memorySpecId || !this.selectedHardwareSpecs[memorySpecId]) return "0";
+        
+        const memoryGB = this.selectedHardwareSpecs[memorySpecId];
+        const ramDiskGB = (memoryGB * this.ramDiskSizePercent / 100).toFixed(1);
+        return ramDiskGB;
       }
     },
     computed: {
@@ -1128,5 +1242,9 @@
 
   .selected-card:hover {
     transform: translateY(-3px);
+  }
+
+  .v-expansion-panel::before {
+    box-shadow: none !important;
   }
 </style>

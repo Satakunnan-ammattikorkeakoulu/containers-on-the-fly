@@ -103,6 +103,8 @@ class ReservedContainer(Base):
   containerId = Column(ForeignKey("Container.containerId"), nullable = False)
   sshPassword = Column(Text, nullable = True)
   containerDockerErrorMessage = Column(Text, nullable = True)
+  shmSizePercent = Column(Integer, nullable = False, default=50) # Shared memory size as percentage of RAM (0-90)
+  ramDiskSizePercent = Column(Integer, nullable = False, default=0) # RAM disk size as percentage of RAM (0-60)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 

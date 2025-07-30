@@ -158,6 +158,7 @@ iptables -A FORWARD -o docker0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACC
 # Restart Docker to recreate its iptables chains (our flush commands destroyed them)
 echo "Restarting Docker to recreate its own iptables chains..."
 systemctl restart docker 2>/dev/null || echo "Could not restart Docker (may not be installed yet)"
+sleep 5 # Wait for Docker to restart
 
 # Save all iptables rules for persistence
 echo "Saving iptables rules for automatic restoration on reboot..."

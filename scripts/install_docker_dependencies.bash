@@ -28,6 +28,26 @@ if [ "$DOCKER_REGISTRY_ADDRESS" = "YOUR_IP_HERE" ] || [ -z "$DOCKER_REGISTRY_ADD
     fi
 fi
 
+# Function to wait for Docker to be ready
+wait_for_docker() {
+    local max_attempts=30
+    local attempt=1
+    
+    echo "Waiting for Docker to be ready..."
+    while [ $attempt -le $max_attempts ]; do
+        if sudo docker info >/dev/null 2>&1; then
+            echo "Docker is ready."
+            return 0
+        fi
+        echo "Attempt $attempt/$max_attempts: Docker not ready yet, waiting..."
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    
+    echo "Error: Docker failed to become ready after $max_attempts attempts"
+    return 1
+}
+
 # Check if the script is run as root
 if [ "$EUID" -ne 0 ]; then
     echo -e "\n${RED}This script must be run with sudo privileges. Please run this with sudo permissions. Exiting.${RESET}"
@@ -151,16 +171,6 @@ if [ $? -ne 0 ]; then
 fi
 echo "Docker runtime configured for NVIDIA."
 
-echo "5/5: Restarting Docker daemon..."
-sudo systemctl restart docker
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to restart Docker daemon. Exiting."
-    exit 1
-fi
-echo "Docker daemon restarted successfully."
-
-echo "NVIDIA Container Toolkit installation and configuration complete."
-
 # Make sure that apt autoupdate does not update Nvidia drivers.
 # If it would update, then Nvidia drivers will stop working until system has been rebooted (not good!)
 # Path to the unattended-upgrades configuration file
@@ -179,7 +189,6 @@ else
 fi
 
 echo "Unattended upgrades configuration updated successfully."
-
 
 # Make sure that the Docker can use a local repository, that has no sertificate
 sudo apt install -y -qq jq
@@ -222,9 +231,23 @@ update_docker_daemon_config
 echo "Adding user to docker group..."
 sudo usermod -aG docker $CURRENT_USER
 
-# Restart Docker Daemon to apply insecure registry configuration
-echo "Restarting Docker daemon..."
+# CONSOLIDATED RESTART: Only restart Docker once after all configuration is complete
+echo "5/5: Restarting Docker daemon with all configuration changes..."
 sudo systemctl restart docker
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to restart Docker daemon. Exiting."
+    exit 1
+fi
+
+# Wait for Docker to be fully ready before proceeding
+wait_for_docker
+if [ $? -ne 0 ]; then
+    echo "Error: Docker is not responding after restart. Exiting."
+    exit 1
+fi
+
+echo "Docker daemon restarted successfully and is ready."
+echo "NVIDIA Container Toolkit installation and configuration complete."
 
 echo "Starting private (local) docker registry (only on main server)"
 # Start private (local) docker registry (only on main server)
@@ -240,6 +263,10 @@ if [ "$IS_MAIN_SERVER" = "true" ]; then
         sudo -u $CURRENT_USER docker run -d -p ${DOCKER_REGISTRY_PORT}:5000 --restart=always --name registry registry:2
     fi
 
+    # Wait a moment for registry to start
+    echo "Waiting for registry to be ready..."
+    sleep 5
+
     # Build base-ubuntu image to be used as an example with default setup
     sudo -u $CURRENT_USER docker build -t $INSECURE_REGISTRY/ubuntu-base:latest -f DockerfileContainerExample .
     sudo -u $CURRENT_USER docker push $INSECURE_REGISTRY/ubuntu-base:latest
@@ -247,8 +274,5 @@ else
     echo "Container server detected - skipping Docker registry setup (will connect to main server registry)"
 fi
 
-# Restart Docker Daemon to apply changes
-sudo systemctl restart docker
-echo "Docker daemon configuration updated and Docker service restarted."
-
+echo "Docker daemon configuration updated and Docker service is running."
 echo "You need to restart the machine before the Nvidia drivers will work."

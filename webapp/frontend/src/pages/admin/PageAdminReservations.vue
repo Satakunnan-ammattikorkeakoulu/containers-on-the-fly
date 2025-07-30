@@ -188,17 +188,32 @@
         this.modalConnectionDetailsVisible = false
       },
       createReservation() {
-        let hasActiveReservations = false
+        // For admins, their limits are typically very high (99 active reservations)
+        // But we still check to be consistent
+        
+        // Count active reservations for the admin user
+        let activeReservationCount = 0
         this.reservations.forEach((res) => {
-          if (res.status == "started" || res.status == "reserved") hasActiveReservations = true
+          // Only count admin's own reservations
+          if ((res.status == "started" || res.status == "reserved") && res.userEmail === this.$store.getters.user.email) {
+            activeReservationCount++
+          }
         })
 
-        let currentUser = this.$store.getters.user
+        // Get user's reservation limits from store
+        const maxActiveReservations = this.$store.getters.userMaxActiveReservations
 
-        if (!hasActiveReservations || currentUser.role == "admin")
-          this.$router.push("/user/reserve")
-        else
-          this.$store.commit('showMessage', { text: "You can only have one reserved or started reservation at a time. Cancel the current reservation if you need a new.", color: "red" })
+        // Check against the user's actual limit
+        if (activeReservationCount >= maxActiveReservations) {
+          this.$store.commit('showMessage', { 
+            text: `You have reached your maximum of ${maxActiveReservations} active reservations.`, 
+            color: "red" 
+          })
+          return
+        }
+
+        // Admin has not reached their limit, allow navigation
+        this.$router.push("/user/reserve")
       },
       fetchReservations() {
         let _this = this

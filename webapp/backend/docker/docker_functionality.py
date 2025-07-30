@@ -88,12 +88,24 @@ def start_container(pars):
         # Create random password for the user if it was not passed
         if "password" not in pars: pars["password"] = create_password()
 
-        # can this lead to oum? we need to test so if weird shit is happening, look in to this:
-        # we add that as half of the ram size, if this seems to work, remove this shm_size from docker.settings.
+        # Calculate SHM size based on percentage
         mem_value = int(float((pars["memory"][:-1])))
         unit = pars["memory"][-1]
-        shm_value = f"{mem_value // 2}{unit}"
-        pars["shm_size"] = shm_value
+        
+        # Convert memory to MB for more precise calculation
+        if unit.lower() == 'g':
+            mem_mb = mem_value * 1024
+        elif unit.lower() == 'm':
+            mem_mb = mem_value
+        else:
+            mem_mb = mem_value * 1024  # Default to GB
+        
+        # Use provided percentage or default to 50%
+        shm_percent = pars.get("shm_size_percent", 50)
+        # Enforce minimum 10% and maximum 90%
+        shm_percent = max(10, min(90, shm_percent))
+        shm_mb = int(mem_mb * shm_percent / 100)
+        pars["shm_size"] = f"{shm_mb}m"
 
         container_name = None
         container_name = pars['name']
@@ -167,17 +179,23 @@ def start_container(pars):
 
         full_image_name = f"{settings_handler.getSetting('docker.registryAddress')}/{pars['image']}:{pars['image_version']}"
 
-        # RAM disk
-        mount_path = "/home/user/ram_disk"
-        ram_disk_size = "1073741824" # 1G in bytes, if I understanded correctly, this need to be in bytes, not 1GB etc
-        tmpfs_config = f"type=tmpfs,destination={mount_path},tmpfs-size={ram_disk_size}" 
-        ram_mounts = [tmpfs_config]
+        # RAM disk configuration
+        ram_mounts = []
+        ram_disk_percent = pars.get("ram_disk_percent", 0)
+        
+        if ram_disk_percent > 0:
+            mount_path = "/home/user/ram_disk"
+            # Calculate RAM disk size in bytes based on percentage
+            # Use the same memory value we calculated for SHM
+            ram_disk_mb = int(mem_mb * ram_disk_percent / 100)
+            ram_disk_bytes = ram_disk_mb * 1024 * 1024  # Convert MB to bytes
+            tmpfs_config = f"type=tmpfs,destination={mount_path},tmpfs-size={ram_disk_bytes}"
+            ram_mounts.append(tmpfs_config)
         
         # Start the container
         # Build the base parameters
         run_params = {
             'volumes': volumes,
-            'mounts': [ram_mounts], # added this for ramdisk
             'name': container_name,
             'memory': pars['memory'],
             'kernel_memory': pars['memory'],
@@ -198,6 +216,12 @@ def start_container(pars):
         # Only add gpus parameter if we actually have GPUs to dedicate
         if gpus is not None:
             run_params['gpus'] = gpus
+        
+        # Add tmpfs mounts if RAM disk is configured
+        if ram_mounts:
+            # mounts expects a list of lists where each inner list contains mount config parts
+            run_params['mounts'] = [[mount] for mount in ram_mounts]
+            
         cont = docker.run(full_image_name, **run_params)
         #print("The running container: ", cont)
         #print("=== Stop printing running container")

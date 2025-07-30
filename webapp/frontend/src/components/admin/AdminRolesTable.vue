@@ -25,16 +25,21 @@
       <template v-slot:item.actions="{item}">
         <!-- Regular role management actions -->
         <template v-if="!isBuiltInRole(item.name)">
-          <a class="link-action" @click="emitEditRole(item.roleId)">Edit Role</a>
-          <br>
-          <a class="link-action" @click="emitRemoveRole(item.roleId)">Remove Role</a>
+          <a class="link-action" @click="emitEditRole(item.roleId)">Edit Name</a>
           <br>
         </template>
         <!-- Mounts action available for all roles -->
         <a class="link-action" @click="emitManageMounts(item)">Mounts</a>
+        <br>
+        <!-- Reservation limits action available for all roles -->
+        <a class="link-action" @click="emitManageReservationLimits(item)">Reservation Limits</a>
         <br v-if="!isBuiltInRole(item.name)">
         <!-- Hardware limits action not available for built-in roles -->
         <a v-if="!isBuiltInRole(item.name)" class="link-action" @click="emitManageHardwareLimits(item)">Hardware Limits</a>
+        <br>
+        <template v-if="!isBuiltInRole(item.name)">
+          <a class="link-action" @click="emitRemoveRole(item.roleId)">Remove Role</a>
+        </template>
       </template>
 
       <!-- Format the timestamps -->
@@ -105,6 +110,9 @@ export default {
     },
     emitManageHardwareLimits(role) {
       this.$emit('emitManageHardwareLimits', role);
+    },
+    emitManageReservationLimits(role) {
+      this.$emit('emitManageReservationLimits', role);
     }
   },
 }

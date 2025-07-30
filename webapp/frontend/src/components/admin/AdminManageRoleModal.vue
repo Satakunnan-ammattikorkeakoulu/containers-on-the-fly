@@ -120,7 +120,7 @@ export default {
           }
         });
 
-        console.log('Role save response:', response.data);
+        //console.log('Role save response:', response.data);
 
         if (response.data.status === true) {
           this.$emit('emitModalClose', true);

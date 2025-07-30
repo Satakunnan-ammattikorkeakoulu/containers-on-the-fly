@@ -64,7 +64,7 @@
           :event-color="getEventColor"
           :type="type"
           :weekdays="weekdays"
-          @mouseup:time="selectSlot"
+          @click:time="selectSlot"
           event-overlap-mode="column"
           first-interval="0"
           interval-minutes="30"
@@ -120,10 +120,12 @@
   const axios = require('axios').default;
   var utc = require('dayjs/plugin/utc')
   var timezone = require('dayjs/plugin/timezone')
+  var isoWeek = require('dayjs/plugin/isoWeek')
   dayjs.extend(utc)
   var customParseFormat = require('dayjs/plugin/customParseFormat')
   dayjs.extend(timezone)
   dayjs.extend(customParseFormat)
+  dayjs.extend(isoWeek)
 
   export default {
     name: 'CalendarReservations',
@@ -168,8 +170,14 @@
         return interval.time
       },
       selectSlot( event ) {
-        // If calendar is in read-only mode or availability mode, don't allow slot selection
-        if (this.readOnly || this.viewMode === 'availability') {
+        // If calendar is in read-only mode, don't allow slot selection
+        if (this.readOnly) {
+          return
+        }
+        
+        // Only allow time selection in day, week, or 4day views (not month view)
+        if (this.type === 'month') {
+          this.$store.commit('showMessage', { text: "Switch to week, day, or 4-day view to select a specific time.", color: "info" })
           return
         }
         
@@ -222,7 +230,7 @@
           } else if (spec.type.toLowerCase() === 'cpu' || spec.type.toLowerCase() === 'cpus') {
             displayText = `CPU: ${Math.round(spec.available)}/${Math.round(spec.maximum)}`
           } else if (spec.type.toLowerCase() === 'ram') {
-            displayText = `RAM: ${Math.round(spec.available)}/${Math.round(spec.maximum)} ${spec.format}`
+            displayText = `RAM: ${Math.round(spec.available)}/${Math.round(spec.maximum)}`
           } else {
             displayText = `${spec.type.toUpperCase()}: ${Math.round(spec.available)}/${Math.round(spec.maximum)}`
           }
@@ -272,8 +280,9 @@
             calendarEnd = focusDate.endOf('month').add(1, 'day');
             break;
           case 'week':
-            calendarStart = focusDate.startOf('week');
-            calendarEnd = focusDate.endOf('week').add(1, 'day');
+            // Use isoWeek to ensure Monday is the first day of the week
+            calendarStart = focusDate.startOf('isoWeek');
+            calendarEnd = focusDate.endOf('isoWeek').add(1, 'day');
             break;
           case '4day':
             // 4-day view shows current day + 3 more days
@@ -335,8 +344,9 @@
             calendarEnd = focusDate.endOf('month').add(1, 'day');
             break;
           case 'week':
-            calendarStart = focusDate.startOf('week');
-            calendarEnd = focusDate.endOf('week').add(1, 'day');
+            // Use isoWeek to ensure Monday is the first day of the week
+            calendarStart = focusDate.startOf('isoWeek');
+            calendarEnd = focusDate.endOf('isoWeek').add(1, 'day');
             break;
           case '4day':
             calendarStart = focusDate.startOf('day');

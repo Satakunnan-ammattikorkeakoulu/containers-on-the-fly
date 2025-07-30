@@ -132,16 +132,17 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
     ),
     
     # Reservation Management Settings
-    "reservation.minimumDuration": SettingSetting(
-        SettingSource.DATABASE, SettingType.INTEGER, default=5,
-        min_value=1, max_value=168,
-        description="Minimum duration for container reservations in hours"
-    ),
-    "reservation.maximumDuration": SettingSetting(
-        SettingSource.DATABASE, SettingType.INTEGER, default=72,
-        min_value=1, max_value=720,
-        description="Maximum duration for container reservations in hours"
-    ),
+    # DEPRECATED: Moved to role-based settings in RoleReservationLimit table
+    # "reservation.minimumDuration": SettingSetting(
+    #     SettingSource.DATABASE, SettingType.INTEGER, default=5,
+    #     min_value=1, max_value=168,
+    #     description="Minimum duration for container reservations in hours"
+    # ),
+    # "reservation.maximumDuration": SettingSetting(
+    #     SettingSource.DATABASE, SettingType.INTEGER, default=72,
+    #     min_value=1, max_value=720,
+    #     description="Maximum duration for container reservations in hours"
+    # ),
     
     # UI Instructions and Labels
     "instructions.login": SettingSetting(

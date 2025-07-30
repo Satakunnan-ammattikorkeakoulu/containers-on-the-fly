@@ -151,7 +151,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Allow MariaDB to listen on all interfaces to allow remote connections
-# Don't worry, we have disabled by default all incoming connections to ports with UFW before this.
+# Don't worry, we have disabled by default all incoming connections to ports with iptables before this.
 # We just need to do this to in the future allow remote connections from possible container servers.
 sudo sed -i 's/^bind-address\s*=.*$/bind-address = 0.0.0.0/' "/etc/mysql/mariadb.conf.d/50-server.cnf"
 
@@ -206,6 +206,10 @@ if [ "$RESULT" -eq 1 ]; then
     fi
   fi
   echo -e "${GREEN}Password verification successful.${RESET}"
+  # Ensure user has privileges on the current database
+  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'%';"
+  mysql -e "FLUSH PRIVILEGES;"
+  echo -e "${GREEN}Granted privileges on database $MARIADB_DB_NAME to user $MARIADB_DB_USER.${RESET}"
 else
   echo "User '$MARIADB_DB_USER' does not exist."
   mysql -e "CREATE USER IF NOT EXISTS '$MARIADB_DB_USER'@'%' IDENTIFIED BY '$MARIADB_DB_USER_PASSWORD';"

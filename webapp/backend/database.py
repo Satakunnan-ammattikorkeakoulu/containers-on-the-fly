@@ -51,6 +51,7 @@ class Role(Base):
   users = relationship("User", secondary = "UserRole", back_populates = "roles", single_parent=True)
   mounts = relationship("RoleMount", back_populates="role")
   hardwareLimits = relationship("RoleHardwareLimit", back_populates="role")
+  reservationLimits = relationship("RoleReservationLimit", back_populates="role", uselist=False)
 
 class UserRole(Base):
   __tablename__ = "UserRole"
@@ -68,7 +69,7 @@ class Container(Base):
   public = Column(Boolean, nullable = False)
   imageName = Column(Text, unique = True, nullable = False)
   name = Column(Text, nullable = False)
-  removed = Column(Boolean, nullable = True) # TODO: Add to diagram
+  removed = Column(Boolean, nullable = True)
   description = Column(Text, nullable = True)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
@@ -102,6 +103,8 @@ class ReservedContainer(Base):
   containerId = Column(ForeignKey("Container.containerId"), nullable = False)
   sshPassword = Column(Text, nullable = True)
   containerDockerErrorMessage = Column(Text, nullable = True)
+  shmSizePercent = Column(Integer, nullable = False, default=50) # Shared memory size as percentage of RAM (0-90)
+  ramDiskSizePercent = Column(Integer, nullable = False, default=0) # RAM disk size as percentage of RAM (0-60)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -132,7 +135,7 @@ class Reservation(Base):
   userId = Column(ForeignKey("User.userId"), nullable = False)
   startDate = Column(DateTime, nullable = False)
   endDate = Column(DateTime, nullable = False)
-  description = Column(Text, nullable = True) # TODO: add to database drawing
+  description = Column(Text, nullable = True)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
   status = Column(Text, nullable = False) # reserved, started, stopped, error, restart
@@ -148,7 +151,7 @@ class Computer(Base):
   computerId = Column(Integer, primary_key = True, autoincrement = True)
   public = Column(Boolean, nullable = False)
   name = Column(Text, nullable = False, unique = True)
-  removed = Column(Boolean, nullable = True) # TODO: Add to diagram
+  removed = Column(Boolean, nullable = True)
   ip = Column(Text, nullable = False)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
@@ -162,7 +165,7 @@ class HardwareSpec(Base):
 
   hardwareSpecId = Column(Integer, primary_key = True, autoincrement = True)
   computerId = Column(ForeignKey("Computer.computerId"), nullable = False)
-  internalId = Column(Text, nullable = True) # TODO: Add to diagram
+  internalId = Column(Text, nullable = True)
   type = Column(Text, nullable = False)
   maximumAmount = Column(Float, nullable = False)
   minimumAmount = Column(Float, nullable = False)
@@ -183,7 +186,6 @@ class ReservedHardwareSpec(Base):
   reservationId = Column(ForeignKey("Reservation.reservationId"), nullable = False)
   hardwareSpecId = Column(ForeignKey("HardwareSpec.hardwareSpecId"), nullable = False)
   amount = Column(Float, nullable = False)
-  #UniqueConstraint('reservationId', 'hardwareSpecId', name='uniqueHardwareSpec')
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -209,11 +211,11 @@ class RoleHardwareLimit(Base):
     __tablename__ = "RoleHardwareLimit"
     
     roleHardwareLimitId = Column(Integer, primary_key=True, autoincrement=True)
-    roleId = Column(ForeignKey("Role.roleId"), nullable=False)
-    hardwareSpecId = Column(ForeignKey("HardwareSpec.hardwareSpecId"), nullable=False)
+    roleId = Column(ForeignKey("Role.roleId", name="fk_RoleHardwareLimit_roleId", ondelete="CASCADE"), nullable=False, index=True)
+    hardwareSpecId = Column(ForeignKey("HardwareSpec.hardwareSpecId", name="fk_RoleHardwareLimit_hardwareSpecId", ondelete="CASCADE"), nullable=False, index=True)
     maximumAmountForRole = Column(Integer, nullable=True)
-    createdAt = Column(DateTime(timezone=True), server_default=func.now())
-    updatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    createdAt = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updatedAt = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     
     __table_args__ = (
         UniqueConstraint('roleId', 'hardwareSpecId', name='unique_role_hardware'),
@@ -221,6 +223,23 @@ class RoleHardwareLimit(Base):
     
     role = relationship("Role", back_populates="hardwareLimits")
     hardwareSpec = relationship("HardwareSpec", back_populates="roleLimits")
+
+class RoleReservationLimit(Base):
+    __tablename__ = "RoleReservationLimit"
+    
+    roleReservationLimitId = Column(Integer, primary_key=True, autoincrement=True)
+    roleId = Column(ForeignKey("Role.roleId"), nullable=False)
+    minDuration = Column(Integer, nullable=True)  # hours (NULL = use default)
+    maxDuration = Column(Integer, nullable=True)  # hours (NULL = use default)
+    maxActiveReservations = Column(Integer, nullable=True)  # count (NULL = use default)
+    createdAt = Column(DateTime(timezone=True), server_default=func.now())
+    updatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    
+    __table_args__ = (
+        UniqueConstraint('roleId', name='unique_role'),
+    )
+    
+    role = relationship("Role", back_populates="reservationLimits")
 
 class ServerStatus(Base):
     __tablename__ = "ServerStatus"

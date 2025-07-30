@@ -21,6 +21,7 @@
             v-on:emitRemoveRole="removeRole" 
             v-on:emitManageMounts="manageMounts" 
             v-on:emitManageHardwareLimits="manageHardwareLimits"
+            v-on:emitManageReservationLimits="manageReservationLimits"
             v-bind:propItems="roles" />
         </div>
         <p v-else class="dim text-center">No roles.</p>
@@ -54,6 +55,14 @@
       :roleName="selectedHardwareLimitsRole.name"
       @emitModalClose="closeHardwareLimitsDialog">
     </AdminRoleHardwareLimitsModal>
+
+    <!-- Add the reservation limits modal -->
+    <AdminRoleReservationLimitsModal 
+      v-if="selectedReservationLimitsRole"
+      :roleId="selectedReservationLimitsRole.roleId"
+      :roleName="selectedReservationLimitsRole.name"
+      @emitModalClose="closeReservationLimitsDialog">
+    </AdminRoleReservationLimitsModal>
   </v-container>
 </template>
 
@@ -63,6 +72,7 @@ import AdminRolesTable from '/src/components/admin/AdminRolesTable.vue';
 import AdminManageRoleModal from '/src/components/admin/AdminManageRoleModal.vue';
 import AdminRoleMountsModal from '/src/components/admin/AdminRoleMountsModal.vue';
 import AdminRoleHardwareLimitsModal from '/src/components/admin/AdminRoleHardwareLimitsModal.vue';
+import AdminRoleReservationLimitsModal from '/src/components/admin/AdminRoleReservationLimitsModal.vue';
 
 // Add axios back
 const axios = require('axios').default;
@@ -74,7 +84,8 @@ export default {
     AdminRolesTable,
     AdminManageRoleModal,
     AdminRoleMountsModal,
-    AdminRoleHardwareLimitsModal
+    AdminRoleHardwareLimitsModal,
+    AdminRoleReservationLimitsModal
   },
   data: () => ({
     intervalFetch: null,
@@ -83,6 +94,7 @@ export default {
     selectedItem: undefined,
     selectedMountsRole: null,
     selectedHardwareLimitsRole: null,
+    selectedReservationLimitsRole: null,
     showRoleModal: false,
     dialogKey: new Date().getTime(),
     tableName: "roles",
@@ -194,6 +206,15 @@ export default {
     },
     closeHardwareLimitsDialog(shouldRefresh) {
       this.selectedHardwareLimitsRole = null;
+      if (shouldRefresh) {
+        this.fetch();
+      }
+    },
+    manageReservationLimits(role) {
+      this.selectedReservationLimitsRole = role;
+    },
+    closeReservationLimitsDialog(shouldRefresh) {
+      this.selectedReservationLimitsRole = null;
       if (shouldRefresh) {
         this.fetch();
       }

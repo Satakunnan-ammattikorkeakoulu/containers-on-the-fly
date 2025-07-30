@@ -24,27 +24,21 @@ def upgrade() -> None:
     op.create_table(
         'RoleHardwareLimit',
         sa.Column('roleHardwareLimitId', sa.Integer(), nullable=False, autoincrement=True),
-        sa.Column('roleId', sa.Integer(), nullable=False),
-        sa.Column('hardwareSpecId', sa.Integer(), nullable=False),
+        sa.Column('roleId', sa.Integer(), nullable=False, index=True),
+        sa.Column('hardwareSpecId', sa.Integer(), nullable=False, index=True),
         sa.Column('maximumAmountForRole', sa.Integer(), nullable=True),
         sa.Column('createdAt', sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column('updatedAt', sa.DateTime(), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
-        sa.ForeignKeyConstraint(['roleId'], ['Role.roleId'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['hardwareSpecId'], ['HardwareSpec.hardwareSpecId'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['roleId'], ['Role.roleId'], name='fk_RoleHardwareLimit_roleId', ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['hardwareSpecId'], ['HardwareSpec.hardwareSpecId'], name='fk_RoleHardwareLimit_hardwareSpecId', ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('roleHardwareLimitId'),
         sa.UniqueConstraint('roleId', 'hardwareSpecId', name='unique_role_hardware')
     )
     
-    # Create index for faster lookups
-    op.create_index('ix_role_hardware_limit_role_id', 'RoleHardwareLimit', ['roleId'])
-    op.create_index('ix_role_hardware_limit_hardware_spec_id', 'RoleHardwareLimit', ['hardwareSpecId'])
+    # Indexes will be created automatically by SQLAlchemy due to index=True in the model
 
 
 def downgrade() -> None:
     """Downgrade schema."""
-    # Drop indexes
-    op.drop_index('ix_role_hardware_limit_hardware_spec_id', 'RoleHardwareLimit')
-    op.drop_index('ix_role_hardware_limit_role_id', 'RoleHardwareLimit')
-    
-    # Drop table
+    # Drop table (this will also drop all indexes and foreign keys)
     op.drop_table('RoleHardwareLimit')

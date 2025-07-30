@@ -50,6 +50,8 @@
           <div style="max-width: 300px;">
             <div><strong>Server:</strong> {{ item.computerName }}</div>
             <div><strong>Resources:</strong> {{ getResources(item.reservedHardwareSpecs) }}</div>
+            <div><strong>SHM Size:</strong> {{ item.shmSizePercent || 50 }}% of RAM</div>
+            <div v-if="item.ramDiskSizePercent && item.ramDiskSizePercent > 0"><strong>RAM Disk:</strong> {{ item.ramDiskSizePercent }}% of RAM</div>
             <div><strong>Container:</strong> {{ item.reservedContainer.container.imageName }}</div>
             <div v-if="item.reservedContainer.reservedPorts && item.reservedContainer.reservedPorts.length > 0">
               <strong>Ports:</strong><br>

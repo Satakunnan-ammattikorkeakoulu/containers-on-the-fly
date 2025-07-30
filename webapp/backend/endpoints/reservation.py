@@ -41,7 +41,7 @@ async def getOwnReservations(reservationId: int, token: str = Depends(oauth2_sch
   return functionality.getOwnReservationDetails(reservationId, userId)
 
 @router.post("/create_reservation")
-async def CreateReservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", token: str = Depends(oauth2_scheme)):
+async def CreateReservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, token: str = Depends(oauth2_scheme)):
   ForceAuthentication(token)
   
   # Validate date parameter
@@ -75,6 +75,14 @@ async def CreateReservation(date: str, duration: int, computerId: int, container
     # Remove potentially harmful characters
     description = re.sub(r'[<>"\']', '', description)
   
+  # Validate SHM size percentage
+  if not isinstance(shmSizePercent, int) or shmSizePercent < 0 or shmSizePercent > 90:
+    return Response(False, "SHM size percentage must be between 0 and 90.")
+  
+  # Validate RAM disk size percentage
+  if not isinstance(ramDiskSizePercent, int) or ramDiskSizePercent < 0 or ramDiskSizePercent > 60:
+    return Response(False, "RAM disk size percentage must be between 0 and 60.")
+  
   # Validate hardwareSpecs JSON
   try:
     hardwareSpecs = json.loads(hardwareSpecs)
@@ -91,7 +99,7 @@ async def CreateReservation(date: str, duration: int, computerId: int, container
     return Response(False, "Invalid hardware specs JSON format.")
   
   userId = get_authenticated_user_id(token)
-  return functionality.createReservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description)
+  return functionality.createReservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description, shmSizePercent, ramDiskSizePercent)
 
 @router.get("/get_current_reservations")
 async def getCurrentReservations(token: str = Depends(oauth2_scheme)):

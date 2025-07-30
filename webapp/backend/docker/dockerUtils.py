@@ -112,7 +112,8 @@ def startDockerContainer(reservationId: str):
       "cpus": int(hwSpecs['cpus']["amount"]),
       "gpus": gpusString if gpusString else None,  # Convert empty string to None
       "memory": f"{hwSpecs['ram']['amount']}g",
-      "shm_size": settings_handler.getSetting("docker.shm_size"),
+      "shm_size_percent": reservation.reservedContainer.shmSizePercent if reservation.reservedContainer.shmSizePercent is not None else 50,
+      "ram_disk_percent": reservation.reservedContainer.ramDiskSizePercent if reservation.reservedContainer.ramDiskSizePercent is not None else 0,
       "ports": portsForContainer,
       "password": sshPassword,
       "dbUserId": reservation.userId,

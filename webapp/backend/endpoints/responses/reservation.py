@@ -192,6 +192,9 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
     res["reservedContainer"] = ORMObjectToDict(reservation.reservedContainer)
     res["reservedContainer"]["container"] = ORMObjectToDict(reservation.reservedContainer.container)
     res["reservedContainer"]["reservedPorts"] = []
+    # Include SHM and RAM disk percentages
+    res["shmSizePercent"] = reservation.reservedContainer.shmSizePercent if reservation.reservedContainer.shmSizePercent is not None else 50
+    res["ramDiskSizePercent"] = reservation.reservedContainer.ramDiskSizePercent if reservation.reservedContainer.ramDiskSizePercent is not None else 0
     # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
     if reservation.status == "started":
       for reservedPort in reservation.reservedContainer.reservedContainerPorts:
@@ -286,10 +289,22 @@ def getCurrentReservations() -> object:
   
   return Response(True, "Current reservations fetched.", { "reservations": reservations })
 
-def createReservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None):
+def createReservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0):
   # Validate description length if provided
   if description and len(description) > 50:
     return Response(False, "Description must be 50 characters or less.")
+  
+  # Validate SHM size percentage (minimum 10%, maximum 90%)
+  if shmSizePercent < 10:
+    return Response(False, "SHM size must be at least 10% of allocated memory.")
+  if shmSizePercent > 90:
+    return Response(False, "SHM size cannot exceed 90% of allocated memory.")
+  
+  # Validate RAM disk size percentage (minimum 0%, maximum 60%)
+  if ramDiskSizePercent < 0:
+    return Response(False, "RAM disk size cannot be negative.")
+  if ramDiskSizePercent > 60:
+    return Response(False, "RAM disk size cannot exceed 60% of allocated memory.")
 
   date = parser.parse(date)
   endDate = date+relativedelta(hours=+duration)
@@ -313,28 +328,52 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     if container.public == False and not isAdmin:
       return Response(False, "Access denied to private container.")
 
-    # Make sure that user can only have one queued / started server at once (admins can have unlimited)
+    # Get user's role-based reservation limits
+    from database import RoleReservationLimit, UserRole
+    user_roles = session.query(UserRole).filter(UserRole.userId == user.userId).all()
+    role_ids = [ur.roleId for ur in user_roles]
+    
+    # Get all reservation limits for user's roles
+    role_limits = session.query(RoleReservationLimit).filter(
+        RoleReservationLimit.roleId.in_(role_ids)
+    ).all() if role_ids else []
+    
+    # Apply defaults based on whether user is admin
+    default_min_duration = 1  # 1 hour for all users
+    default_max_duration = 1440 if isAdmin else 48  # 60 days for admin, 48 hours for others
+    default_max_active = 99 if isAdmin else 1
+    
+    # Find the most permissive limits across all roles
+    min_duration = default_min_duration
+    max_duration = default_max_duration
+    max_active_reservations = default_max_active
+    
+    for limit in role_limits:
+        # For min duration, take the lowest value (most permissive)
+        if limit.minDuration is not None:
+            min_duration = min(min_duration, limit.minDuration)
+        
+        # For max duration, take the highest value (most permissive)
+        if limit.maxDuration is not None:
+            max_duration = max(max_duration, limit.maxDuration)
+            
+        # For max active reservations, take the highest value (most permissive)
+        if limit.maxActiveReservations is not None:
+            max_active_reservations = max(max_active_reservations, limit.maxActiveReservations)
+    
+    # Check active reservations limit
     userActiveReservations = session.query(Reservation).filter(
       (Reservation.userId == userId),
       ( (Reservation.status == "reserved") | (Reservation.status == "started") )
     ).count()
-    if userActiveReservations > 0 and isAdmin == False:
-      return Response(False, "You can only have one queued or started reservation.")
-
-    # Check that the duration is between minimum and maximum lengths
-    try:
-        from settings_handler import getSetting
-        min_duration = getSetting('reservation.minimumDuration')
-        max_duration = getSetting('reservation.maximumDuration')
-    except Exception:
-        # Fallback to default values if database is unavailable
-        min_duration = 5
-        max_duration = 72
+    if userActiveReservations >= max_active_reservations:
+      return Response(False, f"You can only have {max_active_reservations} active reservation(s) at a time.")
     
-    if (duration < min_duration):
-      return Response(False, f"Minimum duration is {min_duration} hours.")
-    if (duration > max_duration) and isAdmin == False:
-      return Response(False, f"Maximum duration is {max_duration} hours.")
+    # Validate duration against limits
+    if duration < min_duration:
+        return Response(False, f"Minimum duration is {min_duration} hours.")
+    if duration > max_duration:
+        return Response(False, f"Maximum duration is {max_duration} hours.")
 
     # If adminReserveUserEmail is given, check that the user exists
     if adminReserveUserEmail != None and adminReserveUserEmail != "" and isAdmin == True:
@@ -435,6 +474,8 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     # Create the ReservedContainer
     reservation.reservedContainer = ReservedContainer(
       containerId = containerId,
+      shmSizePercent = shmSizePercent,
+      ramDiskSizePercent = ramDiskSizePercent,
     )
     #print(ORMObjectToDict(reservation))
     #print(ORMObjectToDict(reservation.reservedContainer))

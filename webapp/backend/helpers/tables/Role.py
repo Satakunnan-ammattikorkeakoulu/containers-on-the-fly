@@ -360,3 +360,108 @@ def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> tuple[bool, str
         
         session.commit()
         return True, "Role hardware limits saved successfully"
+
+def getRoleReservationLimits(roleId: int) -> dict:
+    '''
+    Gets reservation limits for a specific role.
+    
+    Parameters:
+        roleId: The ID of the role
+        
+    Returns:
+        dict: Reservation limits with defaults applied
+    '''
+    from database import RoleReservationLimit
+    
+    with Session() as session:
+        # Get role to check if it's admin
+        role = session.query(Role).filter(Role.roleId == roleId).first()
+        if not role:
+            return {}
+        
+        # Determine defaults based on role
+        if role.name == "admin":
+            default_min = 1  # 1 hour
+            default_max = 1440  # 60 days (60 * 24 hours)
+            default_active = 99
+        else:
+            default_min = 1  # 1 hour
+            default_max = 48  # 48 hours (2 days)
+            default_active = 1
+        
+        # Get existing limits
+        limits = session.query(RoleReservationLimit).filter(
+            RoleReservationLimit.roleId == roleId
+        ).first()
+        
+        if limits:
+            return {
+                "minDuration": limits.minDuration if limits.minDuration is not None else default_min,
+                "maxDuration": limits.maxDuration if limits.maxDuration is not None else default_max,
+                "maxActiveReservations": limits.maxActiveReservations if limits.maxActiveReservations is not None else default_active
+            }
+        else:
+            # Return defaults when no database entry exists
+            return {
+                "minDuration": default_min,
+                "maxDuration": default_max,
+                "maxActiveReservations": default_active
+            }
+
+def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> tuple[bool, str]:
+    '''
+    Saves reservation limits for a role.
+    
+    Parameters:
+        roleId: The ID of the role
+        reservationLimits: Dictionary with minDuration, maxDuration, and maxActiveReservations
+        
+    Returns:
+        tuple[bool, str]: (success, message)
+    '''
+    from database import RoleReservationLimit
+    
+    with Session() as session:
+        # Check if role exists
+        role = session.query(Role).filter(Role.roleId == roleId).first()
+        if not role:
+            return False, "Role not found"
+        
+        # Get or create reservation limits
+        limits = session.query(RoleReservationLimit).filter(
+            RoleReservationLimit.roleId == roleId
+        ).first()
+        
+        if not limits:
+            limits = RoleReservationLimit(roleId=roleId)
+            session.add(limits)
+        
+        # Validate required fields
+        if 'minDuration' not in reservationLimits or reservationLimits['minDuration'] is None:
+            return False, "Minimum duration is required"
+        if 'maxDuration' not in reservationLimits or reservationLimits['maxDuration'] is None:
+            return False, "Maximum duration is required"
+        if 'maxActiveReservations' not in reservationLimits or reservationLimits['maxActiveReservations'] is None:
+            return False, "Max active reservations is required"
+        
+        # Update values
+        limits.minDuration = reservationLimits['minDuration']
+        limits.maxDuration = reservationLimits['maxDuration']
+        limits.maxActiveReservations = reservationLimits['maxActiveReservations']
+        
+        # Validate min/max relationship
+        if limits.minDuration > limits.maxDuration:
+            return False, "Minimum duration cannot be greater than maximum duration"
+        
+        # Validate ranges
+        if limits.minDuration < 1 or limits.minDuration > 720:
+            return False, "Minimum duration must be between 1 and 720 hours"
+        
+        if limits.maxDuration < 1 or limits.maxDuration > 1440:
+            return False, "Maximum duration must be between 1 and 1440 hours (60 days)"
+        
+        if limits.maxActiveReservations < 0 or limits.maxActiveReservations > 99:
+            return False, "Max active reservations must be between 0 and 99"
+        
+        session.commit()
+        return True, "Role reservation limits saved successfully"

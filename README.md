@@ -101,9 +101,24 @@ make start-docker-utility
 To update the software to latest version:
 
 - Run ``git pull`` to pull latest changes to the application codebase
-- If there were new changes pulled, run first ``make start-main-server``. It will automatically run the database migration and update the main server and it's libraries.
-- After that, run ``make start-docker-utility`` in the main server. This will restart and apply changes to the docker utility.
-- After that, update each additional container server (if any). On each additional container server (if any), run first ``git pull``, and then run ``make start-docker-utility``.
+- If there were no changes pulled, then you don't need to proceed further. Otherwise, proceed further below
+
+##### In the main server:
+In the main server, run these:
+```
+sudo make setup-main-server
+sudo make setup-docker-utility
+make start-main-server
+make start-docker-utility
+```
+
+##### In each additional container server (if any)
+After that, update each additional container server (if any). On each additional container server (if any), run:
+```
+git pull
+sudo make setup-docker-utility
+make start-docker-utility
+```
 
 ### Installing Additional Container Servers
 
@@ -142,12 +157,13 @@ Suppose you have an external firewall in front of your server (for example, you 
 - `5000` (TCP/HTTP, for Docker Registry on the main server)
 - `80` and `443` for HTTP / HTTPS connection to the server web interface and possible Let's Encrypt SSL certificate renewal
 - `2000-3000` (default) or the range of ports from which you want to host the reserved servers, which can be configured in the settings file. These services can be any, usually SSH, but could be HTTP, HTTPS, etc...
+- `3306` (TCP, for MariaDB database connection to the main server from the container servers)
 
 #### Install Required APT Packages
 
 Install required APT packages:
 ```
-sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv ufw software-properties-common
+sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv software-properties-common
 ```
 
 #### Setup the Main Server
@@ -188,7 +204,7 @@ Suppose you have an external firewall in front of your server (for example, you 
 
 Install required APT packages:
 ```
-sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv ufw software-properties-common
+sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv software-properties-common
 ```
 
 #### Setup the Docker Utility

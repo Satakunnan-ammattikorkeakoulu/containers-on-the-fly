@@ -311,6 +311,7 @@ setup-main-server: check-root check-os-ubuntu interactive-settings-creation appl
 	@echo "Configure firewall rules automatically?"
 	@echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"
 	@echo "  $(GREEN)n$(RESET) - No, skip firewall configuration (not recommended)"
+	@echo "  NOTE: If you have already configured the firewall in the past, you can skip this step with option $(BOLD)n$(RESET)."
 	@echo -n "Choice (y/n): "; \
 	read FIREWALL_CHOICE; \
 	echo ""; \
@@ -396,6 +397,7 @@ setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-cre
 		echo "Configure firewall rules automatically?"; \
 		echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"; \
 		echo "  $(GREEN)n$(RESET) - No, skip firewall configuration (not recommended)"; \
+		echo "  NOTE: If you have already configured the firewall in the past, you can skip this step with option $(BOLD)n$(RESET)."; \
 		echo -n "Choice (y/n): "; \
 		read FIREWALL_CHOICE; \
 		echo ""; \

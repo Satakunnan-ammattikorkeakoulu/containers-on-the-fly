@@ -20,7 +20,7 @@
         <v-form ref="form" v-model="form['valid']" lazy-validation>
           <v-text-field v-on:keyup.enter="submitLoginForm" type="text" style="max-width: 300px; margin: 0 auto;" :label="usernameField" v-model="form['email']" :rules="validation['email']" required></v-text-field>
           <v-text-field v-on:keyup.enter="submitLoginForm" type="password" style="max-width: 300px; margin: 0 auto;" :label="passwordField" v-model="form['password']" :rules="validation['password']" required></v-text-field>
-          <v-btn :disabled="!form['valid'] || isLoggingIn" color="success" @click="submitLoginForm" label="Login">Login</v-btn>
+          <v-btn :disabled="!form['valid'] || isLoggingIn" color="success" @click="submitLoginForm" label="Login" class="btn-login">Login</v-btn>
         </v-form>
       </v-col>
     </v-row>
@@ -115,11 +115,11 @@
         .catch(function (error) {
             // Error
             if (error.response && error.response.status == 400) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "alert" })
+              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "alert" })
+              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
             }
             _this.isLoggingIn = false
         });
@@ -137,5 +137,11 @@
   }
   .dim {
     opacity: 0.8;
+  }
+
+  .btn-login {
+    width: 305px;
+    margin-top: 20px;
+    height: 45px !important;
   }
 </style>

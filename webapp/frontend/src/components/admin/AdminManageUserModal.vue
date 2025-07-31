@@ -27,8 +27,23 @@
                   type="password" 
                   :rules="isCreatingNew ? [rules.required, rules.newPassword] : [rules.newPassword]" 
                   v-model="data.password" 
-                  :label="isCreatingNew ? 'Password*' : 'Password (leave empty to keep current)'">
+                  :label="isCreatingNew ? 'Password*' : 'Password (leave empty to keep current)'"
+                  :disabled="clearPassword">
                 </v-text-field>
+              </v-col>
+
+              <!-- CLEAR PASSWORD CHECKBOX -->
+              <v-col cols="12" v-if="!isCreatingNew">
+                <v-checkbox
+                  v-model="clearPassword"
+                  label="Clear user password"
+                  hide-details
+                  @change="onClearPasswordChange"
+                ></v-checkbox>
+                <p class="text-caption mt-2 mb-0">
+                  <v-icon small class="mr-1">mdi-alert</v-icon>
+                  Warning: If password is cleared, the user can only login when LDAP authentication is enabled.
+                </p>
               </v-col>
 
               <!-- ROLES -->
@@ -83,6 +98,7 @@ export default {
       isSubmitting: false,
       modalKey: new Date().toString(),
       dataName: "user",
+      clearPassword: false,
       rules: {
         required: value => !!value || "Required",
         newPassword: value => {
@@ -112,6 +128,12 @@ export default {
     closeDialog() {
       this.isOpen = false;
     },
+    onClearPasswordChange(value) {
+      if (value) {
+        // Clear the password field when checkbox is checked
+        this.data.password = '';
+      }
+    },
     submit() {
       if (!this.$refs.form.validate()) return;
       this.isSubmitting = true;
@@ -120,10 +142,16 @@ export default {
       let _this = this;
       let currentUser = this.$store.getters.user;
 
+      // Add clearPassword flag to the data if checkbox is checked
+      const submitData = { ...this.data };
+      if (this.clearPassword) {
+        submitData.clearPassword = true;
+      }
+
       axios({
         method: "post",
         url: this.AppSettings.APIServer.admin.save_user,
-        data: { userId: userId, data: this.data },
+        data: { userId: userId, data: submitData },
         headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
       })
       .then(function(response) {

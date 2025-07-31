@@ -271,7 +271,14 @@ def saveUser(userId: int, data: dict) -> object:
                 return Response(False, "User not found")
             
             user.email = data["email"]
-            if "password" in data and data["password"]:
+            
+            # Check if we should clear the password
+            if "clearPassword" in data and data["clearPassword"]:
+                # Clear both password and salt
+                user.password = ""
+                user.passwordSalt = ""
+            elif "password" in data and data["password"]:
+                # Update password only if provided and not clearing
                 hash = HashPassword(data["password"])
                 user.password = base64.b64encode(hash["hashedPassword"]).decode('utf-8')
                 user.passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')

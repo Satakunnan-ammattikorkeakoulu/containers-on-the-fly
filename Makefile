@@ -349,7 +349,7 @@ setup-main-server: check-root check-os-ubuntu interactive-settings-creation appl
 	@echo "$(GREEN)2. Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
 	@rm -f .server_type
 
-start-main-server: check-not-root verify-config-file-exists apply-settings-main-server install-backend-deps init-database ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings to restart the Docker utility and apply changes.
+start-main-server: check-not-root verify-config-file-exists apply-settings-main-server init-database ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings to restart the Docker utility and apply changes.
 	@echo ""
 	@echo "Moving Caddyfile to /etc/caddy/Caddyfile"
 	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile
@@ -453,7 +453,7 @@ setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-cre
 	@echo "2. Run $(BOLD)make start-docker-utility$(RESET)$(GREEN) to start the Docker utility.$(RESET)\n"
 	@rm -f .server_type
 
-start-docker-utility: check-not-root apply-settings install-backend-deps ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings to restart the Docker utility and apply changes.
+start-docker-utility: check-not-root apply-settings ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings to restart the Docker utility and apply changes.
 	@echo ""
 	@echo "Verifying that connection to the database can be established..."
 	@CONNECTION_URI=$$(grep '"engineUri"' webapp/backend/settings.json | sed 's/.*"engineUri": "\(.*\)".*/\1/') && \

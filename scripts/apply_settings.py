@@ -200,12 +200,18 @@ class SettingsApplier:
             print(f"Error: Templates directory not found at {self.templates_dir}")
             sys.exit(1)
             
+        # Check if we're running in main server context
+        is_main_server_context = os.environ.get('CONTAINERFLY_CONTEXT') == 'main-server'
+        
         # Define where each template should output its final file
         template_mappings = {
             'backend_settings.json': self.base_dir / "webapp" / "backend" / "settings.json",
             'frontend_settings.js': self.base_dir / "webapp" / "frontend" / "src" / "AppSettings.js",
-            'Caddyfile': self.output_dir / "Caddyfile"  # Only Caddyfile stays in user_config
         }
+        
+        # Only include Caddyfile for main server context
+        if is_main_server_context:
+            template_mappings['Caddyfile'] = self.output_dir / "Caddyfile"  # Only Caddyfile stays in user_config
         
         for template_file, output_path in template_mappings.items():
             template_path = self.templates_dir / template_file
@@ -298,9 +304,10 @@ class SettingsApplier:
             if frontend_template.exists():
                 print(f"  - Frontend settings: webapp/frontend/src/AppSettings.js")
             
-            # Only show Caddy config if the template exists
+            # Only show Caddy config if the template exists and we're in main server context
+            is_main_server_context = os.environ.get('CONTAINERFLY_CONTEXT') == 'main-server'
             caddyfile_template = self.templates_dir / 'Caddyfile'
-            if caddyfile_template.exists():
+            if caddyfile_template.exists() and is_main_server_context:
                 print(f"  - Caddy config: user_config/Caddyfile")
             
         except Exception as e:

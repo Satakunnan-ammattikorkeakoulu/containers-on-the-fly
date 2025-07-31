@@ -75,3 +75,7 @@ body .section {
 .v-text-field .v-label {
   font-size: .875rem;
 }
+
+.v-select__selection.v-select__selection--comma {
+  font-size: .900rem;
+}

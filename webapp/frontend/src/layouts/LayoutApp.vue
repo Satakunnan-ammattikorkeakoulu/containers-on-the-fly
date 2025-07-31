@@ -90,8 +90,7 @@
         this.$router.push("/user/reservations")
       },
       profile() {
-        console.log("IMPLEMENT")
-        //this.$router.push("/user/reservations")
+        this.$router.push("/user/profile")
       }
     },
     computed: {

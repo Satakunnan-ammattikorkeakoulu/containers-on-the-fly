@@ -152,3 +152,52 @@ def profile(token):
     userDetails["createdAt"] = user.userCreatedAt
     userDetails["role"] = GetRole(user.email)
     return Response(True, "User details found", { "user": userDetails })
+
+def hasPassword(token):
+  ''' Checks if the user has a password set.
+      Parameters:
+        token: User login token
+  '''
+  with Session() as session:
+    user = session.query(User).filter(User.loginToken == token).first()
+    if user is None:
+      return Response(False, "User not found.")
+    
+    # Check if password is set (not None and not empty string)
+    hasPassword = user.password is not None and user.password != ""
+    return Response(True, "Password status checked", {"hasPassword": hasPassword})
+
+def changePassword(token, currentPassword, newPassword):
+  ''' Changes the user's password.
+      Parameters:
+        token: User login token
+        currentPassword: Current password
+        newPassword: New password
+  '''
+  if currentPassword == "" or currentPassword is None:
+    return Response(False, "Current password cannot be empty.")
+  if newPassword == "" or newPassword is None:
+    return Response(False, "New password cannot be empty.")
+  if len(newPassword) < 5:
+    return Response(False, "New password must be at least 5 characters long.")
+  
+  with Session() as session:
+    user = session.query(User).filter(User.loginToken == token).first()
+    if user is None:
+      return Response(False, "User not found.")
+    
+    # Check if user has a password set
+    if user.password is None or user.password == "":
+      return Response(False, "Password is not set for this account. Cannot change password.")
+    
+    # Verify current password
+    if not IsCorrectPassword(base64.b64decode(user.passwordSalt), base64.b64decode(user.password), currentPassword):
+      return Response(False, "Current password is incorrect.")
+    
+    # Hash and set new password
+    hash = HashPassword(newPassword)
+    user.password = base64.b64encode(hash["hashedPassword"]).decode('utf-8')
+    user.passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
+    session.commit()
+    
+    return Response(True, "Password changed successfully.")

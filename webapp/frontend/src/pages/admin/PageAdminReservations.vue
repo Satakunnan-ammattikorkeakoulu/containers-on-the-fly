@@ -9,25 +9,8 @@
       </v-col>
     </v-row>
 
-    <!-- Filters -->
-    <v-row class="text-center row-filters">
-      <v-row>
-        <v-col cols="3" style="margin: 0 auto;">
-          <v-select
-            :items="['All', 'reserved', 'started', 'stopped', 'error']"
-            label="Status"
-            v-model="filters.status"
-            item-text="text"
-            item-value="value"
-            return-object
-            @change="setFilters"
-          ></v-select>
-        </v-col>
-      </v-row>
-    </v-row>
-
     <!-- Statistics Cards -->
-    <div v-if="!isFetchingReservations">
+    <div v-if="!isFetchingReservations" id="stats-row">
       <!-- Status Statistics -->
       <v-row class="mb-4 justify-center">
         <v-col cols="12" sm="6" md="2">
@@ -109,14 +92,37 @@
       </v-row>
     </div>
 
-    <v-row v-if="!isFetchingReservations">
-        <v-col cols="12">
+    <!-- Filters -->
+    <v-row class="text-center row-filters justify-center" v-if="!isFetchingReservations">
+      <v-col cols="12" md="3">
+        <v-select
+          :items="statusItems"
+          label="Status"
+          v-model="filters.status"
+          item-text="text"
+          item-value="value"
+          return-object
+          @change="applyFilters"
+        ></v-select>
+      </v-col>
+      <v-col cols="12" md="2">
+        <v-text-field
+          v-model="filters.reservationId"
+          label="Reservation ID"
+          clearable
+          @input="applyFilters"
+        ></v-text-field>
+      </v-col>
+    </v-row>
+
+    <v-row v-if="!isFetchingReservations" style="margin-top: 0px">
+        <v-col cols="12" style="padding-top: 0px">
           <v-slide-x-transition mode="out-in">
-            <div v-if="reservations && reservations.length > 0" style="margin-top: 50px">
-              <AdminReservationTable @emitCancelReservation="cancelReservation" @emitChangeEndDate="changeEndDate" @emitRestartContainer="restartContainer" @emitShowReservationDetails="showReservationDetails" v-bind:propReservations="reservations" />
+            <div v-if="filteredReservations && filteredReservations.length > 0">
+              <AdminReservationTable @emitCancelReservation="cancelReservation" @emitChangeEndDate="changeEndDate" @emitRestartContainer="restartContainer" @emitShowReservationDetails="showReservationDetails" v-bind:propReservations="filteredReservations" />
             </div>
           
-            <p v-else class="dim text-center">No reservations found.</p>
+            <p v-else class="dim text-center">{{ reservations.length > 0 ? 'No reservations match the filters.' : 'No reservations found.' }}</p>
           </v-slide-x-transition>
         </v-col>
       </v-row>
@@ -153,7 +159,12 @@
       informByEmail: false,
       modalConnectionDetailsVisible: false,
       modalConnectionDetailsReservationId: null,
-      filters: { status: { text: "All", value: "All" } },
+      filters: { 
+        status: { text: "All", value: "All" },
+        reservationId: ''
+      },
+      filteredReservations: [],
+      statusCounts: {},
       stats: {
         total: 0,
         started: 0,
@@ -165,6 +176,18 @@
         lastThreeMonths: 0
       }
     }),
+    computed: {
+      statusItems() {
+        const items = [
+          { text: `All (${this.reservations.length})`, value: 'All' },
+          { text: `reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
+          { text: `started (${this.statusCounts.started || 0})`, value: 'started' },
+          { text: `stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
+          { text: `error (${this.statusCounts.error || 0})`, value: 'error' }
+        ];
+        return items;
+      }
+    },
     mounted () {
       if (localStorage.getItem("justReserved") === "true") {
         this.justReserved = true;
@@ -181,6 +204,26 @@
       this.intervalFetchReservations = setInterval(() => { this.fetchReservations()}, 15000)
     },
     methods: {
+      applyFilters() {
+        let filtered = this.reservations;
+        
+        // Filter by Status
+        if (this.filters.status && this.filters.status.value !== 'All') {
+          filtered = filtered.filter(reservation => 
+            reservation.status === this.filters.status.value
+          );
+        }
+        
+        // Filter by Reservation ID
+        if (this.filters.reservationId && this.filters.reservationId.trim() !== '') {
+          filtered = filtered.filter(reservation => 
+            reservation.reservationId.toString().toLowerCase().includes(this.filters.reservationId.toLowerCase().trim())
+          );
+        }
+        
+        this.filteredReservations = filtered;
+        this.updateStats();
+      },
       setFilters() {
         this.fetchReservations()
       },
@@ -236,7 +279,8 @@
             // Success
             if (response.data.status == true) {
               _this.reservations = response.data.data.reservations
-              _this.updateStats()
+              _this.statusCounts = response.data.data.statusCounts || {}
+              _this.applyFilters()
             }
             // Fail
             else {
@@ -411,7 +455,8 @@
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
         const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-
+        
+        // Always use all reservations for statistics
         this.stats.total = this.reservations.length
         this.stats.started = this.reservations.filter(r => r.status === 'started').length
         this.stats.stopped = this.reservations.filter(r => r.status === 'stopped').length
@@ -447,5 +492,15 @@
 <style scoped lang="scss">
   .loading {
     margin: 60px auto;
+  }
+  
+  .row-filters {
+    margin-top: 30px;
+    margin-bottom: 0px;
+  }
+
+  #stats-row .row.mb-4, #stats-row .row.mb-6 {
+    margin-bottom: 0px !important;
+    margin-top: 0px !important;
   }
 </style>

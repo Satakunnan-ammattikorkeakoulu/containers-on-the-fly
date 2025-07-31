@@ -311,6 +311,7 @@ setup-main-server: check-root check-os-ubuntu interactive-settings-creation appl
 	@echo "Configure firewall rules automatically?"
 	@echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"
 	@echo "  $(GREEN)n$(RESET) - No, skip firewall configuration (not recommended)"
+	@echo "  NOTE: If you have already configured the firewall in the past, you can skip this step with option $(BOLD)n$(RESET)."
 	@echo -n "Choice (y/n): "; \
 	read FIREWALL_CHOICE; \
 	echo ""; \
@@ -321,7 +322,7 @@ setup-main-server: check-root check-os-ubuntu interactive-settings-creation appl
 	else \
 		echo "$(RED)WARNING: Firewall not configured!$(RESET)"; \
 		echo "Your server may be vulnerable to unauthorized access."; \
-		echo "You can configure it later with: $(BOLD)make apply-firewall-rules$(RESET)"; \
+		echo "You can configure it later by running this command again."; \
 		echo -n "Press Enter to continue with setup anyway..."; \
 		read CONTINUE_ANYWAY; \
 	fi; \
@@ -396,6 +397,7 @@ setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-cre
 		echo "Configure firewall rules automatically?"; \
 		echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"; \
 		echo "  $(GREEN)n$(RESET) - No, skip firewall configuration (not recommended)"; \
+		echo "  NOTE: If you have already configured the firewall in the past, you can skip this step with option $(BOLD)n$(RESET)."; \
 		echo -n "Choice (y/n): "; \
 		read FIREWALL_CHOICE; \
 		echo ""; \
@@ -406,7 +408,7 @@ setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-cre
 		else \
 			echo "$(RED)WARNING: Firewall not configured!$(RESET)"; \
 			echo "Your server may be vulnerable to unauthorized access."; \
-			echo "You can configure it later with: $(BOLD)make apply-firewall-rules$(RESET)"; \
+			echo "You can configure it later by running this command again."; \
 			echo -n "Press Enter to continue with setup anyway..."; \
 			read CONTINUE_ANYWAY; \
 		fi; \

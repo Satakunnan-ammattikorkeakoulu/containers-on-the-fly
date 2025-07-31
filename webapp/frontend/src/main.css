@@ -71,3 +71,7 @@ body .section {
   background-color: #37393f !important;
   color: white !important;
 }
+
+.v-text-field .v-label {
+  font-size: .875rem;
+}

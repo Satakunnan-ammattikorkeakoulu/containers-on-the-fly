@@ -3,7 +3,7 @@
     <v-row class="text-center">
       <v-col cols="12">
         <v-img
-          :src="require('/src/assets/images/front_bg.jpg')"
+          :src="require('/src/assets/images/front_bg.png')"
           class="my-3"
           contain
           height="350"
@@ -11,9 +11,9 @@
       </v-col>
 
       <v-col class="mb-4">
-        <h3 class="color-violet dim">Login to</h3>
-        <h1 class="color-violet">{{appName}}</h1>
-        <p class="color-violet dim" style="margin-top: 10px;" v-if="loginPageInfo && loginPageInfo.trim()" v-html="loginPageInfo.replace(/\n/g, '<br>')"></p>
+        <h3 class="color-blue dim">Login to</h3>
+        <h1 class="color-blue">{{appName}}</h1>
+        <p class="color-blue dim" style="margin-top: 30px;" v-if="loginPageInfo && loginPageInfo.trim()" v-html="loginPageInfo.replace(/\n/g, '<br>')"></p>
       </v-col>
 
       <v-col class="mb-5" cols="12">
@@ -131,6 +131,9 @@
 <style scoped>
   .color-violet {
     color: #6d4c7d;
+  }
+  .color-blue {
+    color: #047093;
   }
   .dim {
     opacity: 0.8;

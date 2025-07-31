@@ -285,7 +285,7 @@
                 backendDockerUtil: data.logs?.docker_utility?.content || ''
               },
               version: data.version || { software: null, updated: null },
-              lastUpdated: data.metrics?.lastUpdated ? new Date(data.metrics.lastUpdated) : null
+              lastUpdated: data.metrics?.lastUpdated ? new Date(data.metrics.lastUpdated + 'Z') : null
             });
             
             // Update active status and last update time

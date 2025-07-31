@@ -55,7 +55,6 @@
         </v-container>
       </v-main>
       
-      <Footer />
       <Snackbar></Snackbar>
     </v-app>
   </div>
@@ -63,13 +62,11 @@
 
 <script>
   import Snackbar from '/src/components/global/Snackbar.vue';
-  import Footer from '/src/components/global/Footer'
 
   export default {
     name: 'LayoutApp',
     components: {
       Snackbar,
-      Footer,
     },
     data: () => ({
       show: true,

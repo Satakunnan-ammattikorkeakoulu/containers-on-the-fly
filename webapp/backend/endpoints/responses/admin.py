@@ -164,12 +164,13 @@ def removeContainer(containerId : int) -> object:
 
 def getUsers() -> object:
     '''
-    Returns a list of all users.
+    Returns a list of all users and available roles.
 
     Returns:
         object: Response object with status, message and data.
     '''
     data = []
+    role_user_counts = {}
 
     with Session() as session:
         query = session.query(User)
@@ -181,8 +182,22 @@ def getUsers() -> object:
             addable["createdAt"] = user.userCreatedAt  # Added createdAt field
             addable["hasPassword"] = user.password is not None and user.password != ""
             data.append(addable)
+            
+            # Count users per role
+            for role in user.roles:
+                if role.name not in role_user_counts:
+                    role_user_counts[role.name] = 0
+                role_user_counts[role.name] += 1
 
-    return Response(True, "Users fetched successfully", {"users": data})
+    # Get available roles
+    from helpers.tables.Role import getRolesWithMountCounts
+    availableRoles = getRolesWithMountCounts()
+    
+    # Add user counts to each role
+    for role in availableRoles:
+        role["userCount"] = role_user_counts.get(role["name"], 0)
+
+    return Response(True, "Users fetched successfully", {"users": data, "availableRoles": availableRoles})
 
 def getUser(userId: int) -> object:
     '''

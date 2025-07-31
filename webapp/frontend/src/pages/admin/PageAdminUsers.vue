@@ -16,12 +16,14 @@
     <!-- Filters -->
     <v-row class="text-center row-filters justify-center">
       <v-col cols="12" md="3">
-        <v-text-field
-          v-model="filters.userId"
-          label="User ID"
-          clearable
-          @input="applyFilters"
-        ></v-text-field>
+        <v-select
+          :items="roleItems"
+          label="Role"
+          v-model="filters.role"
+          item-text="text"
+          item-value="value"
+          @change="applyFilters"
+        ></v-select>
       </v-col>
       <v-col cols="12" md="3">
         <v-text-field
@@ -32,14 +34,12 @@
         ></v-text-field>
       </v-col>
       <v-col cols="12" md="3">
-        <v-select
-          :items="roleItems"
-          label="Role"
-          v-model="filters.role"
-          item-text="text"
-          item-value="value"
-          @change="applyFilters"
-        ></v-select>
+        <v-text-field
+          v-model="filters.userId"
+          label="User ID"
+          clearable
+          @input="applyFilters"
+        ></v-text-field>
       </v-col>
     </v-row>
 

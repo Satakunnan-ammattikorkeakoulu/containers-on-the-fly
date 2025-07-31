@@ -166,12 +166,25 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
     object: Response object with status, message and data.
   '''
   reservations = []
+  status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
 
   # Limit listing to 90 days
   def timeNow(): return datetime.datetime.now(datetime.timezone.utc)
   minStartDate = timeNow() - timedelta(days=90)
 
   with Session() as session:
+    # First get all user's reservations for counting
+    count_query = session.query(Reservation)\
+      .filter(
+        Reservation.userId == userId,
+        (Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()))
+    
+    # Count statuses
+    for reservation in count_query:
+      if reservation.status in status_counts:
+        status_counts[reservation.status] += 1
+    
+    # Now get filtered reservations with all the joins
     query = session.query(Reservation)\
       .options(
         joinedload(Reservation.reservedHardwareSpecs),
@@ -221,7 +234,7 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
           })
     reservations.append(res)
   
-  return Response(True, "Hardware resources fetched.", { "reservations": reservations })
+  return Response(True, "Hardware resources fetched.", { "reservations": reservations, "statusCounts": status_counts })
 
 def getOwnReservationDetails(reservationId : int, userId : int) -> object:
   with Session() as session:

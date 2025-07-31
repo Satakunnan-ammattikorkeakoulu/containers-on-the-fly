@@ -54,7 +54,7 @@
       <v-row>
         <v-col cols="3" style="margin: 0 auto;">
           <v-select
-            :items="['All', 'reserved', 'started', 'stopped', 'error']"
+            :items="statusItems"
             label="Status"
             v-model="filters.status"
             item-text="text"
@@ -108,6 +108,7 @@
       intervalFetchReservations: null,
       isFetchingReservations: true,
       reservations: [],
+      statusCounts: {},
       justReserved: false,
       informByEmail: false,
       modalConnectionDetailsVisible: false,
@@ -173,6 +174,11 @@
             // Success
             if (response.data.status == true) {
               _this.reservations = response.data.data.reservations
+              _this.statusCounts = response.data.data.statusCounts || {}
+              // If no statusCounts from backend, calculate locally
+              if (Object.keys(_this.statusCounts).length === 0) {
+                _this.calculateStatusCounts();
+              }
             }
             // Fail
             else {
@@ -409,9 +415,35 @@
        },
        handleReservationsRefreshed(reservations) {
          this.allReservations = reservations;
+       },
+       calculateStatusCounts() {
+         // Initialize counts
+         this.statusCounts = {
+           reserved: 0,
+           started: 0,
+           stopped: 0,
+           error: 0
+         };
+         
+         // Count reservations by status
+         this.reservations.forEach(reservation => {
+           if (reservation.status in this.statusCounts) {
+             this.statusCounts[reservation.status]++;
+           }
+         });
        }
     },
     computed: {
+      statusItems() {
+        const items = [
+          { text: `All (${this.reservations.length})`, value: 'All' },
+          { text: `reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
+          { text: `started (${this.statusCounts.started || 0})`, value: 'started' },
+          { text: `stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
+          { text: `error (${this.statusCounts.error || 0})`, value: 'error' }
+        ];
+        return items;
+      },
       globalTimezone() {
         return this.$store.getters.appTimezone;
       },

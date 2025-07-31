@@ -13,7 +13,7 @@
           <a href="/admin/containers">Containers</a>
         </div>
         <div class="user-info-container" v-if="isLoggedIn == true">
-          <v-menu offset-y>
+          <v-menu offset-y open-on-hover>
             <template v-slot:activator="{ on, attrs }">
               <span 
                 class="user-email-link"

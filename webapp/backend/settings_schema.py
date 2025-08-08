@@ -57,6 +57,10 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.FILE, SettingType.TEXT, required=True,
         description="Server IP address for internal communication"
     ),
+    "app.clientUrl": SettingSetting(
+        SettingSource.FILE, SettingType.TEXT, required=True,
+        description="Frontend application URL"
+    ),
     "app.logoUrl": SettingSetting(
         SettingSource.FILE, SettingType.TEXT, default="/static/logos/logo.png",
         description="Path to the application logo"

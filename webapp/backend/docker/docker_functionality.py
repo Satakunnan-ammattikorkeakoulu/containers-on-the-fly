@@ -348,11 +348,6 @@ def get_email_container_started(image, ip, ports, password, includeEmailDetails,
     except Exception:
         pass
 
-    webAddress = ""
-    client_url = settings_handler.getSetting("app.clientUrl")
-    if client_url and includeEmailDetails:
-        webAddress = f"You can access your reservations through: {client_url}{linesep}{linesep}"
-    
     endDateText = ""
     if endDate is not None:
         # Get timezone from database settings
@@ -387,7 +382,7 @@ IP address of the machine: {ip}
 
 {generalText}
 
-{noReply}{webAddress}{helpText}{non_critical_errors}
+{noReply}{helpText}{non_critical_errors}
 """
 
     return body

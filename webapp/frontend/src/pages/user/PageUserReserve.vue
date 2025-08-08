@@ -103,7 +103,7 @@
                   >
                     <v-card 
                       :class="{ 'selected-card': container === containerItem.value }"
-                      @click="container = containerItem.value"
+                      @click="selectContainer(containerItem.value)"
                       hover
                       style="cursor: pointer; min-height: 260px;"
                       :outlined="container !== containerItem.value"
@@ -173,7 +173,7 @@
         <!-- Select computer, hardware specs & submit -->
         <v-row v-if="reserveDate != null && reserveDurationDays !== null && reserveDurationHours !== null && !fetchingComputers && allComputers && container" class="section">      
           <v-col cols="12">
-            <h2>Select Computer</h2>
+            <h2 id="select-computer-section">Select Computer</h2>
             <v-row justify="center">
               <v-col cols="10">
                 <v-row style="justify-content: center !important;">
@@ -526,6 +526,32 @@
       refreshHardware() {
         this.fetchAvailableHardware();
         this.refreshTip = false;
+      },
+      /**
+       * Handles container selection and auto-scroll to computer selection.
+       * @param {number} containerValue - The selected container ID
+       */
+      selectContainer(containerValue) {
+        this.container = containerValue;
+        
+        // Auto-scroll to the "Select Computer" section after a short delay
+        // to allow Vue to render the computer selection section
+        try {
+          this.$nextTick(() => {
+            setTimeout(() => {
+              const element = document.getElementById('select-computer-section');
+              if (element) {
+                element.scrollIntoView({ 
+                  behavior: 'smooth', 
+                  block: 'start' 
+                });
+              }
+            }, 100);
+          });
+        } catch (error) {
+          // Silently handle any scrolling errors
+          console.debug('Auto-scroll error:', error);
+        }
       },
       /**
        * Checks if user is admin.

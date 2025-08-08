@@ -19,7 +19,7 @@
               <h3 class="subtitle-1 mb-3">Change Password</h3>
               
               <v-alert v-if="!hasPassword" type="info" outlined>
-                Password is not set for your account. Password authentication is not available for this account.
+                Internal system login password is not set for your account (you probably used LDAP or external login). It is not possible to change password for this account (at least from here).
               </v-alert>
               
               <v-form v-else ref="passwordForm" v-model="passwordFormValid" @submit.prevent="changePassword">

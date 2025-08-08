@@ -759,7 +759,8 @@ export default {
       blacklistEnabled: false,
       whitelistEnabled: false,
       containerAlertsEnabled: false,
-      sendEmail: false
+      sendEmail: false,
+      loginType: false
     }, // Track which settings have been initialized from backend
     testEmail: '',
     sendingTest: false,
@@ -1034,6 +1035,21 @@ export default {
             _this.settings.access.whitelistEnabled = data.access.whitelistEnabled || false;
             _this.settings.notifications.containerAlertsEnabled = data.notifications.containerAlertsEnabled || false;
             
+            // Update auth settings
+            _this.settings.auth = {
+              loginType: data.auth?.loginType || 'password',
+              sessionTimeoutMinutes: data.auth?.sessionTimeoutMinutes || 1440,
+              ldap: {
+                url: data.auth?.ldap?.url || '',
+                usernameFormat: data.auth?.ldap?.usernameFormat || '',
+                passwordFormat: data.auth?.ldap?.passwordFormat || '',
+                domain: data.auth?.ldap?.domain || '',
+                searchMethod: data.auth?.ldap?.searchMethod || '',
+                accountField: data.auth?.ldap?.accountField || '',
+                emailField: data.auth?.ldap?.emailField || ''
+              }
+            };
+            
             // Update email settings (excluding contactEmail)
             _this.settings.email = {
               smtpServer: data.email.smtpServer || '',
@@ -1059,6 +1075,7 @@ export default {
               _this.settingsInitialized.whitelistEnabled = true;
               _this.settingsInitialized.containerAlertsEnabled = true;
               _this.settingsInitialized.sendEmail = true;
+              _this.settingsInitialized.loginType = true;
             }, 200);
             
             // Update email lists
@@ -1328,6 +1345,13 @@ export default {
     'settings.emailEnable.sendEmail': function(newValue, oldValue) {
       if (this.settingsInitialized.sendEmail && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
         this.saveSection('emailEnable');
+      }
+    },
+
+    // Auto-save when login type is changed
+    'settings.auth.loginType': function(newValue, oldValue) {
+      if (this.settingsInitialized.loginType && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveSection('auth');
       }
     }
   }

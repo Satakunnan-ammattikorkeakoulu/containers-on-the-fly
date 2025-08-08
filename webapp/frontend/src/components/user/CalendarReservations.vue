@@ -217,7 +217,10 @@
         let html = ''
         const specs = availabilityEvent.availableSpecs
         
-        Object.values(specs).forEach(spec => {
+        // Sort specs alphabetically by type for consistent display order
+        const sortedSpecs = Object.values(specs).sort((a, b) => a.type.localeCompare(b.type))
+        
+        sortedSpecs.forEach(spec => {
           // Calculate availability ratio for this specific resource
           const ratio = spec.available / Math.max(spec.maximum, 1)
           let indicatorClass = 'resource-low'

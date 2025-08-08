@@ -711,13 +711,26 @@ def getAvailabilityTimeline(startDate: str, endDate: str, isAdmin = False) -> ob
             for reserved_spec in res.reservedHardwareSpecs:
               spec_id = reserved_spec.hardwareSpecId
               
-              # Find which group this spec_id belongs to
-              for group_spec_id, group_data in available_specs.items():
-                if spec_id in group_data.get('relatedSpecIds', [group_spec_id]):
-                  available_specs[group_spec_id]['available'] -= reserved_spec.amount
-                  if available_specs[group_spec_id]['available'] < 0:
-                    available_specs[group_spec_id]['available'] = 0
-                  break
+              # Special handling for GPU reservations: individual GPU specs (with internalId) 
+              # are reserved but not displayed. We need to subtract these from the 
+              # consolidated GPU group (without internalId) that is displayed.
+              if reserved_spec.hardwareSpec.type == 'gpu' and reserved_spec.hardwareSpec.internalId is not None:
+                # Find the consolidated GPU group (type='gpus' without internalId)
+                for group_spec_id, group_data in available_specs.items():
+                  if group_data['type'] == 'gpus':  # Note: 'gpus' plural, not 'gpu'
+                    group_data['available'] -= reserved_spec.amount
+                    if group_data['available'] < 0:
+                      group_data['available'] = 0
+                    break
+              else:
+                # Normal handling for non-GPU specs or consolidated GPU specs
+                # Find which group this spec_id belongs to
+                for group_spec_id, group_data in available_specs.items():
+                  if spec_id in group_data.get('relatedSpecIds', [group_spec_id]):
+                    available_specs[group_spec_id]['available'] -= reserved_spec.amount
+                    if available_specs[group_spec_id]['available'] < 0:
+                      available_specs[group_spec_id]['available'] = 0
+                    break
         
         # Create display text for available resources (no server name in resource text)
         resource_text = ""

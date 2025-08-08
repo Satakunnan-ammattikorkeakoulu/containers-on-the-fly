@@ -28,11 +28,30 @@ def ForceAuthentication(token: str, roleRequired: str = None) -> Union[bool,HTTP
   if (IsLoggedIn(token)):
     if roleRequired is not None:
       with Session() as session:
-        user = session.query(User).filter( User.loginToken == token ).first()
-      if GetRole(user.email) == roleRequired:
-        return True
+        from sqlalchemy.orm import joinedload
+        user = session.query(User).options(joinedload(User.roles)).filter( User.loginToken == token ).first()
+      # Check if user has the required role
+      if roleRequired == "admin":
+        # Use IsAdmin function which properly checks all roles
+        if IsAdmin(user.userId):
+          return True
+        else:
+          wrongRole = True
       else:
-        wrongRole = True
+        # For non-admin roles, check if it's the primary role or in the roles list
+        if GetRole(user.email) == roleRequired:
+          return True
+        else:
+          # Also check if the role is in user's roles list
+          hasRole = False
+          for role in user.roles:
+            if role.name == roleRequired:
+              hasRole = True
+              break
+          if hasRole:
+            return True
+          else:
+            wrongRole = True
     else:
       return True
   

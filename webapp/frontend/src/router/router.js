@@ -121,7 +121,7 @@ router.beforeEach(async (to, from, next) => {
   
   const isLoggedIn = store.getters.isLoggedIn
   const user = store.getters.user
-  const isAdmin = user && user.role === 'admin'
+  const isAdmin = user && (user.role === 'admin' || (user.roles && user.roles.includes('admin')))
 
   // If route requires authentication and user is not logged in
   if (requiresAuth && !isLoggedIn) {

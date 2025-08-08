@@ -562,6 +562,7 @@
         if (!currentUser) return false
 
         if (currentUser.role == "admin") return true
+        if (currentUser.roles && currentUser.roles.includes("admin")) return true
         return false
       },
       /**

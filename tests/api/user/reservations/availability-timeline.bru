@@ -1,0 +1,39 @@
+meta {
+  name: Get Availability Timeline
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{root_url}}/reservation/get_availability_timeline
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user_token}}
+}
+
+params:query {
+  computerId: 1
+  containerId: 1
+  startDate: 2025-02-01
+  endDate: 2025-02-07
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has timeline data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('timeline');
+    expect(res.body.data.timeline).to.be.an('array');
+  });
+}

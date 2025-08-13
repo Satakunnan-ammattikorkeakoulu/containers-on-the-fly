@@ -2,21 +2,6 @@
  * Global app settings.
  */
  var AppSettings = {};
-
- /**
- * General settings for the app.
- */
- AppSettings.General = {
-  contactEmail: "{{CONTACT_EMAIL}}",
-  appName: "{{APP_NAME}}",
-  timezone: "{{TIMEZONE}}",
- }
- 
- AppSettings.Login = {
-  loginText: "Login with your credentials.",
-  usernameField: "Username",
-  passwordField: "Password"
- }
  
  /**
  * API urls

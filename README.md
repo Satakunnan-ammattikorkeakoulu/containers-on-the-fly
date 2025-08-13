@@ -37,9 +37,11 @@ This project has been featured in the following academic publications:
 # Table of Contents
    * [Getting Started](#getting-started)
       * [Installing Main Server](#installing-main-server)
-         * [Settings or Application Updates](#settings-or-application-updates)
+         * [Updating Settings](#updating-settings)
+         * [Updating the Software](#updating-the-software)
       * [Installing Additional Container Servers](#installing-additional-container-servers)
-         * [Settings or Application Updates](#settings-or-application-updates-1)
+         * [Updating Settings](#updating-settings-1)
+         * [Updating the Software](#updating-the-software-1)
       * [Automatic Installation: Main Server](#automatic-installation-main-server)
          * [Open Ports](#open-ports)
          * [Setup the Main Server](#setup-the-main-server)
@@ -73,7 +75,7 @@ Main server contains the web interface, database, local docker registry. Follow 
 3. [Install the Container Server](#automatic-installation-container-server)
 4. [Create reservable containers (images)](#creating-reservable-containers)
 
-By default, the setting `ADD_TEST_DATA` is set to true, which sets up the server machine, adds default docker images and adds default admin and a regular user accounts to the system automatically. The default accounts are as follows:
+By default, the setting `ADD_TEST_DATA` is set to true (we recommend setting it like this), which sets up the server machine, adds default docker images and adds default admin and a regular user accounts to the system automatically. The default accounts are as follows:
 
 ```
 username: admin@foo.com
@@ -85,12 +87,36 @@ username: user@foo.com
 password: test
 ```
 
-#### Settings or Application Updates
+#### Updating Settings
 
-If you change any settings in the ``user_config/settings`` file or run ``git pull`` to update the application, just run these commands again to apply the settings and to restart the servers in the main server:
+If you change any settings in the ``user_config/settings`` file, just run these commands again to apply the settings and to restart the servers in the main server:
 
 ```
 make start-main-server
+make start-docker-utility
+```
+
+#### Updating the Software
+
+To update the software to latest version:
+
+- Run ``git pull`` to pull latest changes to the application codebase
+- If there were no changes pulled, then you don't need to proceed further. Otherwise, proceed further below
+
+##### In the main server:
+In the main server, run these:
+```
+sudo make setup-main-server
+sudo make setup-docker-utility
+make start-main-server
+make start-docker-utility
+```
+
+##### In each additional container server (if any)
+After that, update each additional container server (if any). On each additional container server (if any), run:
+```
+git pull
+sudo make setup-docker-utility
 make start-docker-utility
 ```
 
@@ -104,13 +130,17 @@ After the main server has been installed, it is possible to create more Ubuntu 2
 3. Add the computer through the main server admin web interface (Computers -> Create new Computer). Make a note of the name that you set for the computer as you need to configure this in your settings file.
 4. [Install the Container Server](#automatic-installation-container-server) in the new server
 
-#### Settings or Application Updates
+#### Updating Settings
 
-If you change any setting files in the ``user_config/`` folder or run ``git pull`` to update the application, just run this command again to apply the settings and to restart the servers in the container server:
+If you change any settings in the ``user_config/settings`` file, just run this command again to apply the settings and to restart the container server:
 
 ```
 make start-docker-utility
 ```
+
+#### Updating the Software
+
+Review the section for Main Server on how to update the software on the container server.
 
 ### Automatic Installation: Main Server
 
@@ -133,7 +163,7 @@ Suppose you have an external firewall in front of your server (for example, you 
 
 Install required APT packages:
 ```
-sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv ufw software-properties-common
+sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv software-properties-common
 ```
 
 #### Setup the Main Server
@@ -156,6 +186,8 @@ make start-main-server
 
 That's it! Now you should be able to access the web interface using a browser. There will be more information printed on your console after running the `make start-main-server` command. If the servers crash or something happens, then you should only need to run the `make start-main-server` command again.
 
+You should start by logging in as an administrator (default username ``admin@foo.com`` and password ``test``), and start configuring the settings for the application through the web interface.
+
 ### Automatic Installation: Container Server
 
 > Heads up! The automatic installation script for the **container server** only works with Ubuntu Linux 24.04. It is HIGHLY RECOMMENDED (or even mandatory) to use a fresh Ubuntu installation, due to various software being installed and configured.
@@ -172,7 +204,7 @@ Suppose you have an external firewall in front of your server (for example, you 
 
 Install required APT packages:
 ```
-sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv ufw software-properties-common
+sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv software-properties-common
 ```
 
 #### Setup the Docker Utility

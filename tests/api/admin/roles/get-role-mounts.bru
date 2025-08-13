@@ -1,0 +1,32 @@
+meta {
+  name: Get Role Mounts
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{root_url}}/admin/role_mounts?roleId=1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has mounts data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('mounts');
+    expect(res.body.data.mounts).to.be.an('array');
+  });
+}

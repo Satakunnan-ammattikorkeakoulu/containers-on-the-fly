@@ -1,0 +1,52 @@
+meta {
+  name: Get Available Hardware
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{root_url}}/reservation/get_available_hardware?date=2025-01-01T10:00:00&duration=2
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has hardware data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.be.an('array');
+  });
+  
+  test("Hardware items have required fields", function() {
+    if (res.body.data.length > 0) {
+      const hardware = res.body.data[0];
+      expect(hardware).to.have.property('computerId');
+      expect(hardware).to.have.property('computerName');
+      expect(hardware).to.have.property('containers');
+      expect(hardware.containers).to.be.an('array');
+    }
+  });
+  
+  test("Container items have required fields", function() {
+    if (res.body.data.length > 0 && res.body.data[0].containers.length > 0) {
+      const container = res.body.data[0].containers[0];
+      expect(container).to.have.property('containerId');
+      expect(container).to.have.property('name');
+      expect(container).to.have.property('availableGpus');
+      expect(container).to.have.property('availableCpus');
+      expect(container).to.have.property('availableRam');
+    }
+  });
+}

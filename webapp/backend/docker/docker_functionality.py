@@ -1,12 +1,35 @@
 #! /usr/bin/python3
 from python_on_whales import docker
 from helpers.auth import create_password
+from helpers.Utils import removeSpecialCharacters
 from datetime import datetime
-from settings import settings
+from settings_handler import settings_handler
 from python_on_whales.exceptions import NoSuchContainer
 import os
 import shutil
 import traceback
+import getpass
+from database import Session, Role
+import subprocess
+
+def substitute_mount_variables(path, user_email, user_id):
+    """Substitute template variables in mount paths"""
+    if not path:
+        return path
+    
+    # Sanitize email for filesystem use
+    email_sanitized = removeSpecialCharacters(user_email)
+    
+    substitutions = {
+        '{email}': email_sanitized,
+        '{userid}': str(user_id)
+    }
+    
+    result = path
+    for variable, value in substitutions.items():
+        result = result.replace(variable, value)
+    
+    return result
 
 def start_container(pars):
     """
@@ -22,8 +45,12 @@ def start_container(pars):
         cpus (int): The amount of cpus dedicated for the container. Note: The amount of cpus must be available in the host machine.
         memory (string): The amount of RAM memory dedicated for the container. For example: "1g" or "8g"
         ports (list): The ports to be used. In format: [(local_port, container_port), (local_port2, container_port2)]. For example: [(2213, 22)] for SSH.
-        localMountFolderPath (string): The folder to mount in the local filesystem. For example: /home/user/docker_mounts
         dbUserId (string): User ID from the database who started the container
+        reservation: Reservation dictionary containing computerId and user data (with email)
+        roleMounts (list): List of mount dictionaries with hostPath, containerPath, readOnly, computerId
+                          hostPath and containerPath support template variables:
+                          - {email}: User's email with special characters removed (e.g., "test_foo_com")
+                          - {userid}: User's database ID (e.g., "123")
     Optional parameters:
         gpus (string): The amount of gpus dedicated for the container in format "device=0,2,4" where "0", "2" and "4" are device nvidia / cuda IDs. Pass None if no gpus are needed.
         image_version (string) (default: "latest"): The image version to use.
@@ -39,9 +66,8 @@ def start_container(pars):
             (string) error_message: Error message(s) (if any),
             (string) non_critical_error: Non-critical error messages (if any)
     """
-
     try:
-        # Verify all that all the required parameters are present.
+        # Verify parameters first
         if "name" not in pars: raise Exception("Missing parameter: name")
         if "image" not in pars: raise Exception("Missing parameter: image")
         if "username" not in pars: raise Exception("Missing parameter: username")
@@ -49,6 +75,8 @@ def start_container(pars):
         if "memory" not in pars: raise Exception("Missing parameter: memory")
         if "ports" not in pars: raise Exception("Missing parameter: ports")
         if "dbUserId" not in pars: raise Exception("Missing parameter: dbUserId")
+        if "reservation" not in pars: raise Exception("Missing parameter: reservation")
+        if "roleMounts" not in pars: raise Exception("Missing parameter: roleMounts")
 
         if "gpus" not in pars: pars["gpus"] = None
         if pars["gpus"] == 0: pars["gpus"] = None
@@ -57,98 +85,176 @@ def start_container(pars):
         if "interactive" not in pars: pars["interactive"] = True
         if "remove" not in pars: pars["remove"] = True
 
-        # can this lead to oum? we need to test so if weird shit is happening, look in to this:
-        # we add that as half of the ram size, if this seems to work, remove this shm_size from docker.settings.
-
-        mem_value = int(float((pars["memory"][:-1])))
-        unit = pars["memory"][-1]
-        shm_value = f"{mem_value // 2}{unit}"
-        pars["shm_size"] = shm_value
-
+        # Create random password for the user if it was not passed
         if "password" not in pars: pars["password"] = create_password()
 
+        # Calculate SHM size based on percentage
+        mem_value = int(float((pars["memory"][:-1])))
+        unit = pars["memory"][-1]
+        
+        # Convert memory to MB for more precise calculation
+        if unit.lower() == 'g':
+            mem_mb = mem_value * 1024
+        elif unit.lower() == 'm':
+            mem_mb = mem_value
+        else:
+            mem_mb = mem_value * 1024  # Default to GB
+        
+        # Use provided percentage or default to 50%
+        shm_percent = pars.get("shm_size_percent", 50)
+        # Enforce minimum 10% and maximum 90%
+        shm_percent = max(10, min(90, shm_percent))
+        shm_mb = int(mem_mb * shm_percent / 100)
+        pars["shm_size"] = f"{shm_mb}m"
+
+        container_name = None
         container_name = pars['name']
 
         #print(pars["gpus"])
-
         gpus = None
-        if pars["gpus"] != None:
-            gpus = f'"{pars["gpus"]}"'
+        # Check if gpus parameter exists and is not empty
+        if pars.get("gpus") and pars["gpus"] != "":
+            # Check if GPU debug mode is enabled
+            try:
+                debug_skip_gpu = settings_handler.getSetting("docker.debugSkipGpuDedication")
+            except Exception as e:
+                debug_skip_gpu = False
+            
+            if debug_skip_gpu:
+                gpus = None
+            else:
+                gpus = f'"{pars["gpus"]}"'
 
         # Add volumes and mounts
         volumes = []
-        if pars.get("localMountFolderPath"):
-            # Create directory for mounting if it does not exist
-            if not os.path.isdir(pars["localMountFolderPath"]):
-                os.makedirs(pars["localMountFolderPath"], exist_ok=True)
-            # Set correct owner and group for the mount folder
-            shutil.chown(pars["localMountFolderPath"], user=settings.docker['mountUser'], group=settings.docker['mountGroup'])
-            # Set correct file permissions for the mount folder
-            os.chmod(pars["localMountFolderPath"], 0o777)
-            volumes.append((pars['localMountFolderPath'], f"/home/{pars['username']}/persistent"))
-            #volumes = [(pars['localMountFolderPath'], f"/home/{pars['username']}/persistent")]
-        if "extraMounts" in settings.docker and len(settings.docker["extraMounts"]) > 0:
-            for mount in settings.docker["extraMounts"]:
-                if mount["readOnly"]:
-                    volumes.append((mount["mountLocation"], f"/home/{pars['username']}/{mount['containerFolderName']}", "ro"))
+        
+        # Set mounting user and group
+        # For the user we will use the current user running this script
+        # "docker" is the group
+        mountUser = os.getenv('USER') or os.getenv('USERNAME') or getpass.getuser()
+        mountGroup = "docker"
+
+        # Get user info for variable substitution
+        user_email = pars["reservation"]["user"]["email"]
+        user_id = pars["dbUserId"]
+
+        # Unified mount processing with variable substitution
+        computer_id = pars["reservation"]["computerId"]
+        for mount in pars["roleMounts"]:
+            # Only include mounts for this specific computer
+            if mount["computerId"] == computer_id:
+                # Apply variable substitution to paths
+                host_path = substitute_mount_variables(mount["hostPath"], user_email, user_id)
+                container_path = substitute_mount_variables(mount["containerPath"], user_email, user_id)
+                read_only = mount["readOnly"]
+                
+                if host_path:
+                    # Create directory for mounting if it does not exist
+                    if not os.path.isdir(host_path):
+                        os.makedirs(host_path, exist_ok=True)
+                    # Set correct owner and group for the mount folder (keep docker group for mounting)
+                    shutil.chown(host_path, user=mountUser, group=mountGroup)
+                    # Set correct file permissions for the mount folder
+                    os.chmod(host_path, 0o775)
+                    
+                    # Remove any existing ACLs to ensure default Unix behavior
+                    try:
+                        subprocess.run(['setfacl', '-b', host_path], check=True, capture_output=True)
+                    except Exception as e:
+                        print("Resetting ACL permissions for a mount folder failed:")
+                        print(e)
+                    
+                    # Give containerfly group write access to the directory
+                    try:
+                        subprocess.run(['setfacl', '-m', 'g:containerfly:rwx', host_path], check=True)
+                    except Exception as e:
+                        print(f"Failed to set containerfly group permissions on {host_path}:")
+                        print(e)
+                
+                # Add the volume mount
+                if read_only:
+                    volumes.append((host_path, container_path, "ro"))
                 else:
-                    volumes.append((mount["mountLocation"], f"/home/{pars['username']}/{mount['containerFolderName']}"))
+                    volumes.append((host_path, container_path))
 
-        try:
-            import local_overrides
-            local_overrides.add_extra_volumes(pars, volumes)
-        except ImportError:
-            pass
+        full_image_name = f"{settings_handler.getSetting('docker.registryAddress')}/{pars['image']}:{pars['image_version']}"
 
-        full_image_name = f"{settings.docker['registryAddress']}/{pars['image']}:{pars['image_version']}"
-        #testing ram disk
-        mount_path = "/home/user/ram_disk"
-        ram_disk_size = "1073741824" # 1G in bytes, if I understanded correctly, this need to be in bytes, not 1GB etc
-        tmpfs_config = f"type=tmpfs,destination={mount_path},tmpfs-size={ram_disk_size}" 
-        ram_mounts = [tmpfs_config]
-        cont = docker.run(
-            full_image_name,
-            volumes = volumes,
-            mounts = [ram_mounts], # added this for ramdisk
-            gpus=gpus,
-            name = container_name,
-            memory = pars['memory'],
-            kernel_memory = pars['memory'],
-            shm_size = pars['shm_size'],
-            cpus = pars['cpus'],
-            publish = pars['ports'],
-            detach = True,
-            interactive = pars['interactive'],
-            
+        # RAM disk configuration
+        ram_mounts = []
+        ram_disk_percent = pars.get("ram_disk_percent", 0)
+        
+        if ram_disk_percent > 0:
+            mount_path = "/home/user/ram_disk"
+            # Calculate RAM disk size in bytes based on percentage
+            # Use the same memory value we calculated for SHM
+            ram_disk_mb = int(mem_mb * ram_disk_percent / 100)
+            ram_disk_bytes = ram_disk_mb * 1024 * 1024  # Convert MB to bytes
+            tmpfs_config = f"type=tmpfs,destination={mount_path},tmpfs-size={ram_disk_bytes}"
+            ram_mounts.append(tmpfs_config)
+        
+        # Start the container
+        # Build the base parameters
+        run_params = {
+            'volumes': volumes,
+            'name': container_name,
+            'memory': pars['memory'],
+            'kernel_memory': pars['memory'],
+            'shm_size': pars['shm_size'],
+            'cpus': pars['cpus'],
+            'publish': pars['ports'],
+            'detach': True,
+            'interactive': pars['interactive'],
             # Do not automatically remove the container as it will stop.
             # Removing a container will be handled manually in the stop_container() function.
             # If it would be removed, restarting or crashing a container would fully destroy it immediately.
-            remove = False,
+            'remove': False,
             # Looks every time if there is newer image in local registery
-            pull='always',
-
+            'pull': 'always',
             #user="1002:130"
-        )
+        }
+        
+        # Only add gpus parameter if we actually have GPUs to dedicate
+        if gpus is not None:
+            run_params['gpus'] = gpus
+        
+        # Add tmpfs mounts if RAM disk is configured
+        if ram_mounts:
+            # mounts expects a list of lists where each inner list contains mount config parts
+            run_params['mounts'] = [[mount] for mount in ram_mounts]
+            
+        cont = docker.run(full_image_name, **run_params)
         #print("The running container: ", cont)
         #print("=== Stop printing running container")
         docker.execute(container=container_name, command=["/bin/bash","-c", f"/bin/echo 'user:{pars['password']}' | /usr/sbin/chpasswd"], user="root")
     except Exception as e:
-        print(f"Something went wrong starting container {container_name}. Trying to stop the container. Error:")
+        print(f"Something went wrong starting container {container_name or 'unknown'}. Trying to stop the container. Error:")
         print(e)
         print("Stack trace:")
         print(traceback.format_exc())
-        stop_container(container_name)
+        if container_name:  # Only try to stop if we have a name
+            stop_container(container_name)
         return False, "", "", e, None
 
     try:
         non_critical_errors = ""
         #This will check if the user has config.bash in config folder. If yes, then this config.bash will be executed, before container is given to user
-        if os.path.exists(f'{pars["localMountFolderPath"]}/config/config.bash'):
-            docker.execute(container=container_name, command=["/bin/bash","-c", "timeout 60 /home/user/persistent/config/config.bash"], user="root")
+        # Note: Since we removed localMountFolderPath, config.bash should be placed in role-mounted paths with {email} variable
+        # For example, if a role mount maps /data/users/{email} to /home/user/persistent, 
+        # then config.bash should be at /data/users/{email_sanitized}/config/config.bash
+        
+        # Look for config.bash in any mounted persistent volume
+        for mount in pars["roleMounts"]:
+            if mount["computerId"] == computer_id and not mount["readOnly"]:
+                container_path = substitute_mount_variables(mount["containerPath"], user_email, user_id)
+                host_path = substitute_mount_variables(mount["hostPath"], user_email, user_id)
+                config_path = f'{host_path}/config/config.bash'
+                if os.path.exists(config_path):
+                    docker.execute(container=container_name, command=["/bin/bash","-c", f"timeout 60 {container_path}/config/config.bash"], user="root")
+                    break  # Only run the first config.bash found
     except Exception as e:
         print(f"Something went wrong when running users config.bash in  {container_name}. This is not critical, most likely user error")
         print(e)
-        non_critical_errors = "Something went wrong when running users config.bash, from /home/persistent/config, check your script."
+        non_critical_errors = "Something went wrong when running users config.bash, from a persistent mount path /config, check your script."
 
     return True, container_name, pars["password"], "", non_critical_errors
 
@@ -204,8 +310,11 @@ def get_email_container_started(image, ip, ports, password, includeEmailDetails,
     linesep = os.linesep
 
     helpText = ""
-    if "helpEmailAddress" in settings.email and includeEmailDetails:
-        helpText = f"If you need help, contact: {settings.email['helpEmailAddress']}{linesep}{linesep}"
+    if includeEmailDetails:
+        from settings_handler import getSetting
+        contact_email = getSetting('email.contactEmail')
+        if contact_email:
+            helpText = f"If you need help, contact: {contact_email}{linesep}{linesep}"
 
     helpTextSSH = ""
     foundItem = None
@@ -233,21 +342,27 @@ def get_email_container_started(image, ip, ports, password, includeEmailDetails,
 
 
     generalText = ""
-    if "generalText" in settings.docker:
-        generalText = settings.docker["generalText"]
+    try:
+        from settings_handler import getSetting
+        generalText = getSetting('instructions.email')
+    except Exception:
+        pass
 
-    webAddress = ""
-    if "clientUrl" in settings.app and includeEmailDetails:
-        webAddress = f"You can access your reservations through: {settings.app['clientUrl']}{linesep}{linesep}"
-    
     endDateText = ""
-    # TODO: Get endDate in user timezone and after that add in the email
     if endDate is not None:
-        # convert endDate from UTC to Europe_Helsinki timezone
+        # Get timezone from database settings
+        timezone_name = "UTC"  # Default timezone
+        try:
+            from settings_handler import getSetting
+            timezone_name = getSetting('general.timezone')
+        except Exception:
+            pass
+        
+        # convert endDate from UTC to configured timezone
         from dateutil import tz
         endDate.replace(tzinfo=None)
-        endDate = endDate.astimezone(tz.gettz('Europe_Helsinki'))
-        endDateText = f"Your reservation will end at (Europe_Helsinki): {endDate.strftime('%Y-%m-%d %H:%M:%S')}"
+        endDate = endDate.astimezone(tz.gettz(timezone_name))
+        endDateText = f"Your reservation will end at ({timezone_name}): {endDate.strftime('%Y-%m-%d %H:%M:%S')}"
 
     startMessage = ""
     if includeEmailDetails:
@@ -267,13 +382,7 @@ IP address of the machine: {ip}
 
 {generalText}
 
-Every server contains the same two folders in home folder: persistent and datasets.
-
-persistent: Files and folders in the persistent folder are saved after container stops, so save trained networks, your code, checkpoint files, logs, your datasets etc. to that folder.
-
-datasets: This folder is read-only. This folder contains existing datasets and scripts which you can utilize.
-
-{noReply}{webAddress}{helpText}{non_critical_errors}
+{noReply}{helpText}{non_critical_errors}
 """
 
     return body

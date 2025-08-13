@@ -4,6 +4,7 @@ function createUrls(baseAddress) {
     URLS.user = {}
     URLS.reservation = {}
     URLS.admin = {}
+    URLS.app = {}
     let baseUrl = baseAddress
 
     let baseUserUrl = baseUrl + "user/"
@@ -36,9 +37,27 @@ function createUrls(baseAddress) {
     URLS.admin.edit_reservation = baseAdminUrl + "edit_reservation"
     URLS.admin.get_user = baseAdminUrl + "user"
     URLS.admin.save_user = baseAdminUrl + "save_user"
+    // Fixed endpoints - match actual backend routes
+    URLS.admin.get_general_settings = baseAdminUrl + "general-settings"
+    URLS.admin.save_general_settings = baseAdminUrl + "general-settings"
+    URLS.admin.test_email = baseAdminUrl + "test-email"
+    URLS.admin.get_servers = baseAdminUrl + "servers"
+    URLS.admin.get_server_monitoring = baseAdminUrl + "server"
+    // Role management endpoints
+    URLS.admin.get_roles = baseAdminUrl + "roles"
+    URLS.admin.save_role = baseAdminUrl + "save_role"
+    URLS.admin.remove_role = baseAdminUrl + "remove_role"
+    URLS.admin.get_role_mounts = baseAdminUrl + "role_mounts"
+    URLS.admin.save_role_mounts = baseAdminUrl + "save_role_mounts"
+    URLS.admin.get_role_hardware_limits = baseAdminUrl + "role_hardware_limits"
+    URLS.admin.save_role_hardware_limits = baseAdminUrl + "save_role_hardware_limits"
+    URLS.admin.get_role_reservation_limits = baseAdminUrl + "role_reservation_limits"
+    URLS.admin.save_role_reservation_limits = baseAdminUrl + "save_role_reservation_limits"
+
+    let baseAppUrl = baseUrl + "app/"
+    URLS.app.get_config = baseAppUrl + "config"
 
     return URLS;
 }
 
 module.exports = createUrls;
-//export default URLS;

@@ -1,0 +1,42 @@
+meta {
+  name: Get Single User
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{root_url}}/admin/user?userId=1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has user data", function() {
+    expect(res.body).to.have.property('data');
+    const user = res.body.data;
+    expect(user).to.have.property('userId');
+    expect(user).to.have.property('email');
+    expect(user).to.have.property('firstName');
+    expect(user).to.have.property('lastName');
+    expect(user).to.have.property('ldapUser');
+    expect(user).to.have.property('blacklisted');
+    expect(user).to.have.property('roles');
+  });
+  
+  test("User ID matches request", function() {
+    expect(res.body.data.userId).to.equal(1);
+  });
+}

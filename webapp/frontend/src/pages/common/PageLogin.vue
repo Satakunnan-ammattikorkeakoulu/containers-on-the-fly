@@ -3,7 +3,7 @@
     <v-row class="text-center">
       <v-col cols="12">
         <v-img
-          :src="require('/src/assets/images/front_bg.jpg')"
+          :src="require('/src/assets/images/front_bg.png')"
           class="my-3"
           contain
           height="350"
@@ -11,16 +11,16 @@
       </v-col>
 
       <v-col class="mb-4">
-        <h3 class="color-violet dim">Login to</h3>
-        <h1 class="color-violet">{{appName}}</h1>
-        <p class="color-violet dim" style="margin-top: 10px; font-size: 90%;">{{loginText}}</p>
+        <h3 class="color-blue dim" style="font-size: 18px; letter-spacing: 0.8px; margin-bottom: -2px;">LOGIN TO</h3>
+        <h1 class="color-blue">{{appName}}</h1>
+        <p class="color-blue dim" style="margin-top: 30px;" v-if="loginPageInfo && loginPageInfo.trim()" v-html="loginPageInfo.replace(/\n/g, '<br>')"></p>
       </v-col>
 
       <v-col class="mb-5" cols="12">
         <v-form ref="form" v-model="form['valid']" lazy-validation>
           <v-text-field v-on:keyup.enter="submitLoginForm" type="text" style="max-width: 300px; margin: 0 auto;" :label="usernameField" v-model="form['email']" :rules="validation['email']" required></v-text-field>
           <v-text-field v-on:keyup.enter="submitLoginForm" type="password" style="max-width: 300px; margin: 0 auto;" :label="passwordField" v-model="form['password']" :rules="validation['password']" required></v-text-field>
-          <v-btn :disabled="!form['valid'] || isLoggingIn" color="success" @click="submitLoginForm" label="Login">Login</v-btn>
+          <v-btn :disabled="!form['valid'] || isLoggingIn" color="success" @click="submitLoginForm" label="Login" class="btn-login">Login</v-btn>
         </v-form>
       </v-col>
     </v-row>
@@ -29,7 +29,6 @@
 
 <script>
   const axios = require('axios').default;
-  import AppSettings from '/src/AppSettings.js'
   
   export default {
     name: 'PageLogin',
@@ -62,16 +61,19 @@
         return this.$store.getters.isLoggedIn || false;
       },
       appName() {
-        return AppSettings.General.appName
+        return this.$store.getters.appName
       },
       loginText() {
-        return AppSettings.Login.loginText || ""
+        return this.$store.getters.loginText
       },
       usernameField() {
-        return AppSettings.Login.usernameField || "Username"
+        return this.$store.getters.usernameField
       },
       passwordField() {
-        return AppSettings.Login.passwordField || "Password"
+        return this.$store.getters.passwordField
+      },
+      loginPageInfo() {
+        return this.$store.getters.loginPageInfo
       }
     },
     methods: {
@@ -113,11 +115,11 @@
         .catch(function (error) {
             // Error
             if (error.response && error.response.status == 400) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "alert" })
+              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "alert" })
+              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
             }
             _this.isLoggingIn = false
         });
@@ -125,3 +127,21 @@
     }
   }
 </script>
+
+<style scoped>
+  .color-violet {
+    color: #6d4c7d;
+  }
+  .color-blue {
+    color: #047093;
+  }
+  .dim {
+    opacity: 0.8;
+  }
+
+  .btn-login {
+    width: 305px;
+    margin-top: 20px;
+    height: 45px !important;
+  }
+</style>

@@ -28,6 +28,26 @@ if [ "$DOCKER_REGISTRY_ADDRESS" = "YOUR_IP_HERE" ] || [ -z "$DOCKER_REGISTRY_ADD
     fi
 fi
 
+# Function to wait for Docker to be ready
+wait_for_docker() {
+    local max_attempts=30
+    local attempt=1
+    
+    echo "Waiting for Docker to be ready..."
+    while [ $attempt -le $max_attempts ]; do
+        if sudo docker info >/dev/null 2>&1; then
+            echo "Docker is ready."
+            return 0
+        fi
+        echo "Attempt $attempt/$max_attempts: Docker not ready yet, waiting..."
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    
+    echo "Error: Docker failed to become ready after $max_attempts attempts"
+    return 1
+}
+
 # Check if the script is run as root
 if [ "$EUID" -ne 0 ]; then
     echo -e "\n${RED}This script must be run with sudo privileges. Please run this with sudo permissions. Exiting.${RESET}"
@@ -35,12 +55,14 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 echo "Running with sudo privileges."
-sudo add-apt-repository ppa:graphics-drivers/ppa -y
 
 # Update and install initial packages
-sudo apt update
-sudo rm /etc/apt/sources.list.d/nvidia-*.list
-sudo apt-get purge -y '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*'
+sudo apt update -qq
+sudo rm /etc/apt/sources.list.d/nvidia-*.list 2>/dev/null
+sudo apt-get purge -y -qq '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*' 2>/dev/null
+
+
+
 
 # libnvidia-container key
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
@@ -52,10 +74,21 @@ curl -fsSL https://nvidia.github.io/nvidia-container-runtime/gpgkey | \
 curl -fsSL https://nvidia.github.io/nvidia-docker/gpgkey | \
   gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/nvidia-docker.gpg > /dev/null
 
-sudo apt update
+sudo add-apt-repository ppa:graphics-drivers/ppa -y
+sudo apt update -qq
 
-sudo apt install -y python3-pip libsasl2-dev libldap2-dev libssl-dev
-sudo ubuntu-drivers install nvidia:570-server
+sudo apt install -y -qq python3-pip libsasl2-dev libldap2-dev libssl-dev acl
+
+# Create containerfly group if it doesn't exist
+if ! getent group containerfly > /dev/null 2>&1; then
+    echo "Creating containerfly group with GID 5620..."
+    sudo groupadd -g 5620 containerfly
+    echo -e "${GREEN}Group 'containerfly' created with GID 5620.${RESET}"
+else
+    echo -e "${GREEN}Group 'containerfly' already exists.${RESET}"
+fi
+
+sudo ubuntu-drivers install nvidia:570-server #-qq >/dev/null 2>&1
 
 # Add Docker's official GPG key if it's not already added
 if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
@@ -74,11 +107,11 @@ if ! grep -q "^deb .*https://download.docker.com/linux/ubuntu" /etc/apt/sources.
 fi
 
 # Update repositories and install Docker
-sudo apt update
-sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt update -qq
+sudo apt install -y -qq docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-# Test that docker works
-sudo docker run hello-world
+# Test that docker works and cleanup
+sudo docker run --rm hello-world >/dev/null 2>&1
 
 # Install Node.js and npm if they are not installed
 if ! command -v node > /dev/null || ! command -v npm > /dev/null; then
@@ -118,7 +151,7 @@ fi
 echo "NVIDIA Container Toolkit repository added."
 
 echo "2/5: Updating apt package cache..."
-sudo apt-get update
+sudo apt-get update -qq
 if [ $? -ne 0 ]; then
     echo "Error: Failed to update apt cache. Exiting."
     exit 1
@@ -126,7 +159,7 @@ fi
 echo "Apt cache updated."
 
 echo "3/5: Installing nvidia-container-toolkit..."
-sudo apt-get install -y nvidia-container-toolkit
+sudo apt-get install -y -qq nvidia-container-toolkit
 if [ $? -ne 0 ]; then
     echo "Error: Failed to install nvidia-container-toolkit. Exiting."
     exit 1
@@ -140,16 +173,6 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 echo "Docker runtime configured for NVIDIA."
-
-echo "5/5: Restarting Docker daemon..."
-sudo systemctl restart docker
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to restart Docker daemon. Exiting."
-    exit 1
-fi
-echo "Docker daemon restarted successfully."
-
-echo "NVIDIA Container Toolkit installation and configuration complete."
 
 # Make sure that apt autoupdate does not update Nvidia drivers.
 # If it would update, then Nvidia drivers will stop working until system has been rebooted (not good!)
@@ -170,9 +193,8 @@ fi
 
 echo "Unattended upgrades configuration updated successfully."
 
-
 # Make sure that the Docker can use a local repository, that has no sertificate
-sudo apt install -y jq
+sudo apt install -y -qq jq
 # Docker Daemon Configuration File
 DOCKER_DAEMON_CONFIG="/etc/docker/daemon.json"
 
@@ -212,9 +234,23 @@ update_docker_daemon_config
 echo "Adding user to docker group..."
 sudo usermod -aG docker $CURRENT_USER
 
-# Restart Docker Daemon to apply insecure registry configuration
-echo "Restarting Docker daemon..."
+# CONSOLIDATED RESTART: Only restart Docker once after all configuration is complete
+echo "5/5: Restarting Docker daemon with all configuration changes..."
 sudo systemctl restart docker
+if [ $? -ne 0 ]; then
+    echo "Error: Failed to restart Docker daemon. Exiting."
+    exit 1
+fi
+
+# Wait for Docker to be fully ready before proceeding
+wait_for_docker
+if [ $? -ne 0 ]; then
+    echo "Error: Docker is not responding after restart. Exiting."
+    exit 1
+fi
+
+echo "Docker daemon restarted successfully and is ready."
+echo "NVIDIA Container Toolkit installation and configuration complete."
 
 echo "Starting private (local) docker registry (only on main server)"
 # Start private (local) docker registry (only on main server)
@@ -230,6 +266,10 @@ if [ "$IS_MAIN_SERVER" = "true" ]; then
         sudo -u $CURRENT_USER docker run -d -p ${DOCKER_REGISTRY_PORT}:5000 --restart=always --name registry registry:2
     fi
 
+    # Wait a moment for registry to start
+    echo "Waiting for registry to be ready..."
+    sleep 5
+
     # Build base-ubuntu image to be used as an example with default setup
     sudo -u $CURRENT_USER docker build -t $INSECURE_REGISTRY/ubuntu-base:latest -f DockerfileContainerExample .
     sudo -u $CURRENT_USER docker push $INSECURE_REGISTRY/ubuntu-base:latest
@@ -237,8 +277,5 @@ else
     echo "Container server detected - skipping Docker registry setup (will connect to main server registry)"
 fi
 
-# Restart Docker Daemon to apply changes
-sudo systemctl restart docker
-echo "Docker daemon configuration updated and Docker service restarted."
-
+echo "Docker daemon configuration updated and Docker service is running."
 echo "You need to restart the machine before the Nvidia drivers will work."

@@ -34,7 +34,7 @@ class SettingsApplier:
             print("Please copy user_config/settings_example to user_config/settings and configure it.")
             sys.exit(1)
             
-        print(f"Loading settings from {self.settings_file}")
+        #print(f"Loading settings from {self.settings_file}")
         
         # Read the bash settings file
         with open(self.settings_file, 'r') as f:
@@ -64,7 +64,7 @@ class SettingsApplier:
         # Process derived settings
         self._process_derived_settings()
         self._process_caddy_settings()
-        print(f"Loaded {len(self.settings)} settings")
+        #print(f"Loaded {len(self.settings)} settings")
         
     def _process_derived_settings(self):
         """Process derived settings that depend on other settings."""
@@ -92,8 +92,8 @@ class SettingsApplier:
             
         # Convert boolean strings to proper JSON boolean values
         bool_settings = [
-            'USE_WHITELIST', 'DATABASE_DEBUG', 'ADD_TEST_DATA', 
-            'ENABLE_EMAIL_NOTIFICATIONS', 'MAIN_SERVER_WEB_HTTPS'
+            'DATABASE_DEBUG', 'ADD_TEST_DATA', 
+            'MAIN_SERVER_WEB_HTTPS', 'DEBUG_SKIP_GPU_DEDICATION'
         ]
         
         for setting in bool_settings:
@@ -103,12 +103,15 @@ class SettingsApplier:
                     self.settings[setting] = 'true'  # JSON boolean
                 else:
                     self.settings[setting] = 'false'  # JSON boolean
+            else:
+                # Set default value for missing boolean settings
+                if setting == 'DEBUG_SKIP_GPU_DEDICATION':
+                    self.settings[setting] = 'false'  # Default to false (production mode)
                     
         # Validate numeric settings (keep as strings for template replacement)
         numeric_settings = [
-            'RESERVATION_MIN_DURATION', 'RESERVATION_MAX_DURATION',
-            'SESSION_TIMEOUT_MINUTES', 'BACKEND_PORT', 'FRONTEND_PORT',
-            'SMTP_PORT', 'DOCKER_REGISTRY_PORT', 
+            'BACKEND_PORT', 'FRONTEND_PORT',
+            'DOCKER_REGISTRY_PORT', 
             'DOCKER_RESERVATION_PORT_RANGE_START', 'DOCKER_RESERVATION_PORT_RANGE_END'
         ]
         
@@ -125,7 +128,7 @@ class SettingsApplier:
         if not docker_registry_addr:
             # Use SERVER_IP_ADDRESS if DOCKER_REGISTRY_ADDRESS is empty
             self.settings['DOCKER_REGISTRY_ADDRESS'] = self.settings.get('SERVER_IP_ADDRESS', '')
-            print(f"DOCKER_REGISTRY_ADDRESS was empty, using SERVER_IP_ADDRESS: {self.settings['DOCKER_REGISTRY_ADDRESS']}")
+            #print(f"DOCKER_REGISTRY_ADDRESS was empty, using SERVER_IP_ADDRESS: {self.settings['DOCKER_REGISTRY_ADDRESS']}")
         
         # Process DOCKER_EXTRA_MOUNTS JSON string
         docker_extra_mounts = self.settings.get('DOCKER_EXTRA_MOUNTS', '')
@@ -149,6 +152,9 @@ class SettingsApplier:
         custom_ssl = self.settings.get('CUSTOM_SSL_ENABLED', 'false').lower() == 'true'
         domain = self.settings.get('MAIN_SERVER_WEB_HOST', 'localhost')
         
+        # Check if we're running in main server context via environment variable
+        is_main_server_context = os.environ.get('CONTAINERFLY_CONTEXT') == 'main-server'
+        
         if enable_https:
             if custom_ssl:
                 # HTTPS mode with custom certificates
@@ -160,28 +166,33 @@ class SettingsApplier:
                     self.settings['CADDY_TLS_CONFIG'] = f"\n\ttls {cert_path} {key_path}"
                     self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode - custom certificates)"
                     self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
-                    print(f"Caddy mode: HTTPS enabled for domain '{domain}' (custom SSL certificates)")
+                    if is_main_server_context:
+                        print(f"Caddy mode: HTTPS enabled for domain '{domain}' (custom SSL certificates)")
                 else:
-                    print(f"Warning: Custom SSL enabled but certificate paths not specified. Falling back to Let's Encrypt.")
+                    if is_main_server_context:
+                        print(f"Warning: Custom SSL enabled but certificate paths not specified. Falling back to Let's Encrypt.")
                     self.settings['CADDY_SITE_BLOCK'] = domain
                     self.settings['CADDY_TLS_CONFIG'] = ""
                     self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode - Let's Encrypt fallback)"
                     self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
-                    print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
+                    if is_main_server_context:
+                        print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
             else:
                 # HTTPS mode - automatic Let's Encrypt certificates
                 self.settings['CADDY_SITE_BLOCK'] = domain
                 self.settings['CADDY_TLS_CONFIG'] = ""
                 self.settings['CADDY_SECURITY_HEADERS'] = " (HTTPS mode - Let's Encrypt)"
                 self.settings['CADDY_HSTS_HEADER'] = "\n\t\t# Enable HSTS for HTTPS\n\t\tStrict-Transport-Security max-age=31536000;"
-                print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
+                if is_main_server_context:
+                    print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
         else:
             # HTTP mode - no SSL certificates
             self.settings['CADDY_SITE_BLOCK'] = f"http://{domain}"
             self.settings['CADDY_TLS_CONFIG'] = ""
             self.settings['CADDY_SECURITY_HEADERS'] = " (HTTP mode)"
             self.settings['CADDY_HSTS_HEADER'] = ""
-            print(f"Caddy mode: HTTP only for '{domain}' (no SSL certificates)")
+            if is_main_server_context:
+                print(f"Caddy mode: HTTP only for '{domain}' (no SSL certificates)")
                     
     def apply_templates(self):
         """Apply settings to all template files."""
@@ -189,12 +200,18 @@ class SettingsApplier:
             print(f"Error: Templates directory not found at {self.templates_dir}")
             sys.exit(1)
             
+        # Check if we're running in main server context
+        is_main_server_context = os.environ.get('CONTAINERFLY_CONTEXT') == 'main-server'
+        
         # Define where each template should output its final file
         template_mappings = {
             'backend_settings.json': self.base_dir / "webapp" / "backend" / "settings.json",
             'frontend_settings.js': self.base_dir / "webapp" / "frontend" / "src" / "AppSettings.js",
-            'Caddyfile': self.output_dir / "Caddyfile"  # Only Caddyfile stays in user_config
         }
+        
+        # Only include Caddyfile for main server context
+        if is_main_server_context:
+            template_mappings['Caddyfile'] = self.output_dir / "Caddyfile"  # Only Caddyfile stays in user_config
         
         for template_file, output_path in template_mappings.items():
             template_path = self.templates_dir / template_file
@@ -208,7 +225,7 @@ class SettingsApplier:
                 
     def _apply_template(self, template_path, output_path):
         """Apply settings to a single template file."""
-        print(f"Processing template: {template_path} -> {output_path}")
+        #print(f"Processing template: {template_path} -> {output_path}")
         
         with open(template_path, 'r') as f:
             content = f.read()
@@ -220,14 +237,14 @@ class SettingsApplier:
             
         # Check for unreplaced placeholders
         unreplaced = re.findall(r'\{\{([^}]+)\}\}', content)
-        if unreplaced:
-            print(f"Warning: Unreplaced placeholders in {template_path}: {unreplaced}")
+        #if unreplaced:
+        #    print(f"Info: Unreplaced placeholders in {template_path}: {unreplaced}")
             
         # Write output file
         try:
             with open(output_path, 'w') as f:
                 f.write(content)
-            print(f"Generated: {output_path}")
+            #print(f"Generated: {output_path}")
             
             # If running as root, fix ownership to the original user
             self._fix_file_ownership(output_path)
@@ -273,6 +290,7 @@ class SettingsApplier:
     def run(self):
         """Run the complete settings application process."""
         print("=== Containers on the Fly - Settings Application ===")
+        print("")
         
         try:
             self.load_settings()
@@ -280,8 +298,17 @@ class SettingsApplier:
             print("\n✅ Settings applied successfully!")
             print(f"Generated files:")
             print(f"  - Backend settings: webapp/backend/settings.json")
-            print(f"  - Frontend settings: webapp/frontend/src/AppSettings.js")  
-            print(f"  - Caddy config: user_config/Caddyfile")
+            
+            # Only show frontend settings if the template exists
+            frontend_template = self.templates_dir / 'frontend_settings.js'
+            if frontend_template.exists():
+                print(f"  - Frontend settings: webapp/frontend/src/AppSettings.js")
+            
+            # Only show Caddy config if the template exists and we're in main server context
+            is_main_server_context = os.environ.get('CONTAINERFLY_CONTEXT') == 'main-server'
+            caddyfile_template = self.templates_dir / 'Caddyfile'
+            if caddyfile_template.exists() and is_main_server_context:
+                print(f"  - Caddy config: user_config/Caddyfile")
             
         except Exception as e:
             print(f"\n❌ Error applying settings: {e}")

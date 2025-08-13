@@ -1,0 +1,50 @@
+meta {
+  name: Save Role Hardware Limits
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{root_url}}/admin/save_role_hardware_limits
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "roleId": 1,
+    "hardwareLimits": [
+      {
+        "computerId": 1,
+        "cpu": {
+          "minimumAmount": 1,
+          "maximumAmount": 8,
+          "defaultAmount": 2
+        },
+        "ram": {
+          "minimumAmount": 1,
+          "maximumAmount": 16,
+          "defaultAmount": 4
+        },
+        "gpu": {
+          "maximumAmount": 1
+        }
+      }
+    ]
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal(true);
+  });
+}

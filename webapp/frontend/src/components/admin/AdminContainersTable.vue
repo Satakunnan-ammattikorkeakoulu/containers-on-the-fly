@@ -1,12 +1,23 @@
 <template>
   <div>
-    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
+    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Expand Issues" : "Collapse Issues" }}</a>
     <v-data-table
       :headers="table.headers"
       :items="data"
       :sort-by="'containerId'"
       :sort-desc="true"
       class="elevation-1">
+
+      <!-- Public status with colored labels -->
+      <template v-slot:item.public="{item}">
+        <v-chip
+          :color="item.public ? 'green' : 'orange'"
+          text-color="white"
+          small
+        >
+          {{ item.public ? 'Public' : 'Private' }}
+        </v-chip>
+      </template>
 
       <!-- Actions -->
       <template v-slot:item.actions="{item}">

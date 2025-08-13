@@ -5,13 +5,11 @@
 </template>
 
 <script>
-  import AppSettings from '/src/AppSettings.js'
-
   export default {
     name: 'Footer',
     computed: {
       appName() {
-        return AppSettings.General.appName
+        return this.$store.getters.appName
       }
     },
   }

@@ -1,0 +1,45 @@
+meta {
+  name: Save Container
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{root_url}}/admin/save_container
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "containerId": -1,
+    "data": {
+      "name": "Test Container",
+      "imageName": "test-container",
+      "description": "Test container for Bruno testing",
+      "public": true,
+      "containerPorts": [
+        {
+          "serviceName": "SSH",
+          "port": 22
+        }
+      ],
+      "removedPorts": []
+    }
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal(true);
+  });
+}

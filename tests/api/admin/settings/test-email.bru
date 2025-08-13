@@ -1,0 +1,36 @@
+meta {
+  name: Test Email Configuration
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{root_url}}/admin/test-email
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "recipientEmail": "test@example.com"
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+  });
+  
+  test("Response has message", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('message');
+  });
+}

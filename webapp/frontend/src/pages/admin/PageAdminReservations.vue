@@ -9,31 +9,120 @@
       </v-col>
     </v-row>
 
-    <!-- Filters -->
-    <v-row class="text-center row-filters">
-      <v-row>
-        <v-col cols="3" style="margin: 0 auto;">
-          <v-select
-            :items="['All', 'reserved', 'started', 'stopped', 'error']"
-            label="Status"
-            v-model="filters.status"
-            item-text="text"
-            item-value="value"
-            return-object
-            @change="setFilters"
-          ></v-select>
+    <!-- Statistics Cards -->
+    <div v-if="!isFetchingReservations" id="stats-row">
+      <!-- Status Statistics -->
+      <v-row class="mb-4 justify-center">
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="blue-grey" class="mb-2">mdi-chart-bar</v-icon>
+              <div class="text-h6 font-weight-bold">{{ stats.total }}</div>
+              <div class="text-subtitle-2">Total</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="green" class="mb-2">mdi-play-circle</v-icon>
+              <div class="text-h6 font-weight-bold text--primary" style="color: #4CAF50 !important;">{{ stats.started }}</div>
+              <div class="text-subtitle-2">Running</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="orange" class="mb-2">mdi-stop-circle</v-icon>
+              <div class="text-h6 font-weight-bold" style="color: #FF9800 !important;">{{ stats.stopped }}</div>
+              <div class="text-subtitle-2">Stopped</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="red" class="mb-2">mdi-alert-circle</v-icon>
+              <div class="text-h6 font-weight-bold" style="color: #F44336 !important;">{{ stats.error }}</div>
+              <div class="text-subtitle-2">Errored</div>
+            </v-card-text>
+          </v-card>
         </v-col>
       </v-row>
+
+      <!-- Time-based Statistics -->
+      <v-row class="mb-6 justify-center">
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-today</v-icon>
+              <div class="text-h6 font-weight-bold text-primary">{{ stats.today }}</div>
+              <div class="text-subtitle-2">Today</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-week</v-icon>
+              <div class="text-h6 font-weight-bold text-primary">{{ stats.lastWeek }}</div>
+              <div class="text-subtitle-2">Week</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-month</v-icon>
+              <div class="text-h6 font-weight-bold text-primary">{{ stats.lastMonth }}</div>
+              <div class="text-subtitle-2">Month</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6" md="2">
+          <v-card outlined>
+            <v-card-text class="text-center">
+              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-range</v-icon>
+              <div class="text-h6 font-weight-bold text-primary">{{ stats.lastThreeMonths }}</div>
+              <div class="text-subtitle-2">3 Months</div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+    </div>
+
+    <!-- Filters -->
+    <v-row class="text-center row-filters justify-center" v-if="!isFetchingReservations">
+      <v-col cols="12" md="3">
+        <v-select
+          :items="statusItems"
+          label="Status"
+          v-model="filters.status"
+          item-text="text"
+          item-value="value"
+          return-object
+          @change="applyFilters"
+        ></v-select>
+      </v-col>
+      <v-col cols="12" md="2">
+        <v-text-field
+          v-model="filters.reservationId"
+          label="Reservation ID"
+          clearable
+          @input="applyFilters"
+        ></v-text-field>
+      </v-col>
     </v-row>
 
-    <v-row v-if="!isFetchingReservations">
-        <v-col cols="12">
+    <v-row v-if="!isFetchingReservations" style="margin-top: 0px">
+        <v-col cols="12" style="padding-top: 0px">
           <v-slide-x-transition mode="out-in">
-            <div v-if="reservations && reservations.length > 0" style="margin-top: 50px">
-              <AdminReservationTable @emitCancelReservation="cancelReservation" @emitChangeEndDate="changeEndDate" @emitRestartContainer="restartContainer" @emitShowReservationDetails="showReservationDetails" v-bind:propReservations="reservations" />
+            <div v-if="filteredReservations && filteredReservations.length > 0">
+              <AdminReservationTable @emitCancelReservation="cancelReservation" @emitChangeEndDate="changeEndDate" @emitRestartContainer="restartContainer" @emitShowReservationDetails="showReservationDetails" v-bind:propReservations="filteredReservations" />
             </div>
           
-            <p v-else class="dim text-center">No reservations found.</p>
+            <p v-else class="dim text-center">{{ reservations.length > 0 ? 'No reservations match the filters.' : 'No reservations found.' }}</p>
           </v-slide-x-transition>
         </v-col>
       </v-row>
@@ -70,8 +159,35 @@
       informByEmail: false,
       modalConnectionDetailsVisible: false,
       modalConnectionDetailsReservationId: null,
-      filters: { status: { text: "All", value: "All" } },
+      filters: { 
+        status: { text: "All", value: "All" },
+        reservationId: ''
+      },
+      filteredReservations: [],
+      statusCounts: {},
+      stats: {
+        total: 0,
+        started: 0,
+        stopped: 0,
+        error: 0,
+        today: 0,
+        lastWeek: 0,
+        lastMonth: 0,
+        lastThreeMonths: 0
+      }
     }),
+    computed: {
+      statusItems() {
+        const items = [
+          { text: `All (${this.reservations.length})`, value: 'All' },
+          { text: `reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
+          { text: `started (${this.statusCounts.started || 0})`, value: 'started' },
+          { text: `stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
+          { text: `error (${this.statusCounts.error || 0})`, value: 'error' }
+        ];
+        return items;
+      }
+    },
     mounted () {
       if (localStorage.getItem("justReserved") === "true") {
         this.justReserved = true;
@@ -88,6 +204,26 @@
       this.intervalFetchReservations = setInterval(() => { this.fetchReservations()}, 15000)
     },
     methods: {
+      applyFilters() {
+        let filtered = this.reservations;
+        
+        // Filter by Status
+        if (this.filters.status && this.filters.status.value !== 'All') {
+          filtered = filtered.filter(reservation => 
+            reservation.status === this.filters.status.value
+          );
+        }
+        
+        // Filter by Reservation ID
+        if (this.filters.reservationId && this.filters.reservationId.trim() !== '') {
+          filtered = filtered.filter(reservation => 
+            reservation.reservationId.toString().toLowerCase().includes(this.filters.reservationId.toLowerCase().trim())
+          );
+        }
+        
+        this.filteredReservations = filtered;
+        this.updateStats();
+      },
       setFilters() {
         this.fetchReservations()
       },
@@ -95,17 +231,32 @@
         this.modalConnectionDetailsVisible = false
       },
       createReservation() {
-        let hasActiveReservations = false
+        // For admins, their limits are typically very high (99 active reservations)
+        // But we still check to be consistent
+        
+        // Count active reservations for the admin user
+        let activeReservationCount = 0
         this.reservations.forEach((res) => {
-          if (res.status == "started" || res.status == "reserved") hasActiveReservations = true
+          // Only count admin's own reservations
+          if ((res.status == "started" || res.status == "reserved") && res.userEmail === this.$store.getters.user.email) {
+            activeReservationCount++
+          }
         })
 
-        let currentUser = this.$store.getters.user
+        // Get user's reservation limits from store
+        const maxActiveReservations = this.$store.getters.userMaxActiveReservations
 
-        if (!hasActiveReservations || currentUser.role == "admin")
-          this.$router.push("/user/reserve")
-        else
-          this.$store.commit('showMessage', { text: "You can only have one reserved or started reservation at a time. Cancel the current reservation if you need a new.", color: "red" })
+        // Check against the user's actual limit
+        if (activeReservationCount >= maxActiveReservations) {
+          this.$store.commit('showMessage', { 
+            text: `You have reached your maximum of ${maxActiveReservations} active reservations.`, 
+            color: "red" 
+          })
+          return
+        }
+
+        // Admin has not reached their limit, allow navigation
+        this.$router.push("/user/reserve")
       },
       fetchReservations() {
         let _this = this
@@ -128,6 +279,8 @@
             // Success
             if (response.data.status == true) {
               _this.reservations = response.data.data.reservations
+              _this.statusCounts = response.data.data.statusCounts || {}
+              _this.applyFilters()
             }
             // Fail
             else {
@@ -295,6 +448,39 @@
       showReservationDetails(reservationId) {
         this.modalConnectionDetailsVisible = true
         this.modalConnectionDetailsReservationId = reservationId
+      },
+      updateStats() {
+        const now = new Date()
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+        const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+        
+        // Always use all reservations for statistics
+        this.stats.total = this.reservations.length
+        this.stats.started = this.reservations.filter(r => r.status === 'started').length
+        this.stats.stopped = this.reservations.filter(r => r.status === 'stopped').length
+        this.stats.error = this.reservations.filter(r => r.status === 'error').length
+        
+        this.stats.today = this.reservations.filter(r => {
+          const startDate = new Date(r.startDate)
+          return startDate >= today
+        }).length
+
+        this.stats.lastWeek = this.reservations.filter(r => {
+          const startDate = new Date(r.startDate)
+          return startDate >= weekAgo
+        }).length
+
+        this.stats.lastMonth = this.reservations.filter(r => {
+          const startDate = new Date(r.startDate)
+          return startDate >= monthAgo
+        }).length
+
+        this.stats.lastThreeMonths = this.reservations.filter(r => {
+          const startDate = new Date(r.startDate)
+          return startDate >= threeMonthsAgo
+        }).length
       }
     },
     beforeDestroy() {
@@ -306,5 +492,15 @@
 <style scoped lang="scss">
   .loading {
     margin: 60px auto;
+  }
+  
+  .row-filters {
+    margin-top: 30px;
+    margin-bottom: 0px;
+  }
+
+  #stats-row .row.mb-4, #stats-row .row.mb-6 {
+    margin-bottom: 0px !important;
+    margin-top: 0px !important;
   }
 </style>

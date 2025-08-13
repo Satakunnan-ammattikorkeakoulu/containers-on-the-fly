@@ -1,51 +1,57 @@
 <template>
   <div>
-    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
+    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Expand Issues" : "Collapse Issues" }}</a>
     <v-data-table
       :headers="table.headers"
       :items="reservations"
-      :sort-by="'createdAt'"
+      :sort-by="'reservationId'"
       :sort-desc="true"
       class="elevation-1">
       <!-- Status -->
       <template v-slot:item.status="{item}">
         <v-chip :color="getStatusColor(item.status)">{{item.status}}</v-chip>
       </template>
-      <!-- Reservation ID -->
-      <template v-slot:item.reservationid="{item}">
-        {{ item.reservationId }}
-      </template>
-      <!-- Reserve date -->
-      <template v-slot:item.createdAt="{item}">
-        {{ parseTime(item.createdAt) }}
-      </template>
-      <!-- Start date -->
-      <template v-slot:item.startDate="{item}">
-        {{ parseTime(item.startDate) }}
-      </template>
-      <!-- End date -->
-      <template v-slot:item.endDate="{item}">
-        {{ parseTime(item.endDate) }}
+      <!-- ID -->
+      <template v-slot:item.reservationId="{item}">
+        #{{ item.reservationId }}
       </template>
       <!-- User -->
       <template v-slot:item.userEmail="{item}">
         {{ item.userEmail }} <small>(id: {{ item.userId }})</small>
       </template>
-      <!-- Server -->
-      <template v-slot:item.server="{item}">
-        {{item.computerId }}
+      <!-- Start date -->
+      <template v-slot:item.startDate="{item}">
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <span v-bind="attrs" v-on="on" class="resource-link">{{ parseTime(item.startDate) }}</span>
+          </template>
+          <span>Reserved: {{ parseTime(item.createdAt) }}</span>
+        </v-tooltip>
+      </template>
+      <!-- End date -->
+      <template v-slot:item.endDate="{item}">
+        {{ parseTime(item.endDate) }}
       </template>
       <!-- Resources -->
-      <template v-slot:item.resources="{item}">
-        {{ getResources(item.reservedHardwareSpecs) }}
+      <template v-slot:item.resourcesInfo="{item}">
+        <v-tooltip bottom>
+          <template v-slot:activator="{ on, attrs }">
+            <span v-bind="attrs" v-on="on" class="resource-link">{{ item.computerName }}</span>
+          </template>
+          <div style="max-width: 300px;">
+            <div><strong>Server:</strong> {{ item.computerName }}</div>
+            <div><strong>Resources:</strong> {{ getResources(item.reservedHardwareSpecs) }}</div>
+            <div><strong>Container:</strong> {{ item.reservedContainer.container.imageName }}</div>
+            <div v-if="item.reservedContainer.reservedPorts && item.reservedContainer.reservedPorts.length > 0">
+              <strong>Ports:</strong><br>
+              <span v-html="getPorts(item.reservedContainer.reservedPorts)"></span>
+            </div>
+          </div>
+        </v-tooltip>
       </template>
-      <!-- Container Image -->
-      <template v-slot:item.containerImage="{item}">
-        {{ item.reservedContainer.container.imageName }}
-      </template>
-      <!-- Ports -->
-      <template v-slot:item.ports="{item}">
-        <div v-html="getPorts(item.reservedContainer.reservedPorts)"></div>
+      <!-- Docker Name -->
+      <template v-slot:item.dockerName="{item}">
+        {{ item.reservedContainer.containerDockerName }}
       </template>
       <!-- Container Status -->
       <template v-slot:item.containerStatus="{item}">
@@ -86,16 +92,13 @@
             sortable: false,
             value: 'status',
           },
-          { text: 'Reservation ID', value: 'reservationid' },
+          { text: 'ID', value: 'reservationId' },
           { text: 'User', value: 'userEmail' },
-          { text: 'Reserved', value: 'createdAt' },
           { text: 'Starts', value: 'startDate' },
           { text: 'Ends', value: 'endDate' },
-          { text: 'Server ID', value: 'server' },
-          { text: 'Resources', value: 'resources' },
-          { text: 'Container Image', value: 'containerImage' },
-          { text: 'Ports', value: 'ports' },
-          { text: 'Container Status', value: 'containerStatus' },
+          { text: 'Resources', value: 'resourcesInfo' },
+          { text: 'Docker Name', value: 'dockerName' },
+          { text: 'Issues', value: 'containerStatus' },
           { text: 'actions', value: 'actions' },
         ],
       }
@@ -104,20 +107,20 @@
       this.reservations = this.propReservations
     },
     methods: {
-      toggleReadAll() {
-        this.readAll = !this.readAll;
-      },
       // Returns a string of all ports for a reservation
       getPorts(ports) {
         if (ports) {
           let portsString = ""
           for (let i = 0; i < ports.length; i++) {
-            portsString += ports[i].localPort + " -> " + ports[i].outsidePort + " (" + ports[i].serviceName + ")"
+            portsString += ports[i].localPort + " → " + ports[i].outsidePort + " (" + ports[i].serviceName + ")"
             portsString += i != ports.length - 1 ? "<br />" : ""
           }
           return portsString
         }
-        return ""
+        return "No ports"
+      },
+      toggleReadAll() {
+        this.readAll = !this.readAll;
       },
       getText(text) {
         if (this.readAll) return text;
@@ -126,26 +129,20 @@
           return text.slice(0,10) + "...";
         }
       },
+      emitExtendReservation(reservationId) {
+        this.$emit('emitExtendReservation', reservationId)
+      },
       emitCancelReservation(reservationId) {
         this.$emit('emitCancelReservation', reservationId)
+      },
+      emitChangeEndDate(reservationId) {
+        this.$emit('emitChangeEndDate', reservationId)
       },
       emitRestartContainer(reservationId) {
         this.$emit('emitRestartContainer', reservationId)
       },
       emitShowReservationDetails(reservationId) {
         this.$emit('emitShowReservationDetails', reservationId)
-      },
-      emitChangeEndDate(reservationId) {
-        let endDate = "";
-        // Find from this.reservations the reservation with id reservationId and assign the endDate
-        for (let i = 0; i < this.reservations.length; i++) {
-          if (this.reservations[i].reservationId == reservationId) {
-            endDate = this.reservations[i].endDate;
-            break;
-          }
-        }
-
-        this.$emit('emitChangeEndDate', reservationId, endDate)
       },
       getStatusColor(status) {
         if (status == "reserved") return "primary"
@@ -191,5 +188,18 @@
     display: inline-block;
     padding-left: 15px;
     width: auto;
+  }
+  
+  .resource-link {
+    cursor: help;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+  }
+
+  // Vue 2 deep selector syntax for tooltip styling
+  ::v-deep .v-tooltip__content {
+    opacity: 1 !important;
+    background-color: rgba(55, 61, 63, 0.95) !important;
+    border: 1px solid #ddd;
   }
 </style>

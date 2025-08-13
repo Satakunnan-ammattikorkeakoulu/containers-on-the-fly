@@ -1,34 +1,46 @@
 from fastapi import APIRouter
-from endpoints import user, reservation, admin
-from settings import settings
+from endpoints import user, reservation, admin, app
+from settings_handler import settings_handler
 from helpers.auth import HashPassword
-from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, UserStorage, Container
+from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, Container
 import base64
+import sqlalchemy as sa
 
 router = APIRouter()
 router.include_router(user.router)
 router.include_router(reservation.router)
 router.include_router(admin.router)
+router.include_router(app.router)
 
 
 # Run code here when server starts
 
-if settings.app["production"] == True:
+if settings_handler.getSetting("app.production") == True:
   print("Running server in production mode")
 else:
   print("Running server in development mode")
 
-if settings.app["addTestDataInDevelopment"]:
-  with Session() as session:
-    # Admin role
-    adminRole = session.query(Role).filter( Role.name == "admin" ).first()
-    if adminRole is None:
-      print("Creating test data: admin role with name admin")
-      session.add(Role(
-        name = "admin"
-      ))
-      session.commit()
-    
+# Add everyone role if it does not exist
+with Session() as session:
+  everyoneRole = session.query(Role).filter(Role.name == "everyone").first()
+  if everyoneRole is None:
+    print("Creating role everyone")
+    session.add(Role(
+      name = "everyone"
+    ))
+    session.commit()
+
+# Add admin role if it does not exist
+with Session() as session:
+  adminRole = session.query(Role).filter(Role.name == "admin").first()
+  if adminRole is None:
+    print("Creating role admin")
+    session.add(Role(
+      name = "admin"
+    ))
+    session.commit()
+
+if settings_handler.getSetting("app.addTestDataInDevelopment"):    
     # Admin user
     adminUser = session.query(User).filter( User.email == "admin@foo.com" ).first()
     if adminUser is None:
@@ -41,7 +53,6 @@ if settings.app["addTestDataInDevelopment"]:
       )
       adminRole = session.query(Role).filter( Role.name == "admin" ).first()
       adminUser.roles.append(adminRole)
-      adminUser.userStorage.append(UserStorage( maxSpace = "10000", maxSpaceFormat = "mb" ))
       session.add(adminUser)
       session.commit()
     
@@ -55,7 +66,6 @@ if settings.app["addTestDataInDevelopment"]:
         password = base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
         passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
       )
-      normalUser.userStorage.append(UserStorage( maxSpace = "5000", maxSpaceFormat = "mb" ))
       session.add(normalUser)
       session.commit()
 
@@ -63,7 +73,7 @@ if settings.app["addTestDataInDevelopment"]:
     computer = session.query(Computer).filter( Computer.name == "server1" ).first()
     if computer is None:
       print("Creating test data: computer named server1")
-      computer = Computer( name = "server1", ip = settings.app["serverIp"], public = True )
+      computer = Computer( name = "server1", ip = settings_handler.getSetting("app.serverIp"), public = True )
       session.add(computer)
       session.commit()
 

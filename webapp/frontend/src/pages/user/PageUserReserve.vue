@@ -18,6 +18,18 @@
             <h1 style="margin-bottom: 10px;">Reserve Server</h1>
             <p>When do you want to start the reservation?</p>
             
+            <!-- Reservation Page Instructions -->
+            <v-col cols="12" v-if="reservationPageInstructions && reservationPageInstructions.trim()" class="mb-4">
+              <v-alert 
+                type="info" 
+                outlined
+                class="mx-auto text-left"
+                style="max-width: 800px;"
+              >
+                <div v-html="reservationPageInstructions.replace(/\n/g, '<br>')"></div>
+              </v-alert>
+            </v-col>
+            
             <v-btn large @click="reserveNow" style="margin-bottom: 20px; margin-top: 30px;" color="green">Reserve Now</v-btn>
             <p class="dim" style="font-weight: 17px;">OR</p>
             <p class="dim">To reserve into future, click on the time in the calendar.</p>
@@ -25,11 +37,19 @@
         </v-row>
         <v-row>
           <v-col class="section">
-            <div style="text-align: right">
-              <p style="margin-bottom: 0px;"><small>All times are in timezone <strong>{{globalTimezone}}</strong></small></p>
-              <p><small><a @click="fetchReservations">Refresh reservations</a></small></p>
+            <div style="text-align: left">
+              <p style="margin-bottom: 10px;"><small>All times are in timezone <strong>{{globalTimezone}}</strong></small></p>
             </div>
-            <CalendarReservations v-if="allReservations" :propReservations="allReservations" @slotSelected="slotSelected" />
+            <div style="text-align: center;">
+              <CalendarReservations 
+                v-if="allReservations" 
+                :propReservations="allReservations" 
+                :readOnly="false" 
+                @slotSelected="slotSelected" 
+                @reservationsRefreshed="handleReservationsRefreshed"
+                ref="calendarComponent"
+              />
+            </div>
           </v-col>
         </v-row>
       </v-stepper-content>
@@ -71,44 +91,182 @@
         <v-row v-if="reserveDate != null && reserveDurationDays !== null && reserveDurationHours !== null && !fetchingComputers && allComputers">
           <v-col cols="12">
             <h2>Select Container</h2>
-            <v-row>
-              <v-col cols="6" style="margin: 0 auto">
-                <v-select v-model="container" :items="containers" item-text="text" item-value="value" label="Container"></v-select>
+            <v-row justify="center">
+              <v-col cols="10">
+                <v-row style="justify-content: center !important;">
+                  <v-col 
+                    v-for="containerItem in containers" 
+                    :key="containerItem.value" 
+                    cols="12" 
+                    sm="6" 
+                    md="4"
+                  >
+                    <v-card 
+                      :class="{ 'selected-card': container === containerItem.value }"
+                      @click="selectContainer(containerItem.value)"
+                      hover
+                      style="cursor: pointer; min-height: 260px;"
+                      :outlined="container !== containerItem.value"
+                      :color="container === containerItem.value ? 'primary' : ''"
+                    >
+                      <v-card-body class="pa-4" style="height: 100%;">
+                        <div class="d-flex flex-column h-100" style="padding: 15px;">
+                          <div class="text-center mb-3">
+                            <v-icon 
+                              size="32" 
+                              class="mb-2"
+                              :color="container === containerItem.value ? 'white' : 'primary'"
+                            >
+                              mdi-docker
+                            </v-icon>
+                            <div 
+                              class="font-weight-medium text-h6"
+                              :style="{ color: container === containerItem.value ? 'white' : '' }"
+                            >
+                              {{ containerItem.text }}
+                            </div>
+                            <div 
+                              class="text-body-2 mt-1"
+                              :style="{ 
+                                color: container === containerItem.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.7)',
+                                fontSize: '12px',
+                                fontFamily: 'monospace'
+                              }"
+                            >
+                              {{ getContainerImageById(containerItem.value) || 'No image specified' }}
+                            </div>
+                            <div 
+                              v-if="!getContainerPublicById(containerItem.value) && isAdmin()"
+                              class="text-body-2 mt-1"
+                              :style="{ 
+                                color: container === containerItem.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,165,0,0.9)',
+                                fontSize: '11px',
+                                fontWeight: '500'
+                              }"
+                            >
+                              Private
+                            </div>
+                          </div>
+                          <div class="flex-grow-1">
+                            <div 
+                              class="text-body-2"
+                              :style="{ 
+                                color: container === containerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
+                                fontSize: '13px',
+                                lineHeight: '1.3'
+                              }"
+                            >
+                              {{ getContainerDescriptionById(containerItem.value) || 'No description available' }}
+                            </div>
+                          </div>
+                        </div>
+                      </v-card-body>
+                    </v-card>
+                  </v-col>
+                </v-row>
               </v-col>
             </v-row>
           </v-col>
         </v-row>
 
-        <v-row v-if="container">
-          <v-col cols="6" style="margin: 0 auto;">
-            <!-- Readonly v-textarea, text should come from function getContainerDescription() -->
-            <v-textarea :readonly="true" :value="getContainerDescription" :style="{ userSelect: 'none' }" label="Container Description"></v-textarea>
-          </v-col>
-        </v-row>
 
         <!-- Select computer, hardware specs & submit -->
         <v-row v-if="reserveDate != null && reserveDurationDays !== null && reserveDurationHours !== null && !fetchingComputers && allComputers && container" class="section">      
           <v-col cols="12">
-            <h2 style="margin-top: 30px;">Select Computer</h2>
-            <v-row>
-              <v-col cols="6" style="margin: 0 auto">
-                <v-select v-model="computer" v-on:change="computerChanged" :items="computers" item-text="text" item-value="value" label="Computer"></v-select>
+            <h2 id="select-computer-section">Select Computer</h2>
+            <v-row justify="center">
+              <v-col cols="10">
+                <v-row style="justify-content: center !important;">
+                  <v-col 
+                    v-for="computerItem in computers" 
+                    :key="computerItem.value" 
+                    cols="12" 
+                    sm="6" 
+                    md="4"
+                  >
+                    <v-card 
+                      :class="{ 'selected-card': computer === computerItem.value }"
+                      @click="computer = computerItem.value; computerChanged()"
+                      hover
+                      style="cursor: pointer; min-height: 260px;"
+                      :outlined="computer !== computerItem.value"
+                      :color="computer === computerItem.value ? 'primary' : ''"
+                    >
+                      <v-card-body class="pa-4" style="height: 100%;">
+                        <div class="d-flex flex-column h-100" style="padding: 15px;">
+                          <div class="text-center mb-3">
+                            <v-icon 
+                              size="32" 
+                              class="mb-2"
+                              :color="computer === computerItem.value ? 'white' : 'primary'"
+                            >
+                              mdi-server
+                            </v-icon>
+                            <div 
+                              class="font-weight-medium text-h6"
+                              :style="{ color: computer === computerItem.value ? 'white' : '' }"
+                            >
+                              {{ computerItem.text }}
+                            </div>
+                          </div>
+                          <div class="flex-grow-1">
+                            <div 
+                              class="text-body-2 font-weight-medium mb-2"
+                              :style="{ 
+                                color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
+                                fontSize: '12px'
+                              }"
+                            >
+                              Available Hardware
+                            </div>
+                            <div 
+                              v-for="spec in getComputerHardwareList(computerItem.value)" 
+                              :key="spec.id"
+                              class="text-body-2"
+                              :style="{ 
+                                color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
+                                fontSize: '11px',
+                                lineHeight: '1.4'
+                              }"
+                            >
+                              • {{ spec.text }}
+                            </div>
+                          </div>
+                        </div>
+                      </v-card-body>
+                    </v-card>
+                  </v-col>
+                </v-row>
               </v-col>
             </v-row>
           </v-col>
 
           <v-row v-if="computer && hardwareData">
             <v-col cols="12">
-              <h2>Select Hardware</h2>
+              <h2 style="margin-top: 15px;">Select Hardware</h2>
 
               <v-col cols="12">
                 <h3>GPUs</h3>
-                <v-col cols="6" style="margin: 0 auto">
-                  <v-select v-model="selectedgpus" :items="hardwareDataOnlyGPUs()" attach chips label="GPUs" v-on:input="gpuLimit" :menu-props="{ auto: true }" multiple></v-select>
+                <v-col cols="12" style="margin: 0 auto">
+                  <div style="margin-bottom: 30px;" v-if="hardwareDataOnlyGPUs().length === 0" class="text-center text--secondary">
+                    No GPUs Available
+                  </div>
+                  <div v-else class="d-flex flex-wrap" style="margin-bottom: 30px; justify-content: center;">
+                    <v-checkbox
+                      v-for="gpu in hardwareDataOnlyGPUs()"
+                      :key="gpu.value"
+                      :value="gpu.value"
+                      v-model="selectedgpus"
+                      :label="gpu.text"
+                      @change="gpuLimit"
+                      class="mr-4 mb-2"
+                      hide-details
+                    ></v-checkbox>
+                  </div>
                 </v-col>
               </v-col>
 
-              <v-row v-for="spec in hardwareDataNoGPUs()" :key="spec.name" class="spec-row">
+              <v-row v-for="spec in hardwareDataNoGPUs()" :key="spec.hardwareSpecId" class="spec-row">
                 <v-col cols="12">
                   <h3>{{ spec.type }}</h3>
                 </v-col>
@@ -123,15 +281,111 @@
             </v-col>
           </v-row>
 
-          <!-- Admin extra task: reserve for another user -->
-          <v-col cols="12" v-if="isAdmin() && computer && hardwareData" style="margin-top: 30px;">
-              <h2>Reserve for another user</h2>
-              <v-row>
-                <v-col cols="3" style="margin: 0 auto">
-                  <p><span style="color: gray; font-size: 15px;">Admin only!</span> Write email address of another user, or leave empty to reserve for yourself.</p>
-                  <v-text-field v-model="adminReserveUserEmail" v-if="isAdmin" label="" placeholder="Email"></v-text-field>
-                </v-col>
-              </v-row>
+          <!-- Advanced Settings -->
+          <v-col cols="12" v-if="computer && hardwareData" style="margin-top: 30px;">
+            <v-expansion-panels>
+              <v-expansion-panel>
+                <v-expansion-panel-header style="background-color: #303030;">
+                  <div style="width: 100%; text-align: center;">
+                    <h2 style="margin: 0;">Advanced Settings</h2>
+                  </div>
+                </v-expansion-panel-header>
+                <v-expansion-panel-content>
+                  <!-- Admin extra task: reserve for another user -->
+                  <v-row v-if="isAdmin()" style="margin-top: 20px;">
+                    <v-col cols="12">
+                      <h3>Reserve for another user</h3>
+                      <v-row>
+                        <v-col cols="6" style="margin: 0 auto">
+                          <p><span style="color: gray; font-size: 15px;">Admin only!</span> Write email address of another user, or leave empty to reserve for yourself.</p>
+                          <v-text-field v-model="adminReserveUserEmail" label="" placeholder="Email"></v-text-field>
+                        </v-col>
+                      </v-row>
+                    </v-col>
+                  </v-row>
+
+                  <!-- Reservation Description -->
+                  <v-row style="margin-top: 20px;">
+                    <v-col cols="12">
+                      <h3>Reservation Description</h3>
+                      <v-row>
+                        <v-col cols="6" style="margin: 0 auto">
+                          <p style="color: gray; font-size: 15px; margin-bottom: 0px;">Optional description for your reservation.</p>
+                          <p style="color: gray; font-size: 15px;">(max 50 characters)</p>
+                          <v-text-field 
+                            v-model="reservationDescription" 
+                            label="Description (optional)"
+                            placeholder="Enter description..."
+                            counter="50"
+                            :rules="[rules.maxLength50]"
+                            maxlength="50">
+                          </v-text-field>
+                        </v-col>
+                      </v-row>
+                    </v-col>
+                  </v-row>
+
+                  <!-- SHM Size Configuration -->
+                  <v-row style="margin-top: 20px;">
+                    <v-col cols="12">
+                      <h3>Shared Memory (SHM) Size</h3>
+                      <v-row>
+                        <v-col cols="6" style="margin: 0 auto">
+                          <p style="color: gray; font-size: 15px;">Shared memory for inter-process communication. Required for applications like PyTorch, databases, and parallel computing. Default: 50%</p>
+                          <v-slider 
+                            v-model="shmSizePercent" 
+                            :min="10" 
+                            :max="90" 
+                            :thumb-size="60" 
+                            ticks="always" 
+                            thumb-label="always"
+>
+                            <template v-slot:thumb-label="{ value }">
+                              {{ value }}%
+                            </template>
+                          </v-slider>
+                          <p style="text-align: center; margin-top: 10px;">
+                            SHM Size: {{ shmSizePercent }}% of allocated memory
+                            <span v-if="selectedHardwareSpecs && getMemorySpecId()">
+                              (≈ {{ calculateShmSizeGB() }} GB)
+                            </span>
+                          </p>
+                        </v-col>
+                      </v-row>
+                    </v-col>
+                  </v-row>
+
+                  <!-- RAM Disk Size Configuration -->
+                  <v-row style="margin-top: 20px;">
+                    <v-col cols="12">
+                      <h3>RAM Disk Size</h3>
+                      <v-row>
+                        <v-col cols="6" style="margin: 0 auto">
+                          <p style="color: gray; font-size: 15px;">Mounts a high-speed RAM-based folder to your home directory. Ideal for caching, temp files, and I/O intensive operations. Default: 0%</p>
+                          <v-slider 
+                            v-model="ramDiskSizePercent" 
+                            :min="0" 
+                            :max="60" 
+                            :thumb-size="60" 
+                            ticks="always" 
+                            thumb-label="always">
+                            <template v-slot:thumb-label="{ value }">
+                              {{ value }}%
+                            </template>
+                          </v-slider>
+                          <p style="text-align: center; margin-top: 10px;">
+                            RAM Disk Size: {{ ramDiskSizePercent }}% of allocated memory
+                            <span v-if="selectedHardwareSpecs && getMemorySpecId()">
+                              (≈ {{ calculateRamDiskSizeGB() }} GB)
+                            </span>
+                          </p>
+                        </v-col>
+                      </v-row>
+                    </v-col>
+                  </v-row>
+                </v-expansion-panel-content>
+              </v-expansion-panel>
+            </v-expansion-panels>
           </v-col>
 
         </v-row>
@@ -219,11 +473,16 @@
       pickedDate: (new Date(Date.now() - (new Date()).getTimezoneOffset() * 60000)).toISOString().substr(0, 10),
       pickedHour: {},
       reservableHours: [],
+      reservableDays: [],
       adminReserveUserEmail: null,
+      reservationDescription: "", // Description for the reservation
       hours: [],
       refreshTip: false, // True if there were not enough resources for reservation, shows a tip to refresh hardware data
       reserveDurationDays: null,
       reserveDurationHours: null,
+      initializingDefaults: false, // Flag to prevent watchers from interfering during initialization
+      shmSizePercent: 50, // Default SHM size to 50% of memory
+      ramDiskSizePercent: 0, // Default RAM disk size to 0% of memory
       fetchingReservations: false, // True if we are fetching all current and upcoming reservations
       allReservations: null, // Contains all current reservations
       fetchingComputers: false, // True if we are fetching computers and their hardware data from the server
@@ -237,32 +496,18 @@
       hardwareData: null, // Contains hardware data for the currently selected computer
       selectedHardwareSpecs: {}, // Selected hardware specs for the current computer
       isSubmittingReservation: false, // Set to true when user is submitting the reservation
-      minimumDurationDays: 0, // TODO: Grab from server settings
-      maximumDurationDays: 4,  // TODO: Grab from server settings      
-      minimumDurationHours: 0, // TODO: Grab from server settings
-      maximumDurationHours: 24,  // TODO: Grab from server settings
-      minimumDuration: 5, // TODO: Grab from server settings
+      rules: {
+        maxLength50: value => !value || value.length <= 50 || "Description must be 50 characters or less"
+      }
     }),
     mounted() {
       let d = new Date()
 
-      let hours = []
-      for (let i = this.minimumDurationHours; i <= this.maximumDurationHours; i++) {
-        hours.push( { "text": i + " hours", "value": i } )
+      // Initialize duration defaults if store config is already loaded
+      if (this.$store.state.configLoaded) {
+        this.initializeDurationDefaults()
       }
-      this.reservableHours = hours
-      //this.duration = { "text": "8 hours", "value": 8 }
-
-      // If is admin, set days to 60
-      if (this.isAdmin) {
-        this.maximumDurationDays = 60
-      }
-
-      let days = []
-      for (let i = this.minimumDurationDays; i <= this.maximumDurationDays; i++) {
-        days.push( { "text": i + " days", "value": i } )
-      }
-      this.reservableDays = days
+      // Otherwise, the watcher will handle initialization when config loads
 
       let dayHours = []
       for (let i = 0; i < 24; i++) {
@@ -283,6 +528,32 @@
         this.refreshTip = false;
       },
       /**
+       * Handles container selection and auto-scroll to computer selection.
+       * @param {number} containerValue - The selected container ID
+       */
+      selectContainer(containerValue) {
+        this.container = containerValue;
+        
+        // Auto-scroll to the "Select Computer" section after a short delay
+        // to allow Vue to render the computer selection section
+        try {
+          this.$nextTick(() => {
+            setTimeout(() => {
+              const element = document.getElementById('select-computer-section');
+              if (element) {
+                element.scrollIntoView({ 
+                  behavior: 'smooth', 
+                  block: 'start' 
+                });
+              }
+            }, 100);
+          });
+        } catch (error) {
+          // Silently handle any scrolling errors
+          console.debug('Auto-scroll error:', error);
+        }
+      },
+      /**
        * Checks if user is admin.
        * @returns {Boolean} True if user is admin, false if not
        */
@@ -291,20 +562,30 @@
         if (!currentUser) return false
 
         if (currentUser.role == "admin") return true
+        if (currentUser.roles && currentUser.roles.includes("admin")) return true
         return false
       },
       /**
        * Limits the amount of selected GPUs to the maximum amount allowed.
        */
       gpuLimit() {
+        // Allow admins to select unlimited GPUs
+        if (this.isAdmin()) {
+          return
+        }
+
         let max = 1;
         this.hardwareData.forEach((spec) => {
-          if (spec.type === "gpus") max = spec.maximumAmountForUser
+          if (spec.type === "gpu") {
+            // Use the individual GPU limit, not the summary
+            max = spec.maximumAmountForUser
+          }
         })
 
         if (this.selectedgpus.length > max) {
           this.$store.commit('showMessage', { text: `Maximum of ${max} GPUs can be selected.`, color: "red" })
-          this.selectedgpus.pop()
+          // Remove the last selected GPU to stay within the limit
+          this.selectedgpus.splice(-1, 1)
         }
       },
       /**
@@ -314,9 +595,9 @@
       hardwareDataNoGPUs() {
         let data = []
         this.hardwareData.forEach((spec) => {
-          if (spec.type != "gpu" && spec.type !== "gpus") data.push(spec)
+          if (spec.type !== "gpus" && spec.type !== "gpu") data.push(spec)
         })
-        return data
+        return data.sort((a, b) => a.type.localeCompare(b.type))
       },
       /**
        * Returns a list of all GPUs in the hardware data.
@@ -325,15 +606,15 @@
       hardwareDataOnlyGPUs() {
         let data = []
         this.hardwareData.forEach((spec) => {
-          if (spec.type == "gpu") {
-            // Only add GPUs that are reservable
+          if (spec.type === "gpu") {
+            // Only add individual GPUs that are reservable (not the summary "gpus" type)
             if (spec.maximumAmountForUser > 0) {
               let obj = { text: `${spec.internalId}: ${spec.format}`, value: spec.hardwareSpecId }
               data.push(obj)
             }
           }
         })
-        return data
+        return data.sort((a, b) => a.text.localeCompare(b.text))
       },
       /**
        * Goes to the next step in the reservation process.
@@ -344,6 +625,10 @@
         let duration = this.reserveDurationDays * 24 + this.reserveDurationHours
         if (this.step == 2 && duration < this.minimumDuration) {
           return this.$store.commit('showMessage', { text: "Minimum duration is "+this.minimumDuration+" hours.", color: "red" })
+        }
+        // Skip maximum duration check for admins
+        if (this.step == 2 && duration > this.maximumDuration) {
+          return this.$store.commit('showMessage', { text: "Maximum duration is "+this.maximumDuration+" hours.", color: "red" })
         }
 
         this.step = this.step + 1
@@ -357,6 +642,9 @@
 
         // If going back to step 2 (select reservation duration), reset all selected containers, computers and hardware specs
         if (this.step == 2) {
+          // Initialize duration defaults when step 2 becomes active
+          this.initializeDurationDefaultsIfNeeded()
+      
           this.container = null
           this.computer = null
         }
@@ -366,14 +654,14 @@
        * Checks if there is enough hardware resources from current time + minimumHours
        */
        reserveNow() {
-        checkHardwareAvailability(dayjs().toISOString(), this.minimumDurationHours, this.$store.getters.user.loginToken).then(res => {
+        checkHardwareAvailability(dayjs().toISOString(), this.minimumDuration, this.$store.getters.user.loginToken).then(res => {
           if (res !== null) {
             return this.$store.commit('showMessage', { text: res, color: "red" })
           }
           this.reserveDate = dayjs().toISOString()
           this.reserveType = "now"
-          this.reserveDurationDays = 0
-          this.reserveDurationHours = 0
+          this.reserveDurationDays = this.minimumDurationDays
+          this.reserveDurationHours = this.minimumDurationHours
           this.nextStep()
         })
       },
@@ -383,13 +671,13 @@
        * @param {Date} time The selected time slot
        */
       slotSelected(time) {
-        checkHardwareAvailability(time, this.minimumDurationHours, this.$store.getters.user.loginToken).then(res => {
+        checkHardwareAvailability(time, this.minimumDuration, this.$store.getters.user.loginToken).then(res => {
           if (res !== null) {
             return this.$store.commit('showMessage', { text: res, color: "red" })
           }
           this.reserveDate = time.toISOString()
-          this.reserveDurationDays = 0
-          this.reserveDurationHours = 0
+          this.reserveDurationDays = this.minimumDurationDays
+          this.reserveDurationHours = this.minimumDurationHours
           this.nextStep()
         })
       },
@@ -439,8 +727,6 @@
             // Success
             if (response.data.status == true) {
               _this.allReservations = response.data.data.reservations
-              //console.log(_this.allReservations)
-              _this.fetchingReservations = false
             }
             // Fail
             else {
@@ -484,6 +770,7 @@
             if (response.data.status == true) {
               _this.allComputers = response.data.data.computers
               _this.allContainers = response.data.data.containers
+        
               let computers = []
               _this.allComputers.forEach((computer) => {
                 computers.push({ "value": computer.computerId, "text": computer.name })
@@ -494,11 +781,23 @@
               _this.allContainers.forEach((container) => {
                 if (container.removed == true) return
                 if (!_this.isAdmin() && container.public == false) return
-                let name = container.name
-                if (container.public == false) name = name + " (private)"
-
-                containers.push({ "value": container.containerId, "text": name })
+                containers.push({ 
+                  "value": container.containerId, 
+                  "text": container.name,
+                  "isPublic": container.public 
+                })
               });
+              
+              // Sort containers: public first (alphabetically), then private (alphabetically)
+              containers.sort((a, b) => {
+                if (a.isPublic === b.isPublic) {
+                  // Same visibility, sort by name
+                  return a.text.localeCompare(b.text)
+                }
+                // Different visibility, public containers first
+                return b.isPublic - a.isPublic
+              })
+              
               _this.containers = containers
               _this.nextStep()
             }
@@ -550,7 +849,10 @@
           "duration": duration,
           "containerId": this.container,
           "hardwareSpecs": JSON.stringify(this.selectedHardwareSpecs),
-          "adminReserveUserEmail": this.adminReserveUserEmail ? this.adminReserveUserEmail : ""
+          "adminReserveUserEmail": this.adminReserveUserEmail ? this.adminReserveUserEmail : "",
+          "description": this.reservationDescription && this.reservationDescription.trim() ? this.reservationDescription.trim() : "",
+          "shmSizePercent": this.shmSizePercent,
+          "ramDiskSizePercent": this.ramDiskSizePercent
         }
 
         axios({
@@ -593,6 +895,264 @@
             _this.refreshTip = true;
         });
       },
+      /**
+       * Updates the hours dropdown based on selected days to respect min/max duration limits
+       * @param {number} selectedDays The currently selected number of days
+       */
+      updateHoursDropdown(selectedDays) {
+        let hours = []
+        let minHours = 0
+        let maxHours = 23
+        
+        // If at minimum days, start from minimum hours
+        if (selectedDays === this.minimumDurationDays) {
+          minHours = this.minimumDurationHours
+        }
+        
+        // If at maximum days, limit to maximum hours
+        if (selectedDays === this.maximumDurationDays) {
+          maxHours = this.maximumDurationHours
+        }
+        
+        // Special case: if we're at max days and max hours is 0, only allow 0 hours
+        if (selectedDays === this.maximumDurationDays && this.maximumDurationHours === 0) {
+          maxHours = 0
+        }
+        
+        for (let i = minHours; i <= maxHours; i++) {
+          hours.push( { "text": i + " hours", "value": i } )
+        }
+        
+        this.reservableHours = hours
+        
+        // Reset hour selection if current value is not in the new range or is null
+        if (this.reserveDurationHours === null || this.reserveDurationHours < minHours || this.reserveDurationHours > maxHours) {
+          this.reserveDurationHours = minHours
+        }
+      },
+      /**
+       * Initialize duration defaults when store data is available
+       */
+      initializeDurationDefaults() {
+        this.initializingDefaults = true
+        
+        // Generate days dropdown from minimum to maximum
+        let maxDays = this.maximumDurationDays
+        let minDays = this.minimumDurationDays
+        
+        let days = []
+        for (let i = minDays; i <= maxDays; i++) {
+          let text = i === 1 ? i + " day" : i + " days"
+          days.push( { "text": text, "value": i } )
+        }
+        this.reservableDays = days
+
+        // Generate initial hours dropdown first
+        this.updateHoursDropdown(minDays)
+        
+        // Then set initial default values to minimum allowed (this will trigger the watcher)
+        this.reserveDurationDays = minDays
+        this.reserveDurationHours = this.minimumDurationHours
+        
+        // Use nextTick to ensure watchers complete before clearing the flag
+        this.$nextTick(() => {
+          this.initializingDefaults = false
+        })
+      },
+      /**
+       * Initialize duration defaults only if they haven't been set yet and config is loaded
+       */
+      initializeDurationDefaultsIfNeeded() {
+        if (!this.$store.state.configLoaded) {
+          return
+        }
+        
+        // Only set defaults if no values are currently selected
+        if (this.reserveDurationDays === null || this.reserveDurationHours === null) {
+          this.initializeDurationDefaults()
+        }
+      },
+      /**
+       * Gets the container description for a specific container ID
+       * @param {number} containerId The container ID to get the description for
+       * @returns {string} The container description
+       */
+      getContainerDescriptionById(containerId) {
+        if (this.allContainers) {
+          let container = this.allContainers.find(x => x.containerId == containerId)
+          if (container) return container.description
+        }
+        return ""
+      },
+      /**
+       * Gets the container image name for a specific container ID
+       * @param {number} containerId The container ID to get the image name for
+       * @returns {string} The container image name
+       */
+      getContainerImageById(containerId) {
+        if (this.allContainers) {
+          let container = this.allContainers.find(x => x.containerId == containerId)
+          if (container) return container.imageName
+        }
+        return ""
+      },
+      /**
+       * Gets the container public status for a specific container ID
+       * @param {number} containerId The container ID to get the public status for
+       * @returns {boolean} Whether the container is public
+       */
+      getContainerPublicById(containerId) {
+        if (this.allContainers) {
+          let container = this.allContainers.find(x => x.containerId == containerId)
+          if (container) return container.public
+        }
+        return true // Default to public if not found
+      },
+      /**
+       * Gets the hardware specs for a specific computer ID
+       * @param {number} computerId The computer ID to get the hardware specs for
+       * @returns {Array} The hardware specs array
+       */
+      getComputerHardwareById(computerId) {
+        if (this.allComputers) {
+          let computer = this.allComputers.find(x => x.computerId == computerId)
+          if (computer) return computer.hardwareSpecs
+        }
+        return []
+      },
+      /**
+       * Formats hardware specs for display in computer cards
+       * @param {number} computerId The computer ID to get the formatted specs for
+       * @returns {string} Formatted hardware specs string
+       */
+      getFormattedHardwareSpecs(computerId) {
+        let specs = this.getComputerHardwareById(computerId)
+        if (!specs || specs.length === 0) return "No hardware specs available"
+        
+        let formattedSpecs = []
+        
+        // Group specs by type
+        let gpuSpecs = specs.filter(spec => spec.type === "gpu")
+        let otherSpecs = specs.filter(spec => spec.type !== "gpus" && spec.type !== "gpu").sort((a, b) => a.type.localeCompare(b.type))
+        
+        // Add GPU info
+        if (gpuSpecs.length > 0) {
+          // Count actual GPUs (number of GPU specs), not total reservable slots
+          let gpuCount = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
+          if (gpuCount > 0) {
+            formattedSpecs.push(`${gpuCount} GPU${gpuCount > 1 ? 's' : ''}`)
+          }
+        }
+        
+        // Add other specs (limit to first 2-3 most important ones)
+        let prioritySpecs = otherSpecs.slice(0, 2)
+        prioritySpecs.forEach(spec => {
+          if (spec.maximumAmountForUser > 0) {
+            // Clean up the display format
+            let displayName = spec.type
+            if (spec.type === "cpus") displayName = "CPUs"
+            else if (spec.type === "memory") displayName = "RAM"
+            else if (spec.type === "storage") displayName = "Storage"
+            else displayName = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
+            
+            formattedSpecs.push(`${spec.maximumAmountForUser} ${spec.format} ${displayName}`)
+          }
+        })
+        
+        return formattedSpecs.length > 0 ? formattedSpecs.join(" • ") : "No resources available"
+      },
+      /**
+       * Gets a list of hardware specs formatted for display in computer cards
+       * @param {number} computerId The computer ID to get the hardware list for
+       * @returns {Array} Array of formatted hardware spec objects
+       */
+      getComputerHardwareList(computerId) {
+        let specs = this.getComputerHardwareById(computerId)
+        if (!specs || specs.length === 0) return [{ id: 'none', text: 'No hardware specs available' }]
+        
+        let hardwareList = []
+        
+        // Group specs by type - GPUs first, then others alphabetically (matching hardware selection order)
+        let gpuSpecs = specs.filter(spec => spec.type === "gpu")
+        let otherSpecs = specs.filter(spec => spec.type !== "gpus" && spec.type !== "gpu")
+        
+        // Always add GPUs first (matching the order in hardware selection)
+        let gpuCount = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
+        hardwareList.push({ 
+          id: 'gpu', 
+          text: `${gpuCount} GPU${gpuCount !== 1 ? 's' : ''}`
+        })
+        
+        // Add other specs sorted alphabetically (matching hardwareDataNoGPUs method)
+        let sortedOtherSpecs = [...otherSpecs].sort((a, b) => a.type.localeCompare(b.type))
+        
+        sortedOtherSpecs.forEach(spec => {
+          let displayName = spec.type
+          let text = ""
+          
+          if (spec.type === "cpus") {
+            displayName = "CPUs"
+            text = `${spec.maximumAmountForUser} ${displayName}`
+          } else if (spec.type === "memory") {
+            displayName = "RAM"
+            text = `${spec.maximumAmountForUser} ${spec.format} ${displayName}`
+          } else if (spec.type === "storage") {
+            displayName = "Storage"
+            text = `${spec.maximumAmountForUser} ${spec.format} ${displayName}`
+          } else {
+            displayName = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
+            text = `${spec.maximumAmountForUser} ${spec.format} ${displayName}`
+          }
+          
+          hardwareList.push({ 
+            id: spec.hardwareSpecId || spec.type, 
+            text: text
+          })
+        })
+        
+        return hardwareList.length > 0 ? hardwareList : [{ id: 'none', text: 'No resources available' }]
+      },
+      async refreshCalendarReservations() {
+        if (this.$refs.calendarComponent) {
+          await this.$refs.calendarComponent.refreshCalendarData();
+        }
+      },
+      handleReservationsRefreshed(reservations) {
+        this.allReservations = reservations;
+      },
+      /**
+       * Gets the memory spec ID from the selected hardware specs
+       * @returns {string|null} The memory spec ID or null if not found
+       */
+      getMemorySpecId() {
+        if (!this.hardwareData) return null;
+        const memorySpec = this.hardwareData.find(spec => spec.type === "memory");
+        return memorySpec ? memorySpec.hardwareSpecId : null;
+      },
+      /**
+       * Calculates the actual SHM size in GB based on the percentage and selected memory
+       * @returns {string} The calculated SHM size in GB
+       */
+      calculateShmSizeGB() {
+        const memorySpecId = this.getMemorySpecId();
+        if (!memorySpecId || !this.selectedHardwareSpecs[memorySpecId]) return "0";
+        
+        const memoryGB = this.selectedHardwareSpecs[memorySpecId];
+        const shmGB = (memoryGB * this.shmSizePercent / 100).toFixed(1);
+        return shmGB;
+      },
+      /**
+       * Calculates the actual RAM disk size in GB based on the percentage and selected memory
+       * @returns {string} The calculated RAM disk size in GB
+       */
+      calculateRamDiskSizeGB() {
+        const memorySpecId = this.getMemorySpecId();
+        if (!memorySpecId || !this.selectedHardwareSpecs[memorySpecId]) return "0";
+        
+        const memoryGB = this.selectedHardwareSpecs[memorySpecId];
+        const ramDiskGB = (memoryGB * this.ramDiskSizePercent / 100).toFixed(1);
+        return ramDiskGB;
+      }
     },
     computed: {
       getContainerDescription() {
@@ -607,9 +1167,63 @@
         return dayjs(this.reserveDate).format("DD.MM.YYYY HH:mm")
       },
       globalTimezone() {
-        return AppSettings.General.timezone
+        return this.$store.getters.appTimezone
       },
+      minimumDuration() {
+        // Get minimum duration from user's role-based limits in store
+        return this.$store.getters.userMinDuration || 1
+      },
+      maximumDuration() {
+        // Get maximum duration from user's role-based limits in store
+        return this.$store.getters.userMaxDuration || 48
+      },
+      minimumDurationDays() {
+        return Math.floor(this.minimumDuration / 24)
+      },
+      maximumDurationDays() {
+        return Math.floor(this.maximumDuration / 24)
+      },
+      minimumDurationHours() {
+        return this.minimumDuration % 24
+      },
+      maximumDurationHours() {
+        return this.maximumDuration % 24
+      },
+      reservationPageInstructions() {
+        return this.$store.getters.reservationPageInstructions
+      }
     },
+    watch: {
+      /**
+       * Watch for changes in selected days and update hours dropdown accordingly
+       */
+      reserveDurationDays(newDays) {
+        // Don't interfere if we're currently initializing defaults
+        if (this.initializingDefaults) {
+          return
+        }
+        
+        if (newDays !== null && newDays !== undefined) {
+          this.updateHoursDropdown(newDays)
+        }
+      },
+      /**
+       * Watch for when app config is loaded from store
+       */
+      '$store.state.configLoaded'(isLoaded) {
+        if (isLoaded && this.reservableDays.length === 0) {
+          this.initializeDurationDefaults()
+        }
+      },
+      /**
+       * Watch for step changes to initialize defaults when step 2 becomes active
+       */
+      step(newStep) {
+        if (newStep === 2) {
+          this.initializeDurationDefaultsIfNeeded()
+        }
+      },
+    }
   }
 </script>
 
@@ -620,5 +1234,44 @@
   
   .spec-row {
     margin-bottom: 10px;
+  }
+
+  .section {
+    margin: 30px 0px;
+  }
+
+  .color-violet {
+    color: #6d4c7d;
+  }
+
+  .dim {
+    opacity: 0.8;
+  }
+
+  .color-green {
+    color: green;
+  }
+
+  .refresh-tip {
+    margin-top: 30px;
+  }
+
+  .selected-card {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    transform: translateY(-2px);
+    transition: all 0.3s ease;
+  }
+
+  .v-card:hover {
+    transform: translateY(-1px);
+    transition: all 0.3s ease;
+  }
+
+  .selected-card:hover {
+    transform: translateY(-3px);
+  }
+
+  .v-expansion-panel::before {
+    box-shadow: none !important;
   }
 </style>

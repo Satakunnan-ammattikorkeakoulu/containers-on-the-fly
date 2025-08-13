@@ -1,0 +1,41 @@
+meta {
+  name: Cancel Reservation
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{root_url}}/reservation/cancel_reservation?reservationId=1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user_token}}
+}
+
+tests {
+  test("Status code is 200 or 403", function() {
+    // 200 if successful, 403 if not owner or reservation doesn't exist
+    expect([200, 403]).to.include(res.status);
+  });
+  
+  test("Response has status field", function() {
+    expect(res.body).to.have.property('status');
+  });
+  
+  test("If successful, has confirmation message", function() {
+    if (res.status === 200) {
+      expect(res.body.status).to.equal('success');
+      expect(res.body).to.have.property('data');
+      expect(res.body.data).to.have.property('message');
+    }
+  });
+  
+  test("If forbidden, has error message", function() {
+    if (res.status === 403) {
+      expect(res.body.status).to.equal('error');
+      expect(res.body).to.have.property('message');
+    }
+  });
+}

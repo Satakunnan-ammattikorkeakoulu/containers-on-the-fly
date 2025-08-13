@@ -22,6 +22,12 @@
       <template v-slot:item.roles="{item}">
         {{ Array.isArray(item.roles) ? item.roles.join(', ') : item.roles }}
       </template>
+      
+      <!-- Password Set -->
+      <template v-slot:item.hasPassword="{item}">
+        <v-icon v-if="item.hasPassword" color="green">mdi-check</v-icon>
+        <v-icon v-else color="red">mdi-close</v-icon>
+      </template>
     </v-data-table>
   </div>
 </template>
@@ -46,6 +52,7 @@ export default {
         { text: 'User ID', value: 'userId' },
         { text: 'Email', value: 'email' },
         { text: 'Roles', value: 'roles' },
+        { text: 'Password Set', value: 'hasPassword' },
         { text: 'Created At', value: 'createdAt' },
         { text: 'Actions', value: 'actions' },
       ],

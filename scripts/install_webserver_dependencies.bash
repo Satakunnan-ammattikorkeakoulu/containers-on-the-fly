@@ -22,11 +22,20 @@ fi
 echo "Running with sudo privileges."
 
 # Update and install initial packages
-sudo apt update
+sudo apt update -qq
 
 # Install required libraries
-sudo apt --assume-yes install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev
-sudo apt --assume-yes install python3-ldap
+sudo apt --assume-yes -qq install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev acl
+sudo apt --assume-yes -qq install python3-ldap
+
+# Create containerfly group if it doesn't exist
+if ! getent group containerfly > /dev/null 2>&1; then
+    echo "Creating containerfly group with GID 5620..."
+    sudo groupadd -g 5620 containerfly
+    echo -e "${GREEN}Group 'containerfly' created with GID 5620.${RESET}"
+else
+    echo -e "${GREEN}Group 'containerfly' already exists.${RESET}"
+fi
 
 # Function to check if Caddy is installed
 check_caddy_installed() {
@@ -44,11 +53,11 @@ install_caddy() {
     echo "Installing Caddy..."
     
     # Install Caddy from official repository
-    sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+    sudo apt install -y -qq debian-keyring debian-archive-keyring apt-transport-https
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
     curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-    sudo apt update
-    sudo apt install -y caddy
+    sudo apt update -qq
+    sudo apt install -y -qq caddy
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Caddy installed successfully.${RESET}"
@@ -113,7 +122,7 @@ fi
 
 # Check if MariaDB is installed
 check_mariadb_installed() {
-    if dpkg -l | grep -q mariadb; then
+    if dpkg -l 2>/dev/null | grep -q mariadb; then
         echo -e "${GREEN}MariaDB is already installed.${RESET}"
         return 0
     else
@@ -125,7 +134,7 @@ check_mariadb_installed() {
 # Function to install MariaDB
 install_mariadb() {
     echo "Installing MariaDB..."
-    apt install -y mariadb-server mariadb-client
+    apt install -y -qq mariadb-server mariadb-client
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}MariaDB installed successfully.${RESET}"
@@ -142,7 +151,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Allow MariaDB to listen on all interfaces to allow remote connections
-# Don't worry, we have disabled by default all incoming connections to ports with UFW before this.
+# Don't worry, we have disabled by default all incoming connections to ports with iptables before this.
 # We just need to do this to in the future allow remote connections from possible container servers.
 sudo sed -i 's/^bind-address\s*=.*$/bind-address = 0.0.0.0/' "/etc/mysql/mariadb.conf.d/50-server.cnf"
 
@@ -197,6 +206,10 @@ if [ "$RESULT" -eq 1 ]; then
     fi
   fi
   echo -e "${GREEN}Password verification successful.${RESET}"
+  # Ensure user has privileges on the current database
+  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'%';"
+  mysql -e "FLUSH PRIVILEGES;"
+  echo -e "${GREEN}Granted privileges on database $MARIADB_DB_NAME to user $MARIADB_DB_USER.${RESET}"
 else
   echo "User '$MARIADB_DB_USER' does not exist."
   mysql -e "CREATE USER IF NOT EXISTS '$MARIADB_DB_USER'@'%' IDENTIFIED BY '$MARIADB_DB_USER_PASSWORD';"
@@ -261,7 +274,7 @@ check_node_installed() {
 install_node() {
     echo "Installing Node.js and npm..."
     curl -sL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-    sudo apt install -y nodejs
+    sudo apt install -y -qq nodejs
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Node.js and npm installed successfully.${RESET}"

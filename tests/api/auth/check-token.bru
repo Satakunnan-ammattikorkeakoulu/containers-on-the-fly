@@ -1,0 +1,38 @@
+meta {
+  name: Check Token - Valid
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{root_url}}/user/check_token
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response indicates success", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has user data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('userId');
+    expect(res.body.data).to.have.property('roles');
+  });
+  
+  test("User has admin role", function() {
+    const roles = res.body.data.roles;
+    expect(roles).to.be.an('array');
+    expect(roles).to.include('admin');
+  });
+}

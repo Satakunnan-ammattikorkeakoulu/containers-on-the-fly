@@ -3,21 +3,50 @@
     <v-app v-if="isLoggedIn">
       <v-app-bar app elevation="4">
         <a @click="reservations">Reservations</a>
-        <a @click="logout">Logout</a>
-        <!--<a @click="profile">Profile</a>-->
         <div class="admin-block" v-if="isAdmin">
           <p class="admin-text">Admin</p>
+          <a href="/admin/general">General</a>
           <a href="/admin/reservations">Reservations</a>
           <a href="/admin/users">Users</a>
-          <a href="/admin/hardware">Hardware</a>
+          <a href="/admin/roles">Roles</a>
           <a href="/admin/computers">Computers</a>
           <a href="/admin/containers">Containers</a>
         </div>
-        <p class="loggedInText" v-if="isLoggedIn == true">
-          Logged in as
-          <br />
-          <span>{{userEmail}}</span>
-        </p>
+        <div class="user-info-container" v-if="isLoggedIn == true">
+          <v-menu offset-y open-on-hover>
+            <template v-slot:activator="{ on, attrs }">
+              <span 
+                class="user-email-link"
+                v-bind="attrs"
+                v-on="on"
+              >
+                {{userEmail}}
+              </span>
+            </template>
+            <v-list>
+              <v-list-item @click="profile">
+                <v-list-item-title>Profile</v-list-item-title>
+              </v-list-item>
+              <v-list-item @click="logout">
+                <v-list-item-title>Logout</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+          <v-tooltip bottom v-if="userRoles.length > 0">
+            <template v-slot:activator="{ on, attrs }">
+              <v-chip
+                x-small
+                outlined
+                class="ml-2"
+                v-bind="attrs"
+                v-on="on"
+              >
+                {{ userRoles.length }} {{ userRoles.length === 1 ? 'role' : 'roles' }}
+              </v-chip>
+            </template>
+            <span>{{ userRoles.join(', ') }}</span>
+          </v-tooltip>
+        </div>
       </v-app-bar>
 
       <v-main>
@@ -26,7 +55,6 @@
         </v-container>
       </v-main>
       
-      <Footer />
       <Snackbar></Snackbar>
     </v-app>
   </div>
@@ -34,13 +62,11 @@
 
 <script>
   import Snackbar from '/src/components/global/Snackbar.vue';
-  import Footer from '/src/components/global/Footer'
 
   export default {
     name: 'LayoutApp',
     components: {
       Snackbar,
-      Footer,
     },
     data: () => ({
       show: true,
@@ -61,8 +87,7 @@
         this.$router.push("/user/reservations")
       },
       profile() {
-        console.log("IMPLEMENT")
-        //this.$router.push("/user/reservations")
+        this.$router.push("/user/profile")
       }
     },
     computed: {
@@ -77,11 +102,16 @@
         if (!currentUser) return false
 
         if (currentUser.role == "admin") return true
+        if (currentUser.roles && currentUser.roles.includes("admin")) return true
         return false
       },
       userEmail() {
         if (!this.$store.getters.user) return ""
         return this.$store.getters.user.email || ""
+      },
+      userRoles() {
+        if (!this.$store.getters.user) return []
+        return this.$store.getters.user.roles || []
       },
     },
     beforeRouteUpdate(to, from, next) {
@@ -101,17 +131,20 @@
 </script>
 
 <style scoped lang="scss">
-.loggedInText {
+.user-info-container {
   margin-left: auto;
-  margin-top: 15px;
-  font-size: 80%;
-  color: #717171;
-  text-align: right;
+  display: flex;
+  align-items: center;
   padding-right: 10px;
 }
-.loggedInText span {
+
+.user-email-link {
   color: white;
-  opacity: 80%;
+  opacity: 90%;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  font-size: 14px;
 }
 
 .admin-block {

@@ -3,6 +3,29 @@
     <v-row class="text-center section">
       <v-col>
         <v-btn color="success" large @click="createReservation">Reserve Server</v-btn>
+        <br>
+        <p style="color: grey; font-size: 13px; margin-top: 8px; margin-bottom: 0px;">{{ activeReservationCount }} of {{ maxActiveReservations }} active reservations</p>
+        <a @click="toggleCalendarView" style="margin-top: 15px; display: inline-block; font-size: 13px;">
+          {{ showCalendar ? 'hide reservation calendar' : 'show reservation calendar' }}
+        </a>
+      </v-col>
+    </v-row>
+
+    <!-- Reservation Calendar -->
+    <v-row v-if="showCalendar" class="section">
+      <v-col cols="12">
+        <h3 style="margin-bottom: 10px;">Reservation Calendar</h3>
+        <p style="margin-bottom: 20px; color: #666; font-size: 14px;">All times are in timezone <strong>{{globalTimezone}}</strong></p>
+        <CalendarReservations 
+          v-if="showCalendar" 
+          :propReservations="allReservations || []" 
+          :readOnly="true"
+          @slotSelected="handleSlotSelected"
+          @reservationsRefreshed="handleReservationsRefreshed"
+          @requestRefresh="fetchAllReservations"
+          ref="calendarComponent"
+        />
+        <Loading v-if="fetchingAllReservations" />
       </v-col>
     </v-row>
 
@@ -31,7 +54,7 @@
       <v-row>
         <v-col cols="3" style="margin: 0 auto;">
           <v-select
-            :items="['All', 'reserved', 'started', 'stopped', 'error']"
+            :items="statusItems"
             label="Status"
             v-model="filters.status"
             item-text="text"
@@ -68,6 +91,8 @@
   import Loading from '/src/components/global/Loading.vue';
   import UserReservationTable from '/src/components/user/UserReservationTable.vue';
   import UserReservationsModalConnectionDetails from '/src/components/user/UserReservationsModalConnectionDetails.vue';
+  import CalendarReservations from '/src/components/user/CalendarReservations.vue';
+  import AppSettings from '/src/AppSettings.js';
   
   export default {
     name: 'PageUserReservations',
@@ -75,17 +100,23 @@
     components: {
       Loading,
       UserReservationTable,
-      UserReservationsModalConnectionDetails
+      UserReservationsModalConnectionDetails,
+      CalendarReservations
     },
     data: () => ({
       filters: { status: { text: "All", value: "All" } },
       intervalFetchReservations: null,
       isFetchingReservations: true,
       reservations: [],
+      statusCounts: {},
       justReserved: false,
       informByEmail: false,
       modalConnectionDetailsVisible: false,
-      modalConnectionDetailsReservationId: null
+      modalConnectionDetailsReservationId: null,
+      showCalendar: false,
+      allReservations: null,
+      fetchingAllReservations: false,
+      AppSettings: AppSettings
     }),
     mounted () {
       if (localStorage.getItem("justReserved") === "true") {
@@ -110,17 +141,17 @@
         this.modalConnectionDetailsVisible = false
       },
       createReservation() {
-        let hasActiveReservations = false
-        this.reservations.forEach((res) => {
-          if (res.status == "started" || res.status == "reserved") hasActiveReservations = true
-        })
+        // Check against the user's actual limit
+        if (this.activeReservationCount >= this.maxActiveReservations) {
+          this.$store.commit('showMessage', { 
+            text: `You have reached your maximum of ${this.maxActiveReservations} active reservation${this.maxActiveReservations === 1 ? '' : 's'}. Please wait for an existing reservation to complete before creating a new one.`, 
+            color: "red" 
+          })
+          return
+        }
 
-        let currentUser = this.$store.getters.user
-
-        if (!hasActiveReservations || currentUser.role == "admin")
-          this.$router.push("/user/reserve")
-        else
-          this.$store.commit('showMessage', { text: "You can only have one reserved or started reservation at a time. Cancel the current reservation if you need a new.", color: "red" })
+        // User has not reached their limit, allow navigation
+        this.$router.push("/user/reserve")
       },
       fetchReservations() {
         let _this = this
@@ -143,6 +174,11 @@
             // Success
             if (response.data.status == true) {
               _this.reservations = response.data.data.reservations
+              _this.statusCounts = response.data.data.statusCounts || {}
+              // If no statusCounts from backend, calculate locally
+              if (Object.keys(_this.statusCounts).length === 0) {
+                _this.calculateStatusCounts();
+              }
             }
             // Fail
             else {
@@ -315,6 +351,111 @@
       showReservationDetails(reservationId) {
         this.modalConnectionDetailsVisible = true
         this.modalConnectionDetailsReservationId = reservationId
+      },
+      toggleCalendarView() {
+        this.showCalendar = !this.showCalendar;
+        if (this.showCalendar) {
+          // Use nextTick to ensure calendar component is mounted before fetching
+          this.$nextTick(() => {
+            this.fetchAllReservations();
+          });
+        }
+      },
+      fetchAllReservations() {
+        let _this = this;
+        _this.fetchingAllReservations = true;
+        let currentUser = this.$store.getters.user;
+
+        axios({
+          method: "get",
+          url: this.AppSettings.APIServer.reservation.get_current_reservations,
+          headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+        })
+        .then(function (response) {
+            // Success
+            if (response.data.status == true) {
+              _this.allReservations = response.data.data.reservations || [];
+            }
+            // Fail
+            else {
+              console.log("Failed getting current reservations...")
+              _this.$store.commit('showMessage', { text: "There was an error getting current reservations.", color: "red" })
+            }
+            _this.fetchingAllReservations = false;
+        })
+        .catch(function (error) {
+            // Error
+            if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+            }
+            else {
+              console.log(error)
+              _this.$store.commit('showMessage', { text: "Unknown error while trying to get current reservations.", color: "red" })
+            }
+            _this.fetchingAllReservations = false;
+        });
+      },
+       handleSlotSelected() {
+         // Check against the user's actual limit
+         if (this.activeReservationCount >= this.maxActiveReservations) {
+           this.$store.commit('showMessage', { 
+             text: `You have reached your maximum of ${this.maxActiveReservations} active reservation${this.maxActiveReservations === 1 ? '' : 's'}. Please wait for an existing reservation to complete before creating a new one.`, 
+             color: "red" 
+           })
+           return
+         }
+
+         // User has not reached their limit, allow navigation
+         this.$router.push("/user/reserve");
+       },
+       async refreshCalendarReservations() {
+         if (this.$refs.calendarComponent) {
+           await this.$refs.calendarComponent.refreshCalendarData();
+         }
+       },
+       handleReservationsRefreshed(reservations) {
+         this.allReservations = reservations;
+       },
+       calculateStatusCounts() {
+         // Initialize counts
+         this.statusCounts = {
+           reserved: 0,
+           started: 0,
+           stopped: 0,
+           error: 0
+         };
+         
+         // Count reservations by status
+         this.reservations.forEach(reservation => {
+           if (reservation.status in this.statusCounts) {
+             this.statusCounts[reservation.status]++;
+           }
+         });
+       }
+    },
+    computed: {
+      statusItems() {
+        const items = [
+          { text: `All (${this.reservations.length})`, value: 'All' },
+          { text: `reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
+          { text: `started (${this.statusCounts.started || 0})`, value: 'started' },
+          { text: `stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
+          { text: `error (${this.statusCounts.error || 0})`, value: 'error' }
+        ];
+        return items;
+      },
+      globalTimezone() {
+        return this.$store.getters.appTimezone;
+      },
+      activeReservationCount() {
+        let count = 0;
+        this.reservations.forEach((res) => {
+          if (res.status == "started" || res.status == "reserved") count++;
+        });
+        return count;
+      },
+      maxActiveReservations() {
+        return this.$store.getters.userMaxActiveReservations;
       }
     },
     beforeDestroy() {

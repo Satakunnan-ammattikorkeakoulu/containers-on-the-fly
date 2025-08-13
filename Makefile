@@ -13,6 +13,12 @@ BOLD=\033[1m
 RED=\033[0;31m
 RESET=\033[0m
 
+.DEFAULT_GOAL = help
+
+install-backend-deps: ## Install or update backend dependencies
+	@echo ""
+	@echo "Installing backend dependencies... (pip packages)"
+	@sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location -qq
 
 
 help:
@@ -24,7 +30,7 @@ help:
 
 # Helper targets
 
-apply-firewall-rules: # Applies ufw firewall rules to the server
+apply-firewall-rules: # Applies iptables firewall rules to the server
 	@chmod +x scripts/apply_firewall_rules.bash
 	@./scripts/apply_firewall_rules.bash
 
@@ -36,9 +42,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		EXISTING_SERVER_IP=$$(grep "^SERVER_IP_ADDRESS=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
 		EXISTING_WEB_HTTPS=$$(grep "^MAIN_SERVER_WEB_HTTPS=" user_config/settings | cut -d'=' -f2); \
-		EXISTING_TIMEZONE=$$(grep "^TIMEZONE=" user_config/settings | cut -d'"' -f2); \
-		EXISTING_MIN_DURATION=$$(grep "^RESERVATION_MIN_DURATION=" user_config/settings | cut -d'=' -f2); \
-		EXISTING_MAX_DURATION=$$(grep "^RESERVATION_MAX_DURATION=" user_config/settings | cut -d'=' -f2); \
 		\
 		if [ "$$EXISTING_WEB_HTTPS" = "true" ]; then \
 			EXISTING_WEB_ADDRESS="https://$$EXISTING_WEB_HOST"; \
@@ -50,8 +53,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "  - Server IP: $(GREEN)$$EXISTING_SERVER_IP$(RESET)"; \
 		echo "  - Web Host: $(GREEN)$$EXISTING_WEB_HOST$(RESET)"; \
 		echo "  - Web Address: $(GREEN)$$EXISTING_WEB_ADDRESS$(RESET)"; \
-		echo "  - Timezone: $(GREEN)$$EXISTING_TIMEZONE$(RESET)"; \
-		echo "  - Reservation Duration: $(GREEN)$$EXISTING_MIN_DURATION - $$EXISTING_MAX_DURATION hours$(RESET)"; \
 		echo ""; \
 		echo "What would you like to do?"; \
 		echo "  $(GREEN)1$(RESET) - Use these settings and start main server setup"; \
@@ -166,32 +167,8 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			ENABLE_HTTPS="false"; \
 		fi; \
 		\
-		echo ""; \
-		echo "$(GREEN)$(BOLD)Server Timezone:$(RESET)"; \
-		echo "Enter your server's timezone for proper scheduling and logging."; \
-		echo "Common examples: Europe/London, America/New_York, Asia/Tokyo, UTC"; \
-		echo "Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"; \
-		echo -n "Enter timezone (or empty for $(GREEN)Europe/Helsinki$(RESET)): "; \
-		read TIMEZONE_INPUT; \
-		if [ -z "$$TIMEZONE_INPUT" ]; then \
-			TIMEZONE_INPUT="Europe/Helsinki"; \
-		fi; \
 		\
-		echo ""; \
-		echo "$(GREEN)$(BOLD)Container Reservation Duration:$(RESET)"; \
-		echo "Set the minimum and maximum duration (hours) users can reserve containers."; \
-		echo "This can prevent super short bookings and stops people from reserving containers forever."; \
-		echo ""; \
-		echo -n "Minimum reservation duration in hours (or empty for $(GREEN)5$(RESET)): "; \
-		read MIN_DURATION; \
-		if [ -z "$$MIN_DURATION" ]; then \
-			MIN_DURATION="5"; \
-		fi; \
-		echo -n "Maximum reservation duration in hours (or empty for $(GREEN)72$(RESET)): "; \
-		read MAX_DURATION; \
-		if [ -z "$$MAX_DURATION" ]; then \
-			MAX_DURATION="72"; \
-		fi; \
+		# Reservation duration settings are now stored in the database \
 		\
 		if [ "$$FIRST_TIME_SETUP" = "true" ]; then \
 			DB_PASSWORD=$$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15); \
@@ -199,9 +176,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			sed -i "s/SERVER_IP_ADDRESS=\"YOUR_IP_HERE\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HOST=\"YOUR_IP_OR_DOMAIN_HERE\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HTTPS=false/MAIN_SERVER_WEB_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
-			sed -i "s/TIMEZONE=\"Europe\/Helsinki\"/TIMEZONE=\"$$TIMEZONE_INPUT\"/" user_config/settings; \
-			sed -i "s/RESERVATION_MIN_DURATION=5/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
-			sed -i "s/RESERVATION_MAX_DURATION=72/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
 			DB_PASSWORD_ESCAPED=$$(printf '%s\n' "$$DB_PASSWORD" | sed 's/[\/&]/\\&/g'); \
 			sed -i "s/^MARIADB_DB_USER_PASSWORD=.*/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD_ESCAPED\"/" user_config/settings; \
 		else \
@@ -209,10 +183,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 			sed -i "s/SERVER_IP_ADDRESS=\"[^\"]*\"/SERVER_IP_ADDRESS=\"$$SERVER_IP\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HOST=\"[^\"]*\"/MAIN_SERVER_WEB_HOST=\"$$WEB_HOST\"/" user_config/settings; \
 			sed -i "s/MAIN_SERVER_WEB_HTTPS=[^[:space:]]*/MAIN_SERVER_WEB_HTTPS=$$ENABLE_HTTPS/" user_config/settings; \
-			ESCAPED_TIMEZONE=$$(echo "$$TIMEZONE_INPUT" | sed 's/\//\\\//g'); \
-			sed -i "s/TIMEZONE=\"[^\"]*\"/TIMEZONE=\"$$ESCAPED_TIMEZONE\"/" user_config/settings; \
-			sed -i "s/RESERVATION_MIN_DURATION=[^[:space:]]*/RESERVATION_MIN_DURATION=$$MIN_DURATION/" user_config/settings; \
-			sed -i "s/RESERVATION_MAX_DURATION=[^[:space:]]*/RESERVATION_MAX_DURATION=$$MAX_DURATION/" user_config/settings; \
 			# Only update DB password if it's not already set \
 			if [ -z "$$EXISTING_DB_PASSWORD" ]; then \
 				DB_PASSWORD=$$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15); \
@@ -238,9 +208,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		UPDATED_SERVER_IP=$$(grep "^SERVER_IP_ADDRESS=" user_config/settings | cut -d'"' -f2); \
 		UPDATED_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
 		UPDATED_WEB_HTTPS=$$(grep "^MAIN_SERVER_WEB_HTTPS=" user_config/settings | cut -d'=' -f2); \
-		UPDATED_TIMEZONE=$$(grep "^TIMEZONE=" user_config/settings | cut -d'"' -f2); \
-		UPDATED_MIN_DURATION=$$(grep "^RESERVATION_MIN_DURATION=" user_config/settings | cut -d'=' -f2); \
-		UPDATED_MAX_DURATION=$$(grep "^RESERVATION_MAX_DURATION=" user_config/settings | cut -d'=' -f2); \
 		\
 		if [ "$$UPDATED_WEB_HTTPS" = "true" ]; then \
 			UPDATED_WEB_ADDRESS="https://$$UPDATED_WEB_HOST"; \
@@ -251,8 +218,6 @@ interactive-settings-creation: # Creates settings file interactively if it doesn
 		echo "  - Server IP: $(GREEN)$$UPDATED_SERVER_IP$(RESET)"; \
 		echo "  - Web Host: $(GREEN)$$UPDATED_WEB_HOST$(RESET)"; \
 		echo "  - Web Address: $(GREEN)$$UPDATED_WEB_ADDRESS$(RESET)"; \
-		echo "  - Timezone: $(GREEN)$$UPDATED_TIMEZONE$(RESET)"; \
-		echo "  - Reservation Duration: $(GREEN)$$UPDATED_MIN_DURATION - $$UPDATED_MAX_DURATION hours$(RESET)"; \
 		echo ""; \
 		echo "What would you like to do?"; \
 		echo "  $(GREEN)1$(RESET) - Proceed with installation using these settings"; \
@@ -303,18 +268,35 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 	@chmod +x scripts/apply_settings.py
 	@$(PYTHON) scripts/apply_settings.py
 
+apply-settings-main-server: # Applies settings for main server context
+	@chmod +x scripts/apply_settings.py
+	@CONTAINERFLY_CONTEXT=main-server $(PYTHON) scripts/apply_settings.py
+
 # Production targets
 
-setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings ## Run this with sudo. Installs and configures all dependencies for main server. Call 'make start-main-server' after setup.
+check-root: # Checks if running with root privileges
+	@if [ "$$(id -u)" -ne 0 ]; then \
+		echo "\n$(RED)Error: This command must be run with sudo privileges. Please run with sudo. Exiting.$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Running with root privileges. Proceeding.$(RESET)"
+
+check-not-root: # Checks if NOT running with root privileges
+	@if [ "$$(id -u)" -eq 0 ]; then \
+		echo "\n$(RED)Error: This command should NOT be run with sudo privileges. Please run without sudo. Exiting.$(RESET)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)Running without root privileges. Proceeding.$(RESET)"
+
+setup-main-server: check-root check-os-ubuntu interactive-settings-creation apply-settings ## Run this with sudo. Installs and configures all dependencies for main server. Call 'make start-main-server' after setup.
 	@echo ""
 	@echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"
-	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."
+	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure iptables firewall rules to secure your server."
 	@echo "true" > /tmp/containerfly_server_type
 	@echo "This will:"
-	@echo "  - Enable UFW firewall with secure defaults"
+	@echo "  - Enable iptables firewall with secure defaults"
 	@echo "  - $(RED)BLOCK ALL incoming connections except:$(RESET)"
 	@echo "    - SSH (22), HTTP (80), HTTPS (443)"
-	@echo "    - Docker Registry (5000)"
 	@PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "2000"); \
 	PORT_END=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_END=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "3000"); \
 	echo "    - Container ports ($$PORT_START-$$PORT_END)"; \
@@ -324,11 +306,12 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	fi; \
 	echo "  - Secure Docker registry and containers"
 	@echo ""
-	@echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing UFW firewall rules!"
+	@echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing iptables firewall rules!"
 	@echo ""
 	@echo "Configure firewall rules automatically?"
 	@echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"
 	@echo "  $(GREEN)n$(RESET) - No, skip firewall configuration (not recommended)"
+	@echo "  NOTE: If you have already configured the firewall in the past, you can skip this step with option $(BOLD)n$(RESET)."
 	@echo -n "Choice (y/n): "; \
 	read FIREWALL_CHOICE; \
 	echo ""; \
@@ -339,15 +322,16 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 	else \
 		echo "$(RED)WARNING: Firewall not configured!$(RESET)"; \
 		echo "Your server may be vulnerable to unauthorized access."; \
-		echo "You can configure it later with: $(BOLD)make apply-firewall-rules$(RESET)"; \
+		echo "You can configure it later by running this command again."; \
 		echo -n "Press Enter to continue with setup anyway..."; \
 		read CONTINUE_ANYWAY; \
 	fi; \
 	echo ""
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
-	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location
-	cd webapp/frontend && sudo -u $${SUDO_USER:-$(shell whoami)} npm install
+	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location -qq
+	@echo "$(GREEN)Installing frontend dependencies (clean install)...$(RESET)"
+	cd webapp/frontend && sudo -u $${SUDO_USER:-$(shell whoami)} sh -c 'rm -rf package-lock.json && rm -rf node_modules || true && npm install'
 
 	# Automatically configure pm2 startup
 	@echo "$(GREEN)Configuring pm2 startup...$(RESET)"
@@ -362,19 +346,23 @@ setup-main-server: check-os-ubuntu interactive-settings-creation apply-settings 
 
 	@echo "\n$(GREEN)$(BOLD)The main server has been setup.$(RESET)\n"
 	@echo "$(GREEN)$(BOLD)NEXT STEPS:$(RESET)"
-	@echo "$(GREEN)* Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
+	@echo "$(GREEN)1. Restart the machine for all changes to take effect.$(RESET)"
+	@echo "$(GREEN)2. Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
 	@rm -f .server_type
 
-start-main-server: verify-config-file-exists apply-settings ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
+start-main-server: check-not-root verify-config-file-exists apply-settings-main-server init-database ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings to restart the Docker utility and apply changes.
+	@echo ""
 	@echo "Moving Caddyfile to /etc/caddy/Caddyfile"
 	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile
 	@echo "Reloading Caddy"
 	@sudo systemctl reload caddy
+	@echo ""
 	@echo "Starting frontend and backend"
 	@cd webapp/frontend && pm2 restart frontend 2>/dev/null || pm2 start "npm run production" --name frontend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@cd webapp/backend && pm2 restart backend 2>/dev/null || pm2 start "$(PYTHON) main.py" --name backend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save
 	@URL=$$(grep -o '"url": "[^"]*"' webapp/backend/settings.json | cut -d'"' -f4) && \
+	echo "" && \
 	echo "" && \
 	echo "$(GREEN)$(BOLD)Servers started/restarted!$(RESET)" && \
 	echo "Access at: $(GREEN)$(BOLD)$$URL$(RESET) (can take some time for the server to start)" && \
@@ -386,14 +374,14 @@ start-main-server: verify-config-file-exists apply-settings ## Starts all the ma
 	echo "* If you have not yet setup the Docker utility, run $(GREEN)$(BOLD)sudo make setup-docker-utility$(RESET) to start setting it up.$(RESET)" && \
 	echo ""
 
-setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
+setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
 	@IS_MAIN_SERVER=$$(cat .server_type 2>/dev/null || echo "true"); \
 	if [ "$$IS_MAIN_SERVER" = "false" ]; then \
 		echo ""; \
 		echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"; \
-		echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure UFW firewall rules to secure your server."; \
+		echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure iptables firewall rules to secure your server."; \
 		echo "This will:"; \
-		echo "  - Enable UFW firewall with secure defaults"; \
+		echo "  - Enable iptables firewall with secure defaults"; \
 		echo "  - $(RED)BLOCK ALL incoming connections except:$(RESET)"; \
 		echo "    - SSH (22)"; \
 		PORT_START=$$(grep "^DOCKER_RESERVATION_PORT_RANGE_START=" user_config/settings | cut -d'=' -f2 2>/dev/null || echo "2000"); \
@@ -405,11 +393,12 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 		fi; \
 		echo "  - Secure Docker containers"; \
 		echo ""; \
-		echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing UFW firewall rules!"; \
+		echo "$(RED)WARNING:$(RESET) This will $(RED)RESET$(RESET) any existing iptables firewall rules!"; \
 		echo ""; \
 		echo "Configure firewall rules automatically?"; \
 		echo "  $(GREEN)y$(RESET) - Yes, configure firewall rules (recommended)"; \
 		echo "  $(GREEN)n$(RESET) - No, skip firewall configuration (not recommended)"; \
+		echo "  NOTE: If you have already configured the firewall in the past, you can skip this step with option $(BOLD)n$(RESET)."; \
 		echo -n "Choice (y/n): "; \
 		read FIREWALL_CHOICE; \
 		echo ""; \
@@ -420,7 +409,7 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 		else \
 			echo "$(RED)WARNING: Firewall not configured!$(RESET)"; \
 			echo "Your server may be vulnerable to unauthorized access."; \
-			echo "You can configure it later with: $(BOLD)make apply-firewall-rules$(RESET)"; \
+			echo "You can configure it later by running this command again."; \
 			echo -n "Press Enter to continue with setup anyway..."; \
 			read CONTINUE_ANYWAY; \
 		fi; \
@@ -433,10 +422,19 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
-	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location
+	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location -qq
 	@REAL_USER=$${SUDO_USER:-$$(logname 2>/dev/null || echo $$(whoami))}; \
 	usermod -aG docker $$REAL_USER; \
 	echo "Added user $$REAL_USER to docker group"
+
+	# Set containerfly group permissions on user home directory
+	@echo "$(GREEN)Setting containerfly group permissions on user home directory...$(RESET)"
+	@REAL_USER=$${SUDO_USER:-$$(logname 2>/dev/null || echo $$(whoami))}; \
+	USER_HOME=$$(eval echo ~$$REAL_USER); \
+	echo "Configuring ACL permissions for containerfly group on $$USER_HOME"; \
+	echo "This allows containers to access your home directory when mounted."; \
+	setfacl -m g:containerfly:rwx "$$USER_HOME" 2>/dev/null || echo "Warning: Could not set ACL on home directory"; \
+	echo "Home directory permissions configured for containerfly group."
 
 	# Automatically configure pm2 startup
 	@echo "$(GREEN)Configuring pm2 startup...$(RESET)"
@@ -456,24 +454,26 @@ setup-docker-utility: check-os-ubuntu interactive-docker-settings-creation apply
 	@echo "2. Run $(BOLD)make start-docker-utility$(RESET)$(GREEN) to start the Docker utility.$(RESET)\n"
 	@rm -f .server_type
 
-start-docker-utility: apply-settings ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings or pulling updates to restart the Docker utility and apply changes.
+start-docker-utility: check-not-root apply-settings ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings to restart the Docker utility and apply changes.
+	@echo ""
 	@echo "Verifying that connection to the database can be established..."
 	@CONNECTION_URI=$$(grep '"engineUri"' webapp/backend/settings.json | sed 's/.*"engineUri": "\(.*\)".*/\1/') && \
 	CONNECTION_OK=$$($(PYTHON) scripts/verify_db_connection.py "$$CONNECTION_URI") && \
 	if [ "$$CONNECTION_OK" = "CONNECTION_OK" ]; then \
 		echo "Connection to the database was successful. Proceeding."; \
 	else \
-		echo "\n$(RED)Connection to the database could not be established. Please check that you have the webapp/settings database connection settings properly configured and that connection to the database can be established (firewalls etc...).$(RESET)"; \
+		echo "\n$(RED)Connection to the database could not be established. Please check that you have the webapp/settings database connection settings properly configured and that connection to the database can be established. You need to at least run the command sudo make allow-container-server IP=<IP_ADDRESS> in the main server to allow the container server to access the database.$(RESET)"; \
 		exit 1; \
 	fi
 	@cd webapp/backend && pm2 restart backendDockerUtil 2>/dev/null || pm2 start "$(PYTHON) dockerUtil.py" --name backendDockerUtil --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save
-	@echo "\n$(GREEN)Docker utility is now running.$(RESET)"
+	@echo ""
+	@echo "\n$(GREEN)$(BOLD)Docker utility is now running.$(RESET)"
 	@echo "Containers will now automatically start, stop, and restart on this server."
 	@echo ""
 	@echo "View logs: $(GREEN)$(BOLD)make logs$(RESET)"
 	@echo ""
-	@echo "$(GREEN)Note:$(RESET) Run this task again after changing settings or pulling updates to restart the Docker utility and apply changes."
+	@echo "$(GREEN)Note:$(RESET) Run this task again after changing settings to restart the Docker utility and apply changes."
 	@echo ""
 
 allow-container-server: check-os-ubuntu ## Allows an external given container server to access this main server. For example: make allow-container-server IP=62.151.151.151
@@ -488,8 +488,17 @@ allow-container-server: check-os-ubuntu ## Allows an external given container se
 		exit 1; \
 	fi; \
 	echo "Running as root, proceeding with firewall configuration"; \
-	sudo ufw route insert 1 allow from $(IP) to any port 5000
-	sudo ufw insert 1 allow from $(IP)
+	# Allow IP for general access
+	sudo iptables -I INPUT -s $(IP) -j ACCEPT
+	# Allow IP for Docker registry port 5000 access
+	sudo iptables -I DOCKER-USER -s $(IP) -p tcp --dport 5000 -j ACCEPT
+	sudo iptables -I DOCKER-USER -s $(IP) -p udp --dport 5000 -j ACCEPT
+	
+	# Save iptables rules to make them persistent
+	@echo "Saving iptables rules for persistence..."
+	@mkdir -p /etc/iptables
+	@iptables-save > /etc/iptables/rules.v4
+	@echo "iptables rules saved successfully"
 
 logs: ## View log entries for started servers (pm2)
 	pm2 logs --lines 10000
@@ -509,10 +518,10 @@ stop-servers: ## Kills (stops) the frontend, backend and docker utility servers 
 start-dev-frontend: apply-settings
 	cd webapp/frontend && npm run serve
 
-start-dev-backend: apply-settings
+start-dev-backend: apply-settings install-backend-deps init-database
 	cd webapp/backend && $(PYTHON) main.py
 
-start-dev-docker-utility: apply-settings
+start-dev-docker-utility: apply-settings install-backend-deps
 	cd webapp/backend && $(PYTHON) dockerUtil.py
 
 interactive-docker-settings-creation: # Creates Docker utility settings interactively
@@ -715,3 +724,31 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			exit 1; \
 			;; \
 	esac
+
+init-database: ## Initialize database (for both new and existing environments)
+	@echo ""
+	@echo "Initializing database..."
+	@chmod +x $(BACKEND_PATH)/init_database.py
+	@cd $(BACKEND_PATH) && $(PYTHON) init_database.py
+	@echo "Stopping all pm2 processes to prevent database locks..."
+	@pm2 stop all || true
+	@echo ""
+	@echo "Running any pending migrations..."
+	@echo "$(BOLD)NOTE:$(RESET) If migration gets stuck here and does not proceed further, it may be due to container server(s) holding database connections."
+	@echo "    If that happens, then on each container server, run: $(BOLD)pm2 stop all$(RESET). Wait for migration to complete, then run: $(BOLD)pm2 restart all$(RESET) on each container server."
+	@echo ""
+	@cd $(BACKEND_PATH) && alembic upgrade head
+	@echo "$(GREEN)Restarting all pm2 processes...$(RESET)"
+	@pm2 restart all || true
+
+migrate-database: ## Run database migrations
+	@echo "Running database migrations..."
+	@echo "$(BOLD)NOTE:$(RESET) If migration gets stuck, it may be due to container server(s) holding database connections."
+	@echo "$(RED)      On each container server, run: pm2 stop all$(RESET)"
+	@echo "$(RED)      Wait for migration to complete, then run: pm2 restart all$(RESET)"
+	@echo ""
+	@cd $(BACKEND_PATH) && alembic upgrade head
+
+create-migration: ## Create a new database migration (use MESSAGE="your message")
+	@echo "Creating new migration..."
+	@cd $(BACKEND_PATH) && alembic revision --autogenerate -m "$(MESSAGE)"

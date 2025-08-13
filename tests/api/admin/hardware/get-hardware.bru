@@ -1,0 +1,32 @@
+meta {
+  name: Get Hardware
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{root_url}}/admin/hardware
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has hardware data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('hardware');
+    expect(res.body.data.hardware).to.be.an('array');
+  });
+}

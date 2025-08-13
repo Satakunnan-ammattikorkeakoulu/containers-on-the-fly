@@ -1,0 +1,39 @@
+meta {
+  name: Save User
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{root_url}}/admin/save_user
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "userId": 1,
+    "data": {
+      "email": "test@example.com",
+      "firstName": "Test",
+      "lastName": "User",
+      "blacklisted": false,
+      "roles": [1]
+    }
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal(true);
+  });
+}

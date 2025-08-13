@@ -1,4 +1,4 @@
-from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec
+from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs
 from dateutil import parser
 from dateutil.relativedelta import *
 from datetime import timezone, timedelta
@@ -12,6 +12,8 @@ from helpers.auth import HashPassword, IsCorrectPassword
 import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
+from helpers.tables.Role import getRoles, getRoleById, addRole as addRoleHelper, editRole as editRoleHelper, removeRole as removeRoleHelper
+from sqlalchemy import func
 
 def getReservations(filters : ReservationFilters) -> object:
   '''
@@ -24,19 +26,31 @@ def getReservations(filters : ReservationFilters) -> object:
     object: Response object with status, message and data.
   '''
   reservations = []
+  status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
 
   # Limit listing to 90 days
   def timeNow(): return datetime.datetime.now(datetime.timezone.utc)
   minStartDate = timeNow() - timedelta(days=90)
 
   with Session() as session:
+    # First get all reservations for counting
+    count_query = session.query(Reservation)\
+      .filter((Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()) )
+    
+    # Count statuses
+    for reservation in count_query:
+      if reservation.status in status_counts:
+        status_counts[reservation.status] += 1
+    
+    # Now get filtered reservations with all the joins
     query = session.query(Reservation)\
       .options(
         joinedload(Reservation.reservedHardwareSpecs),
         joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
-        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container)
+        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
+        joinedload(Reservation.computer)
       )\
-      .filter(Reservation.startDate > minStartDate )
+      .filter((Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()) )
     if filters.filters["status"] != "":
       query = query.filter( Reservation.status == filters.filters["status"] )
     session.close()
@@ -44,6 +58,7 @@ def getReservations(filters : ReservationFilters) -> object:
   for reservation in query:
     res = ORMObjectToDict(reservation)
     res["userEmail"] = reservation.user.email
+    res["computerName"] = reservation.computer.name
     res["reservedContainer"] = ORMObjectToDict(reservation.reservedContainer)
     res["reservedContainer"]["container"] = ORMObjectToDict(reservation.reservedContainer.container)
     
@@ -76,7 +91,7 @@ def getReservations(filters : ReservationFilters) -> object:
           })
     reservations.append(res)
     
-  return Response(True, "Reservations fetched.", { "reservations": reservations })
+  return Response(True, "Reservations fetched.", { "reservations": reservations, "statusCounts": status_counts })
 
 def saveContainer(containerEdit : ContainerEdit) -> object:
   '''
@@ -160,12 +175,13 @@ def removeContainer(containerId : int) -> object:
 
 def getUsers() -> object:
     '''
-    Returns a list of all users.
+    Returns a list of all users and available roles.
 
     Returns:
         object: Response object with status, message and data.
     '''
     data = []
+    role_user_counts = {}
 
     with Session() as session:
         query = session.query(User)
@@ -175,9 +191,24 @@ def getUsers() -> object:
             addable["email"] = user.email
             addable["roles"] = [role.name for role in user.roles]
             addable["createdAt"] = user.userCreatedAt  # Added createdAt field
+            addable["hasPassword"] = user.password is not None and user.password != ""
             data.append(addable)
+            
+            # Count users per role
+            for role in user.roles:
+                if role.name not in role_user_counts:
+                    role_user_counts[role.name] = 0
+                role_user_counts[role.name] += 1
 
-    return Response(True, "Users fetched successfully", {"users": data})
+    # Get available roles
+    from helpers.tables.Role import getRolesWithMountCounts
+    availableRoles = getRolesWithMountCounts()
+    
+    # Add user counts to each role
+    for role in availableRoles:
+        role["userCount"] = role_user_counts.get(role["name"], 0)
+
+    return Response(True, "Users fetched successfully", {"users": data, "availableRoles": availableRoles})
 
 def getUser(userId: int) -> object:
     '''
@@ -240,7 +271,14 @@ def saveUser(userId: int, data: dict) -> object:
                 return Response(False, "User not found")
             
             user.email = data["email"]
-            if "password" in data and data["password"]:
+            
+            # Check if we should clear the password
+            if "clearPassword" in data and data["clearPassword"]:
+                # Clear both password and salt
+                user.password = ""
+                user.passwordSalt = ""
+            elif "password" in data and data["password"]:
+                # Update password only if provided and not clearing
                 hash = HashPassword(data["password"])
                 user.password = base64.b64encode(hash["hashedPassword"]).decode('utf-8')
                 user.passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
@@ -558,3 +596,555 @@ def editReservation(reservationId : int, endDate : str) -> object:
       session.commit()
 
   return Response(True, "Reservation was edited succesfully.")
+
+def getAllRoles() -> object:
+    '''
+    Returns a list of all roles with mount counts.
+    Returns:
+        object: Response object with status, message and data.
+    '''
+    from helpers.tables.Role import getRolesWithMountCounts
+    data = getRolesWithMountCounts()
+    
+    return Response(True, "Roles fetched successfully.", {"roles": data})
+
+def addRole(name: str) -> object:
+    '''
+    Adds a new role.
+    Parameters:
+        name: The name of the role
+    Returns:
+        object: Response object with status and message
+    '''
+    success, message, role_dict = addRoleHelper(name)
+    if not success:
+        return Response(False, message)
+    return Response(True, message, role_dict)
+
+def editRole(roleId: int, name: str) -> object:
+    '''
+    Edits an existing role.
+    Parameters:
+        roleId: The ID of the role to edit
+        name: The new name for the role
+    Returns:
+        object: Response object with status and message
+    '''
+    success, message, role_dict = editRoleHelper(roleId, name)
+    if not success:
+        return Response(False, message)
+    return Response(True, message, role_dict)
+
+def removeRole(roleId: int) -> object:
+    '''
+    Removes a role.
+    Parameters:
+        roleId: The ID of the role to remove
+    Returns:
+        object: Response object with status and message
+    '''
+    success, message = removeRoleHelper(roleId)
+    if not success:
+        return Response(False, message)
+    return Response(True, message)
+
+def getRoleMounts(roleId: int) -> object:
+    '''
+    Gets all mounts for a specific role.
+    
+    Parameters:
+        roleId: The ID of the role to get mounts for
+        
+    Returns:
+        object: Response object with status, message and data containing mounts
+    '''
+    try:
+        from helpers.tables.Role import getRoleMounts as getRoleMountsHelper
+        mounts = getRoleMountsHelper(roleId)
+        return Response(True, "Role mounts retrieved successfully", {"mounts": mounts})
+    except Exception as e:
+        return Response(False, f"Error retrieving role mounts: {str(e)}")
+
+def saveRoleMounts(roleId: int, mounts: list) -> object:
+    '''
+    Saves role mounts, replacing existing ones.
+    
+    Parameters:
+        roleId: The ID of the role
+        mounts: List of mount dictionaries
+        
+    Returns:
+        object: Response object with status and message
+    '''
+    try:
+        from helpers.tables.Role import saveRoleMounts as saveRoleMountsHelper
+        success, message = saveRoleMountsHelper(roleId, mounts)
+        return Response(success, message)
+    except Exception as e:
+        return Response(False, f"Error saving role mounts: {str(e)}")
+
+def getRoleHardwareLimits(roleId: int) -> object:
+    '''
+    Retrieves hardware limits for a specific role.
+    
+    Parameters:
+        roleId: The ID of the role
+        
+    Returns:
+        object: Response object with hardware limits data
+    '''
+    try:
+        from helpers.tables.Role import getRoleHardwareLimits as getRoleHardwareLimitsHelper
+        limits = getRoleHardwareLimitsHelper(roleId)
+        return Response(True, "Role hardware limits retrieved successfully", {"hardwareLimits": limits})
+    except Exception as e:
+        return Response(False, f"Error retrieving role hardware limits: {str(e)}")
+
+def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> object:
+    '''
+    Saves role hardware limits, replacing existing ones.
+    
+    Parameters:
+        roleId: The ID of the role
+        hardwareLimits: List of hardware limit dictionaries
+        
+    Returns:
+        object: Response object with status and message
+    '''
+    try:
+        from helpers.tables.Role import saveRoleHardwareLimits as saveRoleHardwareLimitsHelper
+        success, message = saveRoleHardwareLimitsHelper(roleId, hardwareLimits)
+        return Response(success, message)
+    except Exception as e:
+        return Response(False, f"Error saving role hardware limits: {str(e)}")
+
+def getRoleReservationLimits(roleId: int) -> object:
+    '''
+    Retrieves reservation limits for a specific role.
+    
+    Parameters:
+        roleId: The ID of the role
+        
+    Returns:
+        object: Response object with reservation limits data
+    '''
+    try:
+        from helpers.tables.Role import getRoleReservationLimits as getRoleReservationLimitsHelper
+        limits = getRoleReservationLimitsHelper(roleId)
+        return Response(True, "Role reservation limits retrieved successfully", {"reservationLimits": limits})
+    except Exception as e:
+        return Response(False, f"Error retrieving role reservation limits: {str(e)}")
+
+def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> object:
+    '''
+    Saves role reservation limits, replacing existing ones.
+    
+    Parameters:
+        roleId: The ID of the role
+        reservationLimits: Dictionary containing minDuration, maxDuration, and maxActiveReservations
+        
+    Returns:
+        object: Response object indicating success or failure
+    '''
+    try:
+        from helpers.tables.Role import saveRoleReservationLimits as saveRoleReservationLimitsHelper
+        success, message = saveRoleReservationLimitsHelper(roleId, reservationLimits)
+        return Response(success, message)
+    except Exception as e:
+        return Response(False, f"Error saving role reservation limits: {str(e)}")
+
+def getServerMonitoring(computer_id: int) -> object:
+    '''
+    Returns monitoring data (metrics and logs) for a specific server.
+    
+    Args:
+        computer_id (int): The ID of the computer/server.
+        
+    Returns:
+        object: Response object with server monitoring data.
+    '''
+    with Session() as session:
+        # Check if computer exists
+        computer = session.query(Computer).filter(Computer.computerId == computer_id).first()
+        if not computer:
+            return Response(False, "Server not found")
+        
+        # Get server status/metrics
+        status = session.query(ServerStatus).filter(
+            ServerStatus.computerId == computer_id
+        ).first()
+        
+        # Get server logs
+        logs = session.query(ServerLogs).filter(
+            ServerLogs.computerId == computer_id
+        ).all()
+        
+        # Build response
+        monitoring_data = {
+            "computer": {
+                "id": computer.computerId,
+                "name": computer.name,
+                "ip": computer.ip
+            },
+            "isOnline": status.isOnline if status else False,
+            "metrics": None,
+            "logs": {}
+        }
+        
+        # Add metrics if available
+        if status:
+            # Convert uptime seconds to days/hours/minutes
+            uptime_days = 0
+            uptime_hours = 0 
+            uptime_minutes = 0
+            
+            if status.systemUptimeSeconds:
+                uptime_days = status.systemUptimeSeconds // 86400
+                uptime_hours = (status.systemUptimeSeconds % 86400) // 3600
+                uptime_minutes = (status.systemUptimeSeconds % 3600) // 60
+            
+            monitoring_data["metrics"] = {
+                "cpu": {
+                    "usage": status.cpuUsagePercent,
+                    "cores": status.cpuCores
+                },
+                "memory": {
+                    "total": status.memoryTotalBytes,
+                    "used": status.memoryUsedBytes,
+                    "percentage": status.memoryUsagePercent
+                },
+                "disk": {
+                    "total": status.diskTotalBytes,
+                    "used": status.diskUsedBytes,
+                    "free": status.diskFreeBytes,
+                    "percentage": status.diskUsagePercent
+                },
+                "docker": {
+                    "running": status.dockerContainersRunning,
+                    "total": status.dockerContainersTotal
+                },
+                "load": {
+                    "avg1": status.loadAvg1Min,
+                    "avg5": status.loadAvg5Min,
+                    "avg15": status.loadAvg15Min
+                },
+                "uptime": {
+                    "days": uptime_days,
+                    "hours": uptime_hours,
+                    "minutes": uptime_minutes,
+                    "seconds": status.systemUptimeSeconds
+                },
+                "lastUpdated": status.lastUpdatedAt.isoformat() if status.lastUpdatedAt else None
+            }
+            
+            # Add software version information
+            monitoring_data["version"] = {
+                "software": status.softwareVersion,
+                "updated": status.versionUpdatedAt.isoformat() if status.versionUpdatedAt else None
+            }
+        
+        # Add logs
+        for log in logs:
+            monitoring_data["logs"][log.logType] = {
+                "content": log.logContent or "",
+                "lines": log.logLines or 0,
+                "lastUpdated": log.lastUpdatedAt.isoformat() if log.lastUpdatedAt else None
+            }
+        
+        return Response(True, "Server monitoring data retrieved", monitoring_data)
+
+def getServersForMonitoring() -> object:
+    '''
+    Returns a list of all servers/computers available for monitoring.
+    
+    Returns:
+        object: Response object with servers list.
+    '''
+    with Session() as session:
+        computers = session.query(Computer).filter(
+            (Computer.removed == False) | (Computer.removed.is_(None))
+        ).all()
+        
+        servers_list = []
+        for computer in computers:
+            servers_list.append({
+                "id": computer.computerId,
+                "name": computer.name,
+                "address": computer.ip,
+                "public": computer.public
+            })
+        
+        return Response(True, "Servers retrieved successfully", {"servers": servers_list})
+
+def getGeneralSettings() -> object:
+    '''
+    Returns all general admin settings with default values if not set.
+    
+    Returns:
+        object: Response object with all settings organized by section.
+    '''
+    try:
+        from settings_handler import getSetting, getMultipleSettings
+        from helpers.tables.UserAccessControl import getBlacklistedEmails, getWhitelistedEmails
+        
+        # Define all settings with their defaults
+        setting_keys = [
+            'general.applicationName',
+            'general.timezone',
+            'instructions.login',
+            'instructions.reservation', 
+            'instructions.email',
+            'instructions.usernameFieldLabel',
+            'instructions.passwordFieldLabel',
+            'access.blacklistEnabled',
+            'access.whitelistEnabled',
+            'email.smtpServer',
+            'email.smtpPort',
+            'email.smtpUsername',
+            'email.smtpPassword',
+            'email.fromEmail',
+            'email.contactEmail',
+            'email.sendEmail',
+            'notifications.containerAlertsEnabled',
+            'notifications.alertEmails',
+            'auth.loginType',
+            'auth.sessionTimeoutMinutes',
+            'auth.ldap.url',
+            'auth.ldap.usernameFormat',
+            'auth.ldap.passwordFormat',
+            'auth.ldap.domain',
+            'auth.ldap.searchMethod',
+            'auth.ldap.accountField',
+            'auth.ldap.emailField'
+        ]
+        
+        # Get all settings
+        settings_dict = getMultipleSettings(setting_keys)
+        
+        # Get email lists
+        blacklisted_emails = getBlacklistedEmails()
+        whitelisted_emails = getWhitelistedEmails()
+        
+        # Get alert emails from JSON setting
+        alert_emails = settings_dict.get('notifications.alertEmails', [])
+        if isinstance(alert_emails, str):
+            import json
+            try:
+                alert_emails = json.loads(alert_emails)
+            except:
+                alert_emails = []
+        
+        # Build response with defaults
+        response_data = {
+            "general": {
+                "applicationName": settings_dict.get('general.applicationName', 'Containers on the Fly'),
+                "timezone": settings_dict.get('general.timezone', 'UTC'),
+                "loginPageInfo": settings_dict.get('instructions.login', ''),
+                "reservationPageInstructions": settings_dict.get('instructions.reservation', ''),
+                "emailInstructions": settings_dict.get('instructions.email', ''),
+                "usernameFieldLabel": settings_dict.get('instructions.usernameFieldLabel', 'Username'),
+                "passwordFieldLabel": settings_dict.get('instructions.passwordFieldLabel', 'Password')
+            },
+            "access": {
+                "blacklistEnabled": settings_dict.get('access.blacklistEnabled', False),
+                "whitelistEnabled": settings_dict.get('access.whitelistEnabled', False),
+                "blacklistedEmails": blacklisted_emails,
+                "whitelistedEmails": whitelisted_emails
+            },
+            "email": {
+                "smtpServer": settings_dict.get('email.smtpServer', ''),
+                "smtpPort": settings_dict.get('email.smtpPort', 587),
+                "smtpUsername": settings_dict.get('email.smtpUsername', ''),
+                "smtpPassword": settings_dict.get('email.smtpPassword', ''),
+                "fromEmail": settings_dict.get('email.fromEmail', ''),
+                "contactEmail": settings_dict.get('email.contactEmail', '')
+            },
+            "emailEnable": {
+                "sendEmail": settings_dict.get('email.sendEmail', False)
+            },
+            "notifications": {
+                "containerAlertsEnabled": settings_dict.get('notifications.containerAlertsEnabled', False),
+                "alertEmails": alert_emails
+            },
+            "auth": {
+                "loginType": settings_dict.get('auth.loginType', 'password'),
+                "sessionTimeoutMinutes": settings_dict.get('auth.sessionTimeoutMinutes', 1440),
+                "ldap": {
+                    "url": settings_dict.get('auth.ldap.url', ''),
+                    "usernameFormat": settings_dict.get('auth.ldap.usernameFormat', ''),
+                    "passwordFormat": settings_dict.get('auth.ldap.passwordFormat', ''),
+                    "domain": settings_dict.get('auth.ldap.domain', ''),
+                    "searchMethod": settings_dict.get('auth.ldap.searchMethod', ''),
+                    "accountField": settings_dict.get('auth.ldap.accountField', ''),
+                    "emailField": settings_dict.get('auth.ldap.emailField', '')
+                }
+            }
+        }
+        
+        return Response(True, "Settings retrieved successfully", response_data)
+        
+    except Exception as e:
+        return Response(False, f"Error retrieving settings: {str(e)}")
+
+def saveGeneralSettings(section: str, settings: dict) -> object:
+    '''
+    Saves general admin settings for a specific section.
+    
+    Args:
+        section: The section to save (general, access, email, notifications, auth)
+        settings: Dictionary of settings to save
+        
+    Returns:
+        object: Response object indicating success/failure
+    '''
+    try:
+        from settings_handler import setSetting
+        from helpers.tables.UserAccessControl import setBlacklistedEmails, setWhitelistedEmails
+        
+        if section == "general":
+            # Save general application settings
+            if 'applicationName' in settings:
+                setSetting('general.applicationName', settings['applicationName'])
+            if 'timezone' in settings:
+                setSetting('general.timezone', settings['timezone'])
+            
+            # Save instruction settings using new naming scheme
+            if 'loginPageInfo' in settings:
+                setSetting('instructions.login', settings['loginPageInfo'])
+            if 'reservationPageInstructions' in settings:
+                setSetting('instructions.reservation', settings['reservationPageInstructions'])
+            if 'emailInstructions' in settings:
+                setSetting('instructions.email', settings['emailInstructions'])
+            if 'usernameFieldLabel' in settings:
+                setSetting('instructions.usernameFieldLabel', settings['usernameFieldLabel'])
+            if 'passwordFieldLabel' in settings:
+                setSetting('instructions.passwordFieldLabel', settings['passwordFieldLabel'])
+                
+        elif section == "access":
+            # Save access control settings
+            if 'blacklistEnabled' in settings:
+                setSetting('access.blacklistEnabled', settings['blacklistEnabled'])
+            if 'whitelistEnabled' in settings:
+                setSetting('access.whitelistEnabled', settings['whitelistEnabled'])
+            if 'blacklistedEmails' in settings:
+                setBlacklistedEmails(settings['blacklistedEmails'])
+            if 'whitelistedEmails' in settings:
+                setWhitelistedEmails(settings['whitelistedEmails'])
+                
+        elif section == "email":
+            # Save email configuration
+            if 'smtpServer' in settings:
+                setSetting('email.smtpServer', settings['smtpServer'])
+            if 'smtpPort' in settings:
+                setSetting('email.smtpPort', settings['smtpPort'])
+            if 'smtpUsername' in settings:
+                setSetting('email.smtpUsername', settings['smtpUsername'])
+            if 'smtpPassword' in settings:
+                setSetting('email.smtpPassword', settings['smtpPassword'])
+            if 'fromEmail' in settings:
+                setSetting('email.fromEmail', settings['fromEmail'])
+                
+        elif section == "contact":
+            # Save contact email separately
+            if 'contactEmail' in settings:
+                setSetting('email.contactEmail', settings['contactEmail'])
+                
+        elif section == "emailEnable":
+            # Save email enable setting
+            if 'sendEmail' in settings:
+                setSetting('email.sendEmail', settings['sendEmail'])
+                
+        elif section == "notifications":
+            # Save notification settings
+            if 'containerAlertsEnabled' in settings:
+                setSetting('notifications.containerAlertsEnabled', settings['containerAlertsEnabled'])
+            if 'alertEmails' in settings:
+                setSetting('notifications.alertEmails', settings['alertEmails'])
+        
+        elif section == "auth":
+            # Save authentication settings
+            if 'loginType' in settings:
+                setSetting('auth.loginType', settings['loginType'])
+            if 'sessionTimeoutMinutes' in settings:
+                timeout = 1440 if not settings['sessionTimeoutMinutes'] else settings['sessionTimeoutMinutes']
+                setSetting('auth.sessionTimeoutMinutes', timeout)
+                
+            # Save LDAP settings if they exist
+            if 'ldap' in settings and isinstance(settings['ldap'], dict):
+                ldap_settings = settings['ldap']
+                if 'url' in ldap_settings:
+                    setSetting('auth.ldap.url', ldap_settings['url'])
+                if 'usernameFormat' in ldap_settings:
+                    setSetting('auth.ldap.usernameFormat', ldap_settings['usernameFormat'])
+                if 'passwordFormat' in ldap_settings:
+                    setSetting('auth.ldap.passwordFormat', ldap_settings['passwordFormat'])
+                if 'domain' in ldap_settings:
+                    setSetting('auth.ldap.domain', ldap_settings['domain'])
+                if 'searchMethod' in ldap_settings:
+                    setSetting('auth.ldap.searchMethod', ldap_settings['searchMethod'])
+                if 'accountField' in ldap_settings:
+                    setSetting('auth.ldap.accountField', ldap_settings['accountField'])
+                if 'emailField' in ldap_settings:
+                    setSetting('auth.ldap.emailField', ldap_settings['emailField'])
+                
+        else:
+            return Response(False, f"Unknown section: {section}")
+            
+        return Response(True, f"Settings for {section} saved successfully")
+        
+    except Exception as e:
+        return Response(False, f"Error saving settings: {str(e)}")
+
+def sendTestEmail(email: str) -> object:
+    '''
+    Sends a test email to verify SMTP configuration.
+    
+    Args:
+        email: Email address to send test to
+        
+    Returns:
+        object: Response object indicating success/failure
+    '''
+    try:
+        from settings_handler import getSetting
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        
+        # Get SMTP settings
+        smtp_server = getSetting('email.smtpServer')
+        smtp_port = getSetting('email.smtpPort')
+        smtp_username = getSetting('email.smtpUsername')
+        smtp_password = getSetting('email.smtpPassword')
+        from_email = getSetting('email.fromEmail')
+        
+        if not all([smtp_server, smtp_port, smtp_username, smtp_password, from_email]):
+            return Response(False, "SMTP configuration is incomplete. Please configure all SMTP settings first.")
+        
+        # Create message
+        msg = MIMEMultipart()
+        msg['From'] = from_email
+        msg['To'] = email
+        msg['Subject'] = "Test Email from Container Reservation System"
+        
+        body = """
+        This is a test email from your Container Reservation System.
+        
+        If you receive this email, your SMTP configuration is working correctly.
+        
+        This email was sent from the admin general settings page.
+        """
+        
+        msg.attach(MIMEText(body, 'plain'))
+        
+        # Send email
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.send_message(msg)
+        server.quit()
+        
+        return Response(True, f"Test email sent successfully to {email}")
+        
+    except Exception as e:
+        return Response(False, f"Failed to send test email: {str(e)}")

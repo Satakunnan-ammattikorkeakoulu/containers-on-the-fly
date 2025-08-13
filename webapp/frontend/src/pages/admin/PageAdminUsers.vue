@@ -13,12 +13,42 @@
       </v-col>
     </v-row>
 
-    <v-row v-if="!isFetching">
+    <!-- Filters -->
+    <v-row class="text-center row-filters justify-center">
+      <v-col cols="12" md="3">
+        <v-select
+          :items="roleItems"
+          label="Role"
+          v-model="filters.role"
+          item-text="text"
+          item-value="value"
+          @change="applyFilters"
+        ></v-select>
+      </v-col>
+      <v-col cols="12" md="3">
+        <v-text-field
+          v-model="filters.email"
+          label="Email"
+          clearable
+          @input="applyFilters"
+        ></v-text-field>
+      </v-col>
+      <v-col cols="12" md="3">
+        <v-text-field
+          v-model="filters.userId"
+          label="User ID"
+          clearable
+          @input="applyFilters"
+        ></v-text-field>
+      </v-col>
+    </v-row>
+
+    <v-row v-if="!isFetching" style="margin-top: 0px">
       <v-col cols="12">
-        <div v-if="users && users.length > 0" style="margin-top: 50px">
-          <AdminUsersTable v-on:emitEditUser="editUser" v-bind:propItems="users" />
+        <div v-if="filteredUsers && filteredUsers.length > 0">
+          <AdminUsersTable v-on:emitEditUser="editUser" v-bind:propItems="filteredUsers" />
         </div>
-        <p v-else class="dim text-center">No users.</p>
+        <p v-else class="dim text-center">{{ users.length > 0 ? 'No users match the filters.' : 'No users.' }}</p>
       </v-col>
     </v-row>
     <v-row v-else>
@@ -54,11 +84,30 @@ export default {
     intervalFetch: null,
     isFetching: false,
     users: [],  // Changed from data to users
+    filteredUsers: [],
+    availableRoles: [],
     selectedItem: undefined,
     dialog: false,
     dialogKey: new Date().getTime(),
     tableName: "users",
+    filters: {
+      userId: '',
+      email: '',
+      role: 'All'
+    }
   }),
+  computed: {
+    roleItems() {
+      const items = [{text: `All (${this.users.length})`, value: 'All'}];
+      if (this.availableRoles) {
+        items.push(...this.availableRoles.map(role => ({
+          text: `${role.name} (${role.userCount || 0})`,
+          value: role.name
+        })));
+      }
+      return items;
+    }
+  },
   mounted () {
     this.isFetching = true;
     this.fetch();
@@ -94,6 +143,8 @@ export default {
       .then(function (response) {
         if (response.data.status == true) {
           _this.users = response.data.data[_this.tableName];  // Changed from data to users
+          _this.availableRoles = response.data.data.availableRoles || [];
+          _this.applyFilters();
         } else {
           console.log("Failed getting "+_this.tableName+"...");
           _this.$store.commit('showMessage', { text: "There was an error getting "+_this.tableName+".", color: "red" });
@@ -111,6 +162,35 @@ export default {
         }
         _this.isFetching = false;
       });
+    },
+    applyFilters() {
+      let filtered = this.users;
+      
+      // Filter by User ID
+      if (this.filters.userId && this.filters.userId.trim() !== '') {
+        filtered = filtered.filter(user => 
+          user.userId.toString().toLowerCase().includes(this.filters.userId.toLowerCase().trim())
+        );
+      }
+      
+      // Filter by Email
+      if (this.filters.email && this.filters.email.trim() !== '') {
+        filtered = filtered.filter(user => 
+          user.email.toLowerCase().includes(this.filters.email.toLowerCase().trim())
+        );
+      }
+      
+      // Filter by Role
+      if (this.filters.role && this.filters.role !== 'All') {
+        filtered = filtered.filter(user => {
+          if (Array.isArray(user.roles)) {
+            return user.roles.includes(this.filters.role);
+          }
+          return user.roles === this.filters.role;
+        });
+      }
+      
+      this.filteredUsers = filtered;
     }
   },
   beforeDestroy() {
@@ -122,5 +202,10 @@ export default {
 <style scoped lang="scss">
 .loading {
   margin: 60px auto;
+}
+
+.row-filters {
+  margin-top: 50px;
+  margin-bottom: 0px;
 }
 </style>

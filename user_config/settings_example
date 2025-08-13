@@ -12,9 +12,6 @@
 # THESE ARE ALL MANDATORY TO BE SET
 ###
 
-# Name of your application (displayed in the web interface)
-APP_NAME="Containers on the Fly"
-
 # The IP address of this server.
 SERVER_IP_ADDRESS="YOUR_IP_HERE"
 
@@ -34,16 +31,6 @@ MAIN_SERVER_WEB_HTTPS=false
 CUSTOM_SSL_ENABLED=false
 CUSTOM_SSL_CERT_PATH="/path/to/your/certificate.crt"
 CUSTOM_SSL_KEY_PATH="/path/to/your/private.key"
-
-# Minimum and maximum duration (in hours) for a container reservation.
-# Default: minimum 5, maximum 72
-# For example, with the default settings, user needs to reserve the container for at least 5 hours 
-# but can reserve it for a maximum of 72 hours.
-RESERVATION_MIN_DURATION=5
-RESERVATION_MAX_DURATION=72
-
-# Timezone in TZ format, view all available timezones from here: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
-TIMEZONE="Europe/Helsinki"
 
 
 ###
@@ -76,21 +63,6 @@ MARIADB_DB_USER="containerflyuser"
 MARIADB_DB_USER_PASSWORD="password"
 
 ###
-# EMAIL CONFIGURATION
-###
-
-# Email address which is shown for support contacts
-CONTACT_EMAIL="support@foo.com"
-
-# SMTP settings for sending notification emails (optional)
-# Set ENABLE_EMAIL_NOTIFICATIONS to true to enable email notifications
-ENABLE_EMAIL_NOTIFICATIONS=false
-SMTP_SERVER="smtp.office365.com"
-SMTP_PORT=587
-SMTP_USERNAME="email@test.com"
-SMTP_PASSWORD="abc123"
-
-###
 # DOCKER CONFIGURATIONS
 ###
 
@@ -116,60 +88,10 @@ DOCKER_RESERVATION_PORT_RANGE_END=3000
 # If you are creating another container server, then you can change this value to something else, like "server2"
 DOCKER_SERVER_NAME="server1"
 
-# Additionally, if you want your users to persistently store files and folders,
-# you can specify here the full path in the host operating system where the files are stored at.
-# Each user will have a folder in this location for saving persistent data, with the user's email (special characters removed) as the folder name.
-# For example: "/home/containerfly/persistent_mounts"
-# It could then store user test@foo.com data as: "/home/containerfly/persistent_mounts/test_foo_com/"
-DOCKER_USER_MOUNT_LOCATION=""
-
-# With this you can also mount one or many additional folders to the container.
-# mountLocation is the full path to the location on the host system where the folder is located.
-# containerFolderName is the name of the folder in the container under the user. For example: /home/user/playground
-# readOnly is a boolean value. If set to true, the folder will be mounted as read-only.
-# DOCKER_EXTRA_MOUNTS='[{"mountLocation": "/home/containerfly/playground", "containerFolderName": "playground", "readOnly": false}, {"mountLocation": "/home/containerfly/shared_read_only", "containerFolderName": "read_only", "readOnly": true}]'
-
-# User in the host system who will own the mounted folder. This needs to exist.
-# This is usually the current user which has the server running or root.
-# Default: "root"
-DOCKER_MOUNT_USER="root"
-
-# Group in the host system who will own the mounted folder.
-# Default: "docker"
-DOCKER_MOUNT_GROUP="docker"
-
-###
-# AUTHENTICATION SETTINGS
-###
-
-# Authentication method: "password" or "ldap"
-# If "password", logins are executed directly with email and password combination
-# If "LDAP", logins are done against an (external) LDAP server
-LOGIN_TYPE="password"
-
-# Below are the settings for LDAP authentication, which you can use if you want to use LDAP for authentication.
-# LDAP settings
-# LOGIN_TYPE="LDAP"
-# LDAP_URL="ldaps://your-ldap-server-address"
-# LDAP_USERNAME_FORMAT="{username}@ad.local"
-# LDAP_PASSWORD_FORMAT="{password}"
-# LDAP_DOMAIN="dc=ad,dc=local"
-# LDAP_SEARCH_METHOD="(sAMAccountName={username})"
-# LDAP_ACCOUNT_FIELD="sAMAccountName"
-# LDAP_EMAIL_FIELD="mail"
-
-# If enabled, user email will need to be found in Whitelist table in the server to login.
-USE_WHITELIST=false
-
-# Minutes how long the user is logged in until logged out automatically
-SESSION_TIMEOUT_MINUTES=1440
-
 ###
 # ADVANCED SETTINGS
 ###
 
-# Optional text added to the beginning of notification emails
-EMAIL_GENERAL_TEXT=""
 
 # Can be used to set an additional port for the backend that the frontend connects to when making API calls from the browser.
 # Useful when the backend is running in development environment port (like 8000)
@@ -189,6 +111,11 @@ DATABASE_DEBUG=false
 # Set to true to add test data (like, admin user, computer, and test container) when the server starts
 # Recommended to always keep this on, and then manually remove the test data after setup.
 ADD_TEST_DATA=true
+
+# Set to true to skip actual GPU device dedication (for testing without real GPUs)
+# When enabled, GPU reservation logic runs but containers won't have GPU access
+# Default: false (production mode - actually dedicates GPUs to containers)
+DEBUG_SKIP_GPU_DEDICATION=false
 
 # Docker container shared memory size (e.g., "1g")
 DOCKER_SHM_SIZE="1g"

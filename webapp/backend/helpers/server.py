@@ -4,10 +4,7 @@ from sqlalchemy import inspect
 from sqlalchemy.ext.hybrid import hybrid_property
 from helpers.auth import *
 from database import User, Session
-import requests
-import json
-from os import sys
-from settings import settings
+from settings_handler import settings_handler
 
 def Response(status, message, extraData = None):
   response = {
@@ -31,11 +28,30 @@ def ForceAuthentication(token: str, roleRequired: str = None) -> Union[bool,HTTP
   if (IsLoggedIn(token)):
     if roleRequired is not None:
       with Session() as session:
-        user = session.query(User).filter( User.loginToken == token ).first()
-      if GetRole(user.email) == roleRequired:
-        return True
+        from sqlalchemy.orm import joinedload
+        user = session.query(User).options(joinedload(User.roles)).filter( User.loginToken == token ).first()
+      # Check if user has the required role
+      if roleRequired == "admin":
+        # Use IsAdmin function which properly checks all roles
+        if IsAdmin(user.userId):
+          return True
+        else:
+          wrongRole = True
       else:
-        wrongRole = True
+        # For non-admin roles, check if it's the primary role or in the roles list
+        if GetRole(user.email) == roleRequired:
+          return True
+        else:
+          # Also check if the role is in user's roles list
+          hasRole = False
+          for role in user.roles:
+            if role.name == roleRequired:
+              hasRole = True
+              break
+          if hasRole:
+            return True
+          else:
+            wrongRole = True
     else:
       return True
   
@@ -65,37 +81,3 @@ def ORMObjectToDict(self):
             dict_[key] = getattr(self, key)
     return dict_
 
-def CheckIp(ip):
-  if "allowedIpAddresses" in settings.admincli: # Check whether the list exists
-    if len(settings.admincli["allowedIpAddresses"])>0 and ip not in settings.admincli["allowedIpAddresses"]:
-      raise HTTPException(
-        status_code = status.HTTP_403_FORBIDDEN,
-        detail = "IP not found in allowed ip list in settings.json. Refusing access.",
-        headers = {"WWW-Authenticate": "Bearer"})
-    else: return True
-  else: return True
-
-def CallAdminAPI(method, endpoint, token = "", params = {}, data = {}, headers=True):
-  if headers == True: headers = {"Authorization": "Bearer " + token}
-  else: headers = {}
-  if "address" not in settings.admincli: # Check whether the address exists in settings
-    print("\nAdmin API Call Failed Exiting App...")
-    print("No address specified in settings.json")
-    sys.exit()
-  if method == "get":
-    response = requests.get("http://" + settings.admincli["address"] + "/api/" + endpoint,
-                            params=params, headers=headers)
-  elif method == "post":
-    response = requests.post("http://" + settings.admincli["address"] + "/api/" + endpoint,
-                            data=data, headers=headers)
-  #print(response.text)
-  if response.ok != True:
-    if response.status_code == 500:
-      print("Internal Server Error")
-      sys.exit()
-    print("\nAdmin API Call Failed Exiting App...")
-    print(json.loads(response.text)["detail"])
-    sys.exit()
-
-  data = json.loads(response.text)
-  return data

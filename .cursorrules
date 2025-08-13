@@ -48,6 +48,12 @@
 - Admin-only endpoint protection with role checking
 
 ### Database Patterns
+# Database System:
+- MariaDB with SQLAlchemy ORM + PyMySQL driver
+- Connection pooling configured for scalability
+- UTF8MB4 character set with unicode_ci collation
+- InnoDB engine for transaction support
+
 # When making database changes:
 - Update models in database.py first
 - Add helper functions in helpers/tables/
@@ -56,6 +62,25 @@
 - Add migrations carefully since this affects production data
 - Follow existing patterns for created/updated timestamps
 - Use proper indexing for performance
+- Consider MariaDB specifics:
+  * Use TIMESTAMP(6) for microsecond precision
+  * TEXT fields for variable strings
+  * Watch index key length limits
+  * Choose appropriate column types
+
+# Database Migration Process:
+- Use `make create-migration MESSAGE="message"` for new migrations
+- Use `make migrate-database` to apply migrations
+- Review migration files in backend/alembic/versions/
+- Test migrations locally before committing
+- Never edit migrations after production deployment
+- Always backup production database first
+- Keep migrations atomic (one change per migration)
+- Include both upgrade and downgrade paths
+- Consider MariaDB-specific migration impacts:
+  * Lock times during schema changes
+  * Table size impact on migration duration
+  * Online schema changes when possible
 
 ### API Endpoint Patterns
 # For new endpoints:
@@ -84,6 +109,17 @@
 - Use scripts/apply_settings.py for template processing
 - Follow existing Make targets for deployment
 - Consider backwards compatibility for existing installations
+
+# Backend Settings Architecture:
+- Settings handler: webapp/backend/settings_handler.py (unified interface)
+- Settings schema: webapp/backend/settings_schema.py (all settings definitions)
+- Two types of settings:
+  * File-based: Infrastructure config in settings.json (ports, IPs, paths)
+  * Database: Runtime config in SystemSetting table (emails, features)
+- Always add new settings to settings_schema.py with proper type and default
+- Access settings: settings_handler.getSetting("category.settingName")
+- File settings workflow: settings_example → apply_settings.py → backend_settings.json
+- Boolean settings need to be added to bool_settings list in apply_settings.py
 
 ### Development Commands
 # Common development workflows:
@@ -154,3 +190,50 @@ webapp/
 - user_config/settings (use settings_example)
 - webapp/backend/settings.json
 - Any files with real passwords/tokens
+
+### Version Management
+# The project maintains a .version file in the root directory to track releases.
+# When making code changes, always ask: "Should I update the .version file?"
+
+# Version file format:
+version: X.Y.Z
+updated: YYYY-MM-DD HH:MM:SS UTC
+
+# When to update version:
+- After bug fixes or minor improvements
+- After new features or functionality
+- After configuration changes
+- After database schema changes  
+- After API endpoint modifications
+- After UI/UX improvements
+- After performance optimizations
+- After security updates
+
+# Version increment rules:
+# Patch version (Z): Increment by 0.0.1 for:
+- Bug fixes
+- Minor improvements
+- Documentation updates
+- Small configuration changes
+
+# Version number limits:
+- Patch version can exceed 9 (e.g., 1.0.26 is valid)
+- Maximum patch version is 99
+- When reaching 100, roll over to next minor version (1.0.100 → 1.1.0)
+
+# Minor version (Y): Increment for:
+- New features
+- Significant improvements  
+- Non-breaking API changes
+- Major refactoring
+
+# Major version (X): Increment for:
+- Breaking changes
+- Major architectural changes
+- Incompatible API modifications
+
+# Example version progression:
+- 1.0.0 → 1.0.1 (bug fix)
+- 1.0.9 → 1.0.10 (continues past 9)
+- 1.0.99 → 1.1.0 (rollover at 100)
+- 1.9.99 → 2.0.0 (major version bump)

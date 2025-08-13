@@ -1,0 +1,50 @@
+meta {
+  name: Get Public Config
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{root_url}}/app/config
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has data object", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.be.an('object');
+  });
+  
+  test("Config has required fields", function() {
+    const data = res.body.data;
+    expect(data).to.have.property('branding');
+    expect(data).to.have.property('loginForm');
+    expect(data).to.have.property('privacyNoticeUrl');
+  });
+  
+  test("Branding has required fields", function() {
+    const branding = res.body.data.branding;
+    expect(branding).to.have.property('applicationName');
+    expect(branding).to.have.property('tagLine');
+    expect(branding).to.have.property('favicon');
+    expect(branding).to.have.property('logo');
+  });
+  
+  test("Login form configuration is valid", function() {
+    const loginForm = res.body.data.loginForm;
+    expect(loginForm).to.have.property('showEmailLogin');
+    expect(loginForm).to.have.property('showLdapLogin');
+    expect(loginForm.showEmailLogin).to.be.a('boolean');
+    expect(loginForm.showLdapLogin).to.be.a('boolean');
+  });
+}

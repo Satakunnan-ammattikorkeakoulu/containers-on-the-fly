@@ -1,0 +1,54 @@
+meta {
+  name: Create Reservation
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{root_url}}/reservation/create_reservation
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user_token}}
+}
+
+params:query {
+  date: 2025-02-01T10:00:00
+  duration: 2
+  computerId: 1
+  containerId: 1
+  adminReserveUserEmail: null
+  description: Test reservation from Bruno
+}
+
+body:json {
+  {
+    "cpus": 2,
+    "gpus": [],
+    "ram": 4
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+  
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal('success');
+  });
+  
+  test("Response has reservation data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('reservationId');
+    expect(res.body.data).to.have.property('message');
+  });
+  
+  test("Reservation ID is a number", function() {
+    expect(res.body.data.reservationId).to.be.a('number');
+    expect(res.body.data.reservationId).to.be.greaterThan(0);
+  });
+}

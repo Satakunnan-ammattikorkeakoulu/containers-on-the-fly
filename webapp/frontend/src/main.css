@@ -57,3 +57,25 @@ body .section {
 .v-textarea.v-input--is-readonly .v-input__slot::after {
   border: 0px !important;
 }
+
+.theme--dark.v-data-table>.v-data-table__wrapper>table>tbody>tr:hover:not(.v-data-table__expanded__content):not(.v-data-table__empty-wrapper) {
+  background: #181818 !important;
+}
+
+.v-event-timed-container {
+  text-align: center;
+}
+
+.v-tooltip__content {
+  opacity: 1 !important;
+  background-color: #37393f !important;
+  color: white !important;
+}
+
+.v-text-field .v-label {
+  font-size: .875rem;
+}
+
+.v-select__selection.v-select__selection--comma {
+  font-size: .900rem;
+}

@@ -10,13 +10,10 @@
     components: {
     },
     mounted() {
-      let _this = this
-      /* eslint-disable-next-line */
-      this.$store.commit("logoutUser", { callback: (res) => {
-        console.log("logged out...")
-        _this.$router.push("/")
-      }})
-      
+      // Logout user and redirect immediately
+      this.$store.commit("logoutUser")
+      console.log("logged out...")
+      this.$router.push("/")
     },
   }
 </script>

@@ -4,7 +4,7 @@
     <v-row class="text-center">
       <v-col cols="12">
         <h4>Admin</h4>
-        <h2>All Containers</h2>
+        <h2>All Containers (Images)</h2>
       </v-col>
     </v-row>
 

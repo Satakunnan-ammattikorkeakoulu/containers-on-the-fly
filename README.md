@@ -21,19 +21,19 @@ This project has been featured in the following academic publications:
 *Click on any image to view full size*
 
 <a href="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/front.jpg" target="_blank">
-  <img width="380" alt="Front Page of the Application" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/front.jpg">
+  <img width="370" alt="Front Page of the Application" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/front.jpg">
 </a>
 
 <a href="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/reservations.jpg" target="_blank">
-  <img width="380" alt="Reservation Calendar" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/reservations.jpg">
+  <img width="370" alt="Reservation Calendar" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/reservations.jpg">
 </a>
 
 <a href="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/admin_computers.jpg" target="_blank">
-  <img width="380" alt="Admin Management Interface - Computers" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/admin_computers.jpg">
+  <img width="370" alt="Admin Management Interface - Computers" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/admin_computers.jpg">
 </a>
 
 <a href="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/reserve.jpg" target="_blank">
-  <img width="380" alt="Reservation View" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/reserve.jpg">
+  <img width="370" alt="Reservation View" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/reserve.jpg">
 </a>
 
 # Table of Contents

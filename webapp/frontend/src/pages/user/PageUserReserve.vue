@@ -574,13 +574,21 @@
           return
         }
 
-        let max = 1;
+        let max = 1; // Default fallback
+        
+        // Look for the "gpus" summary spec which contains the computer-specific maximum
+        let gpusSummarySpec = null
+        
         this.hardwareData.forEach((spec) => {
-          if (spec.type === "gpu") {
-            // Use the individual GPU limit, not the summary
-            max = spec.maximumAmountForUser
+          if (spec.type === "gpus") {
+            gpusSummarySpec = spec
           }
         })
+
+        // Use the computer-specific GPU limit from the "gpus" summary spec
+        if (gpusSummarySpec) {
+          max = gpusSummarySpec.maximumAmountForUser
+        }
 
         if (this.selectedgpus.length > max) {
           this.$store.commit('showMessage', { text: `Maximum of ${max} GPUs can be selected.`, color: "red" })

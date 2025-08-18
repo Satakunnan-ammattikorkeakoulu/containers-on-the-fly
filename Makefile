@@ -288,7 +288,7 @@ check-not-root: # Checks if NOT running with root privileges
 	fi
 	@echo "$(GREEN)Running without root privileges. Proceeding.$(RESET)"
 
-setup-main-server: check-root check-os-ubuntu interactive-settings-creation apply-settings ## Run this with sudo. Installs and configures all dependencies for main server. Call 'make start-main-server' after setup.
+setup-main-server: check-root check-os-ubuntu interactive-settings-creation apply-settings-main-server ## Run this with sudo. Installs and configures all dependencies for main server. Call 'make start-main-server' after setup.
 	@echo ""
 	@echo "$(GREEN)$(BOLD)FIREWALL CONFIGURATION$(RESET)"
 	@echo "$(GREEN)HIGHLY RECOMMENDED:$(RESET) Configure iptables firewall rules to secure your server."

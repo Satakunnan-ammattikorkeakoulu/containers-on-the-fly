@@ -34,8 +34,12 @@ def send_email(to, mail_subject, mail_body):
     mimemsg['Subject'] = mail_subject
     mimemsg.attach(MIMEText(mail_body, 'plain'))
     try:
-        connection = smtplib.SMTP(host = smtpAddress, port = smtpPort)
-        connection.starttls()
+        # Use SSL/TLS for port 465, STARTTLS for other ports (typically 587)
+        if smtpPort == 465:
+            connection = smtplib.SMTP_SSL(host = smtpAddress, port = smtpPort)
+        else:
+            connection = smtplib.SMTP(host = smtpAddress, port = smtpPort)
+            connection.starttls()
         connection.login(username,password)
         connection.send_message(mimemsg)
         connection.quit()

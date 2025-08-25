@@ -1138,8 +1138,12 @@ def sendTestEmail(email: str) -> object:
         msg.attach(MIMEText(body, 'plain'))
         
         # Send email
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
+        # Use SSL/TLS for port 465, STARTTLS for other ports (typically 587)
+        if smtp_port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
         server.login(smtp_username, smtp_password)
         server.send_message(msg)
         server.quit()

@@ -198,7 +198,7 @@ def start_container(pars):
             'volumes': volumes,
             'name': container_name,
             'memory': pars['memory'],
-            'kernel_memory': pars['memory'],
+            'memory': pars['memory'],
             'shm_size': pars['shm_size'],
             'cpus': pars['cpus'],
             'publish': pars['ports'],

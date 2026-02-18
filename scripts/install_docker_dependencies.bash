@@ -88,7 +88,7 @@ else
     echo -e "${GREEN}Group 'containerfly' already exists.${RESET}"
 fi
 
-sudo ubuntu-drivers install nvidia:570-server #-qq >/dev/null 2>&1
+sudo ubuntu-drivers install nvidia:570-server-open #-qq >/dev/null 2>&1
 
 # Add Docker's official GPG key if it's not already added
 if [ ! -f /etc/apt/keyrings/docker.gpg ]; then

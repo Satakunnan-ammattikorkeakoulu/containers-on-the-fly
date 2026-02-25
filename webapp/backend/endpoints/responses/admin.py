@@ -521,6 +521,7 @@ def saveComputer(computerEdit : ComputerEdit) -> object:
             spec.maximumAmountForUser = computerEdit.data.get("hardware").get("gpu").get("maximumAmountForUser")
         # Remove all removable GPUs
         for spec in computerEdit.data.get("removedGPUs", []):
+          session.query(ReservedHardwareSpec).filter(ReservedHardwareSpec.hardwareSpecId == spec).delete()
           session.query(HardwareSpec).filter(HardwareSpec.hardwareSpecId == spec).delete()
         # Add all new GPUs
         for gpu in computerEdit.data.get("hardware").get("gpus", []):

@@ -4,6 +4,7 @@ from helpers.server import api_response
 from helpers.auth import create_login_token, hash_password, is_correct_password, check_token, get_ldap_user, get_role
 from fastapi import HTTPException, status
 from datetime import datetime, timezone
+from sqlalchemy import select
 import base64
 
 def login(username, password):
@@ -12,7 +13,7 @@ def login(username, password):
       Parameters:
         username: Email address
         password: Password
-      
+
       Returns:
         If login was successful, will return back the generated token that user can use further on.
         Otherwise tells that the username or password was invalid.
@@ -27,17 +28,17 @@ def login(username, password):
     use_blacklisting = get_setting('access.blacklistEnabled')
 
     # Look up user by email first for any auth type
-    user = session.query(User).filter(User.email == username).first()
-    
+    user = session.execute(select(User).where(User.email == username)).scalar_one_or_none()
+
     # Check blacklist first - this overrides whitelist and denies access immediately
     if use_blacklisting:
-      blacklist_email = session.query(UserBlacklist).filter(UserBlacklist.email == username).first()
+      blacklist_email = session.execute(select(UserBlacklist).where(UserBlacklist.email == username)).scalar_one_or_none()
       if blacklist_email is not None:
         return api_response(False, "You are not allowed to login (blacklisted).")
 
     # Check whitelist if enabled
     if use_whitelisting:
-      whitelist_email = session.query(UserWhitelist).filter(UserWhitelist.email == username).first()
+      whitelist_email = session.execute(select(UserWhitelist).where(UserWhitelist.email == username)).scalar_one_or_none()
       if whitelist_email is None:
         return api_response(False, "You are not allowed to login (not whitelisted).")
 
@@ -50,32 +51,32 @@ def login(username, password):
         "access_token": user.loginToken,
         "token_type": "bearer"
       }
-    
+
     # Try password authentication
     def try_password_auth():
       # Check if user exists and has password set
       if not user:
         raise HTTPException(status_code=400, detail="User not found.")
-      
+
       if user.password == "" or user.password is None:
         raise HTTPException(status_code=400, detail="User password was not set yet. Please set the password first to login.")
-      
+
       if is_correct_password(base64.b64decode(user.passwordSalt), base64.b64decode(user.password), password) == False:
         raise HTTPException(status_code=400, detail="Incorrect password.")
-      
+
       # Password is correct
       return create_successful_login(user)
-    
+
     # Try LDAP authentication
     def try_ldap_auth():
       ldap_success, response = get_ldap_user(username, password)
       if ldap_success == False:
         return api_response(False, response)
-      
+
       # Get or create user
-      ldap_user = session.query(User).filter(User.userId == response).first()
+      ldap_user = session.execute(select(User).where(User.userId == response)).scalar_one_or_none()
       return create_successful_login(ldap_user)
-    
+
     # Handle different login types
     if login_type == "password":
       return try_password_auth()
@@ -96,10 +97,10 @@ def login(username, password):
             return try_ldap_auth()
           # Re-raise other errors
           raise
-      
+
       # No user or no password set, try LDAP
       return try_ldap_auth()
-    
+
     else:
       # Unknown login type - fall back to password authentication as the safest option
       return try_password_auth()
@@ -109,7 +110,7 @@ def check_user_token(token):
 
       Parameters:
         token: token
-      
+
       Returns:
         If token was ok, returns also back information about the user.
         Otherwise tells that the user is not currently logged in.
@@ -143,15 +144,15 @@ def profile(token):
         token: User login token
   '''
   with Session() as session:
-    user = session.query(User).filter( User.loginToken == token ).first()
-  if user is None: return api_response(False, "User not found.")
-  else:
-    user_details = {}
-    user_details["userId"] = user.userId
-    user_details["email"] = user.email
-    user_details["createdAt"] = user.userCreatedAt
-    user_details["role"] = get_role(user.email)
-    return api_response(True, "User details found", { "user": user_details })
+    user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
+    if user is None: return api_response(False, "User not found.")
+    else:
+      user_details = {}
+      user_details["userId"] = user.userId
+      user_details["email"] = user.email
+      user_details["createdAt"] = user.userCreatedAt
+      user_details["role"] = get_role(user.email)
+      return api_response(True, "User details found", { "user": user_details })
 
 def has_password(token):
   ''' Checks if the user has a password set.
@@ -159,7 +160,7 @@ def has_password(token):
         token: User login token
   '''
   with Session() as session:
-    user = session.query(User).filter(User.loginToken == token).first()
+    user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
     if user is None:
       return api_response(False, "User not found.")
 
@@ -182,7 +183,7 @@ def change_password(token, current_password, new_password):
     return api_response(False, "New password must be at least 5 characters long.")
 
   with Session() as session:
-    user = session.query(User).filter(User.loginToken == token).first()
+    user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
     if user is None:
       return api_response(False, "User not found.")
 

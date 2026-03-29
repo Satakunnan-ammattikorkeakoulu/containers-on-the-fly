@@ -465,7 +465,7 @@ start-docker-utility: check-not-root apply-settings ## Starts the Docker utility
 		echo "\n$(RED)Connection to the database could not be established. Please check that you have the webapp/settings database connection settings properly configured and that connection to the database can be established. You need to at least run the command sudo make allow-container-server IP=<IP_ADDRESS> in the main server to allow the container server to access the database.$(RESET)"; \
 		exit 1; \
 	fi
-	@cd webapp/backend && pm2 restart backendDockerUtil 2>/dev/null || pm2 start "$(PYTHON) docker_util.py" --name backendDockerUtil --log-date-format="YYYY-MM-DD HH:mm Z"
+	@cd webapp/backend && pm2 restart backendDockerUtil 2>/dev/null || pm2 start "$(PYTHON) dockerUtil.py" --name backendDockerUtil --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save
 	@echo ""
 	@echo "\n$(GREEN)$(BOLD)Docker utility is now running.$(RESET)"
@@ -522,7 +522,7 @@ start-dev-backend: apply-settings install-backend-deps init-database
 	cd webapp/backend && $(PYTHON) main.py
 
 start-dev-docker-utility: apply-settings install-backend-deps
-	cd webapp/backend && $(PYTHON) docker_util.py
+	cd webapp/backend && $(PYTHON) dockerUtil.py
 
 interactive-docker-settings-creation: # Creates Docker utility settings interactively
 	@echo ""

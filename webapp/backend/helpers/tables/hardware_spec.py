@@ -1,5 +1,6 @@
 # Hardware specs table management functionality
 from database import HardwareSpec, Session
+from sqlalchemy import select
 
 def get_hardware_specs(filter = None):
   '''
@@ -12,12 +13,12 @@ def get_hardware_specs(filter = None):
   with Session() as session:
     if filter != None:
       try:
-        hardwarespecs = session.query(HardwareSpec).filter(HardwareSpec.hardwareSpecId == int(filter)).first()
+        hardwarespecs = session.execute(select(HardwareSpec).where(HardwareSpec.hardwareSpecId == int(filter))).scalar_one_or_none()
         if hardwarespecs != None: return [hardwarespecs]
         else: return None
       except:
         return None
-    else: hardwarespecs = session.query(HardwareSpec).all()
+    else: hardwarespecs = session.execute(select(HardwareSpec)).scalars().all()
 
     return hardwarespecs
 
@@ -39,9 +40,7 @@ def add_hardware_spec(computerId, type, maxAmount, minAmount, maxUserAmount, def
   with Session() as session:
     session.add(new_hardware_spec)
     session.commit()
-  # So with the other ones, name was unique so I used it to return the new object, but the only unique field this has is it's own id
-  # but I don't really know how to fetch the specific id since it doesnt exist until session.add so I'm not gonna return anything for now
-  return #session.query(HardwareSpec).filter(HardwareSpec.name == name).first()
+  return
 
 def remove_hardware_spec(hardwarespec_id):
   '''
@@ -52,7 +51,7 @@ def remove_hardware_spec(hardwarespec_id):
       Nothing
   '''
   with Session() as session:
-    hardwarespec = session.query(HardwareSpec).filter(HardwareSpec.hardwareSpecId == hardwarespec_id).first()
+    hardwarespec = session.execute(select(HardwareSpec).where(HardwareSpec.hardwareSpecId == hardwarespec_id)).scalar_one_or_none()
     session.delete(hardwarespec)
     session.commit()
 
@@ -70,7 +69,7 @@ def edit_hardware_spec(hardwarespec_id, new_computer_id, new_type, new_max, new_
       The edited hardwarespec object fetched from database. Or None if name or publicity isn't provided.
   '''
   with Session() as session:
-    hardwarespec = session.query(HardwareSpec).filter(HardwareSpec.hardwareSpecId == hardwarespec_id).first()
+    hardwarespec = session.execute(select(HardwareSpec).where(HardwareSpec.hardwareSpecId == hardwarespec_id)).scalar_one_or_none()
     if new_computer_id != None: hardwarespec.computerId = new_computer_id
     if new_type != None: hardwarespec.type = new_type
     if new_max != None: hardwarespec.maximumAmount = new_max

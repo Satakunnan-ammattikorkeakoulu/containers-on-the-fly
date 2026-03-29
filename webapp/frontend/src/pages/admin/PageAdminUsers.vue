@@ -20,9 +20,9 @@
           :items="roleItems"
           label="Role"
           v-model="filters.role"
-          item-text="text"
+          item-title="text"
           item-value="value"
-          @change="applyFilters"
+          @update:model-value="applyFilters"
         ></v-select>
       </v-col>
       <v-col cols="12" md="3">
@@ -68,13 +68,20 @@
 </template>
 
 <script>
-const axios = require('axios').default;
+import axios from 'axios';
 import Loading from '/src/components/global/Loading.vue';
 import AdminUsersTable from '/src/components/admin/AdminUsersTable.vue';
 import AdminManageUserModal from '/src/components/admin/AdminManageUserModal.vue';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: 'PageAdminUsers',
+
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
+
   components: {
     Loading,
     AdminUsersTable,
@@ -133,11 +140,11 @@ export default {
     },
     fetch() {
       let _this = this;
-      let currentUser = this.$store.getters.user;
+      let currentUser = this.store.user;
 
       axios({
         method: "get",
-        url: this.AppSettings.APIServer.admin.get_users,
+        url: this.$appSettings.APIServer.admin.get_users,
         headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
       })
       .then(function (response) {
@@ -147,18 +154,18 @@ export default {
           _this.applyFilters();
         } else {
           console.log("Failed getting "+_this.tableName+"...");
-          _this.$store.commit('showMessage', { text: "There was an error getting "+_this.tableName+".", color: "red" });
+          _this.store.showMessage({ text: "There was an error getting "+_this.tableName+".", color: "red" });
         }
         _this.isFetching = false;
       })
       .catch(function (error) {
         // Error
         if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-          _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          _this.store.showMessage({ text: error.response.data.detail, color: "red" });
         }
         else {
           console.log(error);
-          _this.$store.commit('showMessage', { text: "Unknown error while trying to get "+_this.tableName+".", color: "red" });
+          _this.store.showMessage({ text: "Unknown error while trying to get "+_this.tableName+".", color: "red" });
         }
         _this.isFetching = false;
       });

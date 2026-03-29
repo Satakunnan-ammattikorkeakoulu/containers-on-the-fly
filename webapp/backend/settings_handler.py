@@ -93,9 +93,10 @@ class UnifiedSettings:
             
             # Load all database settings at once
             with Session() as session:
-                settings = session.query(SystemSetting).filter(
-                    SystemSetting.settingKey.in_(db_setting_keys)
-                ).all()
+                from sqlalchemy import select
+                settings = session.execute(
+                    select(SystemSetting).where(SystemSetting.settingKey.in_(db_setting_keys))
+                ).scalars().all()
                 
                 result = {}
                 for setting in settings:
@@ -128,13 +129,14 @@ class UnifiedSettings:
             import json
             
             with Session() as session:
-                setting = session.query(SystemSetting).filter(
-                    SystemSetting.settingKey == key
-                ).first()
-                
+                from sqlalchemy import select
+                setting = session.execute(
+                    select(SystemSetting).where(SystemSetting.settingKey == key)
+                ).scalar_one_or_none()
+
                 if not setting:
                     return default
-                    
+
                 # Parse based on data type
                 if setting.dataType == "boolean":
                     value = setting.settingValue.lower() == "true" if setting.settingValue else False
@@ -217,10 +219,11 @@ class UnifiedSettings:
             import json
             
             with Session() as session:
-                setting = session.query(SystemSetting).filter(
-                    SystemSetting.settingKey == key
-                ).first()
-                
+                from sqlalchemy import select
+                setting = session.execute(
+                    select(SystemSetting).where(SystemSetting.settingKey == key)
+                ).scalar_one_or_none()
+
                 # Convert value to string for storage
                 if setting_def.data_type == SettingType.BOOLEAN:
                     string_value = "true" if value else "false"

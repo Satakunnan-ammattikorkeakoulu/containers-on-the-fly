@@ -2,6 +2,7 @@ import random
 import socket
 from database import Session, Reservation
 from settings_handler import settings_handler
+from sqlalchemy import select
 
 
 def is_port_in_use(port: int) -> bool:
@@ -17,7 +18,9 @@ def get_available_port():
   # Loop through all started containers and get the ports in use
   portsInUse = []
   with Session() as session:
-    allActiveReservations = session.query(Reservation).filter( Reservation.status == "started" )
+    allActiveReservations = session.execute(
+      select(Reservation).where(Reservation.status == "started")
+    ).scalars().all()
     for reservation in allActiveReservations:
       for usedPort in reservation.reservedContainer.reservedContainerPorts:
         portsInUse.append(usedPort.outsidePort)

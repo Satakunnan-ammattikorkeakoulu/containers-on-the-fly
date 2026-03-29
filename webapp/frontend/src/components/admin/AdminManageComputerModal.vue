@@ -70,7 +70,7 @@
                         <v-text-field type="text" v-model="gpu.format" :rules="[rules.required]" label="Name"></v-text-field>
                       </v-col>
                       <v-col cols="12" md="4">
-                        <v-btn color="red" text @click="removeGPU(index)">Remove</v-btn>
+                        <v-btn color="red" variant="text" @click="removeGPU(index)">Remove</v-btn>
                       </v-col>
                     </v-row>
                   </v-col>
@@ -84,8 +84,8 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="red" text @click="closeDialog">Cancel</v-btn>
-          <v-btn color="blue" text @click="submit"><span v-if="isCreatingNew">Add Computer</span><span v-else>Save Computer</span></v-btn>
+          <v-btn color="red" variant="text" @click="closeDialog">Cancel</v-btn>
+          <v-btn color="blue" variant="text" @click="submit"><span v-if="isCreatingNew">Add Computer</span><span v-else>Save Computer</span></v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -93,11 +93,16 @@
 </template>
 
 <script>
-  const axios = require('axios').default;
+  import axios from 'axios';
+  import { useMainStore } from '@/store/store'
   //import Loading from '/src/components/global/Loading.vue';
 
   export default {
     name: "AdminManageComputerModal",
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     props: {
       propData: [ Number, String ], // Contains the ID of the computer to edit, or "new" if creating new
     },
@@ -165,11 +170,11 @@
         data.removedGPUs = this.removedGPUs;
 
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_computer,
+          url: this.$appSettings.APIServer.admin.save_computer,
           data: { computerId: computerId, data: data },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -183,29 +188,29 @@
             // Fail
             else {
               console.log("Failed saving "+_this.dataName+" information...")
-              _this.$store.commit('showMessage', { text: "There was an error saving "+_this.dataName+" information.", color: "red" })
+              _this.store.showMessage({ text: "There was an error saving "+_this.dataName+" information.", color: "red" })
             }
             _this.isSubmitting = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to save "+_this.dataName+" information.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to save "+_this.dataName+" information.", color: "red" })
             }
             _this.isSubmitting = false
         });
       },
       fetchData() {
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_computer,
+          url: this.$appSettings.APIServer.admin.get_computer,
           params: { computerId: this.item },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -218,18 +223,18 @@
             // Fail
             else {
               console.log("Failed getting "+_this.dataName+"...")
-              _this.$store.commit('showMessage', { text: "There was an error getting "+_this.dataName+".", color: "red" })
+              _this.store.showMessage({ text: "There was an error getting "+_this.dataName+".", color: "red" })
             }
             _this.isFetching = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to get "+_this.dataName+".", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to get "+_this.dataName+".", color: "red" })
             }
             _this.isFetching = false
         });

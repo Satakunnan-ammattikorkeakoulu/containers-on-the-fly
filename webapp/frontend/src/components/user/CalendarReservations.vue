@@ -3,16 +3,16 @@
     <v-col>
       <v-sheet height="64">
         <v-toolbar flat>
-          <v-btn outlined class="mr-4" color="grey darken-2" @click="setToday">
+          <v-btn variant="outlined" class="mr-4" color="grey darken-2" @click="setToday">
             Today
           </v-btn>
-          <v-btn fab text small color="grey darken-2" @click="prev">
-            <v-icon small>
+          <v-btn fab variant="text" size="small" color="grey darken-2" @click="prev">
+            <v-icon size="small">
               mdi-chevron-left
             </v-icon>
           </v-btn>
-          <v-btn fab text small color="grey darken-2" @click="next">
-            <v-icon small>
+          <v-btn fab variant="text" size="small" color="grey darken-2" @click="next">
+            <v-icon size="small">
               mdi-chevron-right
             </v-icon>
           </v-btn>
@@ -31,22 +31,22 @@
             dense
             class="ma-2 availability-toggle"
           >
-            <v-btn small value="reservations">
-              <v-icon small>mdi-calendar-clock</v-icon>
+            <v-btn size="small" value="reservations">
+              <v-icon size="small">mdi-calendar-clock</v-icon>
               Reservations
             </v-btn>
-            <v-btn small value="availability">
-              <v-icon small>mdi-server</v-icon>
+            <v-btn size="small" value="availability">
+              <v-icon size="small">mdi-server</v-icon>
               Availability
             </v-btn>
           </v-btn-toggle>
           <v-btn
-            small
-            outlined
+            size="small"
+            variant="outlined"
             class="ma-2"
             @click="refreshCalendarData"
           >
-            <v-icon small left>mdi-refresh</v-icon>
+            <v-icon size="small" left>mdi-refresh</v-icon>
             Refresh
           </v-btn>
           <v-spacer></v-spacer>
@@ -103,7 +103,7 @@
               <span v-html="selectedEvent.details"></span>
             </v-card-text>
             <v-card-actions>
-              <v-btn text color="secondary" @click="selectedOpen = false">
+              <v-btn variant="text" color="secondary" @click="selectedOpen = false">
                 Cancel
               </v-btn>
             </v-card-actions>
@@ -117,18 +117,23 @@
 <script>
   import { TimestampToLocalTimeZone } from '/src/helpers/time.js'
   import dayjs from "dayjs";
-  const axios = require('axios').default;
-  var utc = require('dayjs/plugin/utc')
-  var timezone = require('dayjs/plugin/timezone')
-  var isoWeek = require('dayjs/plugin/isoWeek')
+  import axios from 'axios';
+  import utc from 'dayjs/plugin/utc'
+  import timezone from 'dayjs/plugin/timezone'
+  import isoWeek from 'dayjs/plugin/isoWeek'
   dayjs.extend(utc)
-  var customParseFormat = require('dayjs/plugin/customParseFormat')
+  import customParseFormat from 'dayjs/plugin/customParseFormat'
   dayjs.extend(timezone)
   dayjs.extend(customParseFormat)
   dayjs.extend(isoWeek)
+  import { useMainStore } from '@/store/store'
 
   export default {
     name: 'CalendarReservations',
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     props: {
       propReservations: {
         type: Array,
@@ -169,32 +174,41 @@
       intervalFormat(interval) {
         return interval.time
       },
-      selectSlot( event ) {
+      selectSlot( nativeEvent, data ) {
         // If calendar is in read-only mode, don't allow slot selection
         if (this.readOnly) {
           return
         }
-        
+
         // Only allow time selection in day, week, or 4day views (not month view)
         if (this.type === 'month') {
-          this.$store.commit('showMessage', { text: "Switch to week, day, or 4-day view to select a specific time.", color: "info" })
+          this.store.showMessage({ text: "Switch to week, day, or 4-day view to select a specific time.", color: "info" })
           return
         }
-        
+
         let now = dayjs()
-        let selectedTime = dayjs(event.date + " " + event.time)
+        // Vuetify 4: @click:time passes (nativeEvent, timestampData)
+        // timestampData has { date: "YYYY-MM-DD", time: "HH:mm", year, month, day, hour, minute, ... }
+        let selectedTime
+        if (data && data.date && data.time) {
+          selectedTime = dayjs(data.date + " " + data.time)
+        } else if (data && data.date) {
+          selectedTime = dayjs(data.date)
+        } else {
+          return
+        }
         // Round to nearest 30 minutes (down)
         if (selectedTime.get("minutes") < 30)
           selectedTime = selectedTime.set("minute", 0)
         else
           selectedTime = selectedTime.set("minute", 30)
-        
+
         // Check that reservation is not made into past
         if (selectedTime < now) {
-          this.$store.commit('showMessage', { text: "Can only make reservations into future.", color: "red" })
+          this.store.showMessage({ text: "Can only make reservations into future.", color: "red" })
           return
         }
-        
+
         this.$emit("slotSelected", selectedTime)
       },
       getReservationSpecs( reservationId ) {
@@ -304,7 +318,7 @@
           const response = await axios({
             method: "get",
             url: "/api/reservation/get_availability_timeline",
-            headers: {"Authorization" : `Bearer ${this.$store.state.user.loginToken}`},
+            headers: {"Authorization" : `Bearer ${this.store.user.loginToken}`},
             params: {
               startDate: calendarStart.format('YYYY-MM-DD HH:mm:ss'),
               endDate: calendarEnd.format('YYYY-MM-DD HH:mm:ss')
@@ -330,7 +344,7 @@
           }
         } catch (error) {
           console.error('Error fetching availability data:', error)
-          this.$store.commit('showMessage', { text: "Error loading availability data.", color: "red" })
+          this.store.showMessage({ text: "Error loading availability data.", color: "red" })
         }
       },
       async fetchAllReservationsForCalendar() {
@@ -366,7 +380,7 @@
           const response = await axios({
             method: "get",
             url: "/api/reservation/get_all_reservations_for_calendar",
-            headers: {"Authorization" : `Bearer ${this.$store.state.user.loginToken}`},
+            headers: {"Authorization" : `Bearer ${this.store.user.loginToken}`},
             params: {
               startDate: calendarStart.format('YYYY-MM-DD HH:mm:ss'),
               endDate: calendarEnd.format('YYYY-MM-DD HH:mm:ss')
@@ -383,7 +397,7 @@
           }
         } catch (error) {
           console.error('Error fetching all reservations:', error)
-          this.$store.commit('showMessage', { text: "Error refreshing reservations.", color: "red" })
+          this.store.showMessage({ text: "Error refreshing reservations.", color: "red" })
         }
       },
       updateDisplayedEvents() {
@@ -542,7 +556,7 @@
 .reservation-event-content {
   padding: 2px 4px;
   font-size: 11px;
-  
+
   p {
     margin: 1px 0;
     color: rgba(255, 255, 255, 0.95);
@@ -552,6 +566,15 @@
 </style>
 
 <style lang="scss">
+// Calendar time slot interactivity
+.v-calendar-daily__day-interval {
+  cursor: pointer;
+
+  &:hover {
+    background-color: rgba(var(--v-theme-primary), 0.08);
+  }
+}
+
 // Global styles for dynamically generated resource indicators
 .resource-item {
   display: flex;

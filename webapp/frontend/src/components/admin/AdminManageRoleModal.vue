@@ -22,19 +22,23 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="blue darken-1" text @click="close">Cancel</v-btn>
-        <v-btn color="blue darken-1" text @click="save" :loading="isSubmitting">Save</v-btn>
+        <v-btn color="blue darken-1" variant="text" @click="close">Cancel</v-btn>
+        <v-btn color="blue darken-1" variant="text" @click="save" :loading="isSubmitting">Save</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 </template>
 
 <script>
-// Add axios back
-const axios = require('axios').default;
+import axios from 'axios';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: "AdminManageRoleModal",
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
   props: {
     propData: {
       type: Object,
@@ -105,11 +109,11 @@ export default {
       
       this.isSubmitting = true;
       try {
-        const currentUser = this.$store.getters.user;  // Get user the same way as other components
+        const currentUser = this.store.user;  // Get user the same way as other components
         
         const response = await axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_role,
+          url: this.$appSettings.APIServer.admin.save_role,
           params: { 
             roleId: this.isCreatingNew ? null : this.item,
             name: this.data.name
@@ -125,14 +129,14 @@ export default {
         if (response.data.status === true) {
           this.$emit('emitModalClose', true);
         } else {
-          this.$store.commit('showMessage', { text: response.data.message, color: "red" });
+          this.store.showMessage({ text: response.data.message, color: "red" });
         }
       } catch (error) {
         console.error('Role save error:', error);
         if (error.response && (error.response.status === 400 || error.response.status === 401)) {
-          this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          this.store.showMessage({ text: error.response.data.detail, color: "red" });
         } else {
-          this.$store.commit('showMessage', { text: "Unknown error while trying to save role", color: "red" });
+          this.store.showMessage({ text: "Unknown error while trying to save role", color: "red" });
         }
       } finally {
         this.isSubmitting = false;

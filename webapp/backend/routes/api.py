@@ -3,6 +3,7 @@ from endpoints import user, reservation, admin, app
 from settings_handler import settings_handler
 from helpers.auth import hash_password
 from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, Container
+from sqlalchemy import select
 import base64
 import sqlalchemy as sa
 
@@ -22,7 +23,7 @@ else:
 
 # Add everyone role if it does not exist
 with Session() as session:
-  everyoneRole = session.query(Role).filter(Role.name == "everyone").first()
+  everyoneRole = session.execute(select(Role).where(Role.name == "everyone")).scalar_one_or_none()
   if everyoneRole is None:
     print("Creating role everyone")
     session.add(Role(
@@ -32,7 +33,7 @@ with Session() as session:
 
 # Add admin role if it does not exist
 with Session() as session:
-  adminRole = session.query(Role).filter(Role.name == "admin").first()
+  adminRole = session.execute(select(Role).where(Role.name == "admin")).scalar_one_or_none()
   if adminRole is None:
     print("Creating role admin")
     session.add(Role(
@@ -40,9 +41,10 @@ with Session() as session:
     ))
     session.commit()
 
-if settings_handler.get_setting("app.addTestDataInDevelopment"):    
+if settings_handler.get_setting("app.addTestDataInDevelopment"):
+  with Session() as session:
     # Admin user
-    adminUser = session.query(User).filter( User.email == "admin@foo.com" ).first()
+    adminUser = session.execute(select(User).where(User.email == "admin@foo.com")).scalar_one_or_none()
     if adminUser is None:
       print("Creating test data: admin user with email admin@foo.com")
       hash = hash_password("test")
@@ -51,13 +53,13 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
         password = base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
         passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
       )
-      adminRole = session.query(Role).filter( Role.name == "admin" ).first()
+      adminRole = session.execute(select(Role).where(Role.name == "admin")).scalar_one_or_none()
       adminUser.roles.append(adminRole)
       session.add(adminUser)
       session.commit()
-    
+
     # Normal User
-    normalUser = session.query(User).filter( User.email == "user@foo.com" ).first()
+    normalUser = session.execute(select(User).where(User.email == "user@foo.com")).scalar_one_or_none()
     if normalUser is None:
       print("Creating test data: normal user with email user@foo.com")
       hash = hash_password("test")
@@ -70,7 +72,7 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
       session.commit()
 
     # Computer
-    computer = session.query(Computer).filter( Computer.name == "server1" ).first()
+    computer = session.execute(select(Computer).where(Computer.name == "server1")).scalar_one_or_none()
     if computer is None:
       print("Creating test data: computer named server1")
       computer = Computer( name = "server1", ip = settings_handler.get_setting("app.serverIp"), public = True )
@@ -78,7 +80,7 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
       session.commit()
 
     # Hardware Specs for computer
-    computer = session.query(Computer).filter( Computer.name == "server1" ).first()
+    computer = session.execute(select(Computer).where(Computer.name == "server1")).scalar_one_or_none()
     if len(computer.hardwareSpecs) == 0:
       print("Creating test data: hardware specs for a computer")
       computer.hardwareSpecs.append(HardwareSpec(
@@ -127,7 +129,7 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
       session.commit()
 
     # Container
-    container = session.query(Container).filter( Container.imageName == "ubuntu-base" ).first()
+    container = session.execute(select(Container).where(Container.imageName == "ubuntu-base")).scalar_one_or_none()
     if container is None:
       print("Creating test data: container with imageName ubuntu-base")
       container = Container(

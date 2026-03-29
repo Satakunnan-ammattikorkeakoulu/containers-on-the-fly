@@ -4,13 +4,12 @@ import pymysql
 engine = create_engine(
     settings_handler.get_setting("database.engineUri"), 
     echo=settings_handler.get_setting("database.debugPrinting"), 
-    future=True,
     pool_size=20,
     max_overflow=30,
     pool_recycle=3600,
     pool_pre_ping=True      # Test connections before using them
 )
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 Base = declarative_base()
 
 from sqlalchemy import Column, Integer, Text, Float, ForeignKey, DateTime, UniqueConstraint, Boolean, BigInteger
@@ -159,6 +158,7 @@ class Computer(Base):
   hardwareSpecs = relationship("HardwareSpec", back_populates = "computer")
   reservations = relationship("Reservation", back_populates = "computer")
   roleMounts = relationship("RoleMount", back_populates="computer")
+  status = relationship("ServerStatus", back_populates="computer", uselist=False)
 
 class HardwareSpec(Base):
   __tablename__ = "HardwareSpec"
@@ -283,7 +283,7 @@ class ServerStatus(Base):
     # Last update timestamp
     lastUpdatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     
-    computer = relationship("Computer", backref="status")
+    computer = relationship("Computer", back_populates="status")
 
 class ServerLogs(Base):
     __tablename__ = "ServerLogs"

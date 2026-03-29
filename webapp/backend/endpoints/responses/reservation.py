@@ -8,6 +8,7 @@ import datetime
 from datetime import timezone, timedelta
 from docker import stop_container
 from endpoints.models.reservation import ReservationFilters
+from sqlalchemy import select, delete, func
 from sqlalchemy.orm import joinedload
 
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
@@ -32,57 +33,60 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
   date = parser.parse(date)
   end_date = date+relativedelta(hours=+duration)
 
-  # Fetch all required data first
+  # Fetch all required data and process inside session scope
   with Session() as session:
-    reservations = session.query(Reservation)\
+    reservations = session.execute(
+      select(Reservation)
       .options(
-        joinedload(Reservation.reservedHardwareSpecs)
-      )\
-      .filter(
+        joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec)
+      )
+      .where(
         Reservation.startDate < end_date,
         Reservation.endDate > date,
         (Reservation.status == "reserved") | (Reservation.status == "started")
       )
-    all_computers = session.query(Computer).filter(Computer.removed.isnot(True), Computer.public.is_(True))
-    all_containers = session.query(Container)
-    session.close()
+    ).unique().scalars().all()
+    all_computers = session.execute(
+      select(Computer).options(joinedload(Computer.hardwareSpecs))
+      .where(Computer.removed.isnot(True), Computer.public.is_(True))
+    ).unique().scalars().all()
+    all_containers = session.execute(select(Container)).scalars().all()
 
-  # All reserved hardware specs for the given time period will be listed here
-  # This loop will go through all reservations and add the reserved hardware specs to this list for the given time period
-  removable_hardware_specs = {}
-  for res in reservations:
-    if res.reservationId == ignored_reservation_id: continue
-    for spec in res.reservedHardwareSpecs:
-      hardware_spec_id = spec.hardwareSpec.hardwareSpecId
-      amount = spec.amount
+    # All reserved hardware specs for the given time period will be listed here
+    removable_hardware_specs = {}
+    for res in reservations:
+      if res.reservationId == ignored_reservation_id: continue
+      for spec in res.reservedHardwareSpecs:
+        hardware_spec_id = spec.hardwareSpec.hardwareSpecId
+        amount = spec.amount
 
-      if hardware_spec_id not in removable_hardware_specs:
-        removable_hardware_specs[hardware_spec_id] = amount
-      else:
-        removable_hardware_specs[hardware_spec_id] += amount
+        if hardware_spec_id not in removable_hardware_specs:
+          removable_hardware_specs[hardware_spec_id] = amount
+        else:
+          removable_hardware_specs[hardware_spec_id] += amount
 
-  # Reduce the available hardware specs by the given reducable specs, if any
-  if reducable_specs != None:
-    for key, val in reducable_specs.items():
-      int_key = int(key)
-      if val == 0: continue
-      if int_key not in removable_hardware_specs:
-        removable_hardware_specs[int_key] = val
-      else:
-        removable_hardware_specs[int_key] += val
+    # Reduce the available hardware specs by the given reducable specs, if any
+    if reducable_specs != None:
+      for key, val in reducable_specs.items():
+        int_key = int(key)
+        if val == 0: continue
+        if int_key not in removable_hardware_specs:
+          removable_hardware_specs[int_key] = val
+        else:
+          removable_hardware_specs[int_key] += val
 
-  computers = []
+    computers = []
 
-  for computer in all_computers:
-    comp_dict = orm_to_dict(computer)
-    comp_dict["hardwareSpecs"] = []
-    for spec in computer.hardwareSpecs:
-      comp_dict["hardwareSpecs"].append(orm_to_dict(spec))
-    computers.append(comp_dict)
+    for computer in all_computers:
+      comp_dict = orm_to_dict(computer)
+      comp_dict["hardwareSpecs"] = []
+      for spec in computer.hardwareSpecs:
+        comp_dict["hardwareSpecs"].append(orm_to_dict(spec))
+      computers.append(comp_dict)
 
-  containers = []
-  for container in all_containers:
-    containers.append(orm_to_dict(container))
+    containers = []
+    for container in all_containers:
+      containers.append(orm_to_dict(container))
 
   # Get user's roles and their hardware limits
   user_role_limits = {}
@@ -90,14 +94,14 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
     from database import RoleHardwareLimit, UserRole
     with Session() as session:
       # Get all roles for the user
-      user_roles = session.query(UserRole).filter(UserRole.userId == user_id).all()
+      user_roles = session.execute(select(UserRole).where(UserRole.userId == user_id)).scalars().all()
       role_ids = [ur.roleId for ur in user_roles]
 
       # Get all hardware limits for user's roles
       if role_ids:
-        role_limits = session.query(RoleHardwareLimit).filter(
+        role_limits = session.execute(select(RoleHardwareLimit).where(
           RoleHardwareLimit.roleId.in_(role_ids)
-        ).all()
+        )).scalars().all()
 
         # Build a dict of hardwareSpecId -> max limit across all roles
         for limit in role_limits:
@@ -165,65 +169,67 @@ def get_own_reservations(userId : int, filters : ReservationFilters) -> object:
 
   with Session() as session:
     # First get all user's reservations for counting
-    count_query = session.query(Reservation)\
-      .filter(
+    count_results = session.execute(
+      select(Reservation)
+      .where(
         Reservation.userId == userId,
         (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()))
+    ).scalars().all()
 
     # Count statuses
-    for reservation in count_query:
+    for reservation in count_results:
       if reservation.status in status_counts:
         status_counts[reservation.status] += 1
 
     # Now get filtered reservations with all the joins
-    query = session.query(Reservation)\
+    stmt = select(Reservation)\
       .options(
         joinedload(Reservation.reservedHardwareSpecs),
         joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
         joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
         joinedload(Reservation.computer)
-      ).\
-      filter(
+      )\
+      .where(
         Reservation.userId == userId,
         (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()))
     if filters.filters["status"] != "":
-      query = query.filter( Reservation.status == filters.filters["status"] )
-    session.close()
+      stmt = stmt.where( Reservation.status == filters.filters["status"] )
+    query = session.execute(stmt).unique().scalars().all()
 
-  for reservation in query:
-    res = orm_to_dict(reservation)
-    res["computerName"] = reservation.computer.name
-    res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
-    res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
-    res["reservedContainer"]["reservedPorts"] = []
-    # Include SHM and RAM disk percentages
-    res["shmSizePercent"] = reservation.reservedContainer.shmSizePercent if reservation.reservedContainer.shmSizePercent is not None else 50
-    res["ramDiskSizePercent"] = reservation.reservedContainer.ramDiskSizePercent if reservation.reservedContainer.ramDiskSizePercent is not None else 0
-    # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
-    if reservation.status == "started":
-      for reserved_port in reservation.reservedContainer.reservedContainerPorts:
-        port_obj = orm_to_dict(reserved_port)
-        port_obj["localPort"] = reserved_port.containerPort.port
-        port_obj["serviceName"] = reserved_port.containerPort.serviceName
-        res["reservedContainer"]["reservedPorts"].append(port_obj)
-    # Add all reserved hardware specs
-    res["reservedHardwareSpecs"] = []
-    for spec in reservation.reservedHardwareSpecs:
-      # Add only specs over 0
-      if spec.amount > 0:
-          # Add also internalId for GPUs
-          if spec.hardwareSpec.type == "gpu":
-            format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
-          else:
-            format = spec.hardwareSpec.format
+    for reservation in query:
+      res = orm_to_dict(reservation)
+      res["computerName"] = reservation.computer.name
+      res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
+      res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
+      res["reservedContainer"]["reservedPorts"] = []
+      # Include SHM and RAM disk percentages
+      res["shmSizePercent"] = reservation.reservedContainer.shmSizePercent if reservation.reservedContainer.shmSizePercent is not None else 50
+      res["ramDiskSizePercent"] = reservation.reservedContainer.ramDiskSizePercent if reservation.reservedContainer.ramDiskSizePercent is not None else 0
+      # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
+      if reservation.status == "started":
+        for reserved_port in reservation.reservedContainer.reservedContainerPorts:
+          port_obj = orm_to_dict(reserved_port)
+          port_obj["localPort"] = reserved_port.containerPort.port
+          port_obj["serviceName"] = reserved_port.containerPort.serviceName
+          res["reservedContainer"]["reservedPorts"].append(port_obj)
+      # Add all reserved hardware specs
+      res["reservedHardwareSpecs"] = []
+      for spec in reservation.reservedHardwareSpecs:
+        # Add only specs over 0
+        if spec.amount > 0:
+            # Add also internalId for GPUs
+            if spec.hardwareSpec.type == "gpu":
+              format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
+            else:
+              format = spec.hardwareSpec.format
 
-          res["reservedHardwareSpecs"].append({
-            "type": spec.hardwareSpec.type,
-            "format": format,
-            "internalId": spec.hardwareSpec.format,
-            "amount": spec.amount
-          })
-    reservations.append(res)
+            res["reservedHardwareSpecs"].append({
+              "type": spec.hardwareSpec.type,
+              "format": format,
+              "internalId": spec.hardwareSpec.format,
+              "amount": spec.amount
+            })
+      reservations.append(res)
   
   return api_response(True, "Hardware resources fetched.", { "reservations": reservations, "statusCounts": status_counts })
 
@@ -231,9 +237,9 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
   with Session() as session:
     # Check that the reservation exists and is owned by the current user (admins can view any reservation)
     if is_admin(userId):
-      reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
+      reservation = session.execute(select(Reservation).where( Reservation.reservationId == reservationId )).scalar_one_or_none()
     else:
-      reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
+      reservation = session.execute(select(Reservation).where( Reservation.reservationId == reservationId, Reservation.userId == userId )).scalar_one_or_none()
     if (reservation == None):
       return api_response(False, "Reservation not found.")
 
@@ -267,30 +273,31 @@ def get_current_reservations() -> object:
   min_end_date = time_now() - timedelta(days=5)
 
   with Session() as session:
-    query = session.query(Reservation)\
-      .options(joinedload(Reservation.reservedHardwareSpecs))\
-      .filter(
+    query = session.execute(
+      select(Reservation)
+      .options(joinedload(Reservation.reservedHardwareSpecs))
+      .where(
         ((Reservation.status == "reserved") | (Reservation.status == "started")),
         (Reservation.endDate > min_end_date),
       )
-    session.close()
-  for reservation in query:
-    specs = []
-    for spec in reservation.reservedHardwareSpecs:
-      specs.append({
-        "type": spec.hardwareSpec.type,
-        "format": spec.hardwareSpec.format,
-        "amount": spec.amount,
-      })
-    res = {
-      "reservationId": reservation.reservationId,
-      "startDate": reservation.startDate,
-      "endDate": reservation.endDate,
-      "computerId": reservation.computerId,
-      "computerName": reservation.computer.name,
-      "hardwareSpecs": specs,
-    }
-    reservations.append(res)
+    ).unique().scalars().all()
+    for reservation in query:
+      specs = []
+      for spec in reservation.reservedHardwareSpecs:
+        specs.append({
+          "type": spec.hardwareSpec.type,
+          "format": spec.hardwareSpec.format,
+          "amount": spec.amount,
+        })
+      res = {
+        "reservationId": reservation.reservationId,
+        "startDate": reservation.startDate,
+        "endDate": reservation.endDate,
+        "computerId": reservation.computerId,
+        "computerName": reservation.computer.name,
+        "hardwareSpecs": specs,
+      }
+      reservations.append(res)
   
   return api_response(True, "Current reservations fetched.", { "reservations": reservations })
 
@@ -316,16 +323,16 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
 
   with Session() as session:
     # Check that user exists
-    user = session.query(User).filter( User.userId == userId ).first()
+    user = session.execute(select(User).where( User.userId == userId )).scalar_one_or_none()
     if (user == None):
       return api_response(False, "User not found.")
     is_user_admin = is_admin(user.email)
 
     # Check that computer and container exists
-    computer = session.query(Computer).filter( Computer.computerId == computerId ).first()
+    computer = session.execute(select(Computer).where( Computer.computerId == computerId )).scalar_one_or_none()
     if (computer == None):
       return api_response(False, "Computer not found.")
-    container = session.query(Container).filter( Container.containerId == containerId ).first()
+    container = session.execute(select(Container).where( Container.containerId == containerId )).scalar_one_or_none()
     if (container == None):
       return api_response(False, "Container not found.")
     
@@ -335,13 +342,13 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
 
     # Get user's role-based reservation limits
     from database import RoleReservationLimit, UserRole
-    user_roles = session.query(UserRole).filter(UserRole.userId == user.userId).all()
+    user_roles = session.execute(select(UserRole).where(UserRole.userId == user.userId)).scalars().all()
     role_ids = [ur.roleId for ur in user_roles]
 
     # Get all reservation limits for user's roles
-    role_limits = session.query(RoleReservationLimit).filter(
+    role_limits = session.execute(select(RoleReservationLimit).where(
         RoleReservationLimit.roleId.in_(role_ids)
-    ).all() if role_ids else []
+    )).scalars().all() if role_ids else []
 
     # Apply defaults based on whether user is admin
     default_min_duration = 1  # 1 hour for all users
@@ -367,10 +374,12 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
             max_active_reservations = max(max_active_reservations, limit.maxActiveReservations)
 
     # Check active reservations limit
-    user_active_reservations = session.query(Reservation).filter(
-      (Reservation.userId == userId),
-      ( (Reservation.status == "reserved") | (Reservation.status == "started") )
-    ).count()
+    user_active_reservations = session.execute(
+      select(func.count()).select_from(Reservation).where(
+        (Reservation.userId == userId),
+        ( (Reservation.status == "reserved") | (Reservation.status == "started") )
+      )
+    ).scalar_one()
     if user_active_reservations >= max_active_reservations:
       return api_response(False, f"You can only have {max_active_reservations} active reservation(s) at a time.")
 
@@ -382,7 +391,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
 
     # If adminReserveUserEmail is given, check that the user exists
     if adminReserveUserEmail != None and adminReserveUserEmail != "" and is_user_admin == True:
-      another_user = session.query(User).filter( User.email == adminReserveUserEmail ).first()
+      another_user = session.execute(select(User).where( User.email == adminReserveUserEmail )).scalar_one_or_none()
       if (another_user == None):
         return api_response(False, "User for which you tried to reserve for did not exist. Check the email address: " + adminReserveUserEmail)
       user = another_user
@@ -411,13 +420,13 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     # Get user's role-based hardware limits
     user_role_limits = {}
     from database import RoleHardwareLimit, UserRole
-    user_roles = session.query(UserRole).filter(UserRole.userId == user.userId).all()
+    user_roles = session.execute(select(UserRole).where(UserRole.userId == user.userId)).scalars().all()
     role_ids = [ur.roleId for ur in user_roles]
-    
+
     if role_ids and not is_user_admin:
-      role_limits = session.query(RoleHardwareLimit).filter(
+      role_limits = session.execute(select(RoleHardwareLimit).where(
         RoleHardwareLimit.roleId.in_(role_ids)
-      ).all()
+      )).scalars().all()
 
       # Build a dict of hardwareSpecId -> max limit across all roles
       for limit in role_limits:
@@ -428,7 +437,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     # Add GPU count validation
     total_gpus_requested = 0
     for key, val in hardwareSpecs.items():
-      hardware_spec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
+      hardware_spec = session.execute(select(HardwareSpec).where( HardwareSpec.hardwareSpecId == key )).scalar_one_or_none()
       if hardware_spec and hardware_spec.type == "gpu" and val > 0:
         total_gpus_requested += val
 
@@ -437,7 +446,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       # Check if any role allows more than 1 GPU
       gpu_limit_from_roles = 1
       for key, val in hardwareSpecs.items():
-        hardware_spec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
+        hardware_spec = session.execute(select(HardwareSpec).where( HardwareSpec.hardwareSpecId == key )).scalar_one_or_none()
         if hardware_spec and hardware_spec.type == "gpu" and key in user_role_limits:
           gpu_limit_from_roles = max(gpu_limit_from_roles, user_role_limits[key])
 
@@ -447,7 +456,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     # Enhanced hardware specification validation
     for key, val in hardwareSpecs.items():
       # Validate hardware spec exists
-      hardware_spec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
+      hardware_spec = session.execute(select(HardwareSpec).where( HardwareSpec.hardwareSpecId == key )).scalar_one_or_none()
       if not hardware_spec:
         return api_response(False, f"Invalid hardware specification ID: {key}")
 
@@ -500,9 +509,9 @@ def cancel_reservation(userId : int, reservationId: str):
   with Session() as session:
     reservation = None
     if is_admin(userId) == False:
-      reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
+      reservation = session.execute(select(Reservation).where( Reservation.reservationId == reservationId, Reservation.userId == userId )).scalar_one_or_none()
     else:
-      reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
+      reservation = session.execute(select(Reservation).where( Reservation.reservationId == reservationId )).scalar_one_or_none()
     if reservation is None: return api_response(False, "No reservation found.")
 
     reservation.endDate = datetime.datetime.now(datetime.timezone.utc)
@@ -516,12 +525,14 @@ def extend_reservation(userId : int, reservationId: str, duration: int):
 
   with Session() as session:
     if is_admin(userId) == False:
-      reservation_check = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
+      reservation_check = session.execute(select(Reservation).where( Reservation.reservationId == reservationId, Reservation.userId == userId )).scalar_one_or_none()
       if reservation_check is None: return api_response(False, "No reservation found for this user.")
 
-    reservation = session.query(Reservation)\
-      .options(joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec))\
-      .filter( Reservation.reservationId == reservationId ).first()
+    reservation = session.execute(
+      select(Reservation)
+      .options(joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec))
+      .where( Reservation.reservationId == reservationId )
+    ).unique().scalar_one_or_none()
     if reservation is None: return api_response(False, "No reservation found.")
 
     if reservation.status != "started":
@@ -539,16 +550,18 @@ def extend_reservation(userId : int, reservationId: str, duration: int):
     for spec in reservation.reservedHardwareSpecs:
       if spec.hardwareSpec.type == "gpu" and spec.amount > 0:
         # Check if this specific GPU is reserved by another reservation during the extension period
-        conflicting_reservation = session.query(Reservation)\
-          .join(ReservedHardwareSpec)\
-          .filter(
+        conflicting_reservation = session.execute(
+          select(Reservation)
+          .join(ReservedHardwareSpec)
+          .where(
             ReservedHardwareSpec.hardwareSpecId == spec.hardwareSpecId,
             ReservedHardwareSpec.amount > 0,
             Reservation.reservationId != reservationId,
             Reservation.startDate < extended_end_date,
             Reservation.endDate > reservation.endDate,
             (Reservation.status == "reserved") | (Reservation.status == "started")
-          ).first()
+          )
+        ).scalar_one_or_none()
 
         if conflicting_reservation:
           return api_response(False, f"Cannot extend reservation: GPU {spec.hardwareSpec.format} (ID: {spec.hardwareSpec.internalId}) is already reserved by another user during the requested extension period.")
@@ -575,24 +588,21 @@ def restart_container(userId : int, reservationId: str):
   # Check that user owns the given container reservation and it can be found
   # Admins can restart any container
   with Session() as session:
-    reservation = session.query(Reservation)\
+    stmt = select(Reservation)\
       .options(joinedload(Reservation.reservedContainer))\
-      .filter( Reservation.reservationId == reservationId )
+      .where( Reservation.reservationId == reservationId )
     if is_admin(userId) == False:
-      reservation = reservation.filter(Reservation.userId == userId )
-    
-    reservation = reservation.first()
-    if reservation is None: 
-      session.close()
+      stmt = stmt.where(Reservation.userId == userId )
+
+    reservation = session.execute(stmt).unique().scalar_one_or_none()
+    if reservation is None:
       return api_response(False, "No reservation found.")
 
     if (reservation.status == "started"):
       reservation.status = "restart"
       session.commit()
-      session.close()
       return api_response(True, "Container will be restarted.")
     else:
-      session.close()
       return api_response(False, "Reservation is not currently started, so cannot restart the container.")
 
 def get_availability_timeline(startDate: str, endDate: str, is_admin = False) -> object:
@@ -616,21 +626,24 @@ def get_availability_timeline(startDate: str, endDate: str, is_admin = False) ->
   
   # Fetch all computers and reservations in the time range
   with Session() as session:
-    computers = session.query(Computer)\
-      .options(joinedload(Computer.hardwareSpecs))\
-      .filter(Computer.removed.isnot(True), Computer.public.is_(True))\
-      .all()
-    
-    reservations = session.query(Reservation)\
+    computers = session.execute(
+      select(Computer)
+      .options(joinedload(Computer.hardwareSpecs))
+      .where(Computer.removed.isnot(True), Computer.public.is_(True))
+    ).unique().scalars().all()
+
+    reservations = session.execute(
+      select(Reservation)
       .options(
         joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec),
         joinedload(Reservation.computer)
-      )\
-      .filter(
+      )
+      .where(
         Reservation.startDate < end_date,
         Reservation.endDate > start_date,
         (Reservation.status == "reserved") | (Reservation.status == "started")
-      ).all()
+      )
+    ).unique().scalars().all()
     
     # Process all data before closing session
     timeline_events = []
@@ -772,8 +785,6 @@ def get_availability_timeline(startDate: str, endDate: str, is_admin = False) ->
           'availableSpecs': available_specs
         })
     
-    session.close()
-  
   return api_response(True, "Availability timeline fetched.", {'events': timeline_events})
 
 def get_all_reservations_for_calendar(startDate: str, endDate: str) -> object:
@@ -797,16 +808,18 @@ def get_all_reservations_for_calendar(startDate: str, endDate: str) -> object:
   reservations = []
 
   with Session() as session:
-    query = session.query(Reservation)\
+    query = session.execute(
+      select(Reservation)
       .options(
         joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec),
         joinedload(Reservation.computer)
-      )\
-      .filter(
+      )
+      .where(
         Reservation.startDate < end_date,
         Reservation.endDate > start_date
       )
-    
+    ).unique().scalars().all()
+
     for reservation in query:
       specs = []
       for spec in reservation.reservedHardwareSpecs:
@@ -832,6 +845,4 @@ def get_all_reservations_for_calendar(startDate: str, endDate: str) -> object:
         "status": reservation.status
       })
     
-    session.close()
-  
   return api_response(True, "All reservations fetched.", {"reservations": reservations})

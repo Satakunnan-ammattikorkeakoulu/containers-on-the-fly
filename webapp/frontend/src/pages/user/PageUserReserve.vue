@@ -3,16 +3,16 @@
 
   <v-stepper v-model="step">
     <v-stepper-header>
-      <v-stepper-step :complete="step > 1" step="1"><b>Time</b></v-stepper-step>
+      <v-stepper-item :complete="step > 1" :value="1" title="Time"></v-stepper-item>
       <v-divider></v-divider>
-      <v-stepper-step :complete="step > 2" step="2"><b>Duration</b></v-stepper-step>
+      <v-stepper-item :complete="step > 2" :value="2" title="Duration"></v-stepper-item>
       <v-divider></v-divider>
-      <v-stepper-step step="3"><b>Hardware</b></v-stepper-step>
+      <v-stepper-item :value="3" title="Hardware"></v-stepper-item>
     </v-stepper-header>
 
-    <v-stepper-items>
+    <v-stepper-window>
       <!-- STEP 1: CALENDAR -->
-      <v-stepper-content step="1">
+      <v-stepper-window-item :value="1">
         <v-row>
           <v-col>
             <h1 style="margin-bottom: 10px;">Reserve Server</h1>
@@ -52,10 +52,10 @@
             </div>
           </v-col>
         </v-row>
-      </v-stepper-content>
+      </v-stepper-window-item>
 
       <!-- STEP 2: DURATION -->
-      <v-stepper-content step="2">
+      <v-stepper-window-item :value="2">
         <v-row v-if="reserveDate != null" class="section">
           <v-col cols="12" style="margin: 0 auto">
             <h2>Reservation Time</h2>
@@ -66,23 +66,23 @@
             <p style="color: gray;">Minimum duration is <b>{{ minimumDuration }}</b> hours.</p>
             <v-row>
               <v-col cols="6">
-                <v-select v-model="reserveDurationDays" :items="reservableDays" item-text="text" item-value="value" label="Days"></v-select>
+                <v-select v-model="reserveDurationDays" :items="reservableDays" item-title="text" item-value="value" label="Days"></v-select>
               </v-col>
               <v-col cols="6">
-                <v-select v-model="reserveDurationHours" :items="reservableHours" item-text="text" item-value="value" label="Hours"></v-select>
+                <v-select v-model="reserveDurationHours" :items="reservableHours" item-title="text" item-value="value" label="Hours"></v-select>
               </v-col>
             </v-row>
           </v-col>
         </v-row>
 
-        <v-btn text @click="prevStep()" style="margin-right: 7px">Back</v-btn>
+        <v-btn variant="text" @click="prevStep()" style="margin-right: 7px">Back</v-btn>
 
         <v-btn color="primary" @click="fetchAvailableHardware" :disabled="!reserveDurationDays && !reserveDurationHours && !fetchingComputers">Continue</v-btn>
         <Loading v-if="fetchingComputers" />
-      </v-stepper-content>
+      </v-stepper-window-item>
 
       <!-- STEP 3: HARDWARE -->
-      <v-stepper-content step="3">
+      <v-stepper-window-item :value="3">
         <v-btn @click="prevStep()">&larr; Back</v-btn>
         <br>
         <br>
@@ -270,10 +270,10 @@
                 <v-col cols="12">
                   <h3>{{ spec.type }}</h3>
                 </v-col>
-                <v-col cols="6" style="margin: 0 auto">
-                  <v-slider :min="spec.minimumAmount" :thumb-size="60" ticks="always" v-model="selectedHardwareSpecs[spec.hardwareSpecId]" :max="spec.maximumAmountForUser" thumb-label="always">
-                    <template v-slot:thumb-label="{ value }">
-                      {{ value + " " + spec.format }}
+                <v-col cols="10" md="6" style="margin: 0 auto; padding: 0 30px;">
+                  <v-slider :min="spec.minimumAmount" show-ticks="always" v-model="selectedHardwareSpecs[spec.hardwareSpecId]" :max="spec.maximumAmountForUser" thumb-label="always" :step="1">
+                    <template v-slot:thumb-label="{ modelValue }">
+                      {{ (modelValue ?? 0) + " " + spec.format }}
                     </template>
                   </v-slider>
                 </v-col>
@@ -283,14 +283,14 @@
 
           <!-- Advanced Settings -->
           <v-col cols="12" v-if="computer && hardwareData" style="margin-top: 30px;">
-            <v-expansion-panels>
+            <v-expansion-panels v-model="advancedSettingsPanel">
               <v-expansion-panel>
-                <v-expansion-panel-header style="background-color: #303030;">
+                <v-expansion-panel-title style="background-color: #303030;">
                   <div style="width: 100%; text-align: center;">
                     <h2 style="margin: 0;">Advanced Settings</h2>
                   </div>
-                </v-expansion-panel-header>
-                <v-expansion-panel-content>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
                   <!-- Admin extra task: reserve for another user -->
                   <v-row v-if="isAdmin()" style="margin-top: 20px;">
                     <v-col cols="12">
@@ -332,16 +332,16 @@
                       <v-row>
                         <v-col cols="6" style="margin: 0 auto">
                           <p style="color: gray; font-size: 15px;">Shared memory for inter-process communication. Required for applications like PyTorch, databases, and parallel computing. Default: 50%</p>
-                          <v-slider 
-                            v-model="shmSizePercent" 
-                            :min="10" 
-                            :max="90" 
-                            :thumb-size="60" 
-                            ticks="always" 
+                          <v-slider
+                            v-model="shmSizePercent"
+                            :min="10"
+                            :max="90"
+                            show-ticks="always"
                             thumb-label="always"
+                            :step="5"
 >
-                            <template v-slot:thumb-label="{ value }">
-                              {{ value }}%
+                            <template v-slot:thumb-label="{ modelValue }">
+                              {{ modelValue }}%
                             </template>
                           </v-slider>
                           <p style="text-align: center; margin-top: 10px;">
@@ -362,15 +362,15 @@
                       <v-row>
                         <v-col cols="6" style="margin: 0 auto">
                           <p style="color: gray; font-size: 15px;">Mounts a high-speed RAM-based folder to your home directory. Ideal for caching, temp files, and I/O intensive operations. Default: 0%</p>
-                          <v-slider 
-                            v-model="ramDiskSizePercent" 
-                            :min="0" 
-                            :max="60" 
-                            :thumb-size="60" 
-                            ticks="always" 
-                            thumb-label="always">
-                            <template v-slot:thumb-label="{ value }">
-                              {{ value }}%
+                          <v-slider
+                            v-model="ramDiskSizePercent"
+                            :min="0"
+                            :max="60"
+                            show-ticks="always"
+                            thumb-label="always"
+                            :step="5">
+                            <template v-slot:thumb-label="{ modelValue }">
+                              {{ modelValue }}%
                             </template>
                           </v-slider>
                           <p style="text-align: center; margin-top: 10px;">
@@ -383,7 +383,7 @@
                       </v-row>
                     </v-col>
                   </v-row>
-                </v-expansion-panel-content>
+                </v-expansion-panel-text>
               </v-expansion-panel>
             </v-expansion-panels>
           </v-col>
@@ -408,9 +408,9 @@
         </v-row>
 
         <Loading v-if="isSubmittingReservation" />
-      </v-stepper-content>
+      </v-stepper-window-item>
 
-    </v-stepper-items>
+    </v-stepper-window>
   </v-stepper>
 
 
@@ -419,22 +419,23 @@
 </template>
 
 <script>
+  import axios from 'axios';
+  import dayjs from "dayjs";
+  import utc from 'dayjs/plugin/utc'
+  import timezone from 'dayjs/plugin/timezone'
+  import customParseFormat from 'dayjs/plugin/customParseFormat'
   import CalendarReservations from '/src/components/user/CalendarReservations.vue';
   import Loading from '/src/components/global/Loading.vue';
+  import AppSettings from '/src/AppSettings.js'
+  import { useMainStore } from '@/store/store'
 
-  const axios = require('axios').default;
-  import dayjs from "dayjs";
-  var utc = require('dayjs/plugin/utc')
-  var timezone = require('dayjs/plugin/timezone')
-  var customParseFormat = require('dayjs/plugin/customParseFormat')
   dayjs.extend(utc)
   dayjs.extend(timezone)
   dayjs.extend(customParseFormat)
-  import AppSettings from '/src/AppSettings.js'
 
   async function checkHardwareAvailability(date, duration, loginToken) {
     let returnData = null;
-    let dateParsed = dayjs(date).tz("GMT+0").toISOString()
+    let dateParsed = dayjs(date).utc().toISOString()
     await axios({
       method: "get",
       url: AppSettings.APIServer.reservation.get_available_hardware,
@@ -462,6 +463,12 @@
 
   export default {
     name: 'PageUserReserve',
+
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
+
     components: {
       CalendarReservations,
       Loading
@@ -495,6 +502,7 @@
       selectedgpus: [], // Contains a list of all selected gpus
       hardwareData: null, // Contains hardware data for the currently selected computer
       selectedHardwareSpecs: {}, // Selected hardware specs for the current computer
+      advancedSettingsPanel: [], // Collapsed by default
       isSubmittingReservation: false, // Set to true when user is submitting the reservation
       rules: {
         maxLength50: value => !value || value.length <= 50 || "Description must be 50 characters or less"
@@ -504,7 +512,7 @@
       let d = new Date()
 
       // Initialize duration defaults if store config is already loaded
-      if (this.$store.state.configLoaded) {
+      if (this.store.configLoaded) {
         this.initializeDurationDefaults()
       }
       // Otherwise, the watcher will handle initialization when config loads
@@ -558,7 +566,7 @@
        * @returns {Boolean} True if user is admin, false if not
        */
       isAdmin() {
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
         if (!currentUser) return false
 
         if (currentUser.role == "admin") return true
@@ -591,7 +599,7 @@
         }
 
         if (this.selectedgpus.length > max) {
-          this.$store.commit('showMessage', { text: `Maximum of ${max} GPUs can be selected.`, color: "red" })
+          this.store.showMessage({ text: `Maximum of ${max} GPUs can be selected.`, color: "red" })
           // Remove the last selected GPU to stay within the limit
           this.selectedgpus.splice(-1, 1)
         }
@@ -632,11 +640,11 @@
 
         let duration = this.reserveDurationDays * 24 + this.reserveDurationHours
         if (this.step == 2 && duration < this.minimumDuration) {
-          return this.$store.commit('showMessage', { text: "Minimum duration is "+this.minimumDuration+" hours.", color: "red" })
+          return this.store.showMessage({ text: "Minimum duration is "+this.minimumDuration+" hours.", color: "red" })
         }
         // Skip maximum duration check for admins
         if (this.step == 2 && duration > this.maximumDuration) {
-          return this.$store.commit('showMessage', { text: "Maximum duration is "+this.maximumDuration+" hours.", color: "red" })
+          return this.store.showMessage({ text: "Maximum duration is "+this.maximumDuration+" hours.", color: "red" })
         }
 
         this.step = this.step + 1
@@ -662,9 +670,9 @@
        * Checks if there is enough hardware resources from current time + minimumHours
        */
        reserveNow() {
-        checkHardwareAvailability(dayjs().toISOString(), this.minimumDuration, this.$store.getters.user.loginToken).then(res => {
+        checkHardwareAvailability(dayjs().toISOString(), this.minimumDuration, this.store.user.loginToken).then(res => {
           if (res !== null) {
-            return this.$store.commit('showMessage', { text: res, color: "red" })
+            return this.store.showMessage({ text: res, color: "red" })
           }
           this.reserveDate = dayjs().toISOString()
           this.reserveType = "now"
@@ -679,11 +687,11 @@
        * @param {Date} time The selected time slot
        */
       slotSelected(time) {
-        checkHardwareAvailability(time, this.minimumDuration, this.$store.getters.user.loginToken).then(res => {
+        checkHardwareAvailability(time, this.minimumDuration, this.store.user.loginToken).then(res => {
           if (res !== null) {
-            return this.$store.commit('showMessage', { text: res, color: "red" })
+            return this.store.showMessage({ text: res, color: "red" })
           }
-          this.reserveDate = time.toISOString()
+          this.reserveDate = dayjs(time).toISOString()
           this.reserveDurationDays = this.minimumDurationDays
           this.reserveDurationHours = this.minimumDurationHours
           this.nextStep()
@@ -723,11 +731,11 @@
       fetchReservations() {
         this.fetchingReservations = true
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.reservation.get_current_reservations,
+          url: this.$appSettings.APIServer.reservation.get_current_reservations,
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
@@ -739,18 +747,18 @@
             // Fail
             else {
               console.log("Failed getting reservations...")
-              //_this.$store.commit('showMessage', { text: "There was an error getting the reservations.", color: "red" })
+              //_this.store.showMessage({ text: "There was an error getting the reservations.", color: "red" })
             }
             _this.fetchingReservations = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              //_this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              //_this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              //_this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              //_this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.fetchingReservations = false
         });
@@ -762,13 +770,13 @@
         this.fetchingComputers = true
         let _this = this
         this.computer = null
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         let duration = this.reserveDurationDays * 24 + this.reserveDurationHours
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.reservation.get_available_hardware,
+          url: this.$appSettings.APIServer.reservation.get_available_hardware,
           params: { "date": dayjs(this.reserveDate).tz("GMT+0").toISOString(), duration: duration },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -812,18 +820,18 @@
             // Fail
             else {
               //console.log("Failed getting hardware data...")
-              _this.$store.commit('showMessage', { text: response.data.message, color: "red" })
+              _this.store.showMessage({ text: response.data.message, color: "red" })
             }
             _this.fetchingComputers = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.fetchingComputers = false
         });
@@ -834,7 +842,7 @@
       submitReservation() {
         this.isSubmittingReservation = true
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
         let computerId = this.computer
         /*console.log("selected computerId: ", this.computer)
         console.log("selected containerId: ", this.container)
@@ -865,7 +873,7 @@
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.reservation.create_reservation,
+          url: this.$appSettings.APIServer.reservation.create_reservation,
           params: params,
           headers: {
             "Authorization" : `Bearer ${currentUser.loginToken}`,
@@ -879,13 +887,13 @@
               localStorage.setItem("justReserved", true)
               localStorage.setItem("justReservedInformEmail", response.data.data.informByEmail)
               _this.$router.push("/user/reservations")
-              _this.$store.commit('showMessage', { text: "Reservation created succesfully!", color: "green" })
+              _this.store.showMessage({ text: "Reservation created succesfully!", color: "green" })
               _this.refreshTip = false;
             }
             // Fail
             else {
               let msg = response && response.data && response.data.message ? response.data.message + " Please select less resources or go back and select another time." : "There was an error getting the hardware specs."
-              _this.$store.commit('showMessage', { text: msg, color: "red" })
+              _this.store.showMessage({ text: msg, color: "red" })
               _this.refreshTip = true;
             }
             _this.isSubmittingReservation = false
@@ -893,11 +901,11 @@
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.isSubmittingReservation = false
             _this.refreshTip = true;
@@ -971,7 +979,7 @@
        * Initialize duration defaults only if they haven't been set yet and config is loaded
        */
       initializeDurationDefaultsIfNeeded() {
-        if (!this.$store.state.configLoaded) {
+        if (!this.store.configLoaded) {
           return
         }
         
@@ -1175,15 +1183,15 @@
         return dayjs(this.reserveDate).format("DD.MM.YYYY HH:mm")
       },
       globalTimezone() {
-        return this.$store.getters.appTimezone
+        return this.store.appTimezone
       },
       minimumDuration() {
         // Get minimum duration from user's role-based limits in store
-        return this.$store.getters.userMinDuration || 1
+        return this.store.userMinDuration || 1
       },
       maximumDuration() {
         // Get maximum duration from user's role-based limits in store
-        return this.$store.getters.userMaxDuration || 48
+        return this.store.userMaxDuration || 48
       },
       minimumDurationDays() {
         return Math.floor(this.minimumDuration / 24)
@@ -1198,7 +1206,7 @@
         return this.maximumDuration % 24
       },
       reservationPageInstructions() {
-        return this.$store.getters.reservationPageInstructions
+        return this.store.reservationPageInstructions
       }
     },
     watch: {
@@ -1218,7 +1226,7 @@
       /**
        * Watch for when app config is loaded from store
        */
-      '$store.state.configLoaded'(isLoaded) {
+      'store.configLoaded'(isLoaded) {
         if (isLoaded && this.reservableDays.length === 0) {
           this.initializeDurationDefaults()
         }

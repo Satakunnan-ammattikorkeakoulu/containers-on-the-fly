@@ -5,11 +5,16 @@
 </template>
 
 <script>
+  import { useMainStore } from '@/store/store'
   export default {
     name: 'Footer',
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     computed: {
       appName() {
-        return this.$store.getters.appName
+        return this.store.appName
       }
     },
   }

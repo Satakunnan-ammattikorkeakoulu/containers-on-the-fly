@@ -25,12 +25,18 @@
 </template>
 
 <script>
-  const axios = require('axios').default;
+  import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import AdminHardwareTable from '/src/components/admin/AdminHardwareTable.vue';
-  
+  import { useMainStore } from '@/store/store'
+
   export default {
     name: 'PageAdminHardware',
+
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
 
     components: {
       Loading,
@@ -52,11 +58,11 @@
     methods: {
       fetch() {
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_hardware,
+          url: this.$appSettings.APIServer.admin.get_hardware,
           //params: { }
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -69,18 +75,18 @@
             // Fail
             else {
               console.log("Failed getting "+_this.tableName+"...")
-              _this.$store.commit('showMessage', { text: "There was an error getting "+_this.tableName+".", color: "red" })
+              _this.store.showMessage({ text: "There was an error getting "+_this.tableName+".", color: "red" })
             }
             _this.isFetching = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to get "+_this.tableName+".", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to get "+_this.tableName+".", color: "red" })
             }
             _this.isFetching = false
         });

@@ -1,6 +1,7 @@
 # User whitelisting table management functionality
 from click import password_option
 from database import UserWhitelist, Session
+from sqlalchemy import select
 
 def view_all(opt_filter = None):
     '''
@@ -12,15 +13,15 @@ def view_all(opt_filter = None):
     with Session() as session:
         all_whitelisted_users_list = []
         if opt_filter != None:
-            all_whitelisted_users = session.query(UserWhitelist).filter(UserWhitelist.email == opt_filter).all()
+            all_whitelisted_users = session.execute(select(UserWhitelist).where(UserWhitelist.email == opt_filter)).scalars().all()
             for user in all_whitelisted_users:
                 all_whitelisted_users_list.append(user)
             return all_whitelisted_users_list
         else:
-            all_whitelisted_users = session.query(UserWhitelist).all()
+            all_whitelisted_users = session.execute(select(UserWhitelist)).scalars().all()
         return all_whitelisted_users
 
-    
+
 
 def add_to_whitelist(emails):
     '''
@@ -28,7 +29,7 @@ def add_to_whitelist(emails):
     If it doesn't then the email/emails get added.
     '''
     with Session() as session:
-        whitelisted = session.query(UserWhitelist).filter(UserWhitelist.email == emails).first()
+        whitelisted = session.execute(select(UserWhitelist).where(UserWhitelist.email == emails)).scalar_one_or_none()
         if whitelisted != None:
             return None
         else:
@@ -48,11 +49,10 @@ def remove_from_whitelist(email):
     And if the email wasn't found in the whitelist, then the user gets notified of that and nothing is removed.
     '''
     with Session() as session:
-        whitelisted = session.query(UserWhitelist).filter(UserWhitelist.email == email).first()
+        whitelisted = session.execute(select(UserWhitelist).where(UserWhitelist.email == email)).scalar_one_or_none()
         if whitelisted == None:
             return None
         else:
             session.delete(whitelisted)
             session.commit()
             return {"msg": "success"}
-        

@@ -15,7 +15,7 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" text @click="isOpen = false">Close</v-btn>
+          <v-btn color="primary" variant="text" @click="isOpen = false">Close</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -24,13 +24,18 @@
 
 <script>
   import Loading from '/src/components/global/Loading.vue';
-  const axios = require('axios').default;
+  import axios from 'axios';
+  import { useMainStore } from '@/store/store'
 
   export default {
     components: {
       Loading
     },
     name: 'UserReservationsModalConnectionDetails',
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     props: {
       reservationId: {
         type: Number,
@@ -44,7 +49,7 @@
     }),
     mounted () {
       let _this = this
-      let currentUser = this.$store.getters.user
+      let currentUser = this.store.user
 
       this.text = ""
       if (this.reservationId != null) {
@@ -52,7 +57,7 @@
       }
       axios({
           method: "get",
-          url: this.AppSettings.APIServer.reservation.get_own_reservation_details,
+          url: this.$appSettings.APIServer.reservation.get_own_reservation_details,
           params: { "reservationId": this.reservationId },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })

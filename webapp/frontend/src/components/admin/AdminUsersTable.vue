@@ -4,8 +4,7 @@
     <v-data-table
       :headers="table.headers"
       :items="data"
-      :sort-by="'userId'"
-      :sort-desc="true"
+      :sort-by="[{key: 'userId', order: 'desc'}]"
       class="elevation-1">
       
       <!-- Actions -->
@@ -49,12 +48,12 @@ export default {
     hasLongItems: false,
     table: {
       headers: [
-        { text: 'User ID', value: 'userId' },
-        { text: 'Email', value: 'email' },
-        { text: 'Roles', value: 'roles' },
-        { text: 'Password Set', value: 'hasPassword' },
-        { text: 'Created At', value: 'createdAt' },
-        { text: 'Actions', value: 'actions' },
+        { title: 'User ID', key: 'userId' },
+        { title: 'Email', key: 'email' },
+        { title: 'Roles', key: 'roles' },
+        { title: 'Password Set', key: 'hasPassword' },
+        { title: 'Created At', key: 'createdAt' },
+        { title: 'Actions', key: 'actions' },
       ],
     }
   }),

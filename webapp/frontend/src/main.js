@@ -1,54 +1,46 @@
-import Vue from 'vue'
+import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router/router'
 import vuetify from './plugins/vuetify'
-import AppSettings from '/src/AppSettings.js';
-import '/src/main.css';
+import { createPinia } from 'pinia'
+import { useMainStore } from './store/store'
+import AppSettings from '/src/AppSettings.js'
+import '/src/main.css'
+import axios from 'axios'
 
-import { store } from './store/store';
-const axios = require('axios').default;
+const app = createApp(App)
+const pinia = createPinia()
+
+app.use(pinia)
+app.use(router)
+app.use(vuetify)
+
+// Make AppSettings available globally (replaces Vue.mixin)
+app.config.globalProperties.$appSettings = AppSettings
+
+// Initialize the store
+const store = useMainStore()
 
 // HTTP interceptors for authentication
 axios.interceptors.response.use(
-  // Return successful responses as-is
   response => response,
-  // Handle errors
   error => {
-    // Check for authentication errors
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-      // Clear user data and redirect to login
-      store.commit('logoutUser')
-      
-      // Only redirect if not already on login/logout pages
-      if (router.currentRoute.path !== '/' && router.currentRoute.path !== '/user/logout') {
+      store.logoutUser()
+
+      if (router.currentRoute.value.path !== '/' && router.currentRoute.value.path !== '/user/logout') {
         router.push('/')
-        store.commit('showMessage', { 
-          text: 'Your session has expired. Please log in again.', 
-          color: 'red' 
+        store.showMessage({
+          text: 'Your session has expired. Please log in again.',
+          color: 'red'
         })
       }
     }
-    
-    // Return the error for component-level handling
     return Promise.reject(error)
   }
 )
 
-Vue.config.productionTip = false
+// Initialize store on app creation
+store.initialiseStore()
 
-new Vue({
-  router,
-  store,
-  vuetify,
-  beforeCreate() { this.$store.commit('initialiseStore'); },
-  render: h => h(App)
-}).$mount('#app')
-
-// Mixins
-Vue.mixin({
-  computed: {
-    AppSettings() {
-      return AppSettings;
-    }
-  }
-})
+app.mount('#app')

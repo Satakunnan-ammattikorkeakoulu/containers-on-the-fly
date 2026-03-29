@@ -3,8 +3,7 @@
     <v-data-table
       :headers="table.headers"
       :items="data"
-      :sort-by="'roleId'"
-      :sort-desc="false"
+      :sort-by="[{key: 'roleId', order: 'asc'}]"
       class="elevation-1">
 
       <!-- Name column with description for built-in roles -->
@@ -65,11 +64,11 @@ export default {
     data: [],
     table: {
       headers: [
-        { text: 'Role ID', value: 'roleId', sortable: true },
-        { text: 'Name', value: 'name', sortable: true },
-        { text: 'Mounts', value: 'mountCount', sortable: true },
-        { text: 'Created At', value: 'createdAt', sortable: true },
-        { text: 'Actions', value: 'actions', sortable: false },
+        { title: 'Role ID', key: 'roleId', sortable: true },
+        { title: 'Name', key: 'name', sortable: true },
+        { title: 'Mounts', key: 'mountCount', sortable: true },
+        { title: 'Created At', key: 'createdAt', sortable: true },
+        { title: 'Actions', key: 'actions', sortable: false },
       ],
     }
   }),

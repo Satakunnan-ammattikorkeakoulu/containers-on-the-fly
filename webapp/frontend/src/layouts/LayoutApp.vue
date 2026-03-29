@@ -14,11 +14,10 @@
         </div>
         <div class="user-info-container" v-if="isLoggedIn == true">
           <v-menu offset-y open-on-hover>
-            <template v-slot:activator="{ on, attrs }">
-              <span 
+            <template v-slot:activator="{ props }">
+              <span
                 class="user-email-link"
-                v-bind="attrs"
-                v-on="on"
+                v-bind="props"
               >
                 {{userEmail}}
               </span>
@@ -33,13 +32,12 @@
             </v-list>
           </v-menu>
           <v-tooltip bottom v-if="userRoles.length > 0">
-            <template v-slot:activator="{ on, attrs }">
+            <template v-slot:activator="{ props }">
               <v-chip
-                x-small
-                outlined
+                size="x-small"
+                variant="outlined"
                 class="ml-2"
-                v-bind="attrs"
-                v-on="on"
+                v-bind="props"
               >
                 {{ userRoles.length }} {{ userRoles.length === 1 ? 'role' : 'roles' }}
               </v-chip>
@@ -62,9 +60,14 @@
 
 <script>
   import Snackbar from '/src/components/global/Snackbar.vue';
+  import { useMainStore } from '@/store/store'
 
   export default {
     name: 'LayoutApp',
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     components: {
       Snackbar,
     },
@@ -92,13 +95,13 @@
     },
     computed: {
       isInitializing() {
-        return this.$store.getters.isInitializing
+        return this.store.isInitializing
       },
       isLoggedIn() {
-        return this.$store.getters.isLoggedIn || false
+        return this.store.isLoggedIn || false
       },
       isAdmin() {
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
         if (!currentUser) return false
 
         if (currentUser.role == "admin") return true
@@ -106,12 +109,12 @@
         return false
       },
       userEmail() {
-        if (!this.$store.getters.user) return ""
-        return this.$store.getters.user.email || ""
+        if (!this.store.user) return ""
+        return this.store.user.email || ""
       },
       userRoles() {
-        if (!this.$store.getters.user) return []
-        return this.$store.getters.user.roles || []
+        if (!this.store.user) return []
+        return this.store.user.roles || []
       },
     },
     beforeRouteUpdate(to, from, next) {

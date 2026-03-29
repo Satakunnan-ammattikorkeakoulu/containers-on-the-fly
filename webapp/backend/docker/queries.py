@@ -1,5 +1,6 @@
 from python_on_whales import docker
 from database import Session, Reservation, Computer
+from sqlalchemy import select
 import datetime
 from datetime import timezone
 
@@ -18,11 +19,13 @@ def get_reservations_requiring_start(computer_id: int):
     List of reservations requiring start in the given computer.
   '''
   with Session() as session:
-    reservations = session.query(Reservation).filter(
-      Reservation.status == "reserved",
-      Reservation.computerId == computer_id,
-      Reservation.startDate < time_now()
-    )
+    reservations = session.execute(
+      select(Reservation).where(
+        Reservation.status == "reserved",
+        Reservation.computerId == computer_id,
+        Reservation.startDate < time_now()
+      )
+    ).scalars().all()
     return reservations
 
 
@@ -36,12 +39,14 @@ def get_running_reservations(computer_id: int):
     List of running reservations in the given computer.
   '''
   with Session() as session:
-    reservations = session.query(Reservation).filter(
-      Reservation.status == "started",
-      Reservation.startDate < time_now(),
-      Reservation.computerId == computer_id,
-      Reservation.endDate > time_now()
-    )
+    reservations = session.execute(
+      select(Reservation).where(
+        Reservation.status == "started",
+        Reservation.startDate < time_now(),
+        Reservation.computerId == computer_id,
+        Reservation.endDate > time_now()
+      )
+    ).scalars().all()
     return reservations
 
 
@@ -55,11 +60,13 @@ def get_reservations_requiring_stop(computer_id: int):
     List of reservations requiring stop in the given computer.
   '''
   with Session() as session:
-    reservations = session.query(Reservation).filter(
-      Reservation.computerId == computer_id,
-      Reservation.status.in_(["started", "reserved"]),
-      Reservation.endDate < time_now()
-    )
+    reservations = session.execute(
+      select(Reservation).where(
+        Reservation.computerId == computer_id,
+        Reservation.status.in_(["started", "reserved"]),
+        Reservation.endDate < time_now()
+      )
+    ).scalars().all()
     return reservations
 
 
@@ -73,11 +80,13 @@ def get_reservations_requiring_restart(computer_id: int):
     List of reservations requiring restart in the given computer.
   '''
   with Session() as session:
-    reservations = session.query(Reservation).filter(
-      Reservation.status == "restart",
-      Reservation.computerId == computer_id,
-      Reservation.endDate > time_now()
-    )
+    reservations = session.execute(
+      select(Reservation).where(
+        Reservation.status == "restart",
+        Reservation.computerId == computer_id,
+        Reservation.endDate > time_now()
+      )
+    ).scalars().all()
     return reservations
 
 
@@ -107,7 +116,9 @@ def get_container_information(reservation_id: str):
   '''
   try:
     with Session() as session:
-      reservation = session.query(Reservation).filter( Reservation.reservationId == reservation_id ).first()
+      reservation = session.execute(
+        select(Reservation).where(Reservation.reservationId == reservation_id)
+      ).scalar_one_or_none()
       if reservation == None:
         return None, {}
       container_state = docker.container.inspect(reservation.reservedContainer.containerDockerName)
@@ -130,7 +141,9 @@ def get_computer_id(computer_name: str):
   '''
   try:
     with Session() as session:
-      computer = session.query(Computer).filter( Computer.name == computer_name ).first()
+      computer = session.execute(
+        select(Computer).where(Computer.name == computer_name)
+      ).scalar_one_or_none()
       if computer == None:
         return None
       return computer.computerId

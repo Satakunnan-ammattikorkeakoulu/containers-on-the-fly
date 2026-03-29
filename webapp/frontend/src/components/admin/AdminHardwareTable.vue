@@ -4,8 +4,7 @@
     <v-data-table
       :headers="table.headers"
       :items="data"
-      :sort-by="'hardwareSpecId'"
-      :sort-desc="true"
+      :sort-by="[{key: 'hardwareSpecId', order: 'desc'}]"
       class="elevation-1">
     </v-data-table>
   </div>
@@ -28,15 +27,15 @@
       hasLongItems: false,
       table: {
         headers: [
-          { text: 'Hardware ID', value: 'hardwareSpecId' },
-          { text: 'Computer ID', value: 'computerId' },
-          { text: 'Type', value: 'type' },
-          { text: 'Format', value: 'format' },
-          { text: 'GPU ID (Internal ID)', value: 'internalId' },
-          { text: 'Max', value: 'maximumAmount' },
-          { text: 'Min', value: 'minimumAmount' },
-          { text: 'Max for Users', value: 'maximumAmountForUser' },
-          { text: 'Default for Users', value: 'defaultAmountForUser' },
+          { title: 'Hardware ID', key: 'hardwareSpecId' },
+          { title: 'Computer ID', key: 'computerId' },
+          { title: 'Type', key: 'type' },
+          { title: 'Format', key: 'format' },
+          { title: 'GPU ID (Internal ID)', key: 'internalId' },
+          { title: 'Max', key: 'maximumAmount' },
+          { title: 'Min', key: 'minimumAmount' },
+          { title: 'Max for Users', key: 'maximumAmountForUser' },
+          { title: 'Default for Users', key: 'defaultAmountForUser' },
         ],
       }
     }),

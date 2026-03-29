@@ -1,7 +1,7 @@
 # Role table management functionality
 from database import Role, RoleMount, Computer, Session, UserRole
 from helpers.server import api_response
-from sqlalchemy import func
+from sqlalchemy import select, delete, func
 
 def get_roles():
     '''
@@ -10,7 +10,7 @@ def get_roles():
         List of all roles.
     '''
     with Session() as session:
-        return session.query(Role).all()
+        return session.execute(select(Role)).scalars().all()
 
 def get_roles_with_mount_counts():
     '''
@@ -19,13 +19,15 @@ def get_roles_with_mount_counts():
         List of all roles with additional mountCount field.
     '''
     with Session() as session:
-        roles = session.query(Role).all()
+        roles = session.execute(select(Role)).scalars().all()
         result = []
         for role in roles:
             from helpers.server import orm_to_dict
             role_dict = orm_to_dict(role)
             # Add mount count
-            mount_count = session.query(RoleMount).filter(RoleMount.roleId == role.roleId).count()
+            mount_count = session.execute(
+                select(func.count()).select_from(RoleMount).where(RoleMount.roleId == role.roleId)
+            ).scalar_one()
             role_dict['mountCount'] = mount_count
             result.append(role_dict)
         return result
@@ -39,7 +41,7 @@ def get_role_by_id(roleId):
         The role object or None if not found.
     '''
     with Session() as session:
-        return session.query(Role).filter(Role.roleId == roleId).first()
+        return session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
 
 def is_role_name_taken(session, name: str, excludeRoleId: int = None) -> bool:
     '''
@@ -51,10 +53,10 @@ def is_role_name_taken(session, name: str, excludeRoleId: int = None) -> bool:
     Returns:
         bool: True if name is taken, False otherwise
     '''
-    query = session.query(Role).filter(func.lower(Role.name) == func.lower(name))
+    stmt = select(func.count()).select_from(Role).where(func.lower(Role.name) == func.lower(name))
     if excludeRoleId is not None:
-        query = query.filter(Role.roleId != excludeRoleId)
-    return query.count() > 0
+        stmt = stmt.where(Role.roleId != excludeRoleId)
+    return session.execute(stmt).scalar_one() > 0
 
 def validate_role_name(name: str) -> tuple[bool, str]:
     '''
@@ -93,7 +95,7 @@ def add_role(name: str) -> tuple[bool, str, dict]:
             role = Role(name=name)
             session.add(role)
             session.commit()
-            
+
             # Convert to dict while still in session
             from helpers.server import orm_to_dict
             role_dict = orm_to_dict(role)
@@ -124,13 +126,13 @@ def edit_role(roleId: int, name: str) -> tuple[bool, str, dict]:
                 return False, f"A role with the name '{name}' already exists", None
 
             # Update existing role
-            role = session.query(Role).filter(Role.roleId == roleId).first()
+            role = session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
             if not role:
                 return False, "Role not found", None
-                
+
             role.name = name
             session.commit()
-            
+
             # Convert to dict while still in session
             from helpers.server import orm_to_dict
             role_dict = orm_to_dict(role)
@@ -146,7 +148,7 @@ def remove_role(roleId):
     - Removes all user associations (UserRole entries)
     - Removes all role mounts (RoleMount entries)
     - Removes the role itself
-    
+
     Parameters:
         roleId: The ID of the role to remove.
     Returns:
@@ -154,29 +156,29 @@ def remove_role(roleId):
     '''
     with Session() as session:
         try:
-            role = session.query(Role).filter(Role.roleId == roleId).first()
+            role = session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
             if not role:
                 return False, "Role not found"
-            
+
             # Don't allow removing built-in roles
             if role.name.lower() in ["admin", "everyone"]:
                 return False, f"Cannot remove built-in role '{role.name}'"
-            
+
             # Remove all user associations
-            session.query(UserRole).filter(UserRole.roleId == roleId).delete()
-            
+            session.execute(delete(UserRole).where(UserRole.roleId == roleId))
+
             # Remove all role mounts
-            session.query(RoleMount).filter(RoleMount.roleId == roleId).delete()
-            
+            session.execute(delete(RoleMount).where(RoleMount.roleId == roleId))
+
             # Remove all role hardware limits
             from database import RoleHardwareLimit
-            session.query(RoleHardwareLimit).filter(RoleHardwareLimit.roleId == roleId).delete()
-            
+            session.execute(delete(RoleHardwareLimit).where(RoleHardwareLimit.roleId == roleId))
+
             # Remove the role itself
             session.delete(role)
             session.commit()
             return True, "Role and all its associations removed successfully"
-            
+
         except Exception as e:
             session.rollback()
             return False, f"Failed to remove role: {str(e)}"
@@ -190,10 +192,10 @@ def get_role_mounts(roleId: int) -> list:
         List of mount objects with computer information
     '''
     with Session() as session:
-        role = session.query(Role).filter(Role.roleId == roleId).first()
+        role = session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
         if not role:
             return []
-        
+
         mounts = []
         for mount in role.mounts:
             mount_data = {
@@ -206,7 +208,7 @@ def get_role_mounts(roleId: int) -> list:
                 "computerName": mount.computer.name if mount.computer else ""
             }
             mounts.append(mount_data)
-        
+
         return mounts
 
 def save_role_mounts(roleId: int, mounts: list) -> tuple[bool, str]:
@@ -220,25 +222,25 @@ def save_role_mounts(roleId: int, mounts: list) -> tuple[bool, str]:
     '''
     with Session() as session:
         # Check if role exists
-        role = session.query(Role).filter(Role.roleId == roleId).first()
+        role = session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
         if not role:
             return False, "Role not found"
-        
+
         # Remove all existing mounts for this role
-        session.query(RoleMount).filter(RoleMount.roleId == roleId).delete()
+        session.execute(delete(RoleMount).where(RoleMount.roleId == roleId))
         session.flush()
-        
+
         # Add new mounts
         for mount_data in mounts:
             # Validate required fields
             if not all(key in mount_data for key in ['computerId', 'hostPath', 'containerPath']):
                 return False, "Missing required mount fields"
-                
+
             # Check if computer exists
-            computer = session.query(Computer).filter(Computer.computerId == mount_data['computerId']).first()
+            computer = session.execute(select(Computer).where(Computer.computerId == mount_data['computerId'])).scalar_one_or_none()
             if not computer:
                 return False, f"Computer with ID {mount_data['computerId']} not found"
-            
+
             new_mount = RoleMount(
                 roleId=roleId,
                 computerId=mount_data['computerId'],
@@ -247,7 +249,7 @@ def save_role_mounts(roleId: int, mounts: list) -> tuple[bool, str]:
                 readOnly=mount_data.get('readOnly', False)
             )
             session.add(new_mount)
-        
+
         session.commit()
         return True, "Role mounts saved successfully"
 
@@ -261,14 +263,14 @@ def get_role_hardware_limits(roleId: int) -> list:
     '''
     from database import RoleHardwareLimit, HardwareSpec
     from helpers.server import orm_to_dict
-    
+
     with Session() as session:
-        limits = session.query(RoleHardwareLimit).filter(
-            RoleHardwareLimit.roleId == roleId
-        ).join(
-            HardwareSpec
-        ).all()
-        
+        limits = session.execute(
+            select(RoleHardwareLimit)
+            .where(RoleHardwareLimit.roleId == roleId)
+            .join(HardwareSpec)
+        ).scalars().all()
+
         result = []
         for limit in limits:
             limit_data = {
@@ -280,7 +282,7 @@ def get_role_hardware_limits(roleId: int) -> list:
                 "hardwareType": limit.hardwareSpec.type if limit.hardwareSpec else None
             }
             result.append(limit_data)
-        
+
         return result
 
 def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> tuple[bool, str]:
@@ -293,92 +295,94 @@ def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> tuple[bool, 
         tuple[bool, str]: (success, message)
     '''
     from database import RoleHardwareLimit, HardwareSpec
-    
+
     with Session() as session:
         # Check if role exists
-        role = session.query(Role).filter(Role.roleId == roleId).first()
+        role = session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
         if not role:
             return False, "Role not found"
-        
+
         # Prevent setting limits for built-in roles
         if role.name.lower() in ["admin", "everyone"]:
             return False, f"Cannot set hardware limits for built-in role '{role.name}'"
-        
+
         # Remove all existing hardware limits for this role
-        session.query(RoleHardwareLimit).filter(RoleHardwareLimit.roleId == roleId).delete()
+        session.execute(delete(RoleHardwareLimit).where(RoleHardwareLimit.roleId == roleId))
         session.flush()
-        
+
         # Add new hardware limits
         for limit_data in hardwareLimits:
             # Validate required fields
             if not all(key in limit_data for key in ['hardwareSpecId', 'maximumAmountForRole']):
                 return False, "Missing required hardware limit fields"
-            
+
             # Skip if maximumAmountForRole is None
             if limit_data['maximumAmountForRole'] is None:
                 continue
-                
+
             # Check if hardware spec exists
-            hardware_spec = session.query(HardwareSpec).filter(
-                HardwareSpec.hardwareSpecId == limit_data['hardwareSpecId']
-            ).first()
+            hardware_spec = session.execute(
+                select(HardwareSpec).where(HardwareSpec.hardwareSpecId == limit_data['hardwareSpecId'])
+            ).scalar_one_or_none()
             if not hardware_spec:
                 return False, f"Hardware spec with ID {limit_data['hardwareSpecId']} not found"
-            
+
             # Validate that role limit doesn't exceed system maximum
             max_amount = limit_data['maximumAmountForRole']
-            
+
             # Validate that the value is a positive integer
             if not isinstance(max_amount, int):
                 try:
                     max_amount = int(max_amount)
                 except (ValueError, TypeError):
                     return False, f"Invalid value for hardware limit: must be an integer, got '{max_amount}'"
-            
+
             if max_amount < 0:
                 return False, f"Hardware limit cannot be negative: {max_amount}"
-            
+
             # For GPUs without internalId, system max is the count of all GPU specs
             if hardware_spec.type == 'gpu' and not hardware_spec.internalId:
-                gpu_count = session.query(HardwareSpec).filter(
-                    HardwareSpec.computerId == hardware_spec.computerId,
-                    HardwareSpec.type == 'gpu'
-                ).count()
+                gpu_count = session.execute(
+                    select(func.count()).select_from(HardwareSpec).where(
+                        HardwareSpec.computerId == hardware_spec.computerId,
+                        HardwareSpec.type == 'gpu'
+                    )
+                ).scalar_one()
                 system_max = gpu_count
             else:
                 system_max = hardware_spec.maximumAmount
-            
+
             if max_amount > system_max:
                 return False, f"Role limit ({max_amount}) exceeds system maximum ({system_max}) for {hardware_spec.type} on computer {hardware_spec.computer.name}"
-            
+
             new_limit = RoleHardwareLimit(
                 roleId=roleId,
                 hardwareSpecId=limit_data['hardwareSpecId'],
                 maximumAmountForRole=max_amount
             )
             session.add(new_limit)
-        
+
         session.commit()
         return True, "Role hardware limits saved successfully"
 
 def get_role_reservation_limits(roleId: int) -> dict:
     '''
     Gets reservation limits for a specific role.
-    
+
     Parameters:
         roleId: The ID of the role
-        
+
     Returns:
         dict: Reservation limits with defaults applied
     '''
     from database import RoleReservationLimit
-    
+
     with Session() as session:
         # Get role to check if it's admin
-        role = session.query(Role).filter(Role.roleId == roleId).first()
+        role = session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
         if not role:
             return {}
-        
+
         # Determine defaults based on role
         if role.name == "admin":
             default_min = 1  # 1 hour
@@ -388,12 +392,12 @@ def get_role_reservation_limits(roleId: int) -> dict:
             default_min = 1  # 1 hour
             default_max = 48  # 48 hours (2 days)
             default_active = 1
-        
+
         # Get existing limits
-        limits = session.query(RoleReservationLimit).filter(
-            RoleReservationLimit.roleId == roleId
-        ).first()
-        
+        limits = session.execute(
+            select(RoleReservationLimit).where(RoleReservationLimit.roleId == roleId)
+        ).scalar_one_or_none()
+
         if limits:
             return {
                 "minDuration": limits.minDuration if limits.minDuration is not None else default_min,
@@ -411,31 +415,31 @@ def get_role_reservation_limits(roleId: int) -> dict:
 def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> tuple[bool, str]:
     '''
     Saves reservation limits for a role.
-    
+
     Parameters:
         roleId: The ID of the role
         reservationLimits: Dictionary with minDuration, maxDuration, and maxActiveReservations
-        
+
     Returns:
         tuple[bool, str]: (success, message)
     '''
     from database import RoleReservationLimit
-    
+
     with Session() as session:
         # Check if role exists
-        role = session.query(Role).filter(Role.roleId == roleId).first()
+        role = session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
         if not role:
             return False, "Role not found"
-        
+
         # Get or create reservation limits
-        limits = session.query(RoleReservationLimit).filter(
-            RoleReservationLimit.roleId == roleId
-        ).first()
-        
+        limits = session.execute(
+            select(RoleReservationLimit).where(RoleReservationLimit.roleId == roleId)
+        ).scalar_one_or_none()
+
         if not limits:
             limits = RoleReservationLimit(roleId=roleId)
             session.add(limits)
-        
+
         # Validate required fields
         if 'minDuration' not in reservationLimits or reservationLimits['minDuration'] is None:
             return False, "Minimum duration is required"
@@ -443,25 +447,25 @@ def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> tuple[
             return False, "Maximum duration is required"
         if 'maxActiveReservations' not in reservationLimits or reservationLimits['maxActiveReservations'] is None:
             return False, "Max active reservations is required"
-        
+
         # Update values
         limits.minDuration = reservationLimits['minDuration']
         limits.maxDuration = reservationLimits['maxDuration']
         limits.maxActiveReservations = reservationLimits['maxActiveReservations']
-        
+
         # Validate min/max relationship
         if limits.minDuration > limits.maxDuration:
             return False, "Minimum duration cannot be greater than maximum duration"
-        
+
         # Validate ranges
         if limits.minDuration < 1 or limits.minDuration > 720:
             return False, "Minimum duration must be between 1 and 720 hours"
-        
+
         if limits.maxDuration < 1 or limits.maxDuration > 1440:
             return False, "Maximum duration must be between 1 and 1440 hours (60 days)"
-        
+
         if limits.maxActiveReservations < 0 or limits.maxActiveReservations > 99:
             return False, "Max active reservations must be between 0 and 99"
-        
+
         session.commit()
         return True, "Role reservation limits saved successfully"

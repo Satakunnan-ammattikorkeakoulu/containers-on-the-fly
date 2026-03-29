@@ -16,7 +16,7 @@
             <strong>Hardware Limits</strong> allow you to override the default hardware allocation limits for users with this role.
             Leave fields empty to use the computer's default limits.
           </div>
-          <div class="mt-2 text-caption grey--text">
+          <div class="mt-2 text-caption text-grey">
             Note: These limits override the computer's default user limits but cannot exceed the system maximum.
           </div>
         </v-alert>
@@ -37,21 +37,21 @@
                 v-for="computer in computers"
                 :key="computer.computerId"
               >
-                <v-expansion-panel-header>
+                <v-expansion-panel-title>
                   <div>
-                    <v-icon small class="mr-2">mdi-server</v-icon>
+                    <v-icon size="small" class="mr-2">mdi-server</v-icon>
                     {{ computer.name }}
                     <v-chip
                       v-if="hasCustomLimits(computer.computerId)"
-                      x-small
+                      size="x-small"
                       color="primary"
                       class="ml-2"
                     >
                       Customized
                     </v-chip>
                   </div>
-                </v-expansion-panel-header>
-                <v-expansion-panel-content>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
                   <v-row
                     v-for="spec in getFilteredHardwareSpecs(computer)"
                     :key="spec.hardwareSpecId"
@@ -60,10 +60,10 @@
                     <v-col cols="12">
                       <div class="hardware-spec-section">
                         <div class="hardware-spec-header">
-                          <v-icon small class="mr-1">{{ getHardwareIcon(spec.type) }}</v-icon>
+                          <v-icon size="small" class="mr-1">{{ getHardwareIcon(spec.type) }}</v-icon>
                           <span class="font-weight-medium">{{ spec.displayName || spec.type.toUpperCase() }}</span>
                         </div>
-                        <div class="hardware-spec-info text-caption grey--text">
+                        <div class="hardware-spec-info text-caption text-grey">
                           Current user max: {{ spec.maximumAmountForUser }} | System max: {{ getSystemMaximum(computer, spec) }}
                         </div>
                         <div class="d-flex align-center mt-2">
@@ -83,8 +83,8 @@
                           >
                             <template v-slot:append>
                               <v-tooltip bottom>
-                                <template v-slot:activator="{ on }">
-                                  <v-icon v-on="on" small>mdi-information-outline</v-icon>
+                                <template v-slot:activator="{ props }">
+                                  <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
                                 </template>
                                 <span>Maximum amount users with this role can reserve (0-{{ getSystemMaximum(computer, spec) }})</span>
                               </v-tooltip>
@@ -92,17 +92,17 @@
                           </v-text-field>
                           <v-btn
                             icon
-                            small
+                            size="small"
                             @click="resetHardwareLimit(computer.computerId, spec.hardwareSpecId)"
                             :disabled="!hasCustomLimit(computer.computerId, spec.hardwareSpecId)"
                           >
-                            <v-icon small>mdi-restore</v-icon>
+                            <v-icon size="small">mdi-restore</v-icon>
                           </v-btn>
                         </div>
                       </div>
                     </v-col>
                   </v-row>
-                </v-expansion-panel-content>
+                </v-expansion-panel-text>
               </v-expansion-panel>
             </v-expansion-panels>
           </template>
@@ -111,19 +111,24 @@
 
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="blue darken-1" text @click="close">Cancel</v-btn>
-        <v-btn color="blue darken-1" text @click="save" :loading="isSubmitting">Save</v-btn>
+        <v-btn color="blue darken-1" variant="text" @click="close">Cancel</v-btn>
+        <v-btn color="blue darken-1" variant="text" @click="save" :loading="isSubmitting">Save</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 </template>
 
 <script>
-const axios = require('axios').default;
+import axios from 'axios';
 import Loading from '../global/Loading.vue';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: "AdminRoleHardwareLimitsModal",
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
   components: {
     Loading
   },
@@ -154,12 +159,12 @@ export default {
     async fetchData() {
       this.isFetching = true;
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         
         // Fetch available computers
         const response = await axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_computers,
+          url: this.$appSettings.APIServer.admin.get_computers,
           headers: {
             'Authorization': `Bearer ${currentUser.loginToken}`
           }
@@ -181,7 +186,7 @@ export default {
           // Fetch existing role hardware limits from backend
           const limitsResponse = await axios({
             method: "get",
-            url: this.AppSettings.APIServer.admin.get_role_hardware_limits,
+            url: this.$appSettings.APIServer.admin.get_role_hardware_limits,
             params: { roleId: this.roleId },
             headers: {
               'Authorization': `Bearer ${currentUser.loginToken}`
@@ -202,7 +207,7 @@ export default {
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error loading hardware limits", 
           color: "red" 
         });
@@ -213,11 +218,11 @@ export default {
     async save() {
       this.isSubmitting = true;
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         
         const response = await axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_role_hardware_limits,
+          url: this.$appSettings.APIServer.admin.save_role_hardware_limits,
           data: { 
             roleId: this.roleId,
             hardwareLimits: this.formatHardwareLimitsForBackend()
@@ -229,20 +234,20 @@ export default {
         });
 
         if (response.data.status === true) {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: "Hardware limits saved successfully", 
             color: "green" 
           });
           this.$emit('emitModalClose', true);
         } else {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: response.data.message, 
             color: "red" 
           });
         }
       } catch (error) {
         console.error('Error saving hardware limits:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error saving hardware limits", 
           color: "red" 
         });
@@ -331,10 +336,10 @@ export default {
   font-size: 0.8em;
   margin-top: 4px;
 }
-.v-expansion-panel-header {
+.v-expansion-panel-title {
   min-height: 48px;
 }
-.v-expansion-panel-content__wrap {
+.v-expansion-panel-text__wrap {
   padding: 16px;
 }
 .hardware-spec-section {

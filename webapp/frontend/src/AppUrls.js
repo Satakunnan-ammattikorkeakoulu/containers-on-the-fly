@@ -10,7 +10,7 @@ function createUrls(baseAddress) {
     let baseUserUrl = baseUrl + "user/"
     URLS.user.login = baseUserUrl + "login"
     URLS.user.check_token = baseUserUrl + "check_token"
-    
+
     let baseReservationUrl = baseUrl + "reservation/"
     URLS.reservation.get_available_hardware = baseReservationUrl + "get_available_hardware"
     URLS.reservation.get_current_reservations = baseReservationUrl + "get_current_reservations"
@@ -60,4 +60,4 @@ function createUrls(baseAddress) {
     return URLS;
 }
 
-module.exports = createUrls;
+export default createUrls;

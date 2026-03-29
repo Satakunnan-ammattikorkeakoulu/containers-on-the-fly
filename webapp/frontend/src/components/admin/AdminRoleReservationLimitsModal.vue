@@ -15,7 +15,7 @@
           <div class="text-body-2">
             <strong>Reservation Limits</strong> allow you to customize reservation duration and count limits for users with this role.
           </div>
-          <div class="mt-2 text-caption grey--text">
+          <div class="mt-2 text-caption text-grey">
             Note: Users will inherit the highest limits from all their assigned roles.
           </div>
         </v-alert>
@@ -55,8 +55,8 @@
                 >
                   <template v-slot:append>
                     <v-tooltip bottom>
-                      <template v-slot:activator="{ on }">
-                        <v-icon v-on="on" small>mdi-information-outline</v-icon>
+                      <template v-slot:activator="{ props }">
+                        <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
                       </template>
                       <span>Minimum hours a user can reserve a container</span>
                     </v-tooltip>
@@ -78,8 +78,8 @@
                 >
                   <template v-slot:append>
                     <v-tooltip bottom>
-                      <template v-slot:activator="{ on }">
-                        <v-icon v-on="on" small>mdi-information-outline</v-icon>
+                      <template v-slot:activator="{ props }">
+                        <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
                       </template>
                       <span>Maximum hours a user can reserve a container (up to 60 days)</span>
                     </v-tooltip>
@@ -113,8 +113,8 @@
                 >
                   <template v-slot:append>
                     <v-tooltip bottom>
-                      <template v-slot:activator="{ on }">
-                        <v-icon v-on="on" small>mdi-information-outline</v-icon>
+                      <template v-slot:activator="{ props }">
+                        <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
                       </template>
                       <span>Maximum number of active (reserved or started) reservations a user can have</span>
                     </v-tooltip>
@@ -129,10 +129,10 @@
 
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="blue darken-1" text @click="close">Cancel</v-btn>
-        <v-btn 
-          color="blue darken-1" 
-          text 
+        <v-btn color="blue darken-1" variant="text" @click="close">Cancel</v-btn>
+        <v-btn
+          color="blue darken-1"
+          variant="text"
           @click="save" 
           :loading="isSubmitting"
           :disabled="!isValid"
@@ -145,11 +145,16 @@
 </template>
 
 <script>
-const axios = require('axios').default;
+import axios from 'axios';
 import Loading from '../global/Loading.vue';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: "AdminRoleReservationLimitsModal",
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
   components: {
     Loading
   },
@@ -223,12 +228,12 @@ export default {
     async fetchData() {
       this.isFetching = true;
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         
         // Fetch existing role reservation limits from backend
         const response = await axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_role_reservation_limits,
+          url: this.$appSettings.APIServer.admin.get_role_reservation_limits,
           params: { roleId: this.roleId },
           headers: {
             'Authorization': `Bearer ${currentUser.loginToken}`
@@ -245,7 +250,7 @@ export default {
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error loading reservation limits", 
           color: "red" 
         });
@@ -258,11 +263,11 @@ export default {
       
       this.isSubmitting = true;
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         
         const response = await axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_role_reservation_limits,
+          url: this.$appSettings.APIServer.admin.save_role_reservation_limits,
           data: { 
             roleId: this.roleId,
             reservationLimits: this.reservationLimits
@@ -274,20 +279,20 @@ export default {
         });
 
         if (response.data.status === true) {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: "Reservation limits saved successfully", 
             color: "green" 
           });
           this.$emit('emitModalClose', true);
         } else {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: response.data.message, 
             color: "red" 
           });
         }
       } catch (error) {
         console.error('Error saving reservation limits:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error saving reservation limits", 
           color: "red" 
         });

@@ -4,8 +4,7 @@
     <v-data-table
       :headers="table.headers"
       :items="data"
-      :sort-by="'containerId'"
-      :sort-desc="true"
+      :sort-by="[{key: 'containerId', order: 'desc'}]"
       class="elevation-1">
 
       <!-- Public status with colored labels -->
@@ -13,7 +12,7 @@
         <v-chip
           :color="item.public ? 'green' : 'orange'"
           text-color="white"
-          small
+          size="small"
         >
           {{ item.public ? 'Public' : 'Private' }}
         </v-chip>
@@ -45,14 +44,14 @@
       hasLongItems: false,
       table: {
         headers: [
-          { text: 'Container ID', value: 'containerId' },
-          { text: 'Public', value: 'public' },
-          { text: 'name', value: 'name' },
-          { text: 'Image name', value: 'imageName' },
-          { text: 'Description', value: 'description' },
-          { text: 'Created At', value: 'createdAt' },
-          { text: 'Updated At', value: 'updatedAt' },
-          { text: 'Actions', value: 'actions' },
+          { title: 'Container ID', key: 'containerId' },
+          { title: 'Public', key: 'public' },
+          { title: 'name', key: 'name' },
+          { title: 'Image name', key: 'imageName' },
+          { title: 'Description', key: 'description' },
+          { title: 'Created At', key: 'createdAt' },
+          { title: 'Updated At', key: 'updatedAt' },
+          { title: 'Actions', key: 'actions' },
         ],
       }
     }),

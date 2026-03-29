@@ -4,8 +4,7 @@
     <v-data-table
       :headers="table.headers"
       :items="reservations"
-      :sort-by="'reservationId'"
-      :sort-desc="true"
+      :sort-by="[{key: 'reservationId', order: 'desc'}]"
       class="elevation-1">
       <!-- Status -->
       <template v-slot:item.status="{item}">
@@ -19,8 +18,8 @@
       <template v-slot:item.description="{item}">
         <span v-if="item.description && item.description.trim()">
           <v-tooltip bottom v-if="item.description.length > 20">
-            <template v-slot:activator="{ on, attrs }">
-              <span v-bind="attrs" v-on="on" class="description-text">{{ truncateDescription(item.description) }}</span>
+            <template v-slot:activator="{ props }">
+              <span v-bind="props" class="description-text">{{ truncateDescription(item.description) }}</span>
             </template>
             <span>{{ item.description }}</span>
           </v-tooltip>
@@ -31,8 +30,8 @@
       <!-- Start date -->
       <template v-slot:item.startDate="{item}">
         <v-tooltip bottom>
-          <template v-slot:activator="{ on, attrs }">
-            <span v-bind="attrs" v-on="on" class="resource-link">{{ parseTime(item.startDate) }}</span>
+          <template v-slot:activator="{ props }">
+            <span v-bind="props" class="resource-link">{{ parseTime(item.startDate) }}</span>
           </template>
           <span>Reserved: {{ parseTime(item.createdAt) }}</span>
         </v-tooltip>
@@ -44,8 +43,8 @@
       <!-- Resources -->
       <template v-slot:item.resourcesInfo="{item}">
         <v-tooltip bottom>
-          <template v-slot:activator="{ on, attrs }">
-            <span v-bind="attrs" v-on="on" class="resource-link">{{ item.computerName }}</span>
+          <template v-slot:activator="{ props }">
+            <span v-bind="props" class="resource-link">{{ item.computerName }}</span>
           </template>
           <div style="max-width: 300px;">
             <div><strong>Server:</strong> {{ item.computerName }}</div>
@@ -94,18 +93,18 @@
       table: {
         headers: [
           {
-            text: 'Status',
+            title: 'Status',
             align: 'start',
             sortable: false,
-            value: 'status',
+            key: 'status',
           },
-          { text: 'ID', value: 'reservationId' },
-          { text: 'Starts', value: 'startDate' },
-          { text: 'Ends', value: 'endDate' },
-          { text: 'Resources', value: 'resourcesInfo' },
-          { text: 'Description', value: 'description' },
-          { text: 'Issues', value: 'containerStatus' },
-          { text: 'actions', value: 'actions' },
+          { title: 'ID', key: 'reservationId' },
+          { title: 'Starts', key: 'startDate' },
+          { title: 'Ends', key: 'endDate' },
+          { title: 'Resources', key: 'resourcesInfo' },
+          { title: 'Description', key: 'description' },
+          { title: 'Issues', key: 'containerStatus' },
+          { title: 'actions', key: 'actions' },
         ],
       }
     }),

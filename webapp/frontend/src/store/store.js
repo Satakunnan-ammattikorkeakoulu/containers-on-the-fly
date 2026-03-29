@@ -1,39 +1,26 @@
-import Vue from 'vue'
-import Vuex from 'vuex'
-const axios = require('axios').default;
-import AppSettings from '/src/AppSettings.js';
+import { defineStore } from 'pinia'
+import axios from 'axios'
+import AppSettings from '/src/AppSettings.js'
 
-Vue.use(Vuex);
-
-// Helper function for responses
-function Response(success, message) {
-  return { success, message };
-}
-
-// Global VUEX store
-export const store = new Vuex.Store({
-  // ##########
-  // # STATES #
-  // ##########
-  state: {
+export const useMainStore = defineStore('main', {
+  state: () => ({
     // For global snackbar (message) component
     snackbar: {
-      text: null, // Text for snackbar
-      color: "primary", // Color for snackbar
-      visible: false, // Is the snackbar visible
-      close: false, // Does user see close button
-      timeout: 7000, // Default timeout for snackbars
-      multiline: false, // Is this multiline, automatically set below
+      text: null,
+      color: "primary",
+      visible: false,
+      close: false,
+      timeout: 7000,
+      multiline: false,
     },
-    initializing: true, // Set to false after we have initialized the app / store
+    initializing: true,
     // Information about the currently logged-in user
     user: {
       loginToken: "",
       email: "",
       role: "",
-      roles: [],  // Array of all user roles (excluding 'everyone')
+      roles: [],
       loggedinAt: null,
-      // User's reservation limits based on their roles
       reservationLimits: {
         minDuration: 1,
         maxDuration: 48,
@@ -62,60 +49,40 @@ export const store = new Vuex.Store({
     configLoaded: false,
     configError: false,
     configErrorMessage: ""
-  },
-  // ###########
-  // # GETTERS #
-  // ###########
+  }),
+
   getters: {
-    // Gets current user data or null
-    user: state => {
-      return state.user || null
-    },
-    // Check if user is logged in or not, only in clientside
-    isLoggedIn: state => {
+    isLoggedIn: (state) => {
       if (state.user && state.user.loginToken) return true
       else return false
     },
-    // true if we are loading the app, false otherwise
-    isInitializing: state => {
-      return state.initializing
-    },
-    // App configuration getters
-    appConfig: state => state.appConfig,
-    isConfigLoaded: state => state.configLoaded,
-    hasConfigError: state => state.configError,
-    configErrorMessage: state => state.configErrorMessage,
-    appName: state => state.appConfig.app.name || 'Containers on the Fly',
-    appTimezone: state => state.appConfig.app.timezone,
-    contactEmail: state => state.appConfig.app.contactEmail,
-    loginPageInfo: state => state.appConfig.instructions.login,
-    reservationPageInstructions: state => state.appConfig.instructions.reservation,
-    emailInstructions: state => state.appConfig.instructions.email,
-    loginText: state => state.appConfig.instructions.login,
-    usernameField: state => state.appConfig.instructions.usernameFieldLabel,
-    passwordField: state => state.appConfig.instructions.passwordFieldLabel,
-    // User reservation limits
-    userReservationLimits: state => state.user.reservationLimits,
-    userMinDuration: state => state.user.reservationLimits.minDuration,
-    userMaxDuration: state => state.user.reservationLimits.maxDuration,
-    userMaxActiveReservations: state => state.user.reservationLimits.maxActiveReservations
+    isInitializing: (state) => state.initializing,
+    isConfigLoaded: (state) => state.configLoaded,
+    hasConfigError: (state) => state.configError,
+    appName: (state) => state.appConfig.app.name || 'Containers on the Fly',
+    appTimezone: (state) => state.appConfig.app.timezone,
+    contactEmail: (state) => state.appConfig.app.contactEmail,
+    loginPageInfo: (state) => state.appConfig.instructions.login,
+    reservationPageInstructions: (state) => state.appConfig.instructions.reservation,
+    emailInstructions: (state) => state.appConfig.instructions.email,
+    loginText: (state) => state.appConfig.instructions.login,
+    usernameField: (state) => state.appConfig.instructions.usernameFieldLabel,
+    passwordField: (state) => state.appConfig.instructions.passwordFieldLabel,
+    userReservationLimits: (state) => state.user.reservationLimits,
+    userMinDuration: (state) => state.user.reservationLimits.minDuration,
+    userMaxDuration: (state) => state.user.reservationLimits.maxDuration,
+    userMaxActiveReservations: (state) => state.user.reservationLimits.maxActiveReservations,
   },
-  // #############
-  // # MUTATIONS #
-  // #############
-  mutations: {
-    // eslint-disable-next-line
-    initialiseStore(state, payload) {
-      // Load app configuration first, then check for user login
-      this.dispatch('loadAppConfig').then(() => {
-        // Only continue if config loaded successfully (no error state)
-        if (!state.configError) {
-          // Apply all permanent localStorage items to store here
+
+  actions: {
+    initialiseStore() {
+      this.loadAppConfig().then(() => {
+        if (!this.configError) {
           try {
             let user = localStorage.getItem("user")
             if (user) {
               user = JSON.parse(user)
-              this.commit("setUser", {
+              this.setUser({
                 "loginToken": user.loginToken,
                 "email": user.email,
                 "role": user.role,
@@ -129,147 +96,131 @@ export const store = new Vuex.Store({
               });
             }
             else {
-              state.initializing = false
+              this.initializing = false
             }
           }
           catch (e) {
             console.log("Error parsing initializeStore items:", e)
-            state.initializing = false
+            this.initializing = false
           }
         }
-        // If config error exists, initialization stops and error page shows
       }).catch(() => {
-        // This catch should not be reached now since we handle errors in loadAppConfig
-        state.initializing = false
+        this.initializing = false
       });
     },
-    
-    setAppConfig(state, config) {
-      state.appConfig = { ...state.appConfig, ...config };
-      state.configLoaded = true;
-      state.configError = false;
-      state.configErrorMessage = "";
+
+    setAppConfig(config) {
+      this.appConfig = { ...this.appConfig, ...config };
+      this.configLoaded = true;
+      this.configError = false;
+      this.configErrorMessage = "";
     },
-    
-    setConfigError(state, errorMessage) {
-      state.configError = true;
-      state.configErrorMessage = errorMessage;
-      state.configLoaded = false;
+
+    setConfigError(errorMessage) {
+      this.configError = true;
+      this.configErrorMessage = errorMessage;
+      this.configLoaded = false;
     },
-    
-    clearConfigError(state) {
-      state.configError = false;
-      state.configErrorMessage = "";
+
+    clearConfigError() {
+      this.configError = false;
+      this.configErrorMessage = "";
     },
-    
-    // Sets currently logged-in user data
-    setUser(state, payload) {
+
+    setUser(payload) {
       if (!payload.callback) payload.callback = () => { };
 
-      if (!payload.loginToken) return payload.callback(Response(false, "loginToken was missing"));
+      if (!payload.loginToken) return payload.callback({ success: false, message: "loginToken was missing" });
       let _this = this;
-      
+
       axios({
         method: "get",
         url: AppSettings.APIServer.user.check_token,
         headers: {"Authorization" : `Bearer ${payload.loginToken}`}
       })
       .then(function (response) {
-          // Success
           if (response.data.status == true) {
-            state.user.loginToken = payload.loginToken
-            state.user.email = response.data.data.email
-            state.user.role = response.data.data.role
-            state.user.roles = response.data.data.roles || []
-            state.user.loggedinAt = new Date()
-            // Set reservation limits from backend
+            _this.user.loginToken = payload.loginToken
+            _this.user.email = response.data.data.email
+            _this.user.role = response.data.data.role
+            _this.user.roles = response.data.data.roles || []
+            _this.user.loggedinAt = new Date()
             if (response.data.data.reservationLimits) {
-              state.user.reservationLimits = response.data.data.reservationLimits
+              _this.user.reservationLimits = response.data.data.reservationLimits
             }
-            localStorage.setItem("user", JSON.stringify(state.user))
-            if (state.initializing) state.initializing = false
-            return payload.callback(Response(true, "Login token OK!"));
+            localStorage.setItem("user", JSON.stringify(_this.user))
+            if (_this.initializing) _this.initializing = false
+            return payload.callback({ success: true, message: "Login token OK!" });
           }
-          // Fail
           else {
-            console.log("Invalid token – logging user out.")
-            _this.commit("logoutUser")
-            if (state.initializing) state.initializing = false
-            return payload.callback(Response(false, "Invalid login token."));
+            console.log("Invalid token - logging user out.")
+            _this.logoutUser()
+            if (_this.initializing) _this.initializing = false
+            return payload.callback({ success: false, message: "Invalid login token." });
           }
       })
       .catch(function (error) {
-          // Error
           if (error.response && error.response.status == 400) {
-            return payload.callback(Response(false, error.response.data.detail));
+            return payload.callback({ success: false, message: error.response.data.detail });
           }
-          // Unauthorized
           else if (error.response && error.response.status == 401) {
-            console.log("Unauthorized – Logging user out.")
-            _this.commit("logoutUser")
-            if (state.initializing) state.initializing = false
-            return payload.callback(Response(false, "Invalid login token."));
+            console.log("Unauthorized - Logging user out.")
+            _this.logoutUser()
+            if (_this.initializing) _this.initializing = false
+            return payload.callback({ success: false, message: "Invalid login token." });
           }
           else {
             console.log(error)
-            return payload.callback(Response(false, "Unknown error."));
+            return payload.callback({ success: false, message: "Unknown error." });
           }
       });
     },
-    
-    // Logs out currently logged in user
-    logoutUser(state) {
+
+    logoutUser() {
       localStorage.removeItem("user")
-      state.user.loginToken = ""
-      state.user.email = ""
-      state.user.role = ""
-      state.user.roles = []
-      state.user.loggedinAt = null
+      this.user.loginToken = ""
+      this.user.email = ""
+      this.user.role = ""
+      this.user.roles = []
+      this.user.loggedinAt = null
     },
-    
-    // Shows global snackbar message
-    showMessage(state, payload) {
-      state.snackbar.text = payload.text;
-      state.snackbar.color = payload.color || "primary";
-      state.snackbar.close = payload.close || false;
-      state.snackbar.multiline = (payload.text.length > 50) ? true : false;
+
+    showMessage(payload) {
+      this.snackbar.text = payload.text;
+      this.snackbar.color = payload.color || "primary";
+      this.snackbar.close = payload.close || false;
+      this.snackbar.multiline = (payload.text.length > 50) ? true : false;
 
       if (payload.multiline) {
-        state.snackbar.multiline = payload.multiline;
+        this.snackbar.multiline = payload.multiline;
       }
 
       if (payload.timeout) {
-        state.snackbar.timeout = payload.timeout;
+        this.snackbar.timeout = payload.timeout;
       }
 
-      state.snackbar.visible = true;
+      this.snackbar.visible = true;
     },
-    
-    // Closes the global snackbar
-    closeMessage(state) {
-      state.snackbar.visible = false;
-    }
-  },
-  
-  // ###########
-  // # ACTIONS #
-  // ###########
-  actions: {
-    async loadAppConfig({ commit }) {
+
+    closeMessage() {
+      this.snackbar.visible = false;
+    },
+
+    async loadAppConfig() {
       try {
         const response = await axios.get(AppSettings.APIServer.app.get_config);
         if (response.data.status) {
-          commit('setAppConfig', response.data.data);
+          this.setAppConfig(response.data.data);
         } else {
           console.error('Failed to load app config:', response.data.message);
-          commit('setConfigError', response.data.message || 'Failed to load application configuration');
-          return; // Don't continue with user initialization
+          this.setConfigError(response.data.message || 'Failed to load application configuration');
+          return;
         }
       } catch (error) {
         console.error('Error loading app config:', error);
         const errorMessage = error.response?.data?.message || error.message || 'Unable to connect to server';
-        commit('setConfigError', `Error loading app configuration: ${errorMessage}`);
-        return; // Don't continue with user initialization
+        this.setConfigError(`Error loading app configuration: ${errorMessage}`);
+        return;
       }
     }
   }

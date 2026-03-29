@@ -40,13 +40,19 @@
 </template>
 
 <script>
-  const axios = require('axios').default;
+  import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import AdminComputersTable from '/src/components/admin/AdminComputersTable.vue';
   import AdminManageComputerModal from '/src/components/admin/AdminManageComputerModal.vue';
-  
+  import { useMainStore } from '@/store/store'
+
   export default {
     name: 'PageAdminComputers',
+
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
 
     components: {
     Loading,
@@ -96,11 +102,11 @@
         }
 
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.remove_computer,
+          url: this.$appSettings.APIServer.admin.remove_computer,
           params: params,
           headers: {
             "Authorization" : `Bearer ${currentUser.loginToken}`
@@ -110,7 +116,7 @@
           //console.log(response)
             // Success
             if (response.data.status == true) {
-              _this.$store.commit('showMessage', { text: "Computer removed.", color: "green" })
+              _this.store.showMessage({ text: "Computer removed.", color: "green" })
               _this.fetch()
             }
             // Fail
@@ -118,17 +124,17 @@
               console.log("Failed removing computer...")
               console.log(response)
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error removing the container."
-              _this.$store.commit('showMessage', { text: msg, color: "red" })
+              _this.store.showMessage({ text: msg, color: "red" })
             }
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
         });
       },
@@ -138,11 +144,11 @@
       },
       fetch() {
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_computers,
+          url: this.$appSettings.APIServer.admin.get_computers,
           //params: { }
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -157,18 +163,18 @@
             // Fail
             else {
               console.log("Failed getting "+_this.tableName+"...")
-              _this.$store.commit('showMessage', { text: "There was an error getting "+_this.tableName+".", color: "red" })
+              _this.store.showMessage({ text: "There was an error getting "+_this.tableName+".", color: "red" })
             }
             _this.isFetching = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to get "+_this.tableName+".", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to get "+_this.tableName+".", color: "red" })
             }
             _this.isFetching = false
         });
@@ -181,7 +187,7 @@
         if (!this.data || this.data.length === 0) return;
         
         let _this = this;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
         
         // Clear previous active status but don't clear lastUpdateTime
         this.activeServers = {};
@@ -191,7 +197,7 @@
           try {
             const response = await axios({
               method: "get",
-              url: `${this.AppSettings.APIServer.admin.get_server_monitoring}/${server.computerId}/monitoring`,
+              url: `${this.$appSettings.APIServer.admin.get_server_monitoring}/${server.computerId}/monitoring`,
               headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
             });
             
@@ -227,21 +233,21 @@
               
               // Store the last update time
               if (lastUpdated) {
-                _this.$set(_this.lastUpdateTime, server.computerId, lastUpdated);
+                _this.lastUpdateTime[server.computerId] = lastUpdated;
                 
                 // Consider active if data is less than 7 minutes old
                 const timeDiff = Date.now() - lastUpdated;
                 
                 if (timeDiff < 7 * 60 * 1000) {
-                  _this.$set(_this.activeServers, server.computerId, true);
+                  _this.activeServers[server.computerId] = true;
                 }
               }
               
               // Even if no timestamp, if we got data, the server responded
               // So we can consider it active
               if (!lastUpdated && response.data.data.metrics) {
-                _this.$set(_this.activeServers, server.computerId, true);
-                _this.$set(_this.lastUpdateTime, server.computerId, Date.now());
+                _this.activeServers[server.computerId] = true;
+                _this.lastUpdateTime[server.computerId] = Date.now();
               }
             }
           } catch (error) {
@@ -253,15 +259,15 @@
       
       async fetchMonitoringData(computerId) {
         let _this = this;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
         
         // Set loading state for this server
-        this.$set(this.monitoringData, computerId, { loading: true });
+        this.monitoringData[computerId] = { loading: true };
         
         try {
           const response = await axios({
             method: "get",
-            url: `${this.AppSettings.APIServer.admin.get_server_monitoring}/${computerId}/monitoring`,
+            url: `${this.$appSettings.APIServer.admin.get_server_monitoring}/${computerId}/monitoring`,
             headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
           });
           
@@ -269,7 +275,7 @@
             const data = response.data.data;
             
             // Update monitoring data for this server
-            _this.$set(_this.monitoringData, computerId, {
+            _this.monitoringData[computerId] = {
               loading: false,
               metrics: data.metrics || {
                 cpu: { usage: null, cores: null },
@@ -286,7 +292,7 @@
               },
               version: data.version || { software: null, updated: null },
               lastUpdated: data.metrics?.lastUpdated ? new Date(data.metrics.lastUpdated + 'Z') : null
-            });
+            };
             
             // Update active status and last update time
             let lastUpdated = null;
@@ -316,35 +322,35 @@
             }
             
             if (lastUpdated) {
-              _this.$set(_this.lastUpdateTime, computerId, lastUpdated);
+              _this.lastUpdateTime[computerId] = lastUpdated;
               const timeDiff = Date.now() - lastUpdated;
               if (timeDiff < 7 * 60 * 1000) {
-                _this.$set(_this.activeServers, computerId, true);
+                _this.activeServers[computerId] = true;
               }
             } else if (data.metrics) {
               // Even if no timestamp, if we got data, the server responded
-              _this.$set(_this.activeServers, computerId, true);
-              _this.$set(_this.lastUpdateTime, computerId, Date.now());
+              _this.activeServers[computerId] = true;
+              _this.lastUpdateTime[computerId] = Date.now();
             }
           } else {
             // No data available
-            _this.$set(_this.monitoringData, computerId, {
+            _this.monitoringData[computerId] = {
               loading: false,
               metrics: null,
               logs: null,
               version: null,
               lastUpdated: null
-            });
+            };
           }
         } catch (error) {
           // Failed to fetch monitoring data
-          _this.$set(_this.monitoringData, computerId, {
+          _this.monitoringData[computerId] = {
             loading: false,
             metrics: null,
             logs: null,
             version: null,
             lastUpdated: null
-          });
+          };
         }
       }
     },

@@ -296,7 +296,7 @@ fix: Fix group removal logic to not break on empty usernames
   <img width="600" alt="Login interface" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/architecture.png">
 </a>
 
-The app is split into two projects: frontend and backend. The frontend can be located from `webapp/frontend` and backend from `webapp/backend`. Both the frontend and backend will run on different ports. The backend also includes a separate script for starting and stopping the reserved containers, called `docker_util.py`.
+The app is split into two projects: frontend and backend. The frontend can be located from `webapp/frontend` and backend from `webapp/backend`. Both the frontend and backend will run on different ports. The backend also includes a separate script for starting and stopping the reserved containers, called `dockerUtil.py`.
 
 ### Frontend
 
@@ -306,4 +306,4 @@ The frontend has been developed using Vue 2.
 
 The backend has been developed using Python 3, SQLAlchemy and FastAPI.
 
-The backend also includes a tool called `docker_util.py` that handles starting and stopping the reserved containers.
+The backend also includes a tool called `dockerUtil.py` that handles starting and stopping the reserved containers.

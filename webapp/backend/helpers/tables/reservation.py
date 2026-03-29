@@ -1,6 +1,7 @@
 # Reservation table management functionality
 from database import Reservation, Session
 from datetime import datetime
+from sqlalchemy import select
 
 def get_reservations(filter = None):
     '''
@@ -10,27 +11,27 @@ def get_reservations(filter = None):
     Returns:
         All found reservations in a list.
     '''
-    
+
     with Session() as session:
         all_reservations_list = []
 
         if filter is None:
-            all_reservations = session.query(Reservation)
+            all_reservations = session.execute(select(Reservation)).scalars().all()
             for reservation in all_reservations:
                 all_reservations_list.append(reservation)
             return all_reservations_list
-        
+
         if filter:
             try:
                 filter = datetime.strptime(filter, '%Y-%m-%d %H:%M:%S')
-                found_reservation = session.query(Reservation).filter(Reservation.startDate == filter).all()
+                found_reservation = session.execute(select(Reservation).where(Reservation.startDate == filter)).scalars().all()
                 if found_reservation:
                     return found_reservation
-                found_reservation = session.query(Reservation).filter(Reservation.endDate == filter).all()
+                found_reservation = session.execute(select(Reservation).where(Reservation.endDate == filter)).scalars().all()
                 if found_reservation:
                     return found_reservation
             except ValueError:
-                found_reservation = session.query(Reservation).filter(Reservation.status == filter).all()
+                found_reservation = session.execute(select(Reservation).where(Reservation.status == filter)).scalars().all()
                 if found_reservation:
                     return found_reservation
 
@@ -46,11 +47,11 @@ def get_reservation(filter = None):
     '''
     with Session() as session:
         if filter != None:
-            reservations = session.query(Reservation).filter(Reservation.reservationId == filter).first()
+            reservations = session.execute(select(Reservation).where(Reservation.reservationId == filter)).scalar_one_or_none()
             if reservations != None: return [reservations]
             else: return None
         return reservations
-    
+
 
 
 def add_reservation(startDate, endDate, userId, computerId, containerId):
@@ -81,11 +82,11 @@ def remove_reservation(reservation_id):
     Removes the given reservation from the system.
         Parameters:
             reservation: The reservation id of the reservation to be removed.
-        Returns: 
+        Returns:
             Nothing
     '''
     with Session() as session:
-        reservation = session.query(Reservation).filter(Reservation.reservationId == reservation_id).first()
+        reservation = session.execute(select(Reservation).where(Reservation.reservationId == reservation_id)).scalar_one_or_none()
         session.delete(reservation)
         session.commit()
 
@@ -101,7 +102,7 @@ def edit_reservation(reservation_id, new_startDate = None, new_endDate = None, n
             The edited reservation object fetched from database. Or none if startDate, endDate or status isn't provided
     '''
     with Session() as session:
-        reservation = session.query(Reservation).filter(Reservation.reservationId == reservation_id).first()
+        reservation = session.execute(select(Reservation).where(Reservation.reservationId == reservation_id)).scalar_one_or_none()
         if new_startDate != None:
             reservation.startDate = new_startDate
         if new_endDate != None:

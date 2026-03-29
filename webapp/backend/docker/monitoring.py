@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 from database import ServerStatus, ServerLogs, Computer, Session
 from settings_handler import settings_handler
+from sqlalchemy import select
 
 
 def read_version_file():
@@ -36,18 +37,22 @@ def update_server_monitoring():
     """Update server monitoring data in database"""
     try:
         with Session() as session:
-            computer = session.query(Computer).filter(
-                Computer.name == settings_handler.get_setting("docker.serverName")
-            ).first()
+            computer = session.execute(
+                select(Computer).where(
+                    Computer.name == settings_handler.get_setting("docker.serverName")
+                )
+            ).scalar_one_or_none()
 
             if not computer:
                 print(f"Warning: Computer '{settings_handler.get_setting('docker.serverName')}' not found in database")
                 return
 
             # Get or create status record
-            status = session.query(ServerStatus).filter(
-                ServerStatus.computerId == computer.computerId
-            ).first()
+            status = session.execute(
+                select(ServerStatus).where(
+                    ServerStatus.computerId == computer.computerId
+                )
+            ).scalar_one_or_none()
 
             if not status:
                 status = ServerStatus(computerId=computer.computerId)
@@ -167,10 +172,12 @@ def update_server_logs(computer_id: int, session):
 def update_log_record(session, computer_id: int, log_type: str, content: str, lines: int):
     """Helper function to upsert log records"""
     try:
-        log_record = session.query(ServerLogs).filter(
-            ServerLogs.computerId == computer_id,
-            ServerLogs.logType == log_type
-        ).first()
+        log_record = session.execute(
+            select(ServerLogs).where(
+                ServerLogs.computerId == computer_id,
+                ServerLogs.logType == log_type
+            )
+        ).scalar_one_or_none()
 
         if not log_record:
             log_record = ServerLogs(

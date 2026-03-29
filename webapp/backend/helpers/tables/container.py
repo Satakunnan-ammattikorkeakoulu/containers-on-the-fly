@@ -1,5 +1,6 @@
 # Container table management functionality
 from database import Container, Session
+from sqlalchemy import select
 
 def get_containers(filter = None):
   '''
@@ -11,16 +12,16 @@ def get_containers(filter = None):
   '''
   with Session() as session:
     if filter != None:
-      containers = session.query(Container).filter(Container.name == filter).first()
+      containers = session.execute(select(Container).where(Container.name == filter)).scalar_one_or_none()
       if containers != None: return [containers]
       else:
         try:
-          containers = session.query(Container).filter(Container.containerId == int(filter)).first()
+          containers = session.execute(select(Container).where(Container.containerId == int(filter))).scalar_one_or_none()
           if containers != None: return [containers]
           else: return None
         except:
           return None
-    else: containers = session.query(Container).all()
+    else: containers = session.execute(select(Container)).scalars().all()
     return containers
 
 def add_container(name, public, description, imageName):
@@ -33,13 +34,13 @@ def add_container(name, public, description, imageName):
       The created container object fetched from database. Or None if provided name already exists.
   '''
   with Session() as session:
-    duplicate = session.query(Container).filter(Container.name == name).first()
+    duplicate = session.execute(select(Container).where(Container.name == name)).scalar_one_or_none()
     if duplicate != None:
         return None
     new_container = Container(name = name, public = public, description = description, imageName = imageName)
     session.add(new_container)
     session.commit()
-    return session.query(Container).filter(Container.name == name).first()
+    return session.execute(select(Container).where(Container.name == name)).scalar_one_or_none()
 
 def remove_container(container_id):
   '''
@@ -50,7 +51,7 @@ def remove_container(container_id):
       Nothing
   '''
   with Session() as session:
-    container = session.query(Container).filter(Container.containerId == container_id).first()
+    container = session.execute(select(Container).where(Container.containerId == container_id)).scalar_one_or_none()
     session.delete(container)
     session.commit()
 
@@ -67,7 +68,7 @@ def edit_container(container_id, new_name = None, new_public = None, new_descrip
       The edited container object fetched from database. Or None if name or publicity isn't provided.
   '''
   with Session() as session:
-    container = session.query(Container).filter(Container.containerId == container_id).first()
+    container = session.execute(select(Container).where(Container.containerId == container_id)).scalar_one_or_none()
     if new_name != None: container.name = new_name
     if new_public != None: container.public = new_public
     if new_description != None: container.description = new_description

@@ -32,7 +32,7 @@
     <v-row class="text-center" v-if="justReserved">
       <v-col cols="1"></v-col>
       <v-col cols="10">
-        <v-alert type="info" :icon="false" dismissible>
+        <v-alert type="info" :icon="false" closable v-model="justReserved" class="text-center reservation-success-alert">
           <h3 style="margin-bottom: 15px;">Reservation created succesfully</h3>
           <p>Your server has been reserved. You can view the details on how to access the server from this page after the container has been started.</p>
           <p v-if="informByEmail">You will also be emailed the connection details after the container starts.</p>
@@ -57,10 +57,9 @@
             :items="statusItems"
             label="Status"
             v-model="filters.status"
-            item-text="text"
+            item-title="text"
             item-value="value"
-            return-object
-            @change="setFilters"
+            @update:model-value="setFilters"
           ></v-select>
         </v-col>
       </v-row>
@@ -87,15 +86,20 @@
 </template>
 
 <script>
-  const axios = require('axios').default;
+  import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import UserReservationTable from '/src/components/user/UserReservationTable.vue';
   import UserReservationsModalConnectionDetails from '/src/components/user/UserReservationsModalConnectionDetails.vue';
   import CalendarReservations from '/src/components/user/CalendarReservations.vue';
-  import AppSettings from '/src/AppSettings.js';
-  
+  import { useMainStore } from '@/store/store'
+
   export default {
     name: 'PageUserReservations',
+
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
 
     components: {
       Loading,
@@ -104,10 +108,11 @@
       CalendarReservations
     },
     data: () => ({
-      filters: { status: { text: "All", value: "All" } },
+      filters: { status: "All" },
       intervalFetchReservations: null,
       isFetchingReservations: true,
       reservations: [],
+      totalReservationCount: 0,
       statusCounts: {},
       justReserved: false,
       informByEmail: false,
@@ -116,7 +121,6 @@
       showCalendar: false,
       allReservations: null,
       fetchingAllReservations: false,
-      AppSettings: AppSettings
     }),
     mounted () {
       if (localStorage.getItem("justReserved") === "true") {
@@ -143,7 +147,7 @@
       createReservation() {
         // Check against the user's actual limit
         if (this.activeReservationCount >= this.maxActiveReservations) {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({ 
             text: `You have reached your maximum of ${this.maxActiveReservations} active reservation${this.maxActiveReservations === 1 ? '' : 's'}. Please wait for an existing reservation to complete before creating a new one.`, 
             color: "red" 
           })
@@ -155,7 +159,7 @@
       },
       fetchReservations() {
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
         
         let filters = {}
         Object.keys(_this.filters).forEach(function(key) {
@@ -165,7 +169,7 @@
         
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.reservation.get_own_reservations,
+          url: this.$appSettings.APIServer.reservation.get_own_reservations,
           data: { filters: filters },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -174,27 +178,30 @@
             // Success
             if (response.data.status == true) {
               _this.reservations = response.data.data.reservations
-              _this.statusCounts = response.data.data.statusCounts || {}
-              // If no statusCounts from backend, calculate locally
-              if (Object.keys(_this.statusCounts).length === 0) {
-                _this.calculateStatusCounts();
+              // Only update status counts when fetching unfiltered data
+              if (_this.filters.status === "All") {
+                _this.totalReservationCount = _this.reservations.length
+                _this.statusCounts = response.data.data.statusCounts || {}
+                if (Object.keys(_this.statusCounts).length === 0) {
+                  _this.calculateStatusCounts();
+                }
               }
             }
             // Fail
             else {
               console.log("Failed getting own reservations...")
-              _this.$store.commit('showMessage', { text: "There was an error getting own reservations.", color: "red" })
+              _this.store.showMessage({ text: "There was an error getting own reservations.", color: "red" })
             }
             _this.isFetchingReservations = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to get reservations.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to get reservations.", color: "red" })
             }
             _this.isFetchingReservations = false
         });
@@ -208,11 +215,11 @@
 
         let _this = this
         _this.cancellingReservation = true
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.reservation.cancel_reservation,
+          url: this.$appSettings.APIServer.reservation.cancel_reservation,
           params: params,
           headers: {
             "Authorization" : `Bearer ${currentUser.loginToken}`
@@ -222,7 +229,7 @@
           //console.log(response)
             // Success
             if (response.data.status == true) {
-              _this.$store.commit('showMessage', { text: "Reservation cancelled.", color: "green" })
+              _this.store.showMessage({ text: "Reservation cancelled.", color: "green" })
               _this.fetchReservations()
             }
             // Fail
@@ -230,18 +237,18 @@
               console.log("Failed removing reservation...")
               console.log(response)
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error getting the hardware specs."
-              _this.$store.commit('showMessage', { text: msg, color: "red" })
+              _this.store.showMessage({ text: msg, color: "red" })
             }
             _this.cancellingReservation = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.cancellingReservation = false
         });
@@ -253,11 +260,11 @@
         }
 
         if (isNaN(extraHours)) {
-          this.$store.commit('showMessage', { text: "Please type in a number.", color: "red" })
+          this.store.showMessage({ text: "Please type in a number.", color: "red" })
           return;
         }
         if (parseInt(extraHours) > 24 || parseInt(extraHours) < 0) {
-          this.$store.commit('showMessage', { text: "Please type in a number between 0 and 24.", color: "red" })
+          this.store.showMessage({ text: "Please type in a number between 0 and 24.", color: "red" })
           return;
         }
 
@@ -267,11 +274,11 @@
         }
 
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.reservation.extend_reservation,
+          url: this.$appSettings.APIServer.reservation.extend_reservation,
           params: params,
           headers: {
             "Authorization" : `Bearer ${currentUser.loginToken}`
@@ -281,23 +288,23 @@
           //console.log(response)
             // Success
             if (response.data.status == true) {
-              _this.$store.commit('showMessage', { text: "Reservation was extended succesfully.", color: "green" })
+              _this.store.showMessage({ text: "Reservation was extended succesfully.", color: "green" })
               _this.fetchReservations()
             }
             // Fail
             else {
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error extending."
-              _this.$store.commit('showMessage', { text: msg, color: "red" })
+              _this.store.showMessage({ text: msg, color: "red" })
             }
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
         });
       },
@@ -310,11 +317,11 @@
 
         let _this = this
         _this.restartingContainer = true
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.reservation.restart_container,
+          url: this.$appSettings.APIServer.reservation.restart_container,
           params: params,
           headers: {
             "Authorization" : `Bearer ${currentUser.loginToken}`
@@ -324,7 +331,7 @@
           //console.log(response)
             // Success
             if (response.data.status == true) {
-              _this.$store.commit('showMessage', { text: "Container restarted succesfully.", color: "green" })
+              _this.store.showMessage({ text: "Container restarted succesfully.", color: "green" })
               _this.fetchReservations()
             }
             // Fail
@@ -332,18 +339,18 @@
               console.log("Failed restarting container...")
               console.log(response)
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error getting the hardware specs."
-              _this.$store.commit('showMessage', { text: msg, color: "red" })
+              _this.store.showMessage({ text: msg, color: "red" })
             }
             _this.restartingContainer = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.restartingContainer = false
         });
@@ -364,11 +371,11 @@
       fetchAllReservations() {
         let _this = this;
         _this.fetchingAllReservations = true;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.reservation.get_current_reservations,
+          url: this.$appSettings.APIServer.reservation.get_current_reservations,
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
@@ -379,18 +386,18 @@
             // Fail
             else {
               console.log("Failed getting current reservations...")
-              _this.$store.commit('showMessage', { text: "There was an error getting current reservations.", color: "red" })
+              _this.store.showMessage({ text: "There was an error getting current reservations.", color: "red" })
             }
             _this.fetchingAllReservations = false;
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to get current reservations.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to get current reservations.", color: "red" })
             }
             _this.fetchingAllReservations = false;
         });
@@ -398,7 +405,7 @@
        handleSlotSelected() {
          // Check against the user's actual limit
          if (this.activeReservationCount >= this.maxActiveReservations) {
-           this.$store.commit('showMessage', { 
+           this.store.showMessage({ 
              text: `You have reached your maximum of ${this.maxActiveReservations} active reservation${this.maxActiveReservations === 1 ? '' : 's'}. Please wait for an existing reservation to complete before creating a new one.`, 
              color: "red" 
            })
@@ -436,7 +443,7 @@
     computed: {
       statusItems() {
         const items = [
-          { text: `All (${this.reservations.length})`, value: 'All' },
+          { text: `All (${this.totalReservationCount})`, value: 'All' },
           { text: `reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
           { text: `started (${this.statusCounts.started || 0})`, value: 'started' },
           { text: `stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
@@ -445,7 +452,7 @@
         return items;
       },
       globalTimezone() {
-        return this.$store.getters.appTimezone;
+        return this.store.appTimezone;
       },
       activeReservationCount() {
         let count = 0;
@@ -455,7 +462,7 @@
         return count;
       },
       maxActiveReservations() {
-        return this.$store.getters.userMaxActiveReservations;
+        return this.store.userMaxActiveReservations;
       }
     },
     beforeDestroy() {
@@ -473,6 +480,22 @@
     .col-3 {
       padding-top: 30px;
       padding-bottom: 0px;
+    }
+  }
+</style>
+
+<style lang="scss">
+  .reservation-success-alert {
+    position: relative;
+
+    .v-alert__close {
+      position: absolute !important;
+      top: 0 !important;
+      right: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      flex: none !important;
+      grid-area: unset !important;
     }
   }
 </style>

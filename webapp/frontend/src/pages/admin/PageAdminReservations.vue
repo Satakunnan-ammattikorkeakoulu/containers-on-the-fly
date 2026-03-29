@@ -14,7 +14,7 @@
       <!-- Status Statistics -->
       <v-row class="mb-4 justify-center">
         <v-col cols="12" sm="6" md="2">
-          <v-card outlined>
+          <v-card variant="outlined">
             <v-card-text class="text-center">
               <v-icon size="24" color="blue-grey" class="mb-2">mdi-chart-bar</v-icon>
               <div class="text-h6 font-weight-bold">{{ stats.total }}</div>
@@ -23,7 +23,7 @@
           </v-card>
         </v-col>
         <v-col cols="12" sm="6" md="2">
-          <v-card outlined>
+          <v-card variant="outlined">
             <v-card-text class="text-center">
               <v-icon size="24" color="green" class="mb-2">mdi-play-circle</v-icon>
               <div class="text-h6 font-weight-bold text--primary" style="color: #4CAF50 !important;">{{ stats.started }}</div>
@@ -32,7 +32,7 @@
           </v-card>
         </v-col>
         <v-col cols="12" sm="6" md="2">
-          <v-card outlined>
+          <v-card variant="outlined">
             <v-card-text class="text-center">
               <v-icon size="24" color="orange" class="mb-2">mdi-stop-circle</v-icon>
               <div class="text-h6 font-weight-bold" style="color: #FF9800 !important;">{{ stats.stopped }}</div>
@@ -41,7 +41,7 @@
           </v-card>
         </v-col>
         <v-col cols="12" sm="6" md="2">
-          <v-card outlined>
+          <v-card variant="outlined">
             <v-card-text class="text-center">
               <v-icon size="24" color="red" class="mb-2">mdi-alert-circle</v-icon>
               <div class="text-h6 font-weight-bold" style="color: #F44336 !important;">{{ stats.error }}</div>
@@ -54,7 +54,7 @@
       <!-- Time-based Statistics -->
       <v-row class="mb-6 justify-center">
         <v-col cols="12" sm="6" md="2">
-          <v-card outlined>
+          <v-card variant="outlined">
             <v-card-text class="text-center">
               <v-icon size="24" color="primary" class="mb-2">mdi-calendar-today</v-icon>
               <div class="text-h6 font-weight-bold text-primary">{{ stats.today }}</div>
@@ -63,7 +63,7 @@
           </v-card>
         </v-col>
         <v-col cols="12" sm="6" md="2">
-          <v-card outlined>
+          <v-card variant="outlined">
             <v-card-text class="text-center">
               <v-icon size="24" color="primary" class="mb-2">mdi-calendar-week</v-icon>
               <div class="text-h6 font-weight-bold text-primary">{{ stats.lastWeek }}</div>
@@ -72,7 +72,7 @@
           </v-card>
         </v-col>
         <v-col cols="12" sm="6" md="2">
-          <v-card outlined>
+          <v-card variant="outlined">
             <v-card-text class="text-center">
               <v-icon size="24" color="primary" class="mb-2">mdi-calendar-month</v-icon>
               <div class="text-h6 font-weight-bold text-primary">{{ stats.lastMonth }}</div>
@@ -81,7 +81,7 @@
           </v-card>
         </v-col>
         <v-col cols="12" sm="6" md="2">
-          <v-card outlined>
+          <v-card variant="outlined">
             <v-card-text class="text-center">
               <v-icon size="24" color="primary" class="mb-2">mdi-calendar-range</v-icon>
               <div class="text-h6 font-weight-bold text-primary">{{ stats.lastThreeMonths }}</div>
@@ -99,10 +99,9 @@
           :items="statusItems"
           label="Status"
           v-model="filters.status"
-          item-text="text"
+          item-title="text"
           item-value="value"
-          return-object
-          @change="applyFilters"
+          @update:model-value="applyFilters"
         ></v-select>
       </v-col>
       <v-col cols="12" md="2">
@@ -138,13 +137,19 @@
 </template>
 
 <script>
-  const axios = require('axios').default;
+  import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import AdminReservationTable from '/src/components/admin/AdminReservationTable.vue';
   import UserReservationsModalConnectionDetails from '/src/components/user/UserReservationsModalConnectionDetails.vue';
-  
+  import { useMainStore } from '@/store/store'
+
   export default {
     name: 'PageUserReservations',
+
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
 
     components: {
       Loading,
@@ -160,7 +165,7 @@
       modalConnectionDetailsVisible: false,
       modalConnectionDetailsReservationId: null,
       filters: { 
-        status: { text: "All", value: "All" },
+        status: "All",
         reservationId: ''
       },
       filteredReservations: [],
@@ -238,17 +243,17 @@
         let activeReservationCount = 0
         this.reservations.forEach((res) => {
           // Only count admin's own reservations
-          if ((res.status == "started" || res.status == "reserved") && res.userEmail === this.$store.getters.user.email) {
+          if ((res.status == "started" || res.status == "reserved") && res.userEmail === this.store.user.email) {
             activeReservationCount++
           }
         })
 
         // Get user's reservation limits from store
-        const maxActiveReservations = this.$store.getters.userMaxActiveReservations
+        const maxActiveReservations = this.store.userMaxActiveReservations
 
         // Check against the user's actual limit
         if (activeReservationCount >= maxActiveReservations) {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({ 
             text: `You have reached your maximum of ${maxActiveReservations} active reservations.`, 
             color: "red" 
           })
@@ -260,7 +265,7 @@
       },
       fetchReservations() {
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
         
         let filters = {}
         Object.keys(_this.filters).forEach(function(key) {
@@ -270,7 +275,7 @@
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.get_reservations,
+          url: this.$appSettings.APIServer.admin.get_reservations,
           data: { filters: filters },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -285,18 +290,18 @@
             // Fail
             else {
               console.log("Failed getting own reservations...")
-              _this.$store.commit('showMessage', { text: "There was an error getting own reservations.", color: "red" })
+              _this.store.showMessage({ text: "There was an error getting own reservations.", color: "red" })
             }
             _this.isFetchingReservations = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to get reservations.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to get reservations.", color: "red" })
             }
             _this.isFetchingReservations = false
         });
@@ -304,10 +309,10 @@
       changeEndDate(reservationId, currentEndDate) {
         let newEndDate = prompt("Enter new end date", currentEndDate);
         if (newEndDate == null || newEndDate == currentEndDate || newEndDate == "") {
-          this.$store.commit('showMessage', { text: "Not changing end date.", color: "blue" })
+          this.store.showMessage({ text: "Not changing end date.", color: "blue" })
           return;
         }
-        this.$store.commit('showMessage', { text: "Changing end date.", color: "green" })
+        this.store.showMessage({ text: "Changing end date.", color: "green" })
 
         let params = {
           "reservationId": reservationId,
@@ -315,11 +320,11 @@
         }
 
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.edit_reservation,
+          url: this.$appSettings.APIServer.admin.edit_reservation,
           params: params,
           headers: {
             "Authorization" : `Bearer ${currentUser.loginToken}`
@@ -329,7 +334,7 @@
           //console.log(response)
             // Success
             if (response.data.status == true) {
-              _this.$store.commit('showMessage', { text: "Reservation edited.", color: "green" })
+              _this.store.showMessage({ text: "Reservation edited.", color: "green" })
               _this.fetchReservations()
             }
             // Fail
@@ -337,17 +342,17 @@
               console.log("Failed editing reservation...")
               console.log(response)
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error editing the reservation."
-              _this.$store.commit('showMessage', { text: msg, color: "red" })
+              _this.store.showMessage({ text: msg, color: "red" })
             }
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
         });
       },
@@ -360,11 +365,11 @@
 
         let _this = this
         _this.cancellingReservation = true
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.reservation.cancel_reservation,
+          url: this.$appSettings.APIServer.reservation.cancel_reservation,
           params: params,
           headers: {
             "Authorization" : `Bearer ${currentUser.loginToken}`
@@ -374,7 +379,7 @@
           //console.log(response)
             // Success
             if (response.data.status == true) {
-              _this.$store.commit('showMessage', { text: "Reservation cancelled.", color: "green" })
+              _this.store.showMessage({ text: "Reservation cancelled.", color: "green" })
               _this.fetchReservations()
             }
             // Fail
@@ -382,18 +387,18 @@
               console.log("Failed removing reservation...")
               console.log(response)
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error getting the hardware specs."
-              _this.$store.commit('showMessage', { text: msg, color: "red" })
+              _this.store.showMessage({ text: msg, color: "red" })
             }
             _this.cancellingReservation = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.cancellingReservation = false
         });
@@ -407,11 +412,11 @@
 
         let _this = this
         _this.restartingContainer = true
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.reservation.restart_container,
+          url: this.$appSettings.APIServer.reservation.restart_container,
           params: params,
           headers: {
             "Authorization" : `Bearer ${currentUser.loginToken}`
@@ -421,7 +426,7 @@
           //console.log(response)
             // Success
             if (response.data.status == true) {
-              _this.$store.commit('showMessage', { text: "Container restarted succesfully.", color: "green" })
+              _this.store.showMessage({ text: "Container restarted succesfully.", color: "green" })
               _this.fetchReservations()
             }
             // Fail
@@ -429,18 +434,18 @@
               console.log("Failed restarting container...")
               console.log(response)
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error getting the hardware specs."
-              _this.$store.commit('showMessage', { text: msg, color: "red" })
+              _this.store.showMessage({ text: msg, color: "red" })
             }
             _this.restartingContainer = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.restartingContainer = false
         });

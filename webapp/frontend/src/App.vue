@@ -16,21 +16,26 @@
 
 <script>
 import ErrorTemplate from '@/components/global/ErrorTemplate.vue'
+import { useMainStore } from '@/store/store'
 
 export default {
   name: 'App',
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
   components: {
     ErrorTemplate
   },
   computed: {
     hasConfigError() {
-      return this.$store.getters.hasConfigError;
+      return this.store.hasConfigError;
     },
     configErrorMessage() {
-      return this.$store.getters.configErrorMessage;
+      return this.store.configErrorMessage;
     },
     appName() {
-      return this.$store.getters.appName;
+      return this.store.appName;
     }
   },
   data: () => ({
@@ -52,7 +57,7 @@ export default {
   .fade-enter-active, .fade-leave-active {
     transition: opacity .2s;
   }
-  .fade-enter, .fade-leave-to {
+  .fade-enter-from, .fade-leave-to {
     opacity: 0;
   }
 </style>

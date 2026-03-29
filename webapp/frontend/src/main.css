@@ -20,18 +20,20 @@ body {
   opacity: .7;
 }
 
-.v-snack__content {
+/* Vuetify 4 snackbar content */
+.v-snackbar__content {
   font-size: 16px !important;
   padding: 18px !important;
 }
 
-.v-toolbar__content a {
+/* Toolbar link styling */
+.v-toolbar a {
   color: white !important;
   margin: 0px 15px !important;
   transition: 0.3s all ease;
 }
 
-.v-toolbar__content a:hover {
+.v-toolbar a:hover {
   color: #2096f3 !important;
 }
 
@@ -39,43 +41,63 @@ body .section {
   margin-bottom: 50px;
 }
 
-.v-event-timed {
-  word-break: break-all !important;
-  white-space: normal !important;
-}
-
-.v-calendar-daily__day-interval {
-  transition: 0.3s all ease;
-}
-
-.v-calendar-daily__day-interval:hover {
-  cursor: pointer;
-  background: #5e5e5e;
-}
-
-.v-textarea.v-input--is-readonly .v-input__slot::before,
-.v-textarea.v-input--is-readonly .v-input__slot::after {
-  border: 0px !important;
-}
-
-.theme--dark.v-data-table>.v-data-table__wrapper>table>tbody>tr:hover:not(.v-data-table__expanded__content):not(.v-data-table__empty-wrapper) {
+/* Vuetify 4 data table hover */
+.v-data-table tbody tr:hover {
   background: #181818 !important;
 }
 
-.v-event-timed-container {
-  text-align: center;
+/* Vuetify 4 data table pagination buttons */
+.v-data-table-footer .v-btn {
+  padding: 0 8px;
+  margin: 0 2px;
+  min-width: 32px;
+  height: 32px;
 }
 
-.v-tooltip__content {
+/* Vuetify 4 tooltip */
+.v-overlay--active .v-overlay__content {
   opacity: 1 !important;
-  background-color: #37393f !important;
-  color: white !important;
 }
 
 .v-text-field .v-label {
   font-size: .875rem;
 }
 
-.v-select__selection.v-select__selection--comma {
+.v-select .v-select__selection-text {
   font-size: .900rem;
+}
+
+/* Vuetify 4: slider thumb label padding */
+.v-slider-thumb__label {
+  padding: 4px 8px !important;
+  min-width: 40px;
+  white-space: nowrap;
+}
+
+/* Vuetify 4: restore cursor pointer on clickable elements */
+a,
+.v-btn,
+.v-list-item--link,
+.v-list-item[href],
+.v-list-item[onClick],
+.v-chip--link,
+.v-tab,
+[role="button"],
+[role="link"],
+[role="menuitem"] {
+  cursor: pointer;
+}
+
+.v-btn.v-btn--disabled {
+    background-color: hsla(0, 0%, 100%, .12) !important;
+    color: hsla(0, 0%, 100%, .3) !important;
+}
+
+.v-btn {
+  text-transform: uppercase;
+  padding: 20px;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  font-weight: 500;
+  margin: 10px;
 }

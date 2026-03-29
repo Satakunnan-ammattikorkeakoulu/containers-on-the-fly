@@ -4,7 +4,7 @@
       <v-col cols="12">
         <h4>Admin</h4>
         <h2>General Settings</h2>
-        <p class="subtitle-1 grey--text">Configure system-wide settings and preferences</p>
+        <p class="subtitle-1 text-grey">Configure system-wide settings and preferences</p>
       </v-col>
     </v-row>
 
@@ -14,17 +14,17 @@
           
           <!-- General Information & Instructions Section -->
           <v-expansion-panel>
-            <v-expansion-panel-header>
+            <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-information-outline</v-icon>
               <span class="font-weight-medium">General Information & Instructions</span>
-            </v-expansion-panel-header>
-            <v-expansion-panel-content>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
               <v-form ref="generalForm" v-model="forms.general.valid">
                 
                 <!-- Application Configuration ---->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Application Configuration</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <p class="body-2 text-grey mb-4">
                     Configure the basic application settings displayed throughout the system.
                   </p>
                   <v-row>
@@ -48,15 +48,15 @@
                         required
                         :rules="[rules.required]"
                         hide-details
-                        :search-input.sync="timezoneSearch"
-                        item-text="label"
+                        v-model:search="timezoneSearch"
+                        item-title="label"
                         item-value="value"
                         filterable
                       >
                         <template v-slot:item="{ item }">
                           <div>
                             <div class="font-weight-medium">{{ item.value }}</div>
-                            <div class="caption grey--text">{{ item.description }}</div>
+                            <div class="caption text-grey">{{ item.description }}</div>
                           </div>
                         </template>
                       </v-select>
@@ -67,7 +67,7 @@
                 <!-- Login Page Information -->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Login Page Instructions</h6>
-                  <p class="body-2 grey--text mb-3">
+                  <p class="body-2 text-grey mb-3">
                     Information text displayed on the login page to provide context or instructions to users.
                   </p>
                   <v-textarea
@@ -82,7 +82,7 @@
                 <!-- Reservation Page Instructions -->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Reservation Page Instructions</h6>
-                  <p class="body-2 grey--text mb-3">
+                  <p class="body-2 text-grey mb-3">
                     Instructions displayed to users on top of the reservation page about server usage guidelines and restrictions.
                   </p>
                   <v-textarea
@@ -97,7 +97,7 @@
                 <!-- Email Template Instructions -->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Container Reserved Instructions</h6>
-                  <p class="body-2 grey--text mb-3">
+                  <p class="body-2 text-grey mb-3">
                     Guidelines and instructions included in reservation confirmation emails sent to users (at the end of the email) and displayed when clicking "Show Details" on reservations.
                   </p>
                   <v-textarea
@@ -112,7 +112,7 @@
                 <!-- Login Form Field Labels -->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Login Form Field Labels</h6>
-                  <p class="body-2 grey--text mb-3">
+                  <p class="body-2 text-grey mb-3">
                     Customize the labels for username and password fields on the login page.
                   </p>
                   <v-row>
@@ -150,22 +150,22 @@
                   </v-col>
                 </v-row>
               </v-form>
-            </v-expansion-panel-content>
+            </v-expansion-panel-text>
           </v-expansion-panel>
           
           <!-- Authentication Section -->
           <v-expansion-panel>
-            <v-expansion-panel-header>
+            <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-account-key</v-icon>
               <span class="font-weight-medium">Authentication</span>
-            </v-expansion-panel-header>
-            <v-expansion-panel-content>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
               <v-form ref="authForm" v-model="forms.auth.valid">
                 
                 <!-- Login Type Settings -->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Login Method</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <p class="body-2 text-grey mb-4">
                     Choose how users authenticate with the system.
                   </p>
                   <v-radio-group
@@ -188,10 +188,9 @@
                   <!-- Password + LDAP explanation -->
                   <v-alert
                     v-if="settings.auth.loginType === 'hybrid'"
-                    text
+                    variant="outlined"
                     type="info"
                     class="mt-2 mb-4"
-                    outlined
                   >
                     <p class="body-2 mb-0">
                       <strong>Password + LDAP Mode</strong>: If a user has a password set, it will try password authentication first. 
@@ -203,7 +202,7 @@
                 <!-- Session Timeout -->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Session Settings</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <p class="body-2 text-grey mb-4">
                     Configure how long user sessions remain active before requiring re-login.
                   </p>
                   <v-row>
@@ -226,7 +225,7 @@
                 <!-- LDAP Configuration -->
                 <div class="mb-6" v-if="settings.auth.loginType === 'hybrid'">
                   <h6 class="text-h6 mb-2">LDAP Server Configuration</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <p class="body-2 text-grey mb-4">
                     Configure connection to your LDAP directory server for user authentication.
                   </p>
                   
@@ -323,26 +322,26 @@
                   </v-col>
                 </v-row>
               </v-form>
-            </v-expansion-panel-content>
+            </v-expansion-panel-text>
           </v-expansion-panel>
 
           <!-- User Access Control Section -->
           <v-expansion-panel>
-            <v-expansion-panel-header>
+            <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-shield-account</v-icon>
               <span class="font-weight-medium">User Access Control</span>
-            </v-expansion-panel-header>
-            <v-expansion-panel-content>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
               <v-form ref="accessForm" v-model="forms.access.valid">
                 <v-row>
                   <v-col cols="12" md="6">
-                    <v-card outlined class="pa-4">
+                    <v-card variant="outlined" class="pa-4">
                       <div class="mb-4">
                         <h6 class="text-h6 mb-2 d-flex align-center">
                           <v-icon left color="red">mdi-account-cancel</v-icon>
                           Email Blacklist
                         </h6>
-                        <p class="body-2 grey--text mb-3">
+                        <p class="body-2 text-grey mb-3">
                           Prevent specific email addresses from logging into the system. Users on this list will be denied access.
                         </p>
                       </div>
@@ -381,7 +380,7 @@
                       
                       <!-- Existing blacklisted emails -->
                       <div v-if="settings.access.blacklistEnabled && blacklistedEmailsList.length > 0">
-                        <p class="caption grey--text mb-2">Blacklisted emails:</p>
+                        <p class="caption text-grey mb-2">Blacklisted emails:</p>
                         <v-chip
                           v-for="(email, index) in blacklistedEmailsList"
                           :key="`blacklist-${index}`"
@@ -395,20 +394,20 @@
                         </v-chip>
                       </div>
                       
-                      <div v-else-if="settings.access.blacklistEnabled" class="text-center grey--text">
+                      <div v-else-if="settings.access.blacklistEnabled" class="text-center text-grey">
                         <p class="body-2">No emails blacklisted</p>
                       </div>
                     </v-card>
                   </v-col>
                   
                   <v-col cols="12" md="6">
-                    <v-card outlined class="pa-4">
+                    <v-card variant="outlined" class="pa-4">
                       <div class="mb-4">
                         <h6 class="text-h6 mb-2 d-flex align-center">
                           <v-icon left color="green">mdi-account-check</v-icon>
                           Email Whitelist
                         </h6>
-                        <p class="body-2 grey--text mb-3">
+                        <p class="body-2 text-grey mb-3">
                           Allow only specific email addresses to log into the system. When enabled, only users on this list can access the system.
                         </p>
                       </div>
@@ -447,7 +446,7 @@
                       
                       <!-- Existing whitelisted emails -->
                       <div v-if="settings.access.whitelistEnabled && whitelistedEmailsList.length > 0">
-                        <p class="caption grey--text mb-2">Whitelisted emails:</p>
+                        <p class="caption text-grey mb-2">Whitelisted emails:</p>
                         <v-chip
                           v-for="(email, index) in whitelistedEmailsList"
                           :key="`whitelist-${index}`"
@@ -461,7 +460,7 @@
                         </v-chip>
                       </div>
                       
-                      <div v-else-if="settings.access.whitelistEnabled" class="text-center grey--text">
+                      <div v-else-if="settings.access.whitelistEnabled" class="text-center text-grey">
                         <p class="body-2">No emails whitelisted</p>
                       </div>
                     </v-card>
@@ -480,22 +479,22 @@
                   </v-col>
                 </v-row>
               </v-form>
-            </v-expansion-panel-content>
+            </v-expansion-panel-text>
           </v-expansion-panel>
 
           <!-- Email Configuration Section -->
           <v-expansion-panel>
-            <v-expansion-panel-header>
+            <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-email-outline</v-icon>
               <span class="font-weight-medium">Email Configuration</span>
-            </v-expansion-panel-header>
-            <v-expansion-panel-content>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
               
               <!-- Contact Information Section with its own separate form -->
               <v-form ref="contactForm" v-model="forms.contact.valid">
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Contact Email</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <p class="body-2 text-grey mb-4">
                     Configure the admin contact email address displayed to users throughout the system.
                   </p>
                   
@@ -532,7 +531,7 @@
               <v-form ref="emailEnableForm" v-model="forms.emailEnable.valid">
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Email System</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <p class="body-2 text-grey mb-4">
                     Enable or disable email sending from the system. When disabled, no emails will be sent for reservations or notifications.
                   </p>
                   
@@ -549,7 +548,7 @@
               <v-form ref="emailForm" v-model="forms.email.valid">
                 <div class="mb-6" v-if="settings.emailEnable.sendEmail">
                   <h6 class="text-h6 mb-2">SMTP Server Configuration</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <p class="body-2 text-grey mb-4">
                     Configure the SMTP server settings for sending system emails like reservation confirmations and notifications.
                   </p>
                   
@@ -631,7 +630,7 @@
               <!-- Test Email Delivery Section (no form needed, just uses validation) -->
               <div class="mb-6" v-if="settings.emailEnable.sendEmail">
                 <h6 class="text-h6 mb-2">Test Email Delivery</h6>
-                <p class="body-2 grey--text mb-4">
+                <p class="body-2 text-grey mb-4">
                   Send a test email to verify that your SMTP configuration is working correctly.
                 </p>
                 
@@ -663,22 +662,22 @@
                 </v-row>
               </div>
               
-            </v-expansion-panel-content>
+            </v-expansion-panel-text>
           </v-expansion-panel>
 
           <!-- System Notifications Section -->
           <v-expansion-panel>
-            <v-expansion-panel-header>
+            <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-bell-alert</v-icon>
               <span class="font-weight-medium">System Notifications</span>
-            </v-expansion-panel-header>
-            <v-expansion-panel-content>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
               <v-form ref="notificationsForm" v-model="forms.notifications.valid">
                 
                 <!-- Container Failure Alerts -->
                 <div class="mb-6">
                   <h6 class="text-h6 mb-2">Container Failure Alerts</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <p class="body-2 text-grey mb-4">
                     Configure email notifications when Docker containers fail to start or stop unexpectedly. This helps administrators quickly respond to system issues.
                   </p>
                   
@@ -716,7 +715,7 @@
                   
                   <!-- Existing alert emails -->
                   <div v-if="settings.notifications.containerAlertsEnabled && alertEmailsList.length > 0">
-                    <p class="caption grey--text mb-2">Alert recipients:</p>
+                    <p class="caption text-grey mb-2">Alert recipients:</p>
                     <v-chip
                       v-for="(email, index) in alertEmailsList"
                       :key="`alert-${index}`"
@@ -730,14 +729,14 @@
                     </v-chip>
                   </div>
                   
-                  <div v-else-if="settings.notifications.containerAlertsEnabled" class="text-center grey--text">
+                  <div v-else-if="settings.notifications.containerAlertsEnabled" class="text-center text-grey">
                     <p class="body-2">No alert recipients configured</p>
                   </div>
                 </div>
                 
 
               </v-form>
-            </v-expansion-panel-content>
+            </v-expansion-panel-text>
           </v-expansion-panel>
 
         </v-expansion-panels>
@@ -747,10 +746,17 @@
 </template>
 
 <script>
-const axios = require('axios').default;
+import axios from 'axios';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: 'PageAdminGeneral',
+
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
+
   data: () => ({
     expandedPanels: [], // All panels collapsed by default
     initialLoadComplete: false, // Flag to prevent auto-save during initial load
@@ -1011,11 +1017,11 @@ export default {
         this.isLoading = true; // Set loading flag
         
         let _this = this;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_general_settings,
+          url: this.$appSettings.APIServer.admin.get_general_settings,
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
@@ -1091,7 +1097,7 @@ export default {
             
           } else {
             console.log("Failed to load settings...");
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: "There was an error loading settings.", 
               color: "red" 
             });
@@ -1103,9 +1109,9 @@ export default {
         .catch(function (error) {
           console.error('Failed to load settings:', error);
           if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+            _this.store.showMessage({ text: error.response.data.detail, color: "red" });
           } else {
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: 'Failed to load settings', 
               color: 'red' 
             });
@@ -1117,7 +1123,7 @@ export default {
         
       } catch (error) {
         console.error('Failed to load settings:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: 'Failed to load settings', 
           color: 'red' 
         });
@@ -1132,7 +1138,7 @@ export default {
         // Validate the form first
         const formRef = `${sectionName}Form`;
         if (this.$refs[formRef] && !this.$refs[formRef].validate()) {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({ 
             text: 'Please fix validation errors before saving', 
             color: 'red' 
           });
@@ -1156,11 +1162,11 @@ export default {
         }
         
         let _this = this;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_general_settings,
+          url: this.$appSettings.APIServer.admin.save_general_settings,
           data: {
             section: sectionName,
             settings: settingsData
@@ -1170,7 +1176,7 @@ export default {
         .then(async function (response) {
           if (response.data.status == true) {
             // Show success notification
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: `${_this.getSectionDisplayName(sectionName)} settings saved successfully!`, 
               color: 'green' 
             });
@@ -1178,7 +1184,7 @@ export default {
             // Reload app config for sections that affect public settings
             if (sectionName === 'general' || sectionName === 'contact') {
               try {
-                await _this.$store.dispatch('loadAppConfig');
+                await _this.store.loadAppConfig();
                 //console.log('App configuration reloaded after saving', sectionName, 'settings');
               } catch (error) {
                 console.error('Failed to reload app config:', error);
@@ -1188,7 +1194,7 @@ export default {
             
           } else {
             console.log(`Failed to save ${sectionName} settings...`);
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: response.data.message || `There was an error saving ${_this.getSectionDisplayName(sectionName)} settings.`, 
               color: "red" 
             });
@@ -1198,9 +1204,9 @@ export default {
         .catch(function (error) {
           console.error(`Failed to save ${sectionName} settings:`, error);
           if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+            _this.store.showMessage({ text: error.response.data.detail, color: "red" });
           } else {
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: `Failed to save ${_this.getSectionDisplayName(sectionName)} settings`, 
               color: 'red' 
             });
@@ -1210,7 +1216,7 @@ export default {
         
       } catch (error) {
         console.error(`Failed to save ${sectionName} settings:`, error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: `Failed to save ${this.getSectionDisplayName(sectionName)} settings`, 
           color: 'red' 
         });
@@ -1220,7 +1226,7 @@ export default {
     
     async sendTestEmail() {
       if (!this.isValidEmail(this.testEmail)) {
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: 'Please enter a valid email address', 
           color: 'red' 
         });
@@ -1233,11 +1239,11 @@ export default {
         console.log(`Sending test email to: ${this.testEmail}`);
         
         let _this = this;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.test_email,
+          url: this.$appSettings.APIServer.admin.test_email,
           data: {
             email: this.testEmail
           },
@@ -1245,13 +1251,13 @@ export default {
         })
         .then(function (response) {
           if (response.data.status == true) {
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: `Test email sent successfully to ${_this.testEmail}`, 
               color: 'green' 
             });
           } else {
             console.log("Failed to send test email...");
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: response.data.message || 'Failed to send test email', 
               color: "red" 
             });
@@ -1261,9 +1267,9 @@ export default {
         .catch(function (error) {
           console.error('Failed to send test email:', error);
           if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+            _this.store.showMessage({ text: error.response.data.detail, color: "red" });
           } else {
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: 'Failed to send test email', 
               color: 'red' 
             });
@@ -1273,7 +1279,7 @@ export default {
         
       } catch (error) {
         console.error('Failed to send test email:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: 'Failed to send test email', 
           color: 'red' 
         });
@@ -1360,7 +1366,7 @@ export default {
 
 <style scoped lang="scss">
 // Override Vuetify's expansion panel header styles
-::v-deep .v-expansion-panel-header {
+:deep(.v-expansion-panel-title) {
   justify-content: space-between !important;
   text-align: left !important;
   padding: 20px 24px !important;
@@ -1372,26 +1378,26 @@ export default {
 }
 
 // Create a flex container for icon + text on the left
-::v-deep .v-expansion-panel-header > div:first-child {
+:deep(.v-expansion-panel-title > div:first-child) {
   display: flex !important;
   align-items: center !important;
   justify-content: flex-start !important;
   flex-grow: 0 !important;
 }
 
-::v-deep .v-expansion-panel-header .v-icon:first-child {
+:deep(.v-expansion-panel-title .v-icon:first-child) {
   margin-right: 8px !important;
   margin-left: 0 !important;
   flex-shrink: 0 !important;
 }
 
-::v-deep .v-expansion-panel-header .font-weight-medium {
+:deep(.v-expansion-panel-title .font-weight-medium) {
   margin: 0 !important;
   white-space: nowrap !important;
 }
 
 // Keep the expand/collapse icon on the right
-::v-deep .v-expansion-panel-header__icon {
+:deep(.v-expansion-panel-title__icon) {
   margin-left: auto !important;
   flex-shrink: 0 !important;
 }
@@ -1406,7 +1412,7 @@ export default {
   font-weight: 500;
 }
 
-.v-expansion-panel-content {
+.v-expansion-panel-text {
   padding-top: 16px;
 }
 
@@ -1441,7 +1447,7 @@ export default {
   margin: 2px !important;
 }
 
-.v-expansion-panel-header>:not(.v-expansion-panel-header__icon) {
+.v-expansion-panel-title>:not(.v-expansion-panel-title__icon) {
     flex: 0;
 }
 

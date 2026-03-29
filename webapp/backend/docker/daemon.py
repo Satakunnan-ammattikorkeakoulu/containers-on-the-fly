@@ -13,6 +13,7 @@ from os import linesep
 from settings_handler import settings_handler
 from database import Session, Reservation, ReservedContainerPort, Role
 from helpers.auth import create_password
+from sqlalchemy import select
 
 from docker.containers import start_container, stop_container, restart_container
 from docker.monitoring import update_server_monitoring
@@ -155,7 +156,9 @@ def stop_orphan_container_reservations():
 
 def start_docker_container(reservation_id: str):
   with Session() as session:
-    reservation = session.query(Reservation).filter( Reservation.reservationId == reservation_id ).first()
+    reservation = session.execute(
+      select(Reservation).where(Reservation.reservationId == reservation_id)
+    ).scalar_one_or_none()
     if reservation == None: return False
     ssh_password = create_password()
 
@@ -226,7 +229,9 @@ def start_docker_container(reservation_id: str):
 
     # Always add mounts from "Everyone" role
     with Session() as mount_session:
-        everyone_role = mount_session.query(Role).filter(Role.name == "everyone").first()
+        everyone_role = mount_session.execute(
+            select(Role).where(Role.name == "everyone")
+        ).scalar_one_or_none()
         if everyone_role:
             for mount in everyone_role.mounts:
                 if mount.computerId == reservation.computerId:
@@ -305,7 +310,9 @@ def start_docker_container(reservation_id: str):
 def stop_docker_container(reservation_id: str):
   try:
     with Session() as session:
-      reservation = session.query(Reservation).filter( Reservation.reservationId == reservation_id ).first()
+      reservation = session.execute(
+        select(Reservation).where(Reservation.reservationId == reservation_id)
+      ).scalar_one_or_none()
       if reservation == None: return False
 
       if (reservation.status == "started"):
@@ -328,7 +335,9 @@ def stop_orphan_docker_container(container_name):
 def restart_docker_container(reservation_id: str):
   try:
     with Session() as session:
-      reservation = session.query(Reservation).filter( Reservation.reservationId == reservation_id ).first()
+      reservation = session.execute(
+        select(Reservation).where(Reservation.reservationId == reservation_id)
+      ).scalar_one_or_none()
       if reservation == None: return False
 
       restart_container(reservation.reservedContainer.containerDockerName)
@@ -344,7 +353,7 @@ def restart_docker_container(reservation_id: str):
 # ---------------------------------------------------------------------------
 
 def run():
-  """Initialize and start the daemon. Called from docker_util.py shim."""
+  """Initialize and start the daemon. Called from dockerUtil.py shim."""
   global computer_id
 
   print("AI Server Docker utility started.")

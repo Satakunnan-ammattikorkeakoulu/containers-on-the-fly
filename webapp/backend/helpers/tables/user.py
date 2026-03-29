@@ -1,5 +1,6 @@
 from database import User, Session
 from helpers.auth import *
+from sqlalchemy import select
 
 # User table management functionality
 
@@ -12,14 +13,14 @@ Finds users with the given optional filter. If no filter is given, finds all use
     All found users in a list.
 '''
   with Session() as session:
-    all_users_list = [] 
+    all_users_list = []
     email_users_list = []
     if email is None:
-      all_users = session.query(User).all()
+      all_users = session.execute(select(User)).scalars().all()
       all_users = cast_users_to_dict(all_users)
       return all_users
     else:
-      email_users = session.query(User).filter(User.email.like("%"+email+"%"))
+      email_users = session.execute(select(User).where(User.email.like("%"+email+"%"))).scalars().all()
       if email_users != None:
         for email_user in email_users:
           email_users_list.append(email_user)
@@ -38,11 +39,11 @@ def get_user(findby):
   '''
   with Session() as session:
     if findby:
-      found_user = session.query(User).filter(User.email == findby).first()
+      found_user = session.execute(select(User).where(User.email == findby)).scalar_one_or_none()
       if found_user:
         found_user = cast_users_to_dict([found_user])
         return found_user
-      found_user = session.query(User).filter(User.userId == findby).first()
+      found_user = session.execute(select(User).where(User.userId == findby)).scalar_one_or_none()
       if found_user:
         found_user = cast_users_to_dict([found_user])
         return found_user
@@ -83,7 +84,7 @@ Finds user by email and changes email or password.
 '''
   if email is None:
     return None
-  
+
   with Session() as session:
     user = get_user_serverside(email)
     if new_email != None:
@@ -116,16 +117,13 @@ Finds user with given search, only to be used serverside.
   Returns:
     Single database object.
 '''
-  #found_user = session.query(User).filter(User.email == search).first()
-  #return found_user
-
   with Session() as session:
     if search != None:
-      roles = session.query(User).filter(User.email == search).first()
+      roles = session.execute(select(User).where(User.email == search)).scalar_one_or_none()
       if roles != None: return roles
       else:
         try:
-          roles = session.query(User).filter(User.userId == int(search)).first()
+          roles = session.execute(select(User).where(User.userId == int(search))).scalar_one_or_none()
           if roles != None: return roles
           else:
             return None

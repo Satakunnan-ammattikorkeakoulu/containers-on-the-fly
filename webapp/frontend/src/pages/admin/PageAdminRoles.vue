@@ -67,18 +67,23 @@
 </template>
 
 <script>
+import axios from 'axios';
 import Loading from '/src/components/global/Loading.vue';
 import AdminRolesTable from '/src/components/admin/AdminRolesTable.vue';
 import AdminManageRoleModal from '/src/components/admin/AdminManageRoleModal.vue';
 import AdminRoleMountsModal from '/src/components/admin/AdminRoleMountsModal.vue';
 import AdminRoleHardwareLimitsModal from '/src/components/admin/AdminRoleHardwareLimitsModal.vue';
 import AdminRoleReservationLimitsModal from '/src/components/admin/AdminRoleReservationLimitsModal.vue';
-
-// Add axios back
-const axios = require('axios').default;
+import { useMainStore } from '@/store/store'
 
 export default {
   name: 'PageAdminRoles',
+
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
+
   components: {
     Loading,
     AdminRolesTable,
@@ -121,7 +126,7 @@ export default {
     async removeRole(roleId) {
       const role = this.roles.find(r => r.roleId === roleId);
       if (role.name === "admin" || role.name === "everyone") {
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: "Cannot remove built-in roles", 
           color: "error" 
         });
@@ -132,29 +137,29 @@ export default {
       if (!confirm) return;
 
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         const response = await axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.remove_role,
+          url: this.$appSettings.APIServer.admin.remove_role,
           params: { roleId },
           headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
         });
 
         if (response.data.status) {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({ 
             text: "Role removed successfully", 
             color: "success" 
           });
           await this.fetch(); // Make sure to await the fetch
         } else {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({ 
             text: response.data.message, 
             color: "error" 
           });
         }
       } catch (error) {
         console.error(error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: "Error removing role", 
           color: "error" 
         });
@@ -167,24 +172,24 @@ export default {
     },
     async fetch() {
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         const response = await axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_roles,
+          url: this.$appSettings.APIServer.admin.get_roles,
           headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
         });
 
         if (response.data.status) {
           this.roles = response.data.data.roles;
         } else {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({ 
             text: "Failed to fetch roles", 
             color: "error" 
           });
         }
       } catch (error) {
         console.error(error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: "Error fetching roles", 
           color: "error" 
         });

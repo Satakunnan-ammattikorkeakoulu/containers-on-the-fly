@@ -41,7 +41,7 @@
                   @change="onClearPasswordChange"
                 ></v-checkbox>
                 <p class="text-caption mt-2 mb-0">
-                  <v-icon small class="mr-1">mdi-alert</v-icon>
+                  <v-icon size="small" class="mr-1">mdi-alert</v-icon>
                   Warning: If password is cleared, the user can only login when LDAP authentication is enabled.
                 </p>
               </v-col>
@@ -68,8 +68,8 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="red" text @click="closeDialog">Cancel</v-btn>
-          <v-btn color="blue" text @click="submit" :disabled="isSubmitting">
+          <v-btn color="red" variant="text" @click="closeDialog">Cancel</v-btn>
+          <v-btn color="blue" variant="text" @click="submit" :disabled="isSubmitting">
             <span v-if="isCreatingNew">Add User</span>
             <span v-else>Save User</span>
           </v-btn>
@@ -80,10 +80,15 @@
 </template>
 
 <script>
-const axios = require('axios').default;
+import axios from 'axios';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: "AdminManageUserModal",
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
   props: {
     propData: [Number, String], // Contains the ID of the user to edit, or "new" if creating new
   },
@@ -140,7 +145,7 @@ export default {
       let userId = this.item === "new" ? -1 : this.item;
 
       let _this = this;
-      let currentUser = this.$store.getters.user;
+      let currentUser = this.store.user;
 
       // Add clearPassword flag to the data if checkbox is checked
       const submitData = { ...this.data };
@@ -150,36 +155,36 @@ export default {
 
       axios({
         method: "post",
-        url: this.AppSettings.APIServer.admin.save_user,
+        url: this.$appSettings.APIServer.admin.save_user,
         data: { userId: userId, data: submitData },
         headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
       })
       .then(function(response) {
         if (response.data.status === true) {
           _this.closeDialog();
-          _this.$store.commit('showMessage', { text: "User saved successfully", color: "green" });
+          _this.store.showMessage({ text: "User saved successfully", color: "green" });
         } else {
-          _this.$store.commit('showMessage', { text: response.data.message, color: "red" });
+          _this.store.showMessage({ text: response.data.message, color: "red" });
         }
         _this.isSubmitting = false;
       })
       .catch(function(error) {
         if (error.response && (error.response.status === 400 || error.response.status === 401)) {
-          _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          _this.store.showMessage({ text: error.response.data.detail, color: "red" });
         } else {
           console.log(error);
-          _this.$store.commit('showMessage', { text: "Unknown error while trying to save user", color: "red" });
+          _this.store.showMessage({ text: "Unknown error while trying to save user", color: "red" });
         }
         _this.isSubmitting = false;
       });
     },
     fetchData() {
       let _this = this;
-      let currentUser = this.$store.getters.user;
+      let currentUser = this.store.user;
 
       axios({
         method: "get",
-        url: this.AppSettings.APIServer.admin.get_user,
+        url: this.$appSettings.APIServer.admin.get_user,
         params: { userId: this.item },
         headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
       })
@@ -192,16 +197,16 @@ export default {
           }
         } else {
           console.log("Failed getting user...");
-          _this.$store.commit('showMessage', { text: "There was an error getting user information", color: "red" });
+          _this.store.showMessage({ text: "There was an error getting user information", color: "red" });
         }
         _this.isFetching = false;
       })
       .catch(function(error) {
         if (error.response && (error.response.status === 400 || error.response.status === 401)) {
-          _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          _this.store.showMessage({ text: error.response.data.detail, color: "red" });
         } else {
           console.log(error);
-          _this.$store.commit('showMessage', { text: "Unknown error while trying to get user information", color: "red" });
+          _this.store.showMessage({ text: "Unknown error while trying to get user information", color: "red" });
         }
         _this.isFetching = false;
       });
@@ -214,11 +219,11 @@ export default {
     },
 
     fetchRoles() {
-      let currentUser = this.$store.getters.user;
-      
+      let currentUser = this.store.user;
+
       axios({
         method: "get",
-        url: this.AppSettings.APIServer.admin.get_roles,
+        url: this.$appSettings.APIServer.admin.get_roles,
         headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
       })
       .then(response => {
@@ -226,12 +231,12 @@ export default {
           // Filter out the "everyone" role since all users belong to it automatically
           this.availableRoles = response.data.data.roles.filter(role => role.name !== "everyone");
         } else {
-          this.$store.commit('showMessage', { text: "Failed to fetch roles", color: "red" });
+          this.store.showMessage({ text: "Failed to fetch roles", color: "red" });
         }
       })
       .catch(error => {
         console.error(error);
-        this.$store.commit('showMessage', { text: "Error fetching roles", color: "red" });
+        this.store.showMessage({ text: "Error fetching roles", color: "red" });
       });
     }
   },

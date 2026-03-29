@@ -76,9 +76,16 @@
 <script>
 import axios from 'axios'
 import dayjs from 'dayjs'
+import { useMainStore } from '@/store/store'
 
 export default {
   name: 'PageUserProfile',
+
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
+
   data() {
     return {
       hasPassword: false,
@@ -100,14 +107,14 @@ export default {
   },
   computed: {
     userEmail() {
-      return this.$store.state.user?.email || ''
+      return this.store.user?.email || ''
     },
     userCreatedAt() {
       const createdAt = this.userProfile?.createdAt
       return createdAt ? dayjs(createdAt).format('MMMM D, YYYY') : ''
     },
     userRoles() {
-      return this.$store.state.user?.roles || []
+      return this.store.user?.roles || []
     }
   },
   mounted() {
@@ -116,7 +123,7 @@ export default {
   },
   methods: {
     async loadUserProfile() {
-      const currentUser = this.$store.state.user
+      const currentUser = this.store.user
       if (!currentUser || !currentUser.loginToken) {
         console.error('No login token available')
         return
@@ -136,7 +143,7 @@ export default {
       }
     },
     async checkPasswordStatus() {
-      const currentUser = this.$store.state.user
+      const currentUser = this.store.user
       if (!currentUser || !currentUser.loginToken) {
         console.error('No login token available')
         return
@@ -151,7 +158,7 @@ export default {
         this.hasPassword = response.data.data.hasPassword
       } catch (error) {
         console.error('Error checking password status:', error)
-        this.$store.commit('showMessage', {
+        this.store.showMessage({
           text: 'Error checking password status',
           color: 'red'
         })
@@ -162,7 +169,7 @@ export default {
         return
       }
       
-      const currentUser = this.$store.state.user
+      const currentUser = this.store.user
       if (!currentUser || !currentUser.loginToken) {
         console.error('No login token available')
         return
@@ -180,7 +187,7 @@ export default {
         })
         
         if (response.data.status) {
-          this.$store.commit('showMessage', {
+          this.store.showMessage({
             text: 'Password changed successfully',
             color: 'green'
           })
@@ -190,7 +197,7 @@ export default {
           this.confirmPassword = ''
           this.$refs.passwordForm.resetValidation()
         } else {
-          this.$store.commit('showMessage', {
+          this.store.showMessage({
             text: response.data.message || 'Failed to change password',
             color: 'red'
           })
@@ -203,7 +210,7 @@ export default {
         } else if (error.response?.data?.message) {
           errorMessage = error.response.data.message
         }
-        this.$store.commit('showMessage', {
+        this.store.showMessage({
           text: errorMessage,
           color: 'red'
         })

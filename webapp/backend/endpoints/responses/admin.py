@@ -13,7 +13,7 @@ import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
 from helpers.tables.role import get_roles, get_role_by_id, add_role as add_role_helper, edit_role as edit_role_helper, remove_role as remove_role_helper
-from sqlalchemy import func
+from sqlalchemy import select, delete, func
 
 def get_reservations(filters : ReservationFilters) -> object:
   '''
@@ -34,62 +34,62 @@ def get_reservations(filters : ReservationFilters) -> object:
 
   with Session() as session:
     # First get all reservations for counting
-    count_query = session.query(Reservation)\
-      .filter((Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()) )
-    
+    count_query = session.execute(select(Reservation)\
+      .where((Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()) )).scalars().all()
+
     # Count statuses
     for reservation in count_query:
       if reservation.status in status_counts:
         status_counts[reservation.status] += 1
-    
+
     # Now get filtered reservations with all the joins
-    query = session.query(Reservation)\
+    stmt = select(Reservation)\
       .options(
         joinedload(Reservation.reservedHardwareSpecs),
         joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
         joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
         joinedload(Reservation.computer)
       )\
-      .filter((Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()) )
+      .where((Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()) )
     if filters.filters["status"] != "":
-      query = query.filter( Reservation.status == filters.filters["status"] )
-    session.close()
+      stmt = stmt.where( Reservation.status == filters.filters["status"] )
+    query = session.execute(stmt).unique().scalars().all()
 
-  for reservation in query:
-    res = orm_to_dict(reservation)
-    res["userEmail"] = reservation.user.email
-    res["computerName"] = reservation.computer.name
-    res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
-    res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
-    
-    # Add all reserved ports
-    res["reservedContainer"]["reservedPorts"] = []
-    # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
-    if reservation.status == "started":
-      for reserved_port in reservation.reservedContainer.reservedContainerPorts:
-        port_obj = orm_to_dict(reserved_port)
-        port_obj["localPort"] = reserved_port.containerPort.port
-        port_obj["serviceName"] = reserved_port.containerPort.serviceName
-        res["reservedContainer"]["reservedPorts"].append(port_obj)
-    
-    # Add all reserved hardware specs
-    res["reservedHardwareSpecs"] = []
-    for spec in reservation.reservedHardwareSpecs:
-      # Add only specs over 0
-      if spec.amount > 0:
-          # Add also internalId for GPUs
-          if spec.hardwareSpec.type == "gpu":
-            format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
-          else:
-            format = spec.hardwareSpec.format
+    for reservation in query:
+      res = orm_to_dict(reservation)
+      res["userEmail"] = reservation.user.email
+      res["computerName"] = reservation.computer.name
+      res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
+      res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
 
-          res["reservedHardwareSpecs"].append({
-            "type": spec.hardwareSpec.type,
-            "format": format,
-            "internalId": spec.hardwareSpec.format,
-            "amount": spec.amount
-          })
-    reservations.append(res)
+      # Add all reserved ports
+      res["reservedContainer"]["reservedPorts"] = []
+      # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
+      if reservation.status == "started":
+        for reserved_port in reservation.reservedContainer.reservedContainerPorts:
+          port_obj = orm_to_dict(reserved_port)
+          port_obj["localPort"] = reserved_port.containerPort.port
+          port_obj["serviceName"] = reserved_port.containerPort.serviceName
+          res["reservedContainer"]["reservedPorts"].append(port_obj)
+
+      # Add all reserved hardware specs
+      res["reservedHardwareSpecs"] = []
+      for spec in reservation.reservedHardwareSpecs:
+        # Add only specs over 0
+        if spec.amount > 0:
+            # Add also internalId for GPUs
+            if spec.hardwareSpec.type == "gpu":
+              format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
+            else:
+              format = spec.hardwareSpec.format
+
+            res["reservedHardwareSpecs"].append({
+              "type": spec.hardwareSpec.type,
+              "format": format,
+              "internalId": spec.hardwareSpec.format,
+              "amount": spec.amount
+            })
+      reservations.append(res)
     
   return api_response(True, "Reservations fetched.", { "reservations": reservations, "statusCounts": status_counts })
 
@@ -121,7 +121,7 @@ def save_container(containerEdit : ContainerEdit) -> object:
       session.commit()
     # Otherwise, edit container
     else:
-      container = session.query(Container).filter(Container.containerId == containerEdit.containerId).first()
+      container = session.execute(select(Container).where(Container.containerId == containerEdit.containerId)).scalar_one_or_none()
       if container is None:
         return api_response(False, "Container not found.")
       else:
@@ -132,7 +132,7 @@ def save_container(containerEdit : ContainerEdit) -> object:
         container.updatedAt = datetime.datetime.now(datetime.timezone.utc)
         # Remove all removable ports
         for port in containerEdit.data.get("removedPorts", []):
-          session.query(ContainerPort).filter(ContainerPort.containerPortId == port).delete()
+          session.execute(delete(ContainerPort).where(ContainerPort.containerPortId == port))
         # Add all new ports
         for port in containerEdit.data.get("ports", []):
           if "containerPortId" not in port:
@@ -140,7 +140,7 @@ def save_container(containerEdit : ContainerEdit) -> object:
         # Edit changed ports
         for port in containerEdit.data.get("ports", []):
           if "containerPortId" in port:
-            old_port = session.query(ContainerPort).filter(ContainerPort.containerPortId == port["containerPortId"]).first()
+            old_port = session.execute(select(ContainerPort).where(ContainerPort.containerPortId == port["containerPortId"])).scalar_one_or_none()
             if old_port.port != port["port"] or old_port.serviceName != port["serviceName"]:
               old_port.port = port["port"]
               old_port.serviceName = port["serviceName"]
@@ -163,14 +163,14 @@ def remove_container(containerId : int) -> object:
   '''
 
   with Session() as session:
-    container = session.query(Container).filter(Container.containerId == containerId).first()
+    container = session.execute(select(Container).where(Container.containerId == containerId)).scalar_one_or_none()
     if container is None:
       return api_response(False, "Container not found.")
     else:
       container.removed = True
       container.public = False
       session.commit()
-  
+
   return api_response(True, "Container removed successfully")
 
 def get_users() -> object:
@@ -184,7 +184,7 @@ def get_users() -> object:
     role_user_counts = {}
 
     with Session() as session:
-        query = session.query(User)
+        query = session.execute(select(User)).scalars().all()
         for user in query:
             addable = {}
             addable["userId"] = user.userId
@@ -223,10 +223,10 @@ def get_user(userId: int) -> object:
     data = {}
 
     with Session() as session:
-        user = session.query(User).filter(User.userId == userId).first()
+        user = session.execute(select(User).where(User.userId == userId)).scalar_one_or_none()
         if user is None:
             return api_response(False, "User not found")
-        
+
         data = {
             "userId": user.userId,
             "email": user.email,
@@ -249,7 +249,7 @@ def save_user(userId: int, data: dict) -> object:
     '''
     with Session() as session:
         # Check if email already exists
-        existing_user = session.query(User).filter(User.email == data["email"]).first()
+        existing_user = session.execute(select(User).where(User.email == data["email"])).scalar_one_or_none()
         if existing_user is not None and (userId == -1 or existing_user.userId != userId):
             return api_response(False, "A user with this email already exists")
 
@@ -266,7 +266,7 @@ def save_user(userId: int, data: dict) -> object:
             
         else:
             # Update existing user
-            user = session.query(User).filter(User.userId == userId).first()
+            user = session.execute(select(User).where(User.userId == userId)).scalar_one_or_none()
             if user is None:
                 return api_response(False, "User not found")
             
@@ -293,7 +293,7 @@ def save_user(userId: int, data: dict) -> object:
             # Create a set of role names to ensure uniqueness
             role_names = set(data["roles"])
             for role_name in role_names:
-                role = session.query(Role).filter(Role.name == role_name).first()
+                role = session.execute(select(Role).where(Role.name == role_name)).scalar_one_or_none()
                 if role and role not in user.roles:  # Check if role exists and isn't already assigned
                     user.roles.append(role)
         
@@ -311,7 +311,7 @@ def get_hardware() -> object:
   data = []
 
   with Session() as session:
-    query = session.query(HardwareSpec)
+    query = session.execute(select(HardwareSpec)).scalars().all()
     for hardware in query:
       addable = {}
       addable = orm_to_dict(hardware)
@@ -331,7 +331,7 @@ def get_containers() -> object:
 
   with Session() as session:
     # Find all where Container.removed is not True
-    query = session.query(Container).filter(Container.removed.isnot(True))
+    query = session.execute(select(Container).where(Container.removed.isnot(True))).scalars().all()
     for container in query:
       addable = {}
       addable = orm_to_dict(container)
@@ -360,7 +360,7 @@ def get_container(containerId : int) -> object:
   addable = {}
 
   with Session() as session:
-    query = session.query(Container).filter(Container.containerId == containerId).limit(1)
+    query = session.execute(select(Container).where(Container.containerId == containerId).limit(1)).scalars().all()
     for container in query:
       addable = {}
       addable = orm_to_dict(container)
@@ -385,7 +385,7 @@ def get_computers() -> object:
   data = []
 
   with Session() as session:
-    query = session.query(Computer).filter(Computer.removed.isnot(True))
+    query = session.execute(select(Computer).where(Computer.removed.isnot(True))).scalars().all()
     for computer in query:
       addable = {}
       addable = orm_to_dict(computer)
@@ -410,7 +410,7 @@ def get_computer(computerId : int) -> object:
   data = {}
 
   with Session() as session:
-    query = session.query(Computer).filter( Computer.computerId == computerId ).limit(1)
+    query = session.execute(select(Computer).where( Computer.computerId == computerId ).limit(1)).scalars().all()
     for computer in query:
       addable = {}
       addable = orm_to_dict(computer)
@@ -496,7 +496,7 @@ def save_computer(computerEdit : ComputerEdit) -> object:
     # Otherwise, edit computer
     else:
       log.debug(computerEdit.data.get("hardware").get("gpus"))
-      computer = session.query(Computer).filter(Computer.computerId == computerEdit.computerId).first()
+      computer = session.execute(select(Computer).where(Computer.computerId == computerEdit.computerId)).scalar_one_or_none()
       if computer is None:
         return api_response(False, "Computer not found.")
       else:
@@ -521,8 +521,8 @@ def save_computer(computerEdit : ComputerEdit) -> object:
             spec.maximumAmountForUser = computerEdit.data.get("hardware").get("gpu").get("maximumAmountForUser")
         # Remove all removable GPUs
         for spec in computerEdit.data.get("removedGPUs", []):
-          session.query(ReservedHardwareSpec).filter(ReservedHardwareSpec.hardwareSpecId == spec).delete()
-          session.query(HardwareSpec).filter(HardwareSpec.hardwareSpecId == spec).delete()
+          session.execute(delete(ReservedHardwareSpec).where(ReservedHardwareSpec.hardwareSpecId == spec))
+          session.execute(delete(HardwareSpec).where(HardwareSpec.hardwareSpecId == spec))
         # Add all new GPUs
         for gpu in computerEdit.data.get("hardware").get("gpus", []):
           if "hardwareSpecId" not in gpu:
@@ -538,7 +538,7 @@ def save_computer(computerEdit : ComputerEdit) -> object:
         # Edit changed GPUs
         for gpu in computerEdit.data.get("hardware").get("gpus", []):
           if "hardwareSpecId" in gpu:
-            old_gpu = session.query(HardwareSpec).filter(HardwareSpec.hardwareSpecId == gpu["hardwareSpecId"]).first()
+            old_gpu = session.execute(select(HardwareSpec).where(HardwareSpec.hardwareSpecId == gpu["hardwareSpecId"])).scalar_one_or_none()
             if old_gpu.format != gpu["format"] or old_gpu.internalId != gpu["internalId"]:
               old_gpu.format = gpu["format"]
               old_gpu.internalId = gpu["internalId"]
@@ -561,7 +561,7 @@ def remove_computer(computerId : int) -> object:
   '''
 
   with Session() as session:
-    computer = session.query(Computer).filter(Computer.computerId == computerId).first()
+    computer = session.execute(select(Computer).where(Computer.computerId == computerId)).scalar_one_or_none()
     if computer is None:
       return api_response(False, "Computer not found.")
     else:
@@ -589,7 +589,7 @@ def edit_reservation(reservationId : int, end_date_str : str) -> object:
     return api_response(False, "Invalid end date.")
 
   with Session() as session:
-    reservation = session.query(Reservation).filter(Reservation.reservationId == reservationId).first()
+    reservation = session.execute(select(Reservation).where(Reservation.reservationId == reservationId)).scalar_one_or_none()
     if reservation is None:
       return api_response(False, "Reservation not found.")
     else:
@@ -766,19 +766,19 @@ def get_server_monitoring(computer_id: int) -> object:
     '''
     with Session() as session:
         # Check if computer exists
-        computer = session.query(Computer).filter(Computer.computerId == computer_id).first()
+        computer = session.execute(select(Computer).where(Computer.computerId == computer_id)).scalar_one_or_none()
         if not computer:
             return api_response(False, "Server not found")
-        
+
         # Get server status/metrics
-        status = session.query(ServerStatus).filter(
+        status = session.execute(select(ServerStatus).where(
             ServerStatus.computerId == computer_id
-        ).first()
-        
+        )).scalar_one_or_none()
+
         # Get server logs
-        logs = session.query(ServerLogs).filter(
+        logs = session.execute(select(ServerLogs).where(
             ServerLogs.computerId == computer_id
-        ).all()
+        )).scalars().all()
         
         # Build response
         monitoring_data = {
@@ -862,9 +862,9 @@ def get_servers_for_monitoring() -> object:
         object: Response object with servers list.
     '''
     with Session() as session:
-        computers = session.query(Computer).filter(
+        computers = session.execute(select(Computer).where(
             (Computer.removed == False) | (Computer.removed.is_(None))
-        ).all()
+        )).scalars().all()
         
         servers_list = []
         for computer in computers:

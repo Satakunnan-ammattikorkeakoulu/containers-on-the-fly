@@ -32,13 +32,19 @@
 </template>
 
 <script>
-  const axios = require('axios').default;
+  import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import AdminContainersTable from '/src/components/admin/AdminContainersTable.vue';
   import AdminManageContainerModal from '/src/components/admin/AdminManageContainerModal.vue';
-  
+  import { useMainStore } from '@/store/store'
+
   export default {
     name: 'PageAdminContainers',
+
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
 
     components: {
     Loading,
@@ -81,11 +87,11 @@
         }
 
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.remove_container,
+          url: this.$appSettings.APIServer.admin.remove_container,
           params: params,
           headers: {
             "Authorization" : `Bearer ${currentUser.loginToken}`
@@ -95,7 +101,7 @@
           //console.log(response)
             // Success
             if (response.data.status == true) {
-              _this.$store.commit('showMessage', { text: "Container removed.", color: "green" })
+              _this.store.showMessage({ text: "Container removed.", color: "green" })
               _this.fetch()
             }
             // Fail
@@ -103,17 +109,17 @@
               console.log("Failed removing container...")
               console.log(response)
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error removing the container."
-              _this.$store.commit('showMessage', { text: msg, color: "red" })
+              _this.store.showMessage({ text: msg, color: "red" })
             }
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
         });
       },
@@ -123,11 +129,11 @@
       },
       fetch() {
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_containers,
+          url: this.$appSettings.APIServer.admin.get_containers,
           //params: { }
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -140,18 +146,18 @@
             // Fail
             else {
               console.log("Failed getting "+_this.tableName+"...")
-              _this.$store.commit('showMessage', { text: "There was an error getting "+_this.tableName+".", color: "red" })
+              _this.store.showMessage({ text: "There was an error getting "+_this.tableName+".", color: "red" })
             }
             _this.isFetching = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to get "+_this.tableName+".", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to get "+_this.tableName+".", color: "red" })
             }
             _this.isFetching = false
         });

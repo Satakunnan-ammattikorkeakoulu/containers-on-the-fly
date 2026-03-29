@@ -1,7 +1,8 @@
 from typing import Union
 from fastapi import HTTPException, status
-from sqlalchemy import inspect
+from sqlalchemy import inspect, select
 from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import joinedload
 from helpers.auth import *
 from database import User, Session
 from settings_handler import settings_handler
@@ -27,25 +28,30 @@ def force_authentication(token: str, role_required: str = None) -> Union[bool,HT
   wrong_role = False
   if (is_logged_in(token)):
     if role_required is not None:
+      # Materialize user data inside session scope
       with Session() as session:
-        from sqlalchemy.orm import joinedload
-        user = session.query(User).options(joinedload(User.roles)).filter( User.loginToken == token ).first()
+        user = session.execute(
+          select(User).options(joinedload(User.roles)).where(User.loginToken == token)
+        ).unique().scalar_one_or_none()
+        user_id = user.userId if user else None
+        user_email = user.email if user else None
+        user_role_names = [role.name for role in user.roles] if user else []
       # Check if user has the required role
       if role_required == "admin":
         # Use is_admin function which properly checks all roles
-        if is_admin(user.userId):
+        if is_admin(user_id):
           return True
         else:
           wrong_role = True
       else:
         # For non-admin roles, check if it's the primary role or in the roles list
-        if get_role(user.email) == role_required:
+        if get_role(user_email) == role_required:
           return True
         else:
           # Also check if the role is in user's roles list
           has_role = False
-          for role in user.roles:
-            if role.name == role_required:
+          for role_name in user_role_names:
+            if role_name == role_required:
               has_role = True
               break
           if has_role:
@@ -80,4 +86,3 @@ def orm_to_dict(self):
         if isinstance(prop, hybrid_property):
             result[key] = getattr(self, key)
     return result
-

@@ -4,8 +4,7 @@
     <v-data-table
       :headers="table.headers"
       :items="reservations"
-      :sort-by="'reservationId'"
-      :sort-desc="true"
+      :sort-by="[{key: 'reservationId', order: 'desc'}]"
       class="elevation-1">
       <!-- Status -->
       <template v-slot:item.status="{item}">
@@ -22,8 +21,8 @@
       <!-- Start date -->
       <template v-slot:item.startDate="{item}">
         <v-tooltip bottom>
-          <template v-slot:activator="{ on, attrs }">
-            <span v-bind="attrs" v-on="on" class="resource-link">{{ parseTime(item.startDate) }}</span>
+          <template v-slot:activator="{ props }">
+            <span v-bind="props" class="resource-link">{{ parseTime(item.startDate) }}</span>
           </template>
           <span>Reserved: {{ parseTime(item.createdAt) }}</span>
         </v-tooltip>
@@ -35,8 +34,8 @@
       <!-- Resources -->
       <template v-slot:item.resourcesInfo="{item}">
         <v-tooltip bottom>
-          <template v-slot:activator="{ on, attrs }">
-            <span v-bind="attrs" v-on="on" class="resource-link">{{ item.computerName }}</span>
+          <template v-slot:activator="{ props }">
+            <span v-bind="props" class="resource-link">{{ item.computerName }}</span>
           </template>
           <div style="max-width: 300px;">
             <div><strong>Server:</strong> {{ item.computerName }}</div>
@@ -87,19 +86,19 @@
       table: {
         headers: [
           {
-            text: 'Status',
+            title: 'Status',
             align: 'start',
             sortable: false,
-            value: 'status',
+            key: 'status',
           },
-          { text: 'ID', value: 'reservationId' },
-          { text: 'User', value: 'userEmail' },
-          { text: 'Starts', value: 'startDate' },
-          { text: 'Ends', value: 'endDate' },
-          { text: 'Resources', value: 'resourcesInfo' },
-          { text: 'Docker Name', value: 'dockerName' },
-          { text: 'Issues', value: 'containerStatus' },
-          { text: 'actions', value: 'actions' },
+          { title: 'ID', key: 'reservationId' },
+          { title: 'User', key: 'userEmail' },
+          { title: 'Starts', key: 'startDate' },
+          { title: 'Ends', key: 'endDate' },
+          { title: 'Resources', key: 'resourcesInfo' },
+          { title: 'Docker Name', key: 'dockerName' },
+          { title: 'Issues', key: 'containerStatus' },
+          { title: 'actions', key: 'actions' },
         ],
       }
     }),
@@ -196,8 +195,8 @@
     text-decoration-style: dotted;
   }
 
-  // Vue 2 deep selector syntax for tooltip styling
-  ::v-deep .v-tooltip__content {
+  // Deep selector for tooltip styling
+  :deep(.v-tooltip__content) {
     opacity: 1 !important;
     background-color: rgba(55, 61, 63, 0.95) !important;
     border: 1px solid #ddd;

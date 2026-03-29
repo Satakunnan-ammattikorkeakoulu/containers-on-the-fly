@@ -13,6 +13,7 @@ from datetime import timedelta
 import datetime
 import string
 import secrets
+from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from fastapi import HTTPException, status
 
@@ -28,9 +29,9 @@ def is_admin(userIdOrEmail) -> bool:
   with Session() as session:
     user = None
     if (isinstance(userIdOrEmail, int)):
-      user = session.query(User).filter( User.userId == userIdOrEmail ).first()
+      user = session.execute(select(User).where(User.userId == userIdOrEmail)).scalar_one_or_none()
     else:
-      user = session.query(User).filter( User.email == userIdOrEmail ).first()
+      user = session.execute(select(User).where(User.email == userIdOrEmail)).scalar_one_or_none()
 
     if (user == None): return False
     result = False
@@ -45,15 +46,16 @@ def get_role(email : str) -> string:
     'user' if role was not found for the user, otherwise the name of the role.
   '''
   with Session() as session:
-    user = session.query(User).options(joinedload(User.roles)).filter( User.email == email ).first()
-    session.close()
+    user = session.execute(
+      select(User).options(joinedload(User.roles)).where(User.email == email)
+    ).unique().scalar_one_or_none()
 
-  if (user == None): return "user"
+    if (user == None): return "user"
 
-  user_role = "user"
-  if (len(user.roles) > 0):
-    user_role = user.roles[0].name
-  return user_role
+    user_role = "user"
+    if (len(user.roles) > 0):
+      user_role = user.roles[0].name
+    return user_role
 
 def is_logged_in(token : str):
   '''
@@ -83,42 +85,42 @@ def get_user_reservation_limits(userId: int) -> dict:
 
   with Session() as session:
     # Get all user roles explicitly assigned
-    user_roles = session.query(Role).join(UserRole).filter(UserRole.userId == userId).all()
+    user_roles = session.execute(select(Role).join(UserRole).where(UserRole.userId == userId)).scalars().all()
 
     # Add the 'everyone' role since it applies to all users
-    everyone_role = session.query(Role).filter(Role.name == "everyone").first()
+    everyone_role = session.execute(select(Role).where(Role.name == "everyone")).scalar_one_or_none()
     if everyone_role and everyone_role not in user_roles:
       user_roles.append(everyone_role)
 
     # Check if user is admin
     user_is_admin = any(role.name == "admin" for role in user_roles)
-    
+
     # Default values based on whether user is admin
     default_min = 1  # 1 hour for all users
     default_max = 1440 if user_is_admin else 48  # 60 days for admin, 48 hours for others
     default_active = 99 if user_is_admin else 1
-    
+
     # Start with the most restrictive defaults
     min_duration = float('inf')
     max_duration = 0
     max_active_reservations = 0
-    
+
     # Apply the most permissive limits from all roles
     for role in user_roles:
       limits = get_role_reservation_limits(role.roleId)
-      
+
       # Use the lowest minimum duration (most permissive)
       if limits['minDuration'] < min_duration:
         min_duration = limits['minDuration']
-      
+
       # Use the highest maximum duration (most permissive)
       if limits['maxDuration'] > max_duration:
         max_duration = limits['maxDuration']
-      
+
       # Use the highest max active reservations (most permissive)
       if limits['maxActiveReservations'] > max_active_reservations:
         max_active_reservations = limits['maxActiveReservations']
-    
+
     # If no roles found, use defaults
     if min_duration == float('inf'):
       min_duration = default_min
@@ -126,7 +128,7 @@ def get_user_reservation_limits(userId: int) -> dict:
       max_duration = default_max
     if max_active_reservations == 0:
       max_active_reservations = default_active
-    
+
     return {
       'minDuration': min_duration,
       'maxDuration': max_duration,
@@ -150,27 +152,32 @@ def check_token(token : str) -> object:
   session_timeout = get_setting('auth.sessionTimeoutMinutes')
   min_start_date = time_now() - timedelta(minutes=session_timeout)
 
+  # Materialize user data inside session scope
+  user_data = None
   with Session() as session:
-    user = session.query(User).filter( User.loginToken == token, User.loginTokenCreatedAt > min_start_date ).first()
-    session.close()
+    user = session.execute(
+      select(User).where(User.loginToken == token, User.loginTokenCreatedAt > min_start_date)
+    ).scalar_one_or_none()
+    if user is not None:
+      user_data = {"userId": user.userId, "email": user.email}
 
-  if user is not None:
-    user_role = get_role(user.email)
+  if user_data is not None:
+    user_role = get_role(user_data["email"])
     # Get all user roles
     user_role_names = []
     with Session() as session:
       from database import UserRole, Role
-      user_roles = session.query(Role).join(UserRole).filter(UserRole.userId == user.userId).all()
+      user_roles = session.execute(select(Role).join(UserRole).where(UserRole.userId == user_data["userId"])).scalars().all()
       for role in user_roles:
         if role.name.lower() != 'everyone':  # Exclude 'everyone' role
           user_role_names.append(role.name)
 
     # Get user's reservation limits
-    reservation_limits = get_user_reservation_limits(user.userId)
+    reservation_limits = get_user_reservation_limits(user_data["userId"])
 
     return helpers.server.api_response(True, "Token OK.", {
-      "userId": user.userId,
-      "email": user.email,
+      "userId": user_data["userId"],
+      "email": user_data["email"],
       "role": user_role,
       "roles": user_role_names,
       "reservationLimits": reservation_limits
@@ -182,13 +189,13 @@ def get_authenticated_user_id(token: str) -> int:
   '''
   Authenticates the provided token and returns the user ID.
   This combines token validation and user ID extraction in one call.
-  
+
   Parameters:
     token: The authentication token
-  
+
   Returns:
     The authenticated user's ID
-    
+
   Raises:
     HTTPException: If the token is invalid or expired
   '''
@@ -281,11 +288,11 @@ def get_ldap_user(username, password):
 
       email = result[0][1][email_field][0].decode("utf-8")
 
-      whitelist_email = session.query(UserWhitelist).filter( UserWhitelist.email == email ).first()
+      whitelist_email = session.execute(select(UserWhitelist).where(UserWhitelist.email == email)).scalar_one_or_none()
       if use_whitelisting and whitelist_email == None:
         return False, "You are not allowed to login (not whitelisted, LDAP)."
 
-      user = session.query(User).filter( User.email == email ).first()
+      user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
       # User not found? Create it and return the newly created user
       if user == None:
         new_user = User(
@@ -293,7 +300,8 @@ def get_ldap_user(username, password):
         )
         session.add(new_user)
         session.commit()
-        return True, session.query(User).filter( User.email == email ).first().userId
+        created_user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
+        return True, created_user.userId
       # User found? Return it
       else:
         return True, user.userId

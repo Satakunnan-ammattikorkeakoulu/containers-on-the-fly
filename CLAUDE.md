@@ -164,6 +164,12 @@ fix: Fix group removal logic to not break on empty usernames
 
 ## Important Development Guidelines
 
+### Python Naming Convention (PEP 8)
+- **Files**: `snake_case.py` (e.g., `hardware_spec.py`, not `HardwareSpec.py`)
+- **Functions, methods, variables, parameters**: `snake_case` (e.g., `get_roles()`, `computer_id`)
+- **Classes**: `PascalCase` (e.g., `Reservation`, `UnifiedSettings`)
+- **Exception — database layer stays camelCase**: SQLAlchemy column attributes (e.g., `userId`, `computerId`), relationship names (e.g., `reservedContainer`), `__tablename__` values, API response JSON field names, Pydantic request model fields, and settings keys (e.g., `docker.serverName`) all remain camelCase because they are part of the API contract with the frontend.
+
 ### AI Workflow Rules
 
 - **Plan before implementing**: When asked for a plan or design, present the plan and wait for approval before writing any code. Do not implement unless explicitly asked.

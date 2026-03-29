@@ -264,6 +264,30 @@ And that's it. Now you should be able to reserve the container!
 
 If you wish to use LDAP for the login, then configure the LDAP in the ``user_config/settings`` file. Example settings are commented in the file.
 
+## Commit Message Format
+
+Format all commit messages using conventional commits: `type(scope): description`
+
+**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`
+
+**Rules**:
+- Write subjects in imperative mood ("Add", "Fix", "Update")
+- Keep messages short — focus on the main changes, not every detail
+- No marketing text ("improved UX", "for better maintainability")
+- No preamble ("This commit introduces...")
+- If there are multiple major changes across areas, group with headers
+
+**Example**:
+```
+Frontend
+feat(teachers): Add new page for teachers to manage their games
+chore(nav): Update the header to include a new link for the games
+
+Backend
+feat(teachers): Add a new route for teacher to fetch game statistics
+fix: Fix group removal logic to not break on empty usernames
+```
+
 ## Technical Details
 
 * Click on the image to view full size

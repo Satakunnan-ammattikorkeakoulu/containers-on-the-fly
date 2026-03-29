@@ -138,6 +138,30 @@ debug_mode = settings_handler.getSetting("docker.debugSkipGpuDedication")
 - Firewall rules managed via `scripts/apply_firewall_rules.bash`
 - Container port ranges configurable (default: 2000-3000)
 
+## Commit Message Format
+
+Use conventional commits: `type(scope): description`
+
+**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`
+
+**Rules**:
+- Write subjects in imperative mood ("Add", "Fix", "Update")
+- Keep messages short — focus on the main changes, not every detail
+- No marketing text ("improved UX", "for better maintainability")
+- No preamble ("This commit introduces...")
+- If there are multiple major changes across areas, group with headers
+
+**Example**:
+```
+Frontend
+feat(teachers): Add new page for teachers to manage their games
+chore(nav): Update the header to include a new link for the games
+
+Backend
+feat(teachers): Add a new route for teacher to fetch game statistics
+fix: Fix group removal logic to not break on empty usernames
+```
+
 ## Important Development Guidelines
 
 ### Version Management

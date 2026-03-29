@@ -1,6 +1,6 @@
 # Role table management functionality
 from database import Role, RoleMount, Computer, Session, UserRole
-from helpers.server import Response
+from helpers.server import api_response
 from sqlalchemy import func
 
 def getRoles():
@@ -22,8 +22,8 @@ def getRolesWithMountCounts():
         roles = session.query(Role).all()
         result = []
         for role in roles:
-            from helpers.server import ORMObjectToDict
-            role_dict = ORMObjectToDict(role)
+            from helpers.server import orm_to_dict
+            role_dict = orm_to_dict(role)
             # Add mount count
             mount_count = session.query(RoleMount).filter(RoleMount.roleId == role.roleId).count()
             role_dict['mountCount'] = mount_count
@@ -95,8 +95,8 @@ def addRole(name: str) -> tuple[bool, str, dict]:
             session.commit()
             
             # Convert to dict while still in session
-            from helpers.server import ORMObjectToDict
-            role_dict = ORMObjectToDict(role)
+            from helpers.server import orm_to_dict
+            role_dict = orm_to_dict(role)
             return True, "Role added successfully", role_dict
 
         except Exception as e:
@@ -132,8 +132,8 @@ def editRole(roleId: int, name: str) -> tuple[bool, str, dict]:
             session.commit()
             
             # Convert to dict while still in session
-            from helpers.server import ORMObjectToDict
-            role_dict = ORMObjectToDict(role)
+            from helpers.server import orm_to_dict
+            role_dict = orm_to_dict(role)
             return True, "Role updated successfully", role_dict
 
         except Exception as e:
@@ -260,7 +260,7 @@ def getRoleHardwareLimits(roleId: int) -> list:
         List of hardware limits for the role
     '''
     from database import RoleHardwareLimit, HardwareSpec
-    from helpers.server import ORMObjectToDict
+    from helpers.server import orm_to_dict
     
     with Session() as session:
         limits = session.query(RoleHardwareLimit).filter(

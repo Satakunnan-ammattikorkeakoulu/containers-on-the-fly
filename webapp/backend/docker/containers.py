@@ -97,7 +97,7 @@ def start_container(pars):
         if pars.get("gpus") and pars["gpus"] != "":
             # Check if GPU debug mode is enabled
             try:
-                debug_skip_gpu = settings_handler.getSetting("docker.debugSkipGpuDedication")
+                debug_skip_gpu = settings_handler.get_setting("docker.debugSkipGpuDedication")
             except Exception as e:
                 debug_skip_gpu = False
 
@@ -114,7 +114,7 @@ def start_container(pars):
         # Build volumes from role mounts (creates host directories and sets permissions)
         volumes = build_volume_list(pars["roleMounts"], computer_id, user_email, user_id)
 
-        full_image_name = f"{settings_handler.getSetting('docker.registryAddress')}/{pars['image']}:{pars['image_version']}"
+        full_image_name = f"{settings_handler.get_setting('docker.registryAddress')}/{pars['image']}:{pars['image_version']}"
 
         # RAM disk configuration
         ram_mounts = []

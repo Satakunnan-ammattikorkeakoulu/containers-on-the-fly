@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from endpoints import user, reservation, admin, app
 from settings_handler import settings_handler
-from helpers.auth import HashPassword
+from helpers.auth import hash_password
 from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, Container
 import base64
 import sqlalchemy as sa
@@ -15,7 +15,7 @@ router.include_router(app.router)
 
 # Run code here when server starts
 
-if settings_handler.getSetting("app.production") == True:
+if settings_handler.get_setting("app.production") == True:
   print("Running server in production mode")
 else:
   print("Running server in development mode")
@@ -40,12 +40,12 @@ with Session() as session:
     ))
     session.commit()
 
-if settings_handler.getSetting("app.addTestDataInDevelopment"):    
+if settings_handler.get_setting("app.addTestDataInDevelopment"):    
     # Admin user
     adminUser = session.query(User).filter( User.email == "admin@foo.com" ).first()
     if adminUser is None:
       print("Creating test data: admin user with email admin@foo.com")
-      hash = HashPassword("test")
+      hash = hash_password("test")
       adminUser = User(
         email = "admin@foo.com",
         password = base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
@@ -60,7 +60,7 @@ if settings_handler.getSetting("app.addTestDataInDevelopment"):
     normalUser = session.query(User).filter( User.email == "user@foo.com" ).first()
     if normalUser is None:
       print("Creating test data: normal user with email user@foo.com")
-      hash = HashPassword("test")
+      hash = hash_password("test")
       normalUser = User(
         email = "user@foo.com",
         password = base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
@@ -73,7 +73,7 @@ if settings_handler.getSetting("app.addTestDataInDevelopment"):
     computer = session.query(Computer).filter( Computer.name == "server1" ).first()
     if computer is None:
       print("Creating test data: computer named server1")
-      computer = Computer( name = "server1", ip = settings_handler.getSetting("app.serverIp"), public = True )
+      computer = Computer( name = "server1", ip = settings_handler.get_setting("app.serverIp"), public = True )
       session.add(computer)
       session.commit()
 

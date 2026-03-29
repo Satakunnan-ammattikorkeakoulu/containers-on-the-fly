@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from helpers.server import Response, ForceAuthentication
+from helpers.server import api_response, force_authentication
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from endpoints.responses import user as functionality
 from pydantic import BaseModel
@@ -22,17 +22,17 @@ async def checkToken(token: str = Depends(oauth2_scheme)):
 
 @router.post("/create_password")
 async def createPassword(password: str, token: str = Depends(oauth2_scheme)):
-  ForceAuthentication(token)
+  force_authentication(token)
   return functionality.createPassword(password)
 
 @router.get("/profile")
 async def profile(token: str = Depends(oauth2_scheme)):
-  ForceAuthentication(token)
+  force_authentication(token)
   return functionality.profile(token)
 
 @router.get("/has_password")
 async def hasPassword(token: str = Depends(oauth2_scheme)):
-  ForceAuthentication(token)
+  force_authentication(token)
   return functionality.hasPassword(token)
 
 class ChangePasswordRequest(BaseModel):
@@ -41,5 +41,5 @@ class ChangePasswordRequest(BaseModel):
 
 @router.post("/change_password")
 async def changePassword(request: ChangePasswordRequest, token: str = Depends(oauth2_scheme)):
-  ForceAuthentication(token)
+  force_authentication(token)
   return functionality.changePassword(token, request.currentPassword, request.newPassword)

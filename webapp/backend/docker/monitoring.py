@@ -37,11 +37,11 @@ def updateServerMonitoring():
     try:
         with Session() as session:
             computer = session.query(Computer).filter(
-                Computer.name == settings_handler.getSetting("docker.serverName")
+                Computer.name == settings_handler.get_setting("docker.serverName")
             ).first()
 
             if not computer:
-                print(f"Warning: Computer '{settings_handler.getSetting('docker.serverName')}' not found in database")
+                print(f"Warning: Computer '{settings_handler.get_setting('docker.serverName')}' not found in database")
                 return
 
             # Get or create status record

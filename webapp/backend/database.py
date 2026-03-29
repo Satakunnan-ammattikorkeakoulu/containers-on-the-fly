@@ -2,8 +2,8 @@ from sqlalchemy import create_engine
 from settings_handler import settings_handler
 import pymysql
 engine = create_engine(
-    settings_handler.getSetting("database.engineUri"), 
-    echo=settings_handler.getSetting("database.debugPrinting"), 
+    settings_handler.get_setting("database.engineUri"), 
+    echo=settings_handler.get_setting("database.debugPrinting"), 
     future=True,
     pool_size=20,
     max_overflow=30,

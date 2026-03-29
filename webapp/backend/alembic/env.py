@@ -20,7 +20,7 @@ from settings_handler import settings_handler
 config = context.config
 
 # Configure the database URL from our settings
-config.set_main_option("sqlalchemy.url", settings_handler.getSetting("database.engineUri"))
+config.set_main_option("sqlalchemy.url", settings_handler.get_setting("database.engineUri"))
 
 # Interpret the config file for Python logging
 if config.config_file_name is not None:

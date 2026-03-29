@@ -67,7 +67,7 @@ def stopFinishedServers():
   global computerId
   reservations = getReservationsRequiringStop(computerId)
   for reservation in reservations:
-    if settings_handler.getSetting("docker.enabled") == True:
+    if settings_handler.get_setting("docker.enabled") == True:
       print(timeNow(), ": Stopping Docker server for reservation with reservationId: ",  reservation.reservationId)
       stopDockerContainer(reservation.reservationId)
 
@@ -79,7 +79,7 @@ def startNewServers():
   global computerId
   reservations = getReservationsRequiringStart(computerId)
   for reservation in reservations:
-    if settings_handler.getSetting("docker.enabled") == True:
+    if settings_handler.get_setting("docker.enabled") == True:
       print(timeNow(), ": Starting Docker server for reservation with reservationId: ",  reservation.reservationId)
       startDockerContainer(reservation.reservationId)
 
@@ -91,7 +91,7 @@ def restartCrashedServers():
   global computerId
   reservations = getRunningReservations(computerId)
   for reservation in reservations:
-    if settings_handler.getSetting("docker.enabled") == True:
+    if settings_handler.get_setting("docker.enabled") == True:
       try:
         containerName, containerState = getContainerInformation(reservation.reservationId)
         if containerState.state.status == "exited":
@@ -109,7 +109,7 @@ def restartServersRequiringRestart():
   reservations = getReservationsRequiringRestart(computerId)
 
   for reservation in reservations:
-    if settings_handler.getSetting("docker.enabled") == True:
+    if settings_handler.get_setting("docker.enabled") == True:
       try:
         restartDockerContainer(reservation.reservationId)
       except Exception as e:
@@ -351,12 +351,12 @@ def run():
   print("This software will run infinitely and start / stop servers for reservations." + linesep)
 
   # Check that docker support has been enabled
-  if (settings_handler.getSetting("docker.enabled") != True):
+  if (settings_handler.get_setting("docker.enabled") != True):
     print("!!! Docker support has not been enabled, so this script does nothing. Enable it with settings.json setting docker.enabled: true !!!" + linesep)
 
   # Get ID of the computer from the database based on the settings.json key docker.serverName.
   # Exit on any errors
-  serverName = settings_handler.getSetting("docker.serverName")
+  serverName = settings_handler.get_setting("docker.serverName")
   if not serverName:
     print("!!! You need to specify the name of the server in settings.json file, in key docker.serverName. The name should be exactly the same as in database !!! Exiting." + linesep)
     sys.exit()

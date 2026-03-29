@@ -1,7 +1,7 @@
 from database import Session, Computer, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec
 from docker import get_email_container_started, restart_container
-from helpers.server import Response, ORMObjectToDict
-from helpers.auth import IsAdmin
+from helpers.server import api_response, orm_to_dict
+from helpers.auth import is_admin
 from dateutil import parser
 from dateutil.relativedelta import *
 import datetime
@@ -78,15 +78,15 @@ def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = Non
   computers = []
 
   for computer in allComputers:
-    compDict = ORMObjectToDict(computer)
+    compDict = orm_to_dict(computer)
     compDict["hardwareSpecs"] = []
     for spec in computer.hardwareSpecs:
-      compDict["hardwareSpecs"].append(ORMObjectToDict(spec))
+      compDict["hardwareSpecs"].append(orm_to_dict(spec))
     computers.append(compDict)
 
   containers = []
   for container in allContainers:
-    containers.append(ORMObjectToDict(container))
+    containers.append(orm_to_dict(container))
 
   # Get user's roles and their hardware limits
   user_role_limits = {}
@@ -150,9 +150,9 @@ def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = Non
             specMessage = f"Available: {specMax} {spec['format']} {spec['type']}."
           else:
             specMessage = f"Available: {specMax} {spec['type']}."
-          return Response(False, f"Not enough resources to make a reservation: {spec['type']}. {specMessage}")
+          return api_response(False, f"Not enough resources to make a reservation: {spec['type']}. {specMessage}")
 
-  return Response(True, "Hardware resources fetched.", { "computers": computers, "containers": containers })
+  return api_response(True, "Hardware resources fetched.", { "computers": computers, "containers": containers })
 
 def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
   '''
@@ -200,10 +200,10 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
     session.close()
   
   for reservation in query:
-    res = ORMObjectToDict(reservation)
+    res = orm_to_dict(reservation)
     res["computerName"] = reservation.computer.name
-    res["reservedContainer"] = ORMObjectToDict(reservation.reservedContainer)
-    res["reservedContainer"]["container"] = ORMObjectToDict(reservation.reservedContainer.container)
+    res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
+    res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
     res["reservedContainer"]["reservedPorts"] = []
     # Include SHM and RAM disk percentages
     res["shmSizePercent"] = reservation.reservedContainer.shmSizePercent if reservation.reservedContainer.shmSizePercent is not None else 50
@@ -211,7 +211,7 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
     # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
     if reservation.status == "started":
       for reservedPort in reservation.reservedContainer.reservedContainerPorts:
-        portObj = ORMObjectToDict(reservedPort)
+        portObj = orm_to_dict(reservedPort)
         portObj["localPort"] = reservedPort.containerPort.port
         portObj["serviceName"] = reservedPort.containerPort.serviceName
         res["reservedContainer"]["reservedPorts"].append(portObj)
@@ -234,17 +234,17 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
           })
     reservations.append(res)
   
-  return Response(True, "Hardware resources fetched.", { "reservations": reservations, "statusCounts": status_counts })
+  return api_response(True, "Hardware resources fetched.", { "reservations": reservations, "statusCounts": status_counts })
 
 def getOwnReservationDetails(reservationId : int, userId : int) -> object:
   with Session() as session:
     # Check that the reservation exists and is owned by the current user (admins can view any reservation)
-    if IsAdmin(userId):
+    if is_admin(userId):
       reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
     else:
       reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
     if (reservation == None):
-      return Response(False, "Reservation not found.")
+      return api_response(False, "Reservation not found.")
 
     portsForEmail = []
 
@@ -267,7 +267,7 @@ def getOwnReservationDetails(reservationId : int, userId : int) -> object:
 
     connectionText = connectionText.replace("\n", "<br>")
 
-  return Response(True, "Details fetched.", { "connectionText": connectionText } )
+  return api_response(True, "Details fetched.", { "connectionText": connectionText } )
 
 def getCurrentReservations() -> object:
   reservations = []
@@ -301,24 +301,24 @@ def getCurrentReservations() -> object:
     }
     reservations.append(res)
   
-  return Response(True, "Current reservations fetched.", { "reservations": reservations })
+  return api_response(True, "Current reservations fetched.", { "reservations": reservations })
 
 def createReservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0):
   # Validate description length if provided
   if description and len(description) > 50:
-    return Response(False, "Description must be 50 characters or less.")
+    return api_response(False, "Description must be 50 characters or less.")
   
   # Validate SHM size percentage (minimum 10%, maximum 90%)
   if shmSizePercent < 10:
-    return Response(False, "SHM size must be at least 10% of allocated memory.")
+    return api_response(False, "SHM size must be at least 10% of allocated memory.")
   if shmSizePercent > 90:
-    return Response(False, "SHM size cannot exceed 90% of allocated memory.")
+    return api_response(False, "SHM size cannot exceed 90% of allocated memory.")
   
   # Validate RAM disk size percentage (minimum 0%, maximum 60%)
   if ramDiskSizePercent < 0:
-    return Response(False, "RAM disk size cannot be negative.")
+    return api_response(False, "RAM disk size cannot be negative.")
   if ramDiskSizePercent > 60:
-    return Response(False, "RAM disk size cannot exceed 60% of allocated memory.")
+    return api_response(False, "RAM disk size cannot exceed 60% of allocated memory.")
 
   date = parser.parse(date)
   endDate = date+relativedelta(hours=+duration)
@@ -327,20 +327,20 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     # Check that user exists
     user = session.query(User).filter( User.userId == userId ).first()
     if (user == None):
-      return Response(False, "User not found.")
-    isAdmin = IsAdmin(user.email)
+      return api_response(False, "User not found.")
+    isAdmin = is_admin(user.email)
 
     # Check that computer and container exists
     computer = session.query(Computer).filter( Computer.computerId == computerId ).first()
     if (computer == None):
-      return Response(False, "Computer not found.")
+      return api_response(False, "Computer not found.")
     container = session.query(Container).filter( Container.containerId == containerId ).first()
     if (container == None):
-      return Response(False, "Container not found.")
+      return api_response(False, "Container not found.")
     
     # Verify user can access this container
     if container.public == False and not isAdmin:
-      return Response(False, "Access denied to private container.")
+      return api_response(False, "Access denied to private container.")
 
     # Get user's role-based reservation limits
     from database import RoleReservationLimit, UserRole
@@ -381,25 +381,25 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
       ( (Reservation.status == "reserved") | (Reservation.status == "started") )
     ).count()
     if userActiveReservations >= max_active_reservations:
-      return Response(False, f"You can only have {max_active_reservations} active reservation(s) at a time.")
+      return api_response(False, f"You can only have {max_active_reservations} active reservation(s) at a time.")
     
     # Validate duration against limits
     if duration < min_duration:
-        return Response(False, f"Minimum duration is {min_duration} hours.")
+        return api_response(False, f"Minimum duration is {min_duration} hours.")
     if duration > max_duration:
-        return Response(False, f"Maximum duration is {max_duration} hours.")
+        return api_response(False, f"Maximum duration is {max_duration} hours.")
 
     # If adminReserveUserEmail is given, check that the user exists
     if adminReserveUserEmail != None and adminReserveUserEmail != "" and isAdmin == True:
       anotherUser = session.query(User).filter( User.email == adminReserveUserEmail ).first()
       if (anotherUser == None):
-        return Response(False, "User for which you tried to reserve for did not exist. Check the email address: " + adminReserveUserEmail)
+        return api_response(False, "User for which you tried to reserve for did not exist. Check the email address: " + adminReserveUserEmail)
       user = anotherUser
 
     # Make sure that there are enough resources for the reservation
     getAvailableHardwareResponse = getAvailableHardware(date.isoformat(), duration, hardwareSpecs, isAdmin, None, user.userId)
     if (getAvailableHardwareResponse["status"] == False):
-      return Response(False, getAvailableHardwareResponse["message"])
+      return api_response(False, getAvailableHardwareResponse["message"])
 
     # Create the base reservation
     reservation_data = {
@@ -451,20 +451,20 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
           gpu_limit_from_roles = max(gpu_limit_from_roles, user_role_limits[key])
       
       if total_gpus_requested > gpu_limit_from_roles:
-        return Response(False, f"You can only reserve {gpu_limit_from_roles} GPU(s) at a time.")
+        return api_response(False, f"You can only reserve {gpu_limit_from_roles} GPU(s) at a time.")
     
     # Enhanced hardware specification validation
     for key, val in hardwareSpecs.items():
       # Validate hardware spec exists
       hardwareSpec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
       if not hardwareSpec:
-        return Response(False, f"Invalid hardware specification ID: {key}")
+        return api_response(False, f"Invalid hardware specification ID: {key}")
       
       # Validate amount bounds
       if val < 0:
-        return Response(False, f"Invalid negative amount for {hardwareSpec.type}")
+        return api_response(False, f"Invalid negative amount for {hardwareSpec.type}")
       if val > hardwareSpec.maximumAmount:
-        return Response(False, f"Requested amount exceeds available resources for {hardwareSpec.type}: {val} > {hardwareSpec.maximumAmount}")
+        return api_response(False, f"Requested amount exceeds available resources for {hardwareSpec.type}: {val} > {hardwareSpec.maximumAmount}")
       
       # Check that the amount does not exceed user limits for the given hardware
       # Skipped for admins
@@ -475,7 +475,7 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
           effective_limit = min(user_role_limits[int(key)], hardwareSpec.maximumAmount)
         
         if val > effective_limit:
-          return Response(False, f"Trying to utilize hardware specs above the user maximum amount for {hardwareSpec.type} {hardwareSpec.format}: {val} > {effective_limit}")
+          return api_response(False, f"Trying to utilize hardware specs above the user maximum amount for {hardwareSpec.type} {hardwareSpec.format}: {val} > {effective_limit}")
       
       # Only add resources over 0
       if val > 0:
@@ -491,16 +491,16 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
       shmSizePercent = shmSizePercent,
       ramDiskSizePercent = ramDiskSizePercent,
     )
-    #print(ORMObjectToDict(reservation))
-    #print(ORMObjectToDict(reservation.reservedContainer))
+    #print(orm_to_dict(reservation))
+    #print(orm_to_dict(reservation.reservedContainer))
     user.reservations.append(reservation)
     session.add(reservation)
     session.commit()
 
-    from settings_handler import getSetting
-    informByEmail = getSetting('email.sendEmail')
+    from settings_handler import get_setting
+    informByEmail = get_setting('email.sendEmail')
 
-    return Response(True, "Reservation created succesfully!", { "informByEmail": informByEmail })
+    return api_response(True, "Reservation created succesfully!", { "informByEmail": informByEmail })
 
 def cancelReservation(userId : int, reservationId: str):
   # Check that user owns the given reservation and it can be found
@@ -508,37 +508,37 @@ def cancelReservation(userId : int, reservationId: str):
   # print("Starting to cancel reservation: " + reservationId)
   with Session() as session:
     reservation = None
-    if IsAdmin(userId) == False:
+    if is_admin(userId) == False:
       reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
     else:
       reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
-    if reservation is None: return Response(False, "No reservation found.")
+    if reservation is None: return api_response(False, "No reservation found.")
 
     reservation.endDate = datetime.datetime.now(datetime.timezone.utc)
     session.commit()
 
-  return Response(True, "Reservation cancelled.")
+  return api_response(True, "Reservation cancelled.")
 
 def extendReservation(userId : int, reservationId: str, duration: int):
   # Check that user owns the given reservation and it can be found
   # Admins can extend any reservation
 
   with Session() as session:
-    if IsAdmin(userId) == False:
+    if is_admin(userId) == False:
       reservationCheck = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
-      if reservationCheck is None: return Response(False, "No reservation found for this user.")
+      if reservationCheck is None: return api_response(False, "No reservation found for this user.")
 
     reservation = session.query(Reservation)\
       .options(joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec))\
       .filter( Reservation.reservationId == reservationId ).first()
-    if reservation is None: return Response(False, "No reservation found.")
+    if reservation is None: return api_response(False, "No reservation found.")
     
     if reservation.status != "started":
-      return Response(False, "Reservation is not started, so cannot extend it.")
+      return api_response(False, "Reservation is not started, so cannot extend it.")
     
     # Check that the duration is between minimum and maximum lengths
     if duration < 0 or duration > 24:
-      return Response(False, "Duration must be between 0 and 24 hours.")
+      return api_response(False, "Duration must be between 0 and 24 hours.")
 
     # First check if specific GPUs are still available during the extension period
     endTimeString = reservation.endDate.strftime("%Y-%m-%d %H:%M:%S")
@@ -560,7 +560,7 @@ def extendReservation(userId : int, reservationId: str, duration: int):
           ).first()
         
         if conflictingReservation:
-          return Response(False, f"Cannot extend reservation: GPU {spec.hardwareSpec.format} (ID: {spec.hardwareSpec.internalId}) is already reserved by another user during the requested extension period.")
+          return api_response(False, f"Cannot extend reservation: GPU {spec.hardwareSpec.format} (ID: {spec.hardwareSpec.internalId}) is already reserved by another user during the requested extension period.")
 
     # Check that there are enough resources for the reservation extension
     # Reducable specs comes from the current reservation
@@ -572,12 +572,12 @@ def extendReservation(userId : int, reservationId: str, duration: int):
       # Extend the reservation
       reservation.endDate = reservation.endDate + relativedelta(hours=+duration)
       session.commit()
-      return Response(True, "Reservation was extended by " + str(duration) + " hours.")
+      return api_response(True, "Reservation was extended by " + str(duration) + " hours.")
     else:
       print(getAvailableHardwareResponse["message"])
-      return Response(False, "Cannot extend reservation due to lack of resources. Try with less hours.")
+      return api_response(False, "Cannot extend reservation due to lack of resources. Try with less hours.")
 
-  return Response(False, "Error.")
+  return api_response(False, "Error.")
 
 def restartContainer(userId : int, reservationId: str):
   reservation = None
@@ -587,22 +587,22 @@ def restartContainer(userId : int, reservationId: str):
     reservation = session.query(Reservation)\
       .options(joinedload(Reservation.reservedContainer))\
       .filter( Reservation.reservationId == reservationId )
-    if IsAdmin(userId) == False:
+    if is_admin(userId) == False:
       reservation = reservation.filter(Reservation.userId == userId )
     
     reservation = reservation.first()
     if reservation is None: 
       session.close()
-      return Response(False, "No reservation found.")
+      return api_response(False, "No reservation found.")
 
     if (reservation.status == "started"):
       reservation.status = "restart"
       session.commit()
       session.close()
-      return Response(True, "Container will be restarted.")
+      return api_response(True, "Container will be restarted.")
     else:
       session.close()
-      return Response(False, "Reservation is not currently started, so cannot restart the container.")
+      return api_response(False, "Reservation is not currently started, so cannot restart the container.")
 
 def getAvailabilityTimeline(startDate: str, endDate: str, isAdmin = False) -> object:
   '''
@@ -621,7 +621,7 @@ def getAvailabilityTimeline(startDate: str, endDate: str, isAdmin = False) -> ob
     start_date = parser.parse(startDate)
     end_date = parser.parse(endDate)
   except:
-    return Response(False, "Invalid date format.")
+    return api_response(False, "Invalid date format.")
   
   # Fetch all computers and reservations in the time range
   with Session() as session:
@@ -783,7 +783,7 @@ def getAvailabilityTimeline(startDate: str, endDate: str, isAdmin = False) -> ob
     
     session.close()
   
-  return Response(True, "Availability timeline fetched.", {'events': timeline_events})
+  return api_response(True, "Availability timeline fetched.", {'events': timeline_events})
 
 def getAllReservationsForCalendar(startDate: str, endDate: str) -> object:
   '''
@@ -801,7 +801,7 @@ def getAllReservationsForCalendar(startDate: str, endDate: str) -> object:
     start_date = parser.parse(startDate)
     end_date = parser.parse(endDate)
   except:
-    return Response(False, "Invalid date format.")
+    return api_response(False, "Invalid date format.")
   
   reservations = []
 
@@ -843,4 +843,4 @@ def getAllReservationsForCalendar(startDate: str, endDate: str) -> object:
     
     session.close()
   
-  return Response(True, "All reservations fetched.", {"reservations": reservations})
+  return api_response(True, "All reservations fetched.", {"reservations": reservations})

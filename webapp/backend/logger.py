@@ -1,6 +1,6 @@
 import logging
 from database import Base
-from helpers.server import ORMObjectToDict
+from helpers.server import orm_to_dict
 from os import linesep
 
 class CustomLogger(logging.Logger):
@@ -20,7 +20,7 @@ class CustomLogger(logging.Logger):
     try:
       # Print database objects as dictionaries
       if isinstance(msg, Base):
-        return f"{linesep}{msg}{linesep}{linesep}{ORMObjectToDict(msg)}"
+        return f"{linesep}{msg}{linesep}{linesep}{orm_to_dict(msg)}"
       else:
         return f"{linesep}{msg}"
     except:

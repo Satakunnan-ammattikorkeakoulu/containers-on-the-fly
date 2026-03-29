@@ -2,13 +2,13 @@ from database import Session, Computer, ContainerPort, User, Reservation, Contai
 from dateutil import parser
 from dateutil.relativedelta import *
 from datetime import timezone, timedelta
-from helpers.server import Response, ORMObjectToDict
+from helpers.server import api_response, orm_to_dict
 import datetime
 from endpoints.models.admin import ContainerEdit, ComputerEdit
 from endpoints.models.reservation import ReservationFilters
 from sqlalchemy.orm import joinedload
 from logger import log
-from helpers.auth import HashPassword, IsCorrectPassword
+from helpers.auth import hash_password, is_correct_password
 import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
@@ -56,18 +56,18 @@ def getReservations(filters : ReservationFilters) -> object:
     session.close()
 
   for reservation in query:
-    res = ORMObjectToDict(reservation)
+    res = orm_to_dict(reservation)
     res["userEmail"] = reservation.user.email
     res["computerName"] = reservation.computer.name
-    res["reservedContainer"] = ORMObjectToDict(reservation.reservedContainer)
-    res["reservedContainer"]["container"] = ORMObjectToDict(reservation.reservedContainer.container)
+    res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
+    res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
     
     # Add all reserved ports
     res["reservedContainer"]["reservedPorts"] = []
     # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
     if reservation.status == "started":
       for reservedPort in reservation.reservedContainer.reservedContainerPorts:
-        portObj = ORMObjectToDict(reservedPort)
+        portObj = orm_to_dict(reservedPort)
         portObj["localPort"] = reservedPort.containerPort.port
         portObj["serviceName"] = reservedPort.containerPort.serviceName
         res["reservedContainer"]["reservedPorts"].append(portObj)
@@ -91,7 +91,7 @@ def getReservations(filters : ReservationFilters) -> object:
           })
     reservations.append(res)
     
-  return Response(True, "Reservations fetched.", { "reservations": reservations, "statusCounts": status_counts })
+  return api_response(True, "Reservations fetched.", { "reservations": reservations, "statusCounts": status_counts })
 
 def saveContainer(containerEdit : ContainerEdit) -> object:
   '''
@@ -123,7 +123,7 @@ def saveContainer(containerEdit : ContainerEdit) -> object:
     else:
       container = session.query(Container).filter(Container.containerId == containerEdit.containerId).first()
       if container is None:
-        return Response(False, "Container not found.")
+        return api_response(False, "Container not found.")
       else:
         container.public = containerEdit.data.get("public", False)
         container.name = containerEdit.data.get("name")
@@ -149,7 +149,7 @@ def saveContainer(containerEdit : ContainerEdit) -> object:
         #for port in containerEdit.data.get("ports", []):
         #  container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
         session.commit()
-  return Response(True, "Container saved successfully")
+  return api_response(True, "Container saved successfully")
 
 def removeContainer(containerId : int) -> object:
   '''
@@ -165,13 +165,13 @@ def removeContainer(containerId : int) -> object:
   with Session() as session:
     container = session.query(Container).filter(Container.containerId == containerId).first()
     if container is None:
-      return Response(False, "Container not found.")
+      return api_response(False, "Container not found.")
     else:
       container.removed = True
       container.public = False
       session.commit()
   
-  return Response(True, "Container removed successfully")
+  return api_response(True, "Container removed successfully")
 
 def getUsers() -> object:
     '''
@@ -208,7 +208,7 @@ def getUsers() -> object:
     for role in availableRoles:
         role["userCount"] = role_user_counts.get(role["name"], 0)
 
-    return Response(True, "Users fetched successfully", {"users": data, "availableRoles": availableRoles})
+    return api_response(True, "Users fetched successfully", {"users": data, "availableRoles": availableRoles})
 
 def getUser(userId: int) -> object:
     '''
@@ -225,7 +225,7 @@ def getUser(userId: int) -> object:
     with Session() as session:
         user = session.query(User).filter(User.userId == userId).first()
         if user is None:
-            return Response(False, "User not found")
+            return api_response(False, "User not found")
         
         data = {
             "userId": user.userId,
@@ -234,7 +234,7 @@ def getUser(userId: int) -> object:
             "createdAt": user.userCreatedAt
         }
 
-    return Response(True, "User fetched successfully", {"user": data})
+    return api_response(True, "User fetched successfully", {"user": data})
 
 def saveUser(userId: int, data: dict) -> object:
     '''
@@ -251,11 +251,11 @@ def saveUser(userId: int, data: dict) -> object:
         # Check if email already exists
         existing_user = session.query(User).filter(User.email == data["email"]).first()
         if existing_user is not None and (userId == -1 or existing_user.userId != userId):
-            return Response(False, "A user with this email already exists")
+            return api_response(False, "A user with this email already exists")
 
         if userId == -1:
             # Create new user
-            hash = HashPassword(data["password"])
+            hash = hash_password(data["password"])
             user = User(
                 email=data["email"],
                 password=base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
@@ -268,7 +268,7 @@ def saveUser(userId: int, data: dict) -> object:
             # Update existing user
             user = session.query(User).filter(User.userId == userId).first()
             if user is None:
-                return Response(False, "User not found")
+                return api_response(False, "User not found")
             
             user.email = data["email"]
             
@@ -279,7 +279,7 @@ def saveUser(userId: int, data: dict) -> object:
                 user.passwordSalt = ""
             elif "password" in data and data["password"]:
                 # Update password only if provided and not clearing
-                hash = HashPassword(data["password"])
+                hash = hash_password(data["password"])
                 user.password = base64.b64encode(hash["hashedPassword"]).decode('utf-8')
                 user.passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
         
@@ -298,7 +298,7 @@ def saveUser(userId: int, data: dict) -> object:
                     user.roles.append(role)
         
         session.commit()
-        return Response(True, "User saved successfully")
+        return api_response(True, "User saved successfully")
 
 def getHardware() -> object:
   '''
@@ -314,10 +314,10 @@ def getHardware() -> object:
     query = session.query(HardwareSpec)
     for hardware in query:
       addable = {}
-      addable = ORMObjectToDict(hardware)
+      addable = orm_to_dict(hardware)
       data.append(addable)
   
-  return Response(True, "Data fetched.", { "hardware": data })
+  return api_response(True, "Data fetched.", { "hardware": data })
 
 def getContainers() -> object:
   '''
@@ -334,7 +334,7 @@ def getContainers() -> object:
     query = session.query(Container).filter(Container.removed.isnot(True))
     for container in query:
       addable = {}
-      addable = ORMObjectToDict(container)
+      addable = orm_to_dict(container)
       addable["ports"] = []
       for port in container.containerPorts:
         addable["ports"].append({
@@ -344,7 +344,7 @@ def getContainers() -> object:
         })
       data.append(addable)
   
-  return Response(True, "Data fetched.", { "containers": data })
+  return api_response(True, "Data fetched.", { "containers": data })
 
 def getContainer(containerId : int) -> object:
   '''
@@ -363,7 +363,7 @@ def getContainer(containerId : int) -> object:
     query = session.query(Container).filter(Container.containerId == containerId).limit(1)
     for container in query:
       addable = {}
-      addable = ORMObjectToDict(container)
+      addable = orm_to_dict(container)
       addable["ports"] = []
       for port in container.containerPorts:
         addable["ports"].append({
@@ -372,7 +372,7 @@ def getContainer(containerId : int) -> object:
           "serviceName": port.serviceName,
         })
   
-  return Response(True, "Data fetched.", { "data": addable })
+  return api_response(True, "Data fetched.", { "data": addable })
 
 def getComputers() -> object:
   '''
@@ -388,13 +388,13 @@ def getComputers() -> object:
     query = session.query(Computer).filter(Computer.removed.isnot(True))
     for computer in query:
       addable = {}
-      addable = ORMObjectToDict(computer)
+      addable = orm_to_dict(computer)
       addable["hardwareSpecs"] = []
       for spec in computer.hardwareSpecs:
-        addable["hardwareSpecs"].append(ORMObjectToDict(spec))
+        addable["hardwareSpecs"].append(orm_to_dict(spec))
       data.append(addable)
   
-  return Response(True, "Data fetched.", { "computers": data })
+  return api_response(True, "Data fetched.", { "computers": data })
 
 def getComputer(computerId : int) -> object:
   '''
@@ -413,23 +413,23 @@ def getComputer(computerId : int) -> object:
     query = session.query(Computer).filter( Computer.computerId == computerId ).limit(1)
     for computer in query:
       addable = {}
-      addable = ORMObjectToDict(computer)
+      addable = orm_to_dict(computer)
       addable["hardware"] = {}
       addable["hardware"]["gpus"] = []
       for spec in computer.hardwareSpecs:
         if spec.type == "cpus":
-          addable["hardware"]["cpu"] = ORMObjectToDict(spec)
+          addable["hardware"]["cpu"] = orm_to_dict(spec)
         if spec.type == "ram":
-          addable["hardware"]["ram"] = ORMObjectToDict(spec)
+          addable["hardware"]["ram"] = orm_to_dict(spec)
         if spec.type == "gpus":
-          addable["hardware"]["gpu"] = ORMObjectToDict(spec)
+          addable["hardware"]["gpu"] = orm_to_dict(spec)
         if spec.type == "gpu":
-          addable["hardware"]["gpus"].append(ORMObjectToDict(spec))
-        #print(ORMObjectToDict(spec))
-        #addable["hardwareSpecs"].append(ORMObjectToDict(spec))
+          addable["hardware"]["gpus"].append(orm_to_dict(spec))
+        #print(orm_to_dict(spec))
+        #addable["hardwareSpecs"].append(orm_to_dict(spec))
       data = addable
 
-  return Response(True, "Data fetched.", { "data": data })
+  return api_response(True, "Data fetched.", { "data": data })
 
 def saveComputer(computerEdit : ComputerEdit) -> object:
   '''
@@ -498,7 +498,7 @@ def saveComputer(computerEdit : ComputerEdit) -> object:
       log.debug(computerEdit.data.get("hardware").get("gpus"))
       computer = session.query(Computer).filter(Computer.computerId == computerEdit.computerId).first()
       if computer is None:
-        return Response(False, "Computer not found.")
+        return api_response(False, "Computer not found.")
       else:
         computer.public = computerEdit.data.get("public", False)
         computer.name = computerEdit.data.get("name")
@@ -547,7 +547,7 @@ def saveComputer(computerEdit : ComputerEdit) -> object:
         #for port in containerEdit.data.get("ports", []):
         #  container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
         session.commit()
-  return Response(True, "Computer saved successfully")
+  return api_response(True, "Computer saved successfully")
 
 def removeComputer(computerId : int) -> object:
   '''
@@ -563,13 +563,13 @@ def removeComputer(computerId : int) -> object:
   with Session() as session:
     computer = session.query(Computer).filter(Computer.computerId == computerId).first()
     if computer is None:
-      return Response(False, "Computer not found.")
+      return api_response(False, "Computer not found.")
     else:
       computer.removed = True
       computer.public = False
       session.commit()
   
-  return Response(True, "Computer removed successfully")
+  return api_response(True, "Computer removed successfully")
 
 def editReservation(reservationId : int, endDate : str) -> object:
   '''
@@ -586,17 +586,17 @@ def editReservation(reservationId : int, endDate : str) -> object:
   try:
     endDate = parser.parse(endDate)
   except:
-    return Response(False, "Invalid end date.")
+    return api_response(False, "Invalid end date.")
 
   with Session() as session:
     reservation = session.query(Reservation).filter(Reservation.reservationId == reservationId).first()
     if reservation is None:
-      return Response(False, "Reservation not found.")
+      return api_response(False, "Reservation not found.")
     else:
       reservation.endDate = endDate
       session.commit()
 
-  return Response(True, "Reservation was edited succesfully.")
+  return api_response(True, "Reservation was edited succesfully.")
 
 def getAllRoles() -> object:
     '''
@@ -607,7 +607,7 @@ def getAllRoles() -> object:
     from helpers.tables.role import getRolesWithMountCounts
     data = getRolesWithMountCounts()
     
-    return Response(True, "Roles fetched successfully.", {"roles": data})
+    return api_response(True, "Roles fetched successfully.", {"roles": data})
 
 def addRole(name: str) -> object:
     '''
@@ -619,8 +619,8 @@ def addRole(name: str) -> object:
     '''
     success, message, role_dict = addRoleHelper(name)
     if not success:
-        return Response(False, message)
-    return Response(True, message, role_dict)
+        return api_response(False, message)
+    return api_response(True, message, role_dict)
 
 def editRole(roleId: int, name: str) -> object:
     '''
@@ -633,8 +633,8 @@ def editRole(roleId: int, name: str) -> object:
     '''
     success, message, role_dict = editRoleHelper(roleId, name)
     if not success:
-        return Response(False, message)
-    return Response(True, message, role_dict)
+        return api_response(False, message)
+    return api_response(True, message, role_dict)
 
 def removeRole(roleId: int) -> object:
     '''
@@ -646,8 +646,8 @@ def removeRole(roleId: int) -> object:
     '''
     success, message = removeRoleHelper(roleId)
     if not success:
-        return Response(False, message)
-    return Response(True, message)
+        return api_response(False, message)
+    return api_response(True, message)
 
 def getRoleMounts(roleId: int) -> object:
     '''
@@ -662,9 +662,9 @@ def getRoleMounts(roleId: int) -> object:
     try:
         from helpers.tables.role import getRoleMounts as getRoleMountsHelper
         mounts = getRoleMountsHelper(roleId)
-        return Response(True, "Role mounts retrieved successfully", {"mounts": mounts})
+        return api_response(True, "Role mounts retrieved successfully", {"mounts": mounts})
     except Exception as e:
-        return Response(False, f"Error retrieving role mounts: {str(e)}")
+        return api_response(False, f"Error retrieving role mounts: {str(e)}")
 
 def saveRoleMounts(roleId: int, mounts: list) -> object:
     '''
@@ -680,9 +680,9 @@ def saveRoleMounts(roleId: int, mounts: list) -> object:
     try:
         from helpers.tables.role import saveRoleMounts as saveRoleMountsHelper
         success, message = saveRoleMountsHelper(roleId, mounts)
-        return Response(success, message)
+        return api_response(success, message)
     except Exception as e:
-        return Response(False, f"Error saving role mounts: {str(e)}")
+        return api_response(False, f"Error saving role mounts: {str(e)}")
 
 def getRoleHardwareLimits(roleId: int) -> object:
     '''
@@ -697,9 +697,9 @@ def getRoleHardwareLimits(roleId: int) -> object:
     try:
         from helpers.tables.role import getRoleHardwareLimits as getRoleHardwareLimitsHelper
         limits = getRoleHardwareLimitsHelper(roleId)
-        return Response(True, "Role hardware limits retrieved successfully", {"hardwareLimits": limits})
+        return api_response(True, "Role hardware limits retrieved successfully", {"hardwareLimits": limits})
     except Exception as e:
-        return Response(False, f"Error retrieving role hardware limits: {str(e)}")
+        return api_response(False, f"Error retrieving role hardware limits: {str(e)}")
 
 def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> object:
     '''
@@ -715,9 +715,9 @@ def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> object:
     try:
         from helpers.tables.role import saveRoleHardwareLimits as saveRoleHardwareLimitsHelper
         success, message = saveRoleHardwareLimitsHelper(roleId, hardwareLimits)
-        return Response(success, message)
+        return api_response(success, message)
     except Exception as e:
-        return Response(False, f"Error saving role hardware limits: {str(e)}")
+        return api_response(False, f"Error saving role hardware limits: {str(e)}")
 
 def getRoleReservationLimits(roleId: int) -> object:
     '''
@@ -732,9 +732,9 @@ def getRoleReservationLimits(roleId: int) -> object:
     try:
         from helpers.tables.role import getRoleReservationLimits as getRoleReservationLimitsHelper
         limits = getRoleReservationLimitsHelper(roleId)
-        return Response(True, "Role reservation limits retrieved successfully", {"reservationLimits": limits})
+        return api_response(True, "Role reservation limits retrieved successfully", {"reservationLimits": limits})
     except Exception as e:
-        return Response(False, f"Error retrieving role reservation limits: {str(e)}")
+        return api_response(False, f"Error retrieving role reservation limits: {str(e)}")
 
 def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> object:
     '''
@@ -750,9 +750,9 @@ def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> object:
     try:
         from helpers.tables.role import saveRoleReservationLimits as saveRoleReservationLimitsHelper
         success, message = saveRoleReservationLimitsHelper(roleId, reservationLimits)
-        return Response(success, message)
+        return api_response(success, message)
     except Exception as e:
-        return Response(False, f"Error saving role reservation limits: {str(e)}")
+        return api_response(False, f"Error saving role reservation limits: {str(e)}")
 
 def getServerMonitoring(computer_id: int) -> object:
     '''
@@ -768,7 +768,7 @@ def getServerMonitoring(computer_id: int) -> object:
         # Check if computer exists
         computer = session.query(Computer).filter(Computer.computerId == computer_id).first()
         if not computer:
-            return Response(False, "Server not found")
+            return api_response(False, "Server not found")
         
         # Get server status/metrics
         status = session.query(ServerStatus).filter(
@@ -852,7 +852,7 @@ def getServerMonitoring(computer_id: int) -> object:
                 "lastUpdated": log.lastUpdatedAt.isoformat() if log.lastUpdatedAt else None
             }
         
-        return Response(True, "Server monitoring data retrieved", monitoring_data)
+        return api_response(True, "Server monitoring data retrieved", monitoring_data)
 
 def getServersForMonitoring() -> object:
     '''
@@ -875,7 +875,7 @@ def getServersForMonitoring() -> object:
                 "public": computer.public
             })
         
-        return Response(True, "Servers retrieved successfully", {"servers": servers_list})
+        return api_response(True, "Servers retrieved successfully", {"servers": servers_list})
 
 def getGeneralSettings() -> object:
     '''
@@ -885,7 +885,7 @@ def getGeneralSettings() -> object:
         object: Response object with all settings organized by section.
     '''
     try:
-        from settings_handler import getSetting, getMultipleSettings
+        from settings_handler import get_setting, get_multiple_settings
         from helpers.tables.user_access_control import getBlacklistedEmails, getWhitelistedEmails
         
         # Define all settings with their defaults
@@ -920,7 +920,7 @@ def getGeneralSettings() -> object:
         ]
         
         # Get all settings
-        settings_dict = getMultipleSettings(setting_keys)
+        settings_dict = get_multiple_settings(setting_keys)
         
         # Get email lists
         blacklisted_emails = getBlacklistedEmails()
@@ -982,10 +982,10 @@ def getGeneralSettings() -> object:
             }
         }
         
-        return Response(True, "Settings retrieved successfully", response_data)
+        return api_response(True, "Settings retrieved successfully", response_data)
         
     except Exception as e:
-        return Response(False, f"Error retrieving settings: {str(e)}")
+        return api_response(False, f"Error retrieving settings: {str(e)}")
 
 def saveGeneralSettings(section: str, settings: dict) -> object:
     '''
@@ -999,34 +999,34 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
         object: Response object indicating success/failure
     '''
     try:
-        from settings_handler import setSetting
+        from settings_handler import set_setting
         from helpers.tables.user_access_control import setBlacklistedEmails, setWhitelistedEmails
         
         if section == "general":
             # Save general application settings
             if 'applicationName' in settings:
-                setSetting('general.applicationName', settings['applicationName'])
+                set_setting('general.applicationName', settings['applicationName'])
             if 'timezone' in settings:
-                setSetting('general.timezone', settings['timezone'])
+                set_setting('general.timezone', settings['timezone'])
             
             # Save instruction settings using new naming scheme
             if 'loginPageInfo' in settings:
-                setSetting('instructions.login', settings['loginPageInfo'])
+                set_setting('instructions.login', settings['loginPageInfo'])
             if 'reservationPageInstructions' in settings:
-                setSetting('instructions.reservation', settings['reservationPageInstructions'])
+                set_setting('instructions.reservation', settings['reservationPageInstructions'])
             if 'emailInstructions' in settings:
-                setSetting('instructions.email', settings['emailInstructions'])
+                set_setting('instructions.email', settings['emailInstructions'])
             if 'usernameFieldLabel' in settings:
-                setSetting('instructions.usernameFieldLabel', settings['usernameFieldLabel'])
+                set_setting('instructions.usernameFieldLabel', settings['usernameFieldLabel'])
             if 'passwordFieldLabel' in settings:
-                setSetting('instructions.passwordFieldLabel', settings['passwordFieldLabel'])
+                set_setting('instructions.passwordFieldLabel', settings['passwordFieldLabel'])
                 
         elif section == "access":
             # Save access control settings
             if 'blacklistEnabled' in settings:
-                setSetting('access.blacklistEnabled', settings['blacklistEnabled'])
+                set_setting('access.blacklistEnabled', settings['blacklistEnabled'])
             if 'whitelistEnabled' in settings:
-                setSetting('access.whitelistEnabled', settings['whitelistEnabled'])
+                set_setting('access.whitelistEnabled', settings['whitelistEnabled'])
             if 'blacklistedEmails' in settings:
                 setBlacklistedEmails(settings['blacklistedEmails'])
             if 'whitelistedEmails' in settings:
@@ -1035,66 +1035,66 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
         elif section == "email":
             # Save email configuration
             if 'smtpServer' in settings:
-                setSetting('email.smtpServer', settings['smtpServer'])
+                set_setting('email.smtpServer', settings['smtpServer'])
             if 'smtpPort' in settings:
-                setSetting('email.smtpPort', settings['smtpPort'])
+                set_setting('email.smtpPort', settings['smtpPort'])
             if 'smtpUsername' in settings:
-                setSetting('email.smtpUsername', settings['smtpUsername'])
+                set_setting('email.smtpUsername', settings['smtpUsername'])
             if 'smtpPassword' in settings:
-                setSetting('email.smtpPassword', settings['smtpPassword'])
+                set_setting('email.smtpPassword', settings['smtpPassword'])
             if 'fromEmail' in settings:
-                setSetting('email.fromEmail', settings['fromEmail'])
+                set_setting('email.fromEmail', settings['fromEmail'])
                 
         elif section == "contact":
             # Save contact email separately
             if 'contactEmail' in settings:
-                setSetting('email.contactEmail', settings['contactEmail'])
+                set_setting('email.contactEmail', settings['contactEmail'])
                 
         elif section == "emailEnable":
             # Save email enable setting
             if 'sendEmail' in settings:
-                setSetting('email.sendEmail', settings['sendEmail'])
+                set_setting('email.sendEmail', settings['sendEmail'])
                 
         elif section == "notifications":
             # Save notification settings
             if 'containerAlertsEnabled' in settings:
-                setSetting('notifications.containerAlertsEnabled', settings['containerAlertsEnabled'])
+                set_setting('notifications.containerAlertsEnabled', settings['containerAlertsEnabled'])
             if 'alertEmails' in settings:
-                setSetting('notifications.alertEmails', settings['alertEmails'])
+                set_setting('notifications.alertEmails', settings['alertEmails'])
         
         elif section == "auth":
             # Save authentication settings
             if 'loginType' in settings:
-                setSetting('auth.loginType', settings['loginType'])
+                set_setting('auth.loginType', settings['loginType'])
             if 'sessionTimeoutMinutes' in settings:
                 timeout = 1440 if not settings['sessionTimeoutMinutes'] else settings['sessionTimeoutMinutes']
-                setSetting('auth.sessionTimeoutMinutes', timeout)
+                set_setting('auth.sessionTimeoutMinutes', timeout)
                 
             # Save LDAP settings if they exist
             if 'ldap' in settings and isinstance(settings['ldap'], dict):
                 ldap_settings = settings['ldap']
                 if 'url' in ldap_settings:
-                    setSetting('auth.ldap.url', ldap_settings['url'])
+                    set_setting('auth.ldap.url', ldap_settings['url'])
                 if 'usernameFormat' in ldap_settings:
-                    setSetting('auth.ldap.usernameFormat', ldap_settings['usernameFormat'])
+                    set_setting('auth.ldap.usernameFormat', ldap_settings['usernameFormat'])
                 if 'passwordFormat' in ldap_settings:
-                    setSetting('auth.ldap.passwordFormat', ldap_settings['passwordFormat'])
+                    set_setting('auth.ldap.passwordFormat', ldap_settings['passwordFormat'])
                 if 'domain' in ldap_settings:
-                    setSetting('auth.ldap.domain', ldap_settings['domain'])
+                    set_setting('auth.ldap.domain', ldap_settings['domain'])
                 if 'searchMethod' in ldap_settings:
-                    setSetting('auth.ldap.searchMethod', ldap_settings['searchMethod'])
+                    set_setting('auth.ldap.searchMethod', ldap_settings['searchMethod'])
                 if 'accountField' in ldap_settings:
-                    setSetting('auth.ldap.accountField', ldap_settings['accountField'])
+                    set_setting('auth.ldap.accountField', ldap_settings['accountField'])
                 if 'emailField' in ldap_settings:
-                    setSetting('auth.ldap.emailField', ldap_settings['emailField'])
+                    set_setting('auth.ldap.emailField', ldap_settings['emailField'])
                 
         else:
-            return Response(False, f"Unknown section: {section}")
+            return api_response(False, f"Unknown section: {section}")
             
-        return Response(True, f"Settings for {section} saved successfully")
+        return api_response(True, f"Settings for {section} saved successfully")
         
     except Exception as e:
-        return Response(False, f"Error saving settings: {str(e)}")
+        return api_response(False, f"Error saving settings: {str(e)}")
 
 def sendTestEmail(email: str) -> object:
     '''
@@ -1107,20 +1107,20 @@ def sendTestEmail(email: str) -> object:
         object: Response object indicating success/failure
     '''
     try:
-        from settings_handler import getSetting
+        from settings_handler import get_setting
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
         
         # Get SMTP settings
-        smtp_server = getSetting('email.smtpServer')
-        smtp_port = getSetting('email.smtpPort')
-        smtp_username = getSetting('email.smtpUsername')
-        smtp_password = getSetting('email.smtpPassword')
-        from_email = getSetting('email.fromEmail')
+        smtp_server = get_setting('email.smtpServer')
+        smtp_port = get_setting('email.smtpPort')
+        smtp_username = get_setting('email.smtpUsername')
+        smtp_password = get_setting('email.smtpPassword')
+        from_email = get_setting('email.fromEmail')
         
         if not all([smtp_server, smtp_port, smtp_username, smtp_password, from_email]):
-            return Response(False, "SMTP configuration is incomplete. Please configure all SMTP settings first.")
+            return api_response(False, "SMTP configuration is incomplete. Please configure all SMTP settings first.")
         
         # Create message
         msg = MIMEMultipart()
@@ -1149,7 +1149,7 @@ def sendTestEmail(email: str) -> object:
         server.send_message(msg)
         server.quit()
         
-        return Response(True, f"Test email sent successfully to {email}")
+        return api_response(True, f"Test email sent successfully to {email}")
         
     except Exception as e:
-        return Response(False, f"Failed to send test email: {str(e)}")
+        return api_response(False, f"Failed to send test email: {str(e)}")

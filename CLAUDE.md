@@ -119,7 +119,7 @@ When adding a new setting, you must:
    - Add to `user_config/settings_example`
    - Add to `user_config/templates/backend_settings.json` if needed by backend
    - Add to boolean/numeric lists in `scripts/apply_settings.py` if applicable
-3. Access settings using: `settings_handler.getSetting("category.settingName")`
+3. Access settings using: `settings_handler.get_setting("category.settingName")`
 
 Example:
 ```python
@@ -130,7 +130,7 @@ Example:
 )
 
 # In code
-debug_mode = settings_handler.getSetting("docker.debugSkipGpuDedication")
+debug_mode = settings_handler.get_setting("docker.debugSkipGpuDedication")
 
 ### Multi-Server Architecture
 - **Main Server**: Web interface, database, Docker registry

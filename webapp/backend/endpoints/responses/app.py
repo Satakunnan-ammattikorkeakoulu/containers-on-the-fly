@@ -1,4 +1,4 @@
-from helpers.server import Response
+from helpers.server import api_response
 
 def getPublicConfig() -> object:
     '''
@@ -9,7 +9,7 @@ def getPublicConfig() -> object:
         object: Response object with public configuration data.
     '''
     try:
-        from settings_handler import getMultipleSettings
+        from settings_handler import get_multiple_settings
         
         # Define public settings keys that don't require admin access
         setting_keys = [
@@ -24,7 +24,7 @@ def getPublicConfig() -> object:
         ]
         
         # Get settings from database
-        settings_dict = getMultipleSettings(setting_keys)
+        settings_dict = get_multiple_settings(setting_keys)
         
         # Build response with public configuration
         config_data = {
@@ -47,8 +47,8 @@ def getPublicConfig() -> object:
             }
         }
         
-        return Response(True, "Public configuration retrieved successfully", config_data)
+        return api_response(True, "Public configuration retrieved successfully", config_data)
         
     except Exception as e:
         print(f"Error retrieving application settings: {str(e)}")
-        return Response(False, f"Error retrieving public configurations")
+        return api_response(False, f"Error retrieving public configurations")

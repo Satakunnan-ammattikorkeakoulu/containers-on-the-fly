@@ -62,7 +62,7 @@ def addUser(email, password):
   Returns:
     The created user object fetched from database.
   '''
-  hash = HashPassword(password)
+  hash = hash_password(password)
   with Session() as session:
     session.add(
       User(
@@ -89,7 +89,7 @@ Finds user by email and changes email or password.
     if new_email != None:
       user.email = new_email
     if new_password != None:
-      hash = HashPassword(new_password)
+      hash = hash_password(new_password)
       user.password = hash["hashedPassword"]
       user.passwordSalt = hash['salt']
     session.commit()

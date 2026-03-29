@@ -21,8 +21,8 @@ def get_available_port():
     for reservation in allActiveReservations:
       for usedPort in reservation.reservedContainer.reservedContainerPorts:
         portsInUse.append(usedPort.outsidePort)
-    min = settings_handler.getSetting("docker.port_range_start")
-    max = settings_handler.getSetting("docker.port_range_end")
+    min = settings_handler.get_setting("docker.port_range_start")
+    max = settings_handler.get_setting("docker.port_range_end")
     availablePorts = []
     for port in range(min, max):
       if port not in portsInUse:

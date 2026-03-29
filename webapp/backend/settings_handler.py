@@ -154,7 +154,7 @@ class UnifiedSettings:
             print(f"Warning: Error getting database setting {key}: {e}")
             return default
     
-    def getSetting(self, key: str) -> Any:
+    def get_setting(self, key: str) -> Any:
         """
         Get a setting value by key from the appropriate source (file or database).
         
@@ -186,7 +186,7 @@ class UnifiedSettings:
             # Get from database
             return self._get_from_database(key, effective_default)
     
-    def setSetting(self, key: str, value: Any) -> bool:
+    def set_setting(self, key: str, value: Any) -> bool:
         """
         Set a setting value.
         
@@ -256,7 +256,7 @@ class UnifiedSettings:
                 elif setting_def.data_type == SettingType.INTEGER:
                     cached_value = int(value) if value is not None else None
                 elif setting_def.data_type == SettingType.JSON:
-                    cached_value = value  # Already parsed by setSetting
+                    cached_value = value  # Already parsed by set_setting
                 else:
                     cached_value = str(value) if value is not None else None
                 
@@ -268,7 +268,7 @@ class UnifiedSettings:
             print(f"Error setting {key}: {e}")
             return False
     
-    def getMultipleSettings(self, keys: List[str]) -> Dict[str, Any]:
+    def get_multiple_settings(self, keys: List[str]) -> Dict[str, Any]:
         """
         Get multiple settings at once for better performance.
         
@@ -295,29 +295,29 @@ class UnifiedSettings:
         
         # Get file-based settings
         for key in file_keys:
-            result[key] = self.getSetting(key)
-        
+            result[key] = self.get_setting(key)
+
         # Get database settings (batch load if not cached)
         if db_keys:
             if not self._cache_loaded:
                 self._load_database_settings_cache()
-            
+
             for key in db_keys:
-                result[key] = self.getSetting(key)
+                result[key] = self.get_setting(key)
         
         return result
     
-    def getAllSettings(self) -> Dict[str, Any]:
+    def get_all_settings(self) -> Dict[str, Any]:
         """Get all settings from both sources"""
         all_keys = list(SETTINGS_SCHEMA.keys())
-        return self.getMultipleSettings(all_keys)
+        return self.get_multiple_settings(all_keys)
     
-    def getSettingsByPrefix(self, prefix: str) -> Dict[str, Any]:
+    def get_settings_by_prefix(self, prefix: str) -> Dict[str, Any]:
         """Get all settings that start with a given prefix"""
         matching_keys = [key for key in SETTINGS_SCHEMA.keys() if key.startswith(prefix)]
-        return self.getMultipleSettings(matching_keys)
+        return self.get_multiple_settings(matching_keys)
     
-    def validateSetting(self, key: str, value: Any) -> tuple[bool, Optional[str]]:
+    def validate_setting(self, key: str, value: Any) -> tuple[bool, Optional[str]]:
         """
         Validate a setting value without setting it.
         
@@ -326,7 +326,7 @@ class UnifiedSettings:
         """
         return validate_setting_value(key, value)
     
-    def getSettingInfo(self, key: str) -> Optional[Dict[str, Any]]:
+    def get_setting_info(self, key: str) -> Optional[Dict[str, Any]]:
         """
         Get metadata information about a setting.
         
@@ -349,17 +349,17 @@ class UnifiedSettings:
             'max_value': setting_def.max_value
         }
     
-    def clearDatabaseCache(self):
+    def clear_database_cache(self):
         """Clear the database settings cache to force reload"""
         self._database_settings_cache.clear()
         self._cache_loaded = False
     
-    def reloadFileSettings(self):
+    def reload_file_settings(self):
         """Reload settings from the file (useful for configuration changes)"""
         self._load_file_settings()
     
     # Legacy compatibility methods
-    def CheckRequiredSettings(self):
+    def check_required_settings(self):
         """Legacy compatibility method for checking required settings"""
         try:
             self._validate_required_file_settings()
@@ -372,8 +372,8 @@ class UnifiedSettings:
     def app(self) -> Dict[str, Any]:
         """Get all app settings as a dictionary"""
         return {
-            key.replace('app.', ''): self.getSetting(key) 
-            for key in SETTINGS_SCHEMA.keys() 
+            key.replace('app.', ''): self.get_setting(key)
+            for key in SETTINGS_SCHEMA.keys()
             if key.startswith('app.')
         }
     
@@ -381,7 +381,7 @@ class UnifiedSettings:
     def database(self) -> Dict[str, Any]:
         """Get all database connection settings as a dictionary"""
         return {
-            key.replace('database.', ''): self.getSetting(key)
+            key.replace('database.', ''): self.get_setting(key)
             for key in SETTINGS_SCHEMA.keys()
             if key.startswith('database.')
         }
@@ -390,7 +390,7 @@ class UnifiedSettings:
     def docker(self) -> Dict[str, Any]:
         """Get all docker settings as a dictionary"""
         return {
-            key.replace('docker.', ''): self.getSetting(key)
+            key.replace('docker.', ''): self.get_setting(key)
             for key in SETTINGS_SCHEMA.keys()
             if key.startswith('docker.')
         }
@@ -400,14 +400,14 @@ class UnifiedSettings:
 settings_handler = UnifiedSettings()
 
 # Convenience functions for direct access
-def getSetting(key: str) -> Any:
+def get_setting(key: str) -> Any:
     """Global convenience function to get a setting"""
-    return settings_handler.getSetting(key)
+    return settings_handler.get_setting(key)
 
-def setSetting(key: str, value: Any) -> bool:
+def set_setting(key: str, value: Any) -> bool:
     """Global convenience function to set a setting"""
-    return settings_handler.setSetting(key, value)
+    return settings_handler.set_setting(key, value)
 
-def getMultipleSettings(keys: List[str]) -> Dict[str, Any]:
+def get_multiple_settings(keys: List[str]) -> Dict[str, Any]:
     """Global convenience function to get multiple settings"""
-    return settings_handler.getMultipleSettings(keys)
+    return settings_handler.get_multiple_settings(keys)

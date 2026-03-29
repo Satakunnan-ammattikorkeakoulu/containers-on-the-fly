@@ -12,7 +12,7 @@ app = FastAPI()
 
 # Setup allowed origins
 origins = [
-    settings_handler.getSetting("app.url") + ":" + str(settings_handler.getSetting("app.port")),
+    settings_handler.get_setting("app.url") + ":" + str(settings_handler.get_setting("app.port")),
     "http://localhost:8080"
 ]
 
@@ -30,10 +30,10 @@ app.include_router(api_router)
 
 # Start the app
 if __name__ == '__main__':
-    production = settings_handler.getSetting("app.production")
+    production = settings_handler.get_setting("app.production")
     logLevel = "info"
     reload = True
     #if production == True: logLevel = "critical"
     if production == True: reload = False
-    uvicorn.run("main:app", host="0.0.0.0", port=int(settings_handler.getSetting("app.port")), log_level=logLevel, reload=reload)
+    uvicorn.run("main:app", host="0.0.0.0", port=int(settings_handler.get_setting("app.port")), log_level=logLevel, reload=reload)
     print("running")

@@ -1,6 +1,6 @@
 import os
 from helpers.email import send_email
-from settings_handler import getSetting
+from settings_handler import get_setting
 
 
 def generate_connection_text(image, ip, ports, password, includeEmailDetails, non_critical_errors, endDate=None):
@@ -22,7 +22,7 @@ def generate_connection_text(image, ip, ports, password, includeEmailDetails, no
 
     helpText = ""
     if includeEmailDetails:
-        contact_email = getSetting('email.contactEmail')
+        contact_email = get_setting('email.contactEmail')
         if contact_email:
             helpText = f"If you need help, contact: {contact_email}{linesep}{linesep}"
 
@@ -52,7 +52,7 @@ def generate_connection_text(image, ip, ports, password, includeEmailDetails, no
 
     generalText = ""
     try:
-        generalText = getSetting('instructions.email')
+        generalText = get_setting('instructions.email')
     except Exception:
         pass
 
@@ -61,7 +61,7 @@ def generate_connection_text(image, ip, ports, password, includeEmailDetails, no
         # Get timezone from database settings
         timezone_name = "UTC"  # Default timezone
         try:
-            timezone_name = getSetting('general.timezone')
+            timezone_name = get_setting('general.timezone')
         except Exception:
             pass
 
@@ -97,7 +97,7 @@ IP address of the machine: {ip}
 
 def send_container_started_email(user_email, image_name, computer_ip, ports, password, non_critical_errors, end_date):
     """Send email notification when a container starts successfully."""
-    if not getSetting('email.sendEmail'):
+    if not get_setting('email.sendEmail'):
         return
 
     body = generate_connection_text(
@@ -109,7 +109,7 @@ def send_container_started_email(user_email, image_name, computer_ip, ports, pas
 
 def send_container_error_email(user_email, errors):
     """Send email notification when a container fails to start."""
-    if not getSetting('email.sendEmail'):
+    if not get_setting('email.sendEmail'):
         return
 
     linesep = os.linesep
@@ -122,11 +122,11 @@ def send_container_error_email(user_email, errors):
 def send_admin_failure_alert(user_email, reservation_id, image_name, server_name, errors):
     """Send container failure alerts to admin emails using existing helpers/email.py infrastructure."""
     try:
-        alerts_enabled = getSetting('notifications.containerAlertsEnabled')
+        alerts_enabled = get_setting('notifications.containerAlertsEnabled')
         if not alerts_enabled:
             return
 
-        alert_emails = getSetting('notifications.alertEmails')
+        alert_emails = get_setting('notifications.alertEmails')
         if not alert_emails or len(alert_emails) == 0:
             print("Container failure alerts enabled but no alert emails configured")
             return

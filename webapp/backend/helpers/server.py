@@ -6,78 +6,78 @@ from helpers.auth import *
 from database import User, Session
 from settings_handler import settings_handler
 
-def Response(status, message, extraData = None):
+def api_response(status, message, extra_data = None):
   response = {
     "status": status,
     "message": message
   }
-  if extraData is not None:
-    response["data"] = extraData
+  if extra_data is not None:
+    response["data"] = extra_data
   return response
 
-def ForceAuthentication(token: str, roleRequired: str = None) -> Union[bool,HTTPException]:
+def force_authentication(token: str, role_required: str = None) -> Union[bool,HTTPException]:
   '''
   Checks if user is logged in by using the token passed.
   Parameters:
     token: Token
-    roleRequired: If user is required to be in a specific role, that role should be passed here
+    role_required: If user is required to be in a specific role, that role should be passed here
   Returns:
     True if is user is logged in, otherwise will raise HTTPException.
   '''
-  wrongRole = False
-  if (IsLoggedIn(token)):
-    if roleRequired is not None:
+  wrong_role = False
+  if (is_logged_in(token)):
+    if role_required is not None:
       with Session() as session:
         from sqlalchemy.orm import joinedload
         user = session.query(User).options(joinedload(User.roles)).filter( User.loginToken == token ).first()
       # Check if user has the required role
-      if roleRequired == "admin":
-        # Use IsAdmin function which properly checks all roles
-        if IsAdmin(user.userId):
+      if role_required == "admin":
+        # Use is_admin function which properly checks all roles
+        if is_admin(user.userId):
           return True
         else:
-          wrongRole = True
+          wrong_role = True
       else:
         # For non-admin roles, check if it's the primary role or in the roles list
-        if GetRole(user.email) == roleRequired:
+        if get_role(user.email) == role_required:
           return True
         else:
           # Also check if the role is in user's roles list
-          hasRole = False
+          has_role = False
           for role in user.roles:
-            if role.name == roleRequired:
-              hasRole = True
+            if role.name == role_required:
+              has_role = True
               break
-          if hasRole:
+          if has_role:
             return True
           else:
-            wrongRole = True
+            wrong_role = True
     else:
       return True
-  
-  detailMessage = "Invalid authentication credentials"
-  if wrongRole == True:
-    detailMessage = detailMessage + " - Wrong role"
+
+  detail_message = "Invalid authentication credentials"
+  if wrong_role == True:
+    detail_message = detail_message + " - Wrong role"
   raise HTTPException(
     status_code = status.HTTP_401_UNAUTHORIZED,
-    detail = detailMessage,
+    detail = detail_message,
     headers = {"WWW-Authenticate": "Bearer"},
   )
 
-def ORMObjectToDict(self):
-    dict_ = {}
+def orm_to_dict(self):
+    result = {}
     for key in self.__mapper__.c.keys():
         # Going through all the keys one by one
         if not key.startswith('_'):
             # Cast all bytes to strings
             if isinstance(getattr(self, key), bytes):
-              dict_[key] = str(getattr(self, key))
+              result[key] = str(getattr(self, key))
             # Otherwise do the casting automatically
             else:
-              dict_[key] = getattr(self, key)
+              result[key] = getattr(self, key)
 
     for key, prop in inspect(self.__class__).all_orm_descriptors.items():
         if isinstance(prop, hybrid_property):
-            dict_[key] = getattr(self, key)
-    return dict_
+            result[key] = getattr(self, key)
+    return result
 

@@ -12,7 +12,7 @@ from helpers.auth import hash_password, is_correct_password
 import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
-from helpers.tables.role import getRoles, getRoleById, addRole as addRoleHelper, editRole as editRoleHelper, removeRole as removeRoleHelper
+from helpers.tables.role import get_roles, get_role_by_id, add_role as add_role_helper, edit_role as edit_role_helper, remove_role as remove_role_helper
 from sqlalchemy import func
 
 def getReservations(filters : ReservationFilters) -> object:
@@ -201,9 +201,9 @@ def getUsers() -> object:
                 role_user_counts[role.name] += 1
 
     # Get available roles
-    from helpers.tables.role import getRolesWithMountCounts
-    availableRoles = getRolesWithMountCounts()
-    
+    from helpers.tables.role import get_roles_with_mount_counts
+    availableRoles = get_roles_with_mount_counts()
+
     # Add user counts to each role
     for role in availableRoles:
         role["userCount"] = role_user_counts.get(role["name"], 0)
@@ -604,8 +604,8 @@ def getAllRoles() -> object:
     Returns:
         object: Response object with status, message and data.
     '''
-    from helpers.tables.role import getRolesWithMountCounts
-    data = getRolesWithMountCounts()
+    from helpers.tables.role import get_roles_with_mount_counts
+    data = get_roles_with_mount_counts()
     
     return api_response(True, "Roles fetched successfully.", {"roles": data})
 
@@ -617,7 +617,7 @@ def addRole(name: str) -> object:
     Returns:
         object: Response object with status and message
     '''
-    success, message, role_dict = addRoleHelper(name)
+    success, message, role_dict = add_role_helper(name)
     if not success:
         return api_response(False, message)
     return api_response(True, message, role_dict)
@@ -631,7 +631,7 @@ def editRole(roleId: int, name: str) -> object:
     Returns:
         object: Response object with status and message
     '''
-    success, message, role_dict = editRoleHelper(roleId, name)
+    success, message, role_dict = edit_role_helper(roleId, name)
     if not success:
         return api_response(False, message)
     return api_response(True, message, role_dict)
@@ -644,7 +644,7 @@ def removeRole(roleId: int) -> object:
     Returns:
         object: Response object with status and message
     '''
-    success, message = removeRoleHelper(roleId)
+    success, message = remove_role_helper(roleId)
     if not success:
         return api_response(False, message)
     return api_response(True, message)
@@ -660,8 +660,8 @@ def getRoleMounts(roleId: int) -> object:
         object: Response object with status, message and data containing mounts
     '''
     try:
-        from helpers.tables.role import getRoleMounts as getRoleMountsHelper
-        mounts = getRoleMountsHelper(roleId)
+        from helpers.tables.role import get_role_mounts as get_role_mounts_helper
+        mounts = get_role_mounts_helper(roleId)
         return api_response(True, "Role mounts retrieved successfully", {"mounts": mounts})
     except Exception as e:
         return api_response(False, f"Error retrieving role mounts: {str(e)}")
@@ -678,8 +678,8 @@ def saveRoleMounts(roleId: int, mounts: list) -> object:
         object: Response object with status and message
     '''
     try:
-        from helpers.tables.role import saveRoleMounts as saveRoleMountsHelper
-        success, message = saveRoleMountsHelper(roleId, mounts)
+        from helpers.tables.role import save_role_mounts as save_role_mounts_helper
+        success, message = save_role_mounts_helper(roleId, mounts)
         return api_response(success, message)
     except Exception as e:
         return api_response(False, f"Error saving role mounts: {str(e)}")
@@ -695,8 +695,8 @@ def getRoleHardwareLimits(roleId: int) -> object:
         object: Response object with hardware limits data
     '''
     try:
-        from helpers.tables.role import getRoleHardwareLimits as getRoleHardwareLimitsHelper
-        limits = getRoleHardwareLimitsHelper(roleId)
+        from helpers.tables.role import get_role_hardware_limits as get_role_hardware_limits_helper
+        limits = get_role_hardware_limits_helper(roleId)
         return api_response(True, "Role hardware limits retrieved successfully", {"hardwareLimits": limits})
     except Exception as e:
         return api_response(False, f"Error retrieving role hardware limits: {str(e)}")
@@ -713,8 +713,8 @@ def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> object:
         object: Response object with status and message
     '''
     try:
-        from helpers.tables.role import saveRoleHardwareLimits as saveRoleHardwareLimitsHelper
-        success, message = saveRoleHardwareLimitsHelper(roleId, hardwareLimits)
+        from helpers.tables.role import save_role_hardware_limits as save_role_hardware_limits_helper
+        success, message = save_role_hardware_limits_helper(roleId, hardwareLimits)
         return api_response(success, message)
     except Exception as e:
         return api_response(False, f"Error saving role hardware limits: {str(e)}")
@@ -730,8 +730,8 @@ def getRoleReservationLimits(roleId: int) -> object:
         object: Response object with reservation limits data
     '''
     try:
-        from helpers.tables.role import getRoleReservationLimits as getRoleReservationLimitsHelper
-        limits = getRoleReservationLimitsHelper(roleId)
+        from helpers.tables.role import get_role_reservation_limits as get_role_reservation_limits_helper
+        limits = get_role_reservation_limits_helper(roleId)
         return api_response(True, "Role reservation limits retrieved successfully", {"reservationLimits": limits})
     except Exception as e:
         return api_response(False, f"Error retrieving role reservation limits: {str(e)}")
@@ -748,8 +748,8 @@ def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> object:
         object: Response object indicating success or failure
     '''
     try:
-        from helpers.tables.role import saveRoleReservationLimits as saveRoleReservationLimitsHelper
-        success, message = saveRoleReservationLimitsHelper(roleId, reservationLimits)
+        from helpers.tables.role import save_role_reservation_limits as save_role_reservation_limits_helper
+        success, message = save_role_reservation_limits_helper(roleId, reservationLimits)
         return api_response(success, message)
     except Exception as e:
         return api_response(False, f"Error saving role reservation limits: {str(e)}")
@@ -886,7 +886,7 @@ def getGeneralSettings() -> object:
     '''
     try:
         from settings_handler import get_setting, get_multiple_settings
-        from helpers.tables.user_access_control import getBlacklistedEmails, getWhitelistedEmails
+        from helpers.tables.user_access_control import get_blacklisted_emails, get_whitelisted_emails
         
         # Define all settings with their defaults
         setting_keys = [
@@ -923,8 +923,8 @@ def getGeneralSettings() -> object:
         settings_dict = get_multiple_settings(setting_keys)
         
         # Get email lists
-        blacklisted_emails = getBlacklistedEmails()
-        whitelisted_emails = getWhitelistedEmails()
+        blacklisted_emails = get_blacklisted_emails()
+        whitelisted_emails = get_whitelisted_emails()
         
         # Get alert emails from JSON setting
         alert_emails = settings_dict.get('notifications.alertEmails', [])
@@ -1000,7 +1000,7 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
     '''
     try:
         from settings_handler import set_setting
-        from helpers.tables.user_access_control import setBlacklistedEmails, setWhitelistedEmails
+        from helpers.tables.user_access_control import set_blacklisted_emails, set_whitelisted_emails
         
         if section == "general":
             # Save general application settings
@@ -1028,9 +1028,9 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
             if 'whitelistEnabled' in settings:
                 set_setting('access.whitelistEnabled', settings['whitelistEnabled'])
             if 'blacklistedEmails' in settings:
-                setBlacklistedEmails(settings['blacklistedEmails'])
+                set_blacklisted_emails(settings['blacklistedEmails'])
             if 'whitelistedEmails' in settings:
-                setWhitelistedEmails(settings['whitelistedEmails'])
+                set_whitelisted_emails(settings['whitelistedEmails'])
                 
         elif section == "email":
             # Save email configuration

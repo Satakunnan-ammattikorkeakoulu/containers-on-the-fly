@@ -79,7 +79,7 @@ def get_user_reservation_limits(userId: int) -> dict:
     Dict with minDuration, maxDuration, and maxActiveReservations
   '''
   from database import UserRole, Role
-  from helpers.tables.role import getRoleReservationLimits
+  from helpers.tables.role import get_role_reservation_limits
 
   with Session() as session:
     # Get all user roles explicitly assigned
@@ -105,7 +105,7 @@ def get_user_reservation_limits(userId: int) -> dict:
     
     # Apply the most permissive limits from all roles
     for role in user_roles:
-      limits = getRoleReservationLimits(role.roleId)
+      limits = get_role_reservation_limits(role.roleId)
       
       # Use the lowest minimum duration (most permissive)
       if limits['minDuration'] < min_duration:

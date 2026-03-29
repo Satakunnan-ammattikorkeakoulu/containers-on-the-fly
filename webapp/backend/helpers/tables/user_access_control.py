@@ -1,7 +1,7 @@
 # User access control (blacklist/whitelist) table management functionality
 from database import UserBlacklist, UserWhitelist, Session
 
-def getBlacklistedEmails():
+def get_blacklisted_emails():
     """
     Get all blacklisted email addresses.
     
@@ -12,7 +12,7 @@ def getBlacklistedEmails():
         blacklist = session.query(UserBlacklist).all()
         return [entry.email for entry in blacklist if entry.email]
 
-def setBlacklistedEmails(emails: list):
+def set_blacklisted_emails(emails: list):
     """
     Set the complete blacklist (replace all existing entries).
     
@@ -39,7 +39,7 @@ def setBlacklistedEmails(emails: list):
         print(f"Error setting blacklisted emails: {e}")
         return False
 
-def getWhitelistedEmails():
+def get_whitelisted_emails():
     """
     Get all whitelisted email addresses.
     
@@ -50,7 +50,7 @@ def getWhitelistedEmails():
         whitelist = session.query(UserWhitelist).all()
         return [entry.email for entry in whitelist if entry.email]
 
-def setWhitelistedEmails(emails: list):
+def set_whitelisted_emails(emails: list):
     """
     Set the complete whitelist (replace all existing entries).
     

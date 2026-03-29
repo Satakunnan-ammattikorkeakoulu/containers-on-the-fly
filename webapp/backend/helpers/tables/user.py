@@ -3,7 +3,7 @@ from helpers.auth import *
 
 # User table management functionality
 
-def getUsers(email = None):
+def get_users(email = None):
   '''
 Finds users with the given optional filter. If no filter is given, finds all users in the system.
   Parameters:
@@ -16,19 +16,19 @@ Finds users with the given optional filter. If no filter is given, finds all use
     email_users_list = []
     if email is None:
       all_users = session.query(User).all()
-      all_users = castUsersToDict(all_users)
+      all_users = cast_users_to_dict(all_users)
       return all_users
     else:
       email_users = session.query(User).filter(User.email.like("%"+email+"%"))
       if email_users != None:
         for email_user in email_users:
           email_users_list.append(email_user)
-        email_users_list = castUsersToDict(email_users_list)
+        email_users_list = cast_users_to_dict(email_users_list)
         return email_users_list
       else:
         return None
 
-def getUser(findby):
+def get_user(findby):
   '''
   Finds user with the given optional filter (email or userId). If no filter is given, returns None.
     Parameters:
@@ -40,20 +40,20 @@ def getUser(findby):
     if findby:
       found_user = session.query(User).filter(User.email == findby).first()
       if found_user:
-        found_user = castUsersToDict([found_user])
+        found_user = cast_users_to_dict([found_user])
         return found_user
       found_user = session.query(User).filter(User.userId == findby).first()
       if found_user:
-        found_user = castUsersToDict([found_user])
+        found_user = cast_users_to_dict([found_user])
         return found_user
     else:
       return None
 
-def castUsersToDict(user_list):
+def cast_users_to_dict(user_list):
   all_users = [dict(userId = user.userId, email = user.email, userCreatedAt = user.userCreatedAt, userUpdatedAt = user.userUpdatedAt, roles = user.roles, reservations = user.reservations, userStorage = user.userStorage) for user in user_list]
   return all_users
 
-def addUser(email, password):
+def add_user(email, password):
   '''
   Adds user to the system.
   Parameters:
@@ -73,7 +73,7 @@ def addUser(email, password):
     )
     session.commit()
 
-def editUser(email, new_email = None, new_password = None):
+def edit_user(email, new_email = None, new_password = None):
   '''
 Finds user by email and changes email or password.
   Optional parameters:
@@ -85,7 +85,7 @@ Finds user by email and changes email or password.
     return None
   
   with Session() as session:
-    user = getUserServerside(email)
+    user = get_user_serverside(email)
     if new_email != None:
       user.email = new_email
     if new_password != None:
@@ -95,7 +95,7 @@ Finds user by email and changes email or password.
     session.commit()
     return None
 
-def removeUser(findby):
+def remove_user(findby):
   '''
   Removes user.
   Parameters:
@@ -104,11 +104,11 @@ def removeUser(findby):
     Nothing.
   '''
   with Session() as session:
-    found_user = getUserServerside(findby)
+    found_user = get_user_serverside(findby)
     session.delete(found_user)
     session.commit()
 
-def getUserServerside(search):
+def get_user_serverside(search):
   '''
 Finds user with given search, only to be used serverside.
   Parameter:

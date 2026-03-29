@@ -1,7 +1,7 @@
 # Hardware specs table management functionality
 from database import HardwareSpec, Session
 
-def getHardwarespecs(filter = None):
+def get_hardware_specs(filter = None):
   '''
   Finds hardwarespecs with the given optional filter. If no filter is given, finds all hardwarespecs in the system.
     Parameters:
@@ -21,7 +21,7 @@ def getHardwarespecs(filter = None):
 
     return hardwarespecs
 
-def addHardwarespec(computerId, type, maxAmount, minAmount, maxUserAmount, defaultUserAmount, format):
+def add_hardware_spec(computerId, type, maxAmount, minAmount, maxUserAmount, defaultUserAmount, format):
   '''
   Adds the given hardwarespec in the system.
     Parameters:
@@ -35,15 +35,15 @@ def addHardwarespec(computerId, type, maxAmount, minAmount, maxUserAmount, defau
     Returns:
       Nothing for now.
   '''
-  newHardwarespec = HardwareSpec(computerId = computerId, type = type, maximumAmount = maxAmount, minimumAmount = minAmount, maximumAmountForUser = maxUserAmount, defaultAmountForUser = defaultUserAmount, format = format)
+  new_hardware_spec = HardwareSpec(computerId = computerId, type = type, maximumAmount = maxAmount, minimumAmount = minAmount, maximumAmountForUser = maxUserAmount, defaultAmountForUser = defaultUserAmount, format = format)
   with Session() as session:
-    session.add(newHardwarespec)
+    session.add(new_hardware_spec)
     session.commit()
   # So with the other ones, name was unique so I used it to return the new object, but the only unique field this has is it's own id
   # but I don't really know how to fetch the specific id since it doesnt exist until session.add so I'm not gonna return anything for now
   return #session.query(HardwareSpec).filter(HardwareSpec.name == name).first()
 
-def removeHardwarespec(hardwarespec_id):
+def remove_hardware_spec(hardwarespec_id):
   '''
   Removes the given hardwarespec in the system.
     Parameters:
@@ -57,7 +57,7 @@ def removeHardwarespec(hardwarespec_id):
     session.commit()
 
 
-def editHardwarespec(hardwarespec_id, new_computer_id, new_type, new_max, new_min, new_user_max, new_user_default, new_format):
+def edit_hardware_spec(hardwarespec_id, new_computer_id, new_type, new_max, new_min, new_user_max, new_user_default, new_format):
   '''
   Edits the given hardwarespec in the system.
     Parameters:

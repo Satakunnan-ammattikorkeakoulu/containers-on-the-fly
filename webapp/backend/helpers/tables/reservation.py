@@ -2,7 +2,7 @@
 from database import Reservation, Session
 from datetime import datetime
 
-def getReservations(filter = None):
+def get_reservations(filter = None):
     '''
     Find reservations with the given optional filter. If no filter is given, finds all reservations in the system.
     Parameters:
@@ -36,7 +36,7 @@ def getReservations(filter = None):
 
 
 
-def getReservation(filter = None):
+def get_reservation(filter = None):
     '''
     Find reservation with the given optional filter which in this case is reservationId.
     Parameters:
@@ -53,7 +53,7 @@ def getReservation(filter = None):
     
 
 
-def addReservation(startDate, endDate, userId, computerId, containerId):
+def add_reservation(startDate, endDate, userId, computerId, containerId):
     '''
     Adds the given reservation in the system.
         Parameters:
@@ -76,7 +76,7 @@ def addReservation(startDate, endDate, userId, computerId, containerId):
         )
         session.commit()
 
-def removeReservation(reservation_id):
+def remove_reservation(reservation_id):
     '''
     Removes the given reservation from the system.
         Parameters:
@@ -89,7 +89,7 @@ def removeReservation(reservation_id):
         session.delete(reservation)
         session.commit()
 
-def editReservation(reservation_id, new_startDate = None, new_endDate = None, new_status = None):
+def edit_reservation(reservation_id, new_startDate = None, new_endDate = None, new_status = None):
     '''
     Edits the given reservation in the system.
         Parameters:

@@ -1,7 +1,7 @@
 # Container table management functionality
 from database import Container, Session
 
-def getContainers(filter = None):
+def get_containers(filter = None):
   '''
   Finds containers with the given optional filter. If no filter is given, finds all containers in the system.
     Parameters:
@@ -23,7 +23,7 @@ def getContainers(filter = None):
     else: containers = session.query(Container).all()
     return containers
 
-def addContainer(name, public, description, imageName):
+def add_container(name, public, description, imageName):
   '''
   Adds the given container in the system.
     Parameters:
@@ -36,12 +36,12 @@ def addContainer(name, public, description, imageName):
     duplicate = session.query(Container).filter(Container.name == name).first()
     if duplicate != None:
         return None
-    newContainer = Container(name = name, public = public, description = description, imageName = imageName)
-    session.add(newContainer)
+    new_container = Container(name = name, public = public, description = description, imageName = imageName)
+    session.add(new_container)
     session.commit()
     return session.query(Container).filter(Container.name == name).first()
 
-def removeContainer(container_id):
+def remove_container(container_id):
   '''
   Removes the given container in the system.
     Parameters:
@@ -54,7 +54,7 @@ def removeContainer(container_id):
     session.delete(container)
     session.commit()
 
-def editContainer(container_id, new_name = None, new_public = None, new_description = None, new_image_name = None):
+def edit_container(container_id, new_name = None, new_public = None, new_description = None, new_image_name = None):
   '''
   Edits the given container in the system.
     Parameters:

@@ -3,7 +3,7 @@ from database import Role, RoleMount, Computer, Session, UserRole
 from helpers.server import api_response
 from sqlalchemy import func
 
-def getRoles():
+def get_roles():
     '''
     Gets all roles from the database.
     Returns:
@@ -12,7 +12,7 @@ def getRoles():
     with Session() as session:
         return session.query(Role).all()
 
-def getRolesWithMountCounts():
+def get_roles_with_mount_counts():
     '''
     Gets all roles from the database with their mount counts.
     Returns:
@@ -30,7 +30,7 @@ def getRolesWithMountCounts():
             result.append(role_dict)
         return result
 
-def getRoleById(roleId):
+def get_role_by_id(roleId):
     '''
     Gets a role by its ID.
     Parameters:
@@ -41,7 +41,7 @@ def getRoleById(roleId):
     with Session() as session:
         return session.query(Role).filter(Role.roleId == roleId).first()
 
-def isRoleNameTaken(session, name: str, excludeRoleId: int = None) -> bool:
+def is_role_name_taken(session, name: str, excludeRoleId: int = None) -> bool:
     '''
     Checks if a role name is already taken.
     Parameters:
@@ -56,7 +56,7 @@ def isRoleNameTaken(session, name: str, excludeRoleId: int = None) -> bool:
         query = query.filter(Role.roleId != excludeRoleId)
     return query.count() > 0
 
-def validateRoleName(name: str) -> tuple[bool, str]:
+def validate_role_name(name: str) -> tuple[bool, str]:
     '''
     Validates a role name.
     Parameters:
@@ -70,7 +70,7 @@ def validateRoleName(name: str) -> tuple[bool, str]:
         return False, f"The name '{name}' is reserved for built-in roles"
     return True, ""
 
-def addRole(name: str) -> tuple[bool, str, dict]:
+def add_role(name: str) -> tuple[bool, str, dict]:
     '''
     Adds a new role to the database.
     Parameters:
@@ -81,12 +81,12 @@ def addRole(name: str) -> tuple[bool, str, dict]:
     with Session() as session:
         try:
             # Validate name
-            is_valid, error_msg = validateRoleName(name)
+            is_valid, error_msg = validate_role_name(name)
             if not is_valid:
                 return False, error_msg, None
 
             # Check for duplicate names
-            if isRoleNameTaken(session, name):
+            if is_role_name_taken(session, name):
                 return False, f"A role with the name '{name}' already exists", None
 
             # Create new role
@@ -103,7 +103,7 @@ def addRole(name: str) -> tuple[bool, str, dict]:
             session.rollback()
             return False, f"Failed to add role: {str(e)}", None
 
-def editRole(roleId: int, name: str) -> tuple[bool, str, dict]:
+def edit_role(roleId: int, name: str) -> tuple[bool, str, dict]:
     '''
     Edits an existing role in the database.
     Parameters:
@@ -115,12 +115,12 @@ def editRole(roleId: int, name: str) -> tuple[bool, str, dict]:
     with Session() as session:
         try:
             # Validate name
-            is_valid, error_msg = validateRoleName(name)
+            is_valid, error_msg = validate_role_name(name)
             if not is_valid:
                 return False, error_msg, None
 
             # Check for duplicate names (excluding this role)
-            if isRoleNameTaken(session, name, roleId):
+            if is_role_name_taken(session, name, roleId):
                 return False, f"A role with the name '{name}' already exists", None
 
             # Update existing role
@@ -140,7 +140,7 @@ def editRole(roleId: int, name: str) -> tuple[bool, str, dict]:
             session.rollback()
             return False, f"Failed to update role: {str(e)}", None
 
-def removeRole(roleId):
+def remove_role(roleId):
     '''
     Removes a role from the system and cleans up all associated data:
     - Removes all user associations (UserRole entries)
@@ -181,7 +181,7 @@ def removeRole(roleId):
             session.rollback()
             return False, f"Failed to remove role: {str(e)}"
 
-def getRoleMounts(roleId: int) -> list:
+def get_role_mounts(roleId: int) -> list:
     '''
     Gets all mounts for a specific role.
     Parameters:
@@ -209,7 +209,7 @@ def getRoleMounts(roleId: int) -> list:
         
         return mounts
 
-def saveRoleMounts(roleId: int, mounts: list) -> tuple[bool, str]:
+def save_role_mounts(roleId: int, mounts: list) -> tuple[bool, str]:
     '''
     Saves role mounts, removing old ones and adding new ones.
     Parameters:
@@ -251,7 +251,7 @@ def saveRoleMounts(roleId: int, mounts: list) -> tuple[bool, str]:
         session.commit()
         return True, "Role mounts saved successfully"
 
-def getRoleHardwareLimits(roleId: int) -> list:
+def get_role_hardware_limits(roleId: int) -> list:
     '''
     Gets hardware limits for a specific role.
     Parameters:
@@ -283,7 +283,7 @@ def getRoleHardwareLimits(roleId: int) -> list:
         
         return result
 
-def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> tuple[bool, str]:
+def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> tuple[bool, str]:
     '''
     Saves role hardware limits, removing old ones and adding new ones.
     Parameters:
@@ -361,7 +361,7 @@ def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> tuple[bool, str
         session.commit()
         return True, "Role hardware limits saved successfully"
 
-def getRoleReservationLimits(roleId: int) -> dict:
+def get_role_reservation_limits(roleId: int) -> dict:
     '''
     Gets reservation limits for a specific role.
     
@@ -408,7 +408,7 @@ def getRoleReservationLimits(roleId: int) -> dict:
                 "maxActiveReservations": default_active
             }
 
-def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> tuple[bool, str]:
+def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> tuple[bool, str]:
     '''
     Saves reservation limits for a role.
     

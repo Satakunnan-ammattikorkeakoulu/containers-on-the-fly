@@ -8,7 +8,7 @@ from database import Session, Computer, ContainerPort, User, Reservation, Contai
 from sqlalchemy import desc, Column, Integer, Text, Float, ForeignKey, DateTime, UniqueConstraint, Boolean, BigInteger, func
 import datetime
 from pydantic import BaseModel
-from helpers.tables.role import getRoles, getRoleById, addRole as addRoleHelper, editRole as editRoleHelper, removeRole as removeRoleHelper
+from helpers.tables.role import get_roles, get_role_by_id, add_role as add_role_helper, edit_role as edit_role_helper, remove_role as remove_role_helper
 from helpers.server import api_response, orm_to_dict
 from typing import Dict, Any, List
 

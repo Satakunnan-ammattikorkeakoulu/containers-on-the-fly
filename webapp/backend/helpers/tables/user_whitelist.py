@@ -2,7 +2,7 @@
 from click import password_option
 from database import UserWhitelist, Session
 
-def viewAll(opt_filter = None):
+def view_all(opt_filter = None):
     '''
     Get all users from UserWhitelist
     Make a list and append all those users into the list
@@ -22,7 +22,7 @@ def viewAll(opt_filter = None):
 
     
 
-def addToWhitelist(emails):
+def add_to_whitelist(emails):
     '''
     Checks if the user with the given email already exists in the whitelist,
     If it doesn't then the email/emails get added.
@@ -41,7 +41,7 @@ def addToWhitelist(emails):
             return {"msg": "success"}
 
 
-def removeFromWhitelist(email):
+def remove_from_whitelist(email):
     '''
     Checks if the email user is inputting is the same as the one in the whitelist,
     If emails are the same then remove it.

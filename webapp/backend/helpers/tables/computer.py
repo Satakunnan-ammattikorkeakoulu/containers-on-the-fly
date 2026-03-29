@@ -1,7 +1,7 @@
 # Computer table management functionality
 from database import Computer, Session
 
-def getComputers(filter = None):
+def get_computers(filter = None):
   '''
   Finds computers with the given optional filter. If no filter is given, finds all computers in the system.
     Parameters:
@@ -23,7 +23,7 @@ def getComputers(filter = None):
     else: computers = session.query(Computer).all()
     return computers
 
-def addComputer(name, public):
+def add_computer(name, public):
   '''
   Adds the given computer in the system.
     Parameters:
@@ -36,12 +36,12 @@ def addComputer(name, public):
     duplicate = session.query(Computer).filter(Computer.name == name).first()
     if duplicate != None:
       return None
-    newComputer = Computer(name = name, public = public)
-    session.add(newComputer)
+    new_computer = Computer(name = name, public = public)
+    session.add(new_computer)
     session.commit()
     return session.query(Computer).filter(Computer.name == name).first()
 
-def removeComputer(computer_id):
+def remove_computer(computer_id):
   '''
   Removes the given computer in the system.
     Parameters:
@@ -54,7 +54,7 @@ def removeComputer(computer_id):
     session.delete(computer)
     session.commit()
 
-def editComputer(computer_id, new_name = None, new_public = None):
+def edit_computer(computer_id, new_name = None, new_public = None):
   '''
   Edits the given computer in the system.
     Parameters:

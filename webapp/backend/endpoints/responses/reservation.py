@@ -1,12 +1,12 @@
 from database import Session, Computer, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec
-from docker.docker_functionality import get_email_container_started, restart_container
+from docker import get_email_container_started, restart_container
 from helpers.server import Response, ORMObjectToDict
 from helpers.auth import IsAdmin
 from dateutil import parser
 from dateutil.relativedelta import *
 import datetime
 from datetime import timezone, timedelta
-from docker.dockerUtils import stop_container
+from docker import stop_container
 from endpoints.models.reservation import ReservationFilters
 from sqlalchemy.orm import joinedload
 
@@ -261,6 +261,7 @@ def getOwnReservationDetails(reservationId : int, userId : int) -> object:
       portsForEmail,
       reservation.reservedContainer.sshPassword,
       False,
+      "",
       reservation.endDate
       )
 

@@ -172,6 +172,7 @@ fix: Fix group removal logic to not break on empty usernames
 
 ### AI Workflow Rules
 
+- **Never stage or commit**: Do NOT run `git add`, `git commit`, or any git command that stages or commits changes. The user will always do this manually.
 - **Plan before implementing**: When asked for a plan or design, present the plan and wait for approval before writing any code. Do not implement unless explicitly asked.
 - **UI changes — change only what was requested**: When modifying frontend components, only change the elements explicitly requested. Do not move, resize, restyle, or reorganize other elements in the same component or page. If an adjacent change seems beneficial, mention it and wait for approval.
 - **Respect existing structure**: When adding new items to arrays, config objects, endpoint lists (like `AppUrls.js`), database models, or Vuex store modules, study the existing entries first and replicate their exact pattern (spacing, naming, ordering conventions).

@@ -17,13 +17,13 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
   return functionality.login(form_data.username, form_data.password)
 
 @router.get("/check_token")
-async def checkToken(token: str = Depends(oauth2_scheme)):
-  return functionality.checkToken(token)
+async def check_token(token: str = Depends(oauth2_scheme)):
+  return functionality.check_user_token(token)
 
 @router.post("/create_password")
-async def createPassword(password: str, token: str = Depends(oauth2_scheme)):
+async def create_password(password: str, token: str = Depends(oauth2_scheme)):
   force_authentication(token)
-  return functionality.createPassword(password)
+  return functionality.create_password(password)
 
 @router.get("/profile")
 async def profile(token: str = Depends(oauth2_scheme)):
@@ -31,15 +31,15 @@ async def profile(token: str = Depends(oauth2_scheme)):
   return functionality.profile(token)
 
 @router.get("/has_password")
-async def hasPassword(token: str = Depends(oauth2_scheme)):
+async def has_password(token: str = Depends(oauth2_scheme)):
   force_authentication(token)
-  return functionality.hasPassword(token)
+  return functionality.has_password(token)
 
 class ChangePasswordRequest(BaseModel):
   currentPassword: str
   newPassword: str
 
 @router.post("/change_password")
-async def changePassword(request: ChangePasswordRequest, token: str = Depends(oauth2_scheme)):
+async def change_password(request: ChangePasswordRequest, token: str = Depends(oauth2_scheme)):
   force_authentication(token)
-  return functionality.changePassword(token, request.currentPassword, request.newPassword)
+  return functionality.change_password(token, request.currentPassword, request.newPassword)

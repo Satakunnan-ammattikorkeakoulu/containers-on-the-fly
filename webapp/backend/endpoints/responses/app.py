@@ -1,6 +1,6 @@
 from helpers.server import api_response
 
-def getPublicConfig() -> object:
+def get_public_config() -> object:
     '''
     Returns public app configuration that doesn't require authentication.
     This includes app info, reservation limits, instruction messages, etc.

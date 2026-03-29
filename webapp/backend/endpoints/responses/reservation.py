@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload
 
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
 # TODO: Should also be able to only fail there is not enough resources any computer. Right now it fails if any of the computers are out of resources for the given time period.
-def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = None, isAdmin = False, ignoredReservationId : int = None, userId : int = None) -> object:
+def get_available_hardware(date : str, duration : int, reducable_specs : dict = None, is_admin = False, ignored_reservation_id : int = None, user_id : int = None) -> object:
   '''
   Returns a list of all available hardware specs for the given date and duration.
   
@@ -30,7 +30,7 @@ def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = Non
     If status is False, message will contain the error message. The error is usually that there are not enough resources for the given date and duration.
   '''
   date = parser.parse(date)
-  endDate = date+relativedelta(hours=+duration)
+  end_date = date+relativedelta(hours=+duration)
 
   # Fetch all required data first
   with Session() as session:
@@ -39,70 +39,66 @@ def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = Non
         joinedload(Reservation.reservedHardwareSpecs)
       )\
       .filter(
-        Reservation.startDate < endDate,
+        Reservation.startDate < end_date,
         Reservation.endDate > date,
         (Reservation.status == "reserved") | (Reservation.status == "started")
       )
-    allComputers = session.query(Computer).filter(Computer.removed.isnot(True), Computer.public.is_(True))
-    allContainers = session.query(Container)
+    all_computers = session.query(Computer).filter(Computer.removed.isnot(True), Computer.public.is_(True))
+    all_containers = session.query(Container)
     session.close()
-
-  #print("Ignored reservation ID: ", ignoredReservationId)
 
   # All reserved hardware specs for the given time period will be listed here
   # This loop will go through all reservations and add the reserved hardware specs to this list for the given time period
-  removableHardwareSpecs = {}
+  removable_hardware_specs = {}
   for res in reservations:
-    if res.reservationId == ignoredReservationId: continue
+    if res.reservationId == ignored_reservation_id: continue
     for spec in res.reservedHardwareSpecs:
-      hardwareSpecId = spec.hardwareSpec.hardwareSpecId
+      hardware_spec_id = spec.hardwareSpec.hardwareSpecId
       amount = spec.amount
-      
-      if hardwareSpecId not in removableHardwareSpecs:
-        removableHardwareSpecs[hardwareSpecId] = amount
+
+      if hardware_spec_id not in removable_hardware_specs:
+        removable_hardware_specs[hardware_spec_id] = amount
       else:
-        removableHardwareSpecs[hardwareSpecId] += amount
+        removable_hardware_specs[hardware_spec_id] += amount
 
   # Reduce the available hardware specs by the given reducable specs, if any
-  if reducableSpecs != None:
-    for key, val in reducableSpecs.items():
-      intKey = int(key)
+  if reducable_specs != None:
+    for key, val in reducable_specs.items():
+      int_key = int(key)
       if val == 0: continue
-      if intKey not in removableHardwareSpecs:
-        removableHardwareSpecs[intKey] = val
+      if int_key not in removable_hardware_specs:
+        removable_hardware_specs[int_key] = val
       else:
-        removableHardwareSpecs[intKey] += val
-
-  #print("removableHardwareSpecs: ", removableHardwareSpecs)
+        removable_hardware_specs[int_key] += val
 
   computers = []
 
-  for computer in allComputers:
-    compDict = orm_to_dict(computer)
-    compDict["hardwareSpecs"] = []
+  for computer in all_computers:
+    comp_dict = orm_to_dict(computer)
+    comp_dict["hardwareSpecs"] = []
     for spec in computer.hardwareSpecs:
-      compDict["hardwareSpecs"].append(orm_to_dict(spec))
-    computers.append(compDict)
+      comp_dict["hardwareSpecs"].append(orm_to_dict(spec))
+    computers.append(comp_dict)
 
   containers = []
-  for container in allContainers:
+  for container in all_containers:
     containers.append(orm_to_dict(container))
 
   # Get user's roles and their hardware limits
   user_role_limits = {}
-  if userId:
+  if user_id:
     from database import RoleHardwareLimit, UserRole
     with Session() as session:
       # Get all roles for the user
-      user_roles = session.query(UserRole).filter(UserRole.userId == userId).all()
+      user_roles = session.query(UserRole).filter(UserRole.userId == user_id).all()
       role_ids = [ur.roleId for ur in user_roles]
-      
+
       # Get all hardware limits for user's roles
       if role_ids:
         role_limits = session.query(RoleHardwareLimit).filter(
           RoleHardwareLimit.roleId.in_(role_ids)
         ).all()
-        
+
         # Build a dict of hardwareSpecId -> max limit across all roles
         for limit in role_limits:
           spec_id = limit.hardwareSpecId
@@ -110,7 +106,7 @@ def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = Non
             user_role_limits[spec_id] = limit.maximumAmountForRole
 
   # Set all user maximums to max for admins
-  if (isAdmin == True):
+  if (is_admin == True):
     for computer in computers:
       for spec in computer["hardwareSpecs"]:
         spec["maximumAmountForUser"] = spec["maximumAmount"]
@@ -127,34 +123,29 @@ def getAvailableHardware(date : str, duration : int, reducableSpecs : dict = Non
 
   for computer in computers:
     for spec in computer["hardwareSpecs"]:
-      if spec["hardwareSpecId"] in removableHardwareSpecs:
-        spec["maximumAmount"] -= removableHardwareSpecs[spec["hardwareSpecId"]]
-        
+      if spec["hardwareSpecId"] in removable_hardware_specs:
+        spec["maximumAmount"] -= removable_hardware_specs[spec["hardwareSpecId"]]
+
         # Prevent any resource going below 0
         if (spec["maximumAmount"] < 0):
           spec["maximumAmount"] = 0
 
-        #print(f"Reducing " + str(removableHardwareSpecs[spec["hardwareSpecId"]]) + " from max: " + str(spec["maximumAmount"]))
         if spec["maximumAmountForUser"] > spec["maximumAmount"]:
           spec["maximumAmountForUser"] = spec["maximumAmount"]
-        #print("Reducing spec: ", spec["type"], " ", removableHardwareSpecs[spec["type"]], " max: " , spec["maximumAmount"], "maxForUser: ", spec["maximumAmountForUser"])
         if spec["maximumAmount"] < spec["minimumAmount"]:
           print("Spec: ", spec["type"], " ", spec["maximumAmount"], " is below minimum amount: ", spec["minimumAmount"])
-          #print("minimumAmount: ", spec["minimumAmount"])
-          #print("maximumAmount: ", spec["maximumAmount"])
-          #print("maximumAmountForUser: ", spec["maximumAmountForUser"])
-          specMessage = ""
-          specMax = spec['maximumAmount']
-          if specMax < 0: specMax = 0
+          spec_message = ""
+          spec_max = spec['maximumAmount']
+          if spec_max < 0: spec_max = 0
           if spec["type"] == "ram":
-            specMessage = f"Available: {specMax} {spec['format']} {spec['type']}."
+            spec_message = f"Available: {spec_max} {spec['format']} {spec['type']}."
           else:
-            specMessage = f"Available: {specMax} {spec['type']}."
-          return api_response(False, f"Not enough resources to make a reservation: {spec['type']}. {specMessage}")
+            spec_message = f"Available: {spec_max} {spec['type']}."
+          return api_response(False, f"Not enough resources to make a reservation: {spec['type']}. {spec_message}")
 
   return api_response(True, "Hardware resources fetched.", { "computers": computers, "containers": containers })
 
-def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
+def get_own_reservations(userId : int, filters : ReservationFilters) -> object:
   '''
   Returns a list of all reservations owned by the given user.
 
@@ -169,21 +160,21 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
   status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
 
   # Limit listing to 90 days
-  def timeNow(): return datetime.datetime.now(datetime.timezone.utc)
-  minStartDate = timeNow() - timedelta(days=90)
+  def time_now(): return datetime.datetime.now(datetime.timezone.utc)
+  min_start_date = time_now() - timedelta(days=90)
 
   with Session() as session:
     # First get all user's reservations for counting
     count_query = session.query(Reservation)\
       .filter(
         Reservation.userId == userId,
-        (Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()))
-    
+        (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()))
+
     # Count statuses
     for reservation in count_query:
       if reservation.status in status_counts:
         status_counts[reservation.status] += 1
-    
+
     # Now get filtered reservations with all the joins
     query = session.query(Reservation)\
       .options(
@@ -194,11 +185,11 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
       ).\
       filter(
         Reservation.userId == userId,
-        (Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()))
+        (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()))
     if filters.filters["status"] != "":
       query = query.filter( Reservation.status == filters.filters["status"] )
     session.close()
-  
+
   for reservation in query:
     res = orm_to_dict(reservation)
     res["computerName"] = reservation.computer.name
@@ -210,11 +201,11 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
     res["ramDiskSizePercent"] = reservation.reservedContainer.ramDiskSizePercent if reservation.reservedContainer.ramDiskSizePercent is not None else 0
     # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
     if reservation.status == "started":
-      for reservedPort in reservation.reservedContainer.reservedContainerPorts:
-        portObj = orm_to_dict(reservedPort)
-        portObj["localPort"] = reservedPort.containerPort.port
-        portObj["serviceName"] = reservedPort.containerPort.serviceName
-        res["reservedContainer"]["reservedPorts"].append(portObj)
+      for reserved_port in reservation.reservedContainer.reservedContainerPorts:
+        port_obj = orm_to_dict(reserved_port)
+        port_obj["localPort"] = reserved_port.containerPort.port
+        port_obj["serviceName"] = reserved_port.containerPort.serviceName
+        res["reservedContainer"]["reservedPorts"].append(port_obj)
     # Add all reserved hardware specs
     res["reservedHardwareSpecs"] = []
     for spec in reservation.reservedHardwareSpecs:
@@ -236,7 +227,7 @@ def getOwnReservations(userId : int, filters : ReservationFilters) -> object:
   
   return api_response(True, "Hardware resources fetched.", { "reservations": reservations, "statusCounts": status_counts })
 
-def getOwnReservationDetails(reservationId : int, userId : int) -> object:
+def get_own_reservation_details(reservationId : int, userId : int) -> object:
   with Session() as session:
     # Check that the reservation exists and is owned by the current user (admins can view any reservation)
     if is_admin(userId):
@@ -246,41 +237,41 @@ def getOwnReservationDetails(reservationId : int, userId : int) -> object:
     if (reservation == None):
       return api_response(False, "Reservation not found.")
 
-    portsForEmail = []
+    ports_for_email = []
 
     # Set bindable ports for the reservation container
     for port in reservation.reservedContainer.reservedContainerPorts:
-      serviceName = port.containerPort.serviceName
-      outsidePort = port.outsidePort
-      localPort = port.containerPort.port
-      portsForEmail.append({ "serviceName": serviceName, "localPort": localPort, "outsidePort": outsidePort })
+      service_name = port.containerPort.serviceName
+      outside_port = port.outsidePort
+      local_port = port.containerPort.port
+      ports_for_email.append({ "serviceName": service_name, "localPort": local_port, "outsidePort": outside_port })
 
-    connectionText = get_email_container_started(
+    connection_text = get_email_container_started(
       reservation.reservedContainer.container.imageName,
       reservation.computer.ip,
-      portsForEmail,
+      ports_for_email,
       reservation.reservedContainer.sshPassword,
       False,
       "",
       reservation.endDate
       )
 
-    connectionText = connectionText.replace("\n", "<br>")
+    connection_text = connection_text.replace("\n", "<br>")
 
-  return api_response(True, "Details fetched.", { "connectionText": connectionText } )
+  return api_response(True, "Details fetched.", { "connectionText": connection_text } )
 
-def getCurrentReservations() -> object:
+def get_current_reservations() -> object:
   reservations = []
 
-  def timeNow(): return datetime.datetime.now(datetime.timezone.utc)
-  minEndDate = timeNow() - timedelta(days=5)
+  def time_now(): return datetime.datetime.now(datetime.timezone.utc)
+  min_end_date = time_now() - timedelta(days=5)
 
   with Session() as session:
     query = session.query(Reservation)\
       .options(joinedload(Reservation.reservedHardwareSpecs))\
       .filter(
         ((Reservation.status == "reserved") | (Reservation.status == "started")),
-        (Reservation.endDate > minEndDate),
+        (Reservation.endDate > min_end_date),
       )
     session.close()
   for reservation in query:
@@ -303,7 +294,7 @@ def getCurrentReservations() -> object:
   
   return api_response(True, "Current reservations fetched.", { "reservations": reservations })
 
-def createReservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0):
+def create_reservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0):
   # Validate description length if provided
   if description and len(description) > 50:
     return api_response(False, "Description must be 50 characters or less.")
@@ -321,14 +312,14 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     return api_response(False, "RAM disk size cannot exceed 60% of allocated memory.")
 
   date = parser.parse(date)
-  endDate = date+relativedelta(hours=+duration)
+  end_date = date+relativedelta(hours=+duration)
 
   with Session() as session:
     # Check that user exists
     user = session.query(User).filter( User.userId == userId ).first()
     if (user == None):
       return api_response(False, "User not found.")
-    isAdmin = is_admin(user.email)
+    is_user_admin = is_admin(user.email)
 
     # Check that computer and container exists
     computer = session.query(Computer).filter( Computer.computerId == computerId ).first()
@@ -339,50 +330,50 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
       return api_response(False, "Container not found.")
     
     # Verify user can access this container
-    if container.public == False and not isAdmin:
+    if container.public == False and not is_user_admin:
       return api_response(False, "Access denied to private container.")
 
     # Get user's role-based reservation limits
     from database import RoleReservationLimit, UserRole
     user_roles = session.query(UserRole).filter(UserRole.userId == user.userId).all()
     role_ids = [ur.roleId for ur in user_roles]
-    
+
     # Get all reservation limits for user's roles
     role_limits = session.query(RoleReservationLimit).filter(
         RoleReservationLimit.roleId.in_(role_ids)
     ).all() if role_ids else []
-    
+
     # Apply defaults based on whether user is admin
     default_min_duration = 1  # 1 hour for all users
-    default_max_duration = 1440 if isAdmin else 48  # 60 days for admin, 48 hours for others
-    default_max_active = 99 if isAdmin else 1
-    
+    default_max_duration = 1440 if is_user_admin else 48  # 60 days for admin, 48 hours for others
+    default_max_active = 99 if is_user_admin else 1
+
     # Find the most permissive limits across all roles
     min_duration = default_min_duration
     max_duration = default_max_duration
     max_active_reservations = default_max_active
-    
+
     for limit in role_limits:
         # For min duration, take the lowest value (most permissive)
         if limit.minDuration is not None:
             min_duration = min(min_duration, limit.minDuration)
-        
+
         # For max duration, take the highest value (most permissive)
         if limit.maxDuration is not None:
             max_duration = max(max_duration, limit.maxDuration)
-            
+
         # For max active reservations, take the highest value (most permissive)
         if limit.maxActiveReservations is not None:
             max_active_reservations = max(max_active_reservations, limit.maxActiveReservations)
-    
+
     # Check active reservations limit
-    userActiveReservations = session.query(Reservation).filter(
+    user_active_reservations = session.query(Reservation).filter(
       (Reservation.userId == userId),
       ( (Reservation.status == "reserved") | (Reservation.status == "started") )
     ).count()
-    if userActiveReservations >= max_active_reservations:
+    if user_active_reservations >= max_active_reservations:
       return api_response(False, f"You can only have {max_active_reservations} active reservation(s) at a time.")
-    
+
     # Validate duration against limits
     if duration < min_duration:
         return api_response(False, f"Minimum duration is {min_duration} hours.")
@@ -390,22 +381,22 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
         return api_response(False, f"Maximum duration is {max_duration} hours.")
 
     # If adminReserveUserEmail is given, check that the user exists
-    if adminReserveUserEmail != None and adminReserveUserEmail != "" and isAdmin == True:
-      anotherUser = session.query(User).filter( User.email == adminReserveUserEmail ).first()
-      if (anotherUser == None):
+    if adminReserveUserEmail != None and adminReserveUserEmail != "" and is_user_admin == True:
+      another_user = session.query(User).filter( User.email == adminReserveUserEmail ).first()
+      if (another_user == None):
         return api_response(False, "User for which you tried to reserve for did not exist. Check the email address: " + adminReserveUserEmail)
-      user = anotherUser
+      user = another_user
 
     # Make sure that there are enough resources for the reservation
-    getAvailableHardwareResponse = getAvailableHardware(date.isoformat(), duration, hardwareSpecs, isAdmin, None, user.userId)
-    if (getAvailableHardwareResponse["status"] == False):
-      return api_response(False, getAvailableHardwareResponse["message"])
+    available_hardware_response = get_available_hardware(date.isoformat(), duration, hardwareSpecs, is_user_admin, None, user.userId)
+    if (available_hardware_response["status"] == False):
+      return api_response(False, available_hardware_response["message"])
 
     # Create the base reservation
     reservation_data = {
       "reservedContainerId": containerId,
       "startDate": date,
-      "endDate": endDate,
+      "endDate": end_date,
       "userId": user.userId,
       "computerId": computerId,
       "status": "reserved",
@@ -423,11 +414,11 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     user_roles = session.query(UserRole).filter(UserRole.userId == user.userId).all()
     role_ids = [ur.roleId for ur in user_roles]
     
-    if role_ids and not isAdmin:
+    if role_ids and not is_user_admin:
       role_limits = session.query(RoleHardwareLimit).filter(
         RoleHardwareLimit.roleId.in_(role_ids)
       ).all()
-      
+
       # Build a dict of hardwareSpecId -> max limit across all roles
       for limit in role_limits:
         spec_id = limit.hardwareSpecId
@@ -437,45 +428,45 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     # Add GPU count validation
     total_gpus_requested = 0
     for key, val in hardwareSpecs.items():
-      hardwareSpec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
-      if hardwareSpec and hardwareSpec.type == "gpu" and val > 0:
+      hardware_spec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
+      if hardware_spec and hardware_spec.type == "gpu" and val > 0:
         total_gpus_requested += val
-    
+
     # Validate total GPU count for non-admins (max 1 GPU per reservation)
-    if not isAdmin and total_gpus_requested > 1:
+    if not is_user_admin and total_gpus_requested > 1:
       # Check if any role allows more than 1 GPU
       gpu_limit_from_roles = 1
       for key, val in hardwareSpecs.items():
-        hardwareSpec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
-        if hardwareSpec and hardwareSpec.type == "gpu" and key in user_role_limits:
+        hardware_spec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
+        if hardware_spec and hardware_spec.type == "gpu" and key in user_role_limits:
           gpu_limit_from_roles = max(gpu_limit_from_roles, user_role_limits[key])
-      
+
       if total_gpus_requested > gpu_limit_from_roles:
         return api_response(False, f"You can only reserve {gpu_limit_from_roles} GPU(s) at a time.")
-    
+
     # Enhanced hardware specification validation
     for key, val in hardwareSpecs.items():
       # Validate hardware spec exists
-      hardwareSpec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
-      if not hardwareSpec:
+      hardware_spec = session.query(HardwareSpec).filter( HardwareSpec.hardwareSpecId == key ).first()
+      if not hardware_spec:
         return api_response(False, f"Invalid hardware specification ID: {key}")
-      
+
       # Validate amount bounds
       if val < 0:
-        return api_response(False, f"Invalid negative amount for {hardwareSpec.type}")
-      if val > hardwareSpec.maximumAmount:
-        return api_response(False, f"Requested amount exceeds available resources for {hardwareSpec.type}: {val} > {hardwareSpec.maximumAmount}")
-      
+        return api_response(False, f"Invalid negative amount for {hardware_spec.type}")
+      if val > hardware_spec.maximumAmount:
+        return api_response(False, f"Requested amount exceeds available resources for {hardware_spec.type}: {val} > {hardware_spec.maximumAmount}")
+
       # Check that the amount does not exceed user limits for the given hardware
       # Skipped for admins
-      if isAdmin == False:
+      if is_user_admin == False:
         # Use role-based limit if available, otherwise use default computer limit
-        effective_limit = hardwareSpec.maximumAmountForUser
+        effective_limit = hardware_spec.maximumAmountForUser
         if int(key) in user_role_limits:
-          effective_limit = min(user_role_limits[int(key)], hardwareSpec.maximumAmount)
-        
+          effective_limit = min(user_role_limits[int(key)], hardware_spec.maximumAmount)
+
         if val > effective_limit:
-          return api_response(False, f"Trying to utilize hardware specs above the user maximum amount for {hardwareSpec.type} {hardwareSpec.format}: {val} > {effective_limit}")
+          return api_response(False, f"Trying to utilize hardware specs above the user maximum amount for {hardware_spec.type} {hardware_spec.format}: {val} > {effective_limit}")
       
       # Only add resources over 0
       if val > 0:
@@ -498,11 +489,11 @@ def createReservation(userId : int, date: str, duration: int, computerId: int, c
     session.commit()
 
     from settings_handler import get_setting
-    informByEmail = get_setting('email.sendEmail')
+    inform_by_email = get_setting('email.sendEmail')
 
-    return api_response(True, "Reservation created succesfully!", { "informByEmail": informByEmail })
+    return api_response(True, "Reservation created succesfully!", { "informByEmail": inform_by_email })
 
-def cancelReservation(userId : int, reservationId: str):
+def cancel_reservation(userId : int, reservationId: str):
   # Check that user owns the given reservation and it can be found
   # Admins can cancel any reservation
   # print("Starting to cancel reservation: " + reservationId)
@@ -519,67 +510,67 @@ def cancelReservation(userId : int, reservationId: str):
 
   return api_response(True, "Reservation cancelled.")
 
-def extendReservation(userId : int, reservationId: str, duration: int):
+def extend_reservation(userId : int, reservationId: str, duration: int):
   # Check that user owns the given reservation and it can be found
   # Admins can extend any reservation
 
   with Session() as session:
     if is_admin(userId) == False:
-      reservationCheck = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
-      if reservationCheck is None: return api_response(False, "No reservation found for this user.")
+      reservation_check = session.query(Reservation).filter( Reservation.reservationId == reservationId, Reservation.userId == userId ).first()
+      if reservation_check is None: return api_response(False, "No reservation found for this user.")
 
     reservation = session.query(Reservation)\
       .options(joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec))\
       .filter( Reservation.reservationId == reservationId ).first()
     if reservation is None: return api_response(False, "No reservation found.")
-    
+
     if reservation.status != "started":
       return api_response(False, "Reservation is not started, so cannot extend it.")
-    
+
     # Check that the duration is between minimum and maximum lengths
     if duration < 0 or duration > 24:
       return api_response(False, "Duration must be between 0 and 24 hours.")
 
     # First check if specific GPUs are still available during the extension period
-    endTimeString = reservation.endDate.strftime("%Y-%m-%d %H:%M:%S")
-    extendedEndDate = reservation.endDate + relativedelta(hours=+duration)
-    
+    end_time_string = reservation.endDate.strftime("%Y-%m-%d %H:%M:%S")
+    extended_end_date = reservation.endDate + relativedelta(hours=+duration)
+
     # Check for GPU conflicts specifically
     for spec in reservation.reservedHardwareSpecs:
       if spec.hardwareSpec.type == "gpu" and spec.amount > 0:
         # Check if this specific GPU is reserved by another reservation during the extension period
-        conflictingReservation = session.query(Reservation)\
+        conflicting_reservation = session.query(Reservation)\
           .join(ReservedHardwareSpec)\
           .filter(
             ReservedHardwareSpec.hardwareSpecId == spec.hardwareSpecId,
             ReservedHardwareSpec.amount > 0,
             Reservation.reservationId != reservationId,
-            Reservation.startDate < extendedEndDate,
+            Reservation.startDate < extended_end_date,
             Reservation.endDate > reservation.endDate,
             (Reservation.status == "reserved") | (Reservation.status == "started")
           ).first()
-        
-        if conflictingReservation:
+
+        if conflicting_reservation:
           return api_response(False, f"Cannot extend reservation: GPU {spec.hardwareSpec.format} (ID: {spec.hardwareSpec.internalId}) is already reserved by another user during the requested extension period.")
 
     # Check that there are enough resources for the reservation extension
     # Reducable specs comes from the current reservation
-    reducableSpecs = {}
+    reducable_specs = {}
     for spec in reservation.reservedHardwareSpecs:
-      reducableSpecs[spec.hardwareSpecId] = spec.amount
-    getAvailableHardwareResponse = getAvailableHardware(endTimeString, duration, reducableSpecs, False, reservation.reservationId, reservation.userId)
-    if getAvailableHardwareResponse["status"]:
+      reducable_specs[spec.hardwareSpecId] = spec.amount
+    available_hardware_response = get_available_hardware(end_time_string, duration, reducable_specs, False, reservation.reservationId, reservation.userId)
+    if available_hardware_response["status"]:
       # Extend the reservation
       reservation.endDate = reservation.endDate + relativedelta(hours=+duration)
       session.commit()
       return api_response(True, "Reservation was extended by " + str(duration) + " hours.")
     else:
-      print(getAvailableHardwareResponse["message"])
+      print(available_hardware_response["message"])
       return api_response(False, "Cannot extend reservation due to lack of resources. Try with less hours.")
 
   return api_response(False, "Error.")
 
-def restartContainer(userId : int, reservationId: str):
+def restart_container(userId : int, reservationId: str):
   reservation = None
   # Check that user owns the given container reservation and it can be found
   # Admins can restart any container
@@ -604,7 +595,7 @@ def restartContainer(userId : int, reservationId: str):
       session.close()
       return api_response(False, "Reservation is not currently started, so cannot restart the container.")
 
-def getAvailabilityTimeline(startDate: str, endDate: str, isAdmin = False) -> object:
+def get_availability_timeline(startDate: str, endDate: str, is_admin = False) -> object:
   '''
   Returns availability timeline data for all servers between the given dates.
   This creates continuous availability events showing remaining resources for each server.
@@ -785,7 +776,7 @@ def getAvailabilityTimeline(startDate: str, endDate: str, isAdmin = False) -> ob
   
   return api_response(True, "Availability timeline fetched.", {'events': timeline_events})
 
-def getAllReservationsForCalendar(startDate: str, endDate: str) -> object:
+def get_all_reservations_for_calendar(startDate: str, endDate: str) -> object:
   '''
   Returns all reservations within a date range for calendar display.
   This includes all reservations regardless of status (reserved, started, stopped, etc.)

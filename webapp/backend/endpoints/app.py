@@ -8,12 +8,12 @@ router = APIRouter(
 )
 
 @router.get("/config")
-async def getPublicConfig():
+async def get_public_config():
     """
     Get public app configuration (no authentication required)
-    
+
     This endpoint provides public configuration data that's needed
     by the frontend before users log in, including app info,
     reservation limits, and instruction messages.
     """
-    return functionality.getPublicConfig() 
+    return functionality.get_public_config() 

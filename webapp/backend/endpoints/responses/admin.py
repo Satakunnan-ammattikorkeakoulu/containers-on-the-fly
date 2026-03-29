@@ -15,7 +15,7 @@ from database import UserRole, Role
 from helpers.tables.role import get_roles, get_role_by_id, add_role as add_role_helper, edit_role as edit_role_helper, remove_role as remove_role_helper
 from sqlalchemy import func
 
-def getReservations(filters : ReservationFilters) -> object:
+def get_reservations(filters : ReservationFilters) -> object:
   '''
   Returns a list of all reservations.
 
@@ -29,13 +29,13 @@ def getReservations(filters : ReservationFilters) -> object:
   status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
 
   # Limit listing to 90 days
-  def timeNow(): return datetime.datetime.now(datetime.timezone.utc)
-  minStartDate = timeNow() - timedelta(days=90)
+  def time_now(): return datetime.datetime.now(datetime.timezone.utc)
+  min_start_date = time_now() - timedelta(days=90)
 
   with Session() as session:
     # First get all reservations for counting
     count_query = session.query(Reservation)\
-      .filter((Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()) )
+      .filter((Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()) )
     
     # Count statuses
     for reservation in count_query:
@@ -50,7 +50,7 @@ def getReservations(filters : ReservationFilters) -> object:
         joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
         joinedload(Reservation.computer)
       )\
-      .filter((Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()) )
+      .filter((Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()) )
     if filters.filters["status"] != "":
       query = query.filter( Reservation.status == filters.filters["status"] )
     session.close()
@@ -66,11 +66,11 @@ def getReservations(filters : ReservationFilters) -> object:
     res["reservedContainer"]["reservedPorts"] = []
     # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
     if reservation.status == "started":
-      for reservedPort in reservation.reservedContainer.reservedContainerPorts:
-        portObj = orm_to_dict(reservedPort)
-        portObj["localPort"] = reservedPort.containerPort.port
-        portObj["serviceName"] = reservedPort.containerPort.serviceName
-        res["reservedContainer"]["reservedPorts"].append(portObj)
+      for reserved_port in reservation.reservedContainer.reservedContainerPorts:
+        port_obj = orm_to_dict(reserved_port)
+        port_obj["localPort"] = reserved_port.containerPort.port
+        port_obj["serviceName"] = reserved_port.containerPort.serviceName
+        res["reservedContainer"]["reservedPorts"].append(port_obj)
     
     # Add all reserved hardware specs
     res["reservedHardwareSpecs"] = []
@@ -93,7 +93,7 @@ def getReservations(filters : ReservationFilters) -> object:
     
   return api_response(True, "Reservations fetched.", { "reservations": reservations, "statusCounts": status_counts })
 
-def saveContainer(containerEdit : ContainerEdit) -> object:
+def save_container(containerEdit : ContainerEdit) -> object:
   '''
   Edits the given container.
 
@@ -140,18 +140,18 @@ def saveContainer(containerEdit : ContainerEdit) -> object:
         # Edit changed ports
         for port in containerEdit.data.get("ports", []):
           if "containerPortId" in port:
-            oldPort = session.query(ContainerPort).filter(ContainerPort.containerPortId == port["containerPortId"]).first()
-            if oldPort.port != port["port"] or oldPort.serviceName != port["serviceName"]:
-              oldPort.port = port["port"]
-              oldPort.serviceName = port["serviceName"]
-              oldPort.updatedAt = datetime.datetime.now(datetime.timezone.utc)
+            old_port = session.query(ContainerPort).filter(ContainerPort.containerPortId == port["containerPortId"]).first()
+            if old_port.port != port["port"] or old_port.serviceName != port["serviceName"]:
+              old_port.port = port["port"]
+              old_port.serviceName = port["serviceName"]
+              old_port.updatedAt = datetime.datetime.now(datetime.timezone.utc)
 
         #for port in containerEdit.data.get("ports", []):
         #  container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
         session.commit()
   return api_response(True, "Container saved successfully")
 
-def removeContainer(containerId : int) -> object:
+def remove_container(containerId : int) -> object:
   '''
   Removes the given container.
 
@@ -173,7 +173,7 @@ def removeContainer(containerId : int) -> object:
   
   return api_response(True, "Container removed successfully")
 
-def getUsers() -> object:
+def get_users() -> object:
     '''
     Returns a list of all users and available roles.
 
@@ -202,15 +202,15 @@ def getUsers() -> object:
 
     # Get available roles
     from helpers.tables.role import get_roles_with_mount_counts
-    availableRoles = get_roles_with_mount_counts()
+    available_roles = get_roles_with_mount_counts()
 
     # Add user counts to each role
-    for role in availableRoles:
+    for role in available_roles:
         role["userCount"] = role_user_counts.get(role["name"], 0)
 
-    return api_response(True, "Users fetched successfully", {"users": data, "availableRoles": availableRoles})
+    return api_response(True, "Users fetched successfully", {"users": data, "availableRoles": available_roles})
 
-def getUser(userId: int) -> object:
+def get_user(userId: int) -> object:
     '''
     Returns a single user.
 
@@ -236,7 +236,7 @@ def getUser(userId: int) -> object:
 
     return api_response(True, "User fetched successfully", {"user": data})
 
-def saveUser(userId: int, data: dict) -> object:
+def save_user(userId: int, data: dict) -> object:
     '''
     Saves user data.
 
@@ -292,15 +292,15 @@ def saveUser(userId: int, data: dict) -> object:
         if "roles" in data:
             # Create a set of role names to ensure uniqueness
             role_names = set(data["roles"])
-            for roleName in role_names:
-                role = session.query(Role).filter(Role.name == roleName).first()
+            for role_name in role_names:
+                role = session.query(Role).filter(Role.name == role_name).first()
                 if role and role not in user.roles:  # Check if role exists and isn't already assigned
                     user.roles.append(role)
         
         session.commit()
         return api_response(True, "User saved successfully")
 
-def getHardware() -> object:
+def get_hardware() -> object:
   '''
   Returns a list of all hardware.
 
@@ -319,7 +319,7 @@ def getHardware() -> object:
   
   return api_response(True, "Data fetched.", { "hardware": data })
 
-def getContainers() -> object:
+def get_containers() -> object:
   '''
   Returns a list of all containers which have not been removed.
 
@@ -346,7 +346,7 @@ def getContainers() -> object:
   
   return api_response(True, "Data fetched.", { "containers": data })
 
-def getContainer(containerId : int) -> object:
+def get_container(containerId : int) -> object:
   '''
   Returns the given container.
 
@@ -374,7 +374,7 @@ def getContainer(containerId : int) -> object:
   
   return api_response(True, "Data fetched.", { "data": addable })
 
-def getComputers() -> object:
+def get_computers() -> object:
   '''
   Returns a list of all computers.
 
@@ -396,7 +396,7 @@ def getComputers() -> object:
   
   return api_response(True, "Data fetched.", { "computers": data })
 
-def getComputer(computerId : int) -> object:
+def get_computer(computerId : int) -> object:
   '''
   Returns a single computer.
 
@@ -431,7 +431,7 @@ def getComputer(computerId : int) -> object:
 
   return api_response(True, "Data fetched.", { "data": data })
 
-def saveComputer(computerEdit : ComputerEdit) -> object:
+def save_computer(computerEdit : ComputerEdit) -> object:
   '''
   Edits the given computer.
 
@@ -482,7 +482,7 @@ def saveComputer(computerEdit : ComputerEdit) -> object:
       computer.hardwareSpecs.append(gpus)
       # Add GPUs
       for gpu in hardware.get("gpus"):
-        gpuSpec = HardwareSpec(
+        gpu_spec = HardwareSpec(
           type = "gpu",
           format = gpu.get("format", ""),
           maximumAmount = 1,
@@ -490,7 +490,7 @@ def saveComputer(computerEdit : ComputerEdit) -> object:
           defaultAmountForUser = 0,
           maximumAmountForUser = 1,
           internalId = gpu.get("internalId", ""))
-        computer.hardwareSpecs.append(gpuSpec)
+        computer.hardwareSpecs.append(gpu_spec)
       session.add(computer)
       session.commit()
     # Otherwise, edit computer
@@ -538,18 +538,18 @@ def saveComputer(computerEdit : ComputerEdit) -> object:
         # Edit changed GPUs
         for gpu in computerEdit.data.get("hardware").get("gpus", []):
           if "hardwareSpecId" in gpu:
-            oldGPU = session.query(HardwareSpec).filter(HardwareSpec.hardwareSpecId == gpu["hardwareSpecId"]).first()
-            if oldGPU.format != gpu["format"] or oldGPU.internalId != gpu["internalId"]:
-              oldGPU.format = gpu["format"]
-              oldGPU.internalId = gpu["internalId"]
-              oldGPU.updatedAt = datetime.datetime.now(datetime.timezone.utc)
+            old_gpu = session.query(HardwareSpec).filter(HardwareSpec.hardwareSpecId == gpu["hardwareSpecId"]).first()
+            if old_gpu.format != gpu["format"] or old_gpu.internalId != gpu["internalId"]:
+              old_gpu.format = gpu["format"]
+              old_gpu.internalId = gpu["internalId"]
+              old_gpu.updatedAt = datetime.datetime.now(datetime.timezone.utc)
 
         #for port in containerEdit.data.get("ports", []):
         #  container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
         session.commit()
   return api_response(True, "Computer saved successfully")
 
-def removeComputer(computerId : int) -> object:
+def remove_computer(computerId : int) -> object:
   '''
   Removes the given computer.
 
@@ -571,20 +571,20 @@ def removeComputer(computerId : int) -> object:
   
   return api_response(True, "Computer removed successfully")
 
-def editReservation(reservationId : int, endDate : str) -> object:
+def edit_reservation(reservationId : int, end_date_str : str) -> object:
   '''
   Edits the given reservation.
 
   Parameters:
     reservationId: id of the reservation to edit.
-    endDate: New end date for the reservation.
+    end_date_str: New end date for the reservation.
 
   Returns:
     object: Response object with status, message and data.
   '''
   # Verify that the new end date is valid
   try:
-    endDate = parser.parse(endDate)
+    parsed_end_date = parser.parse(end_date_str)
   except:
     return api_response(False, "Invalid end date.")
 
@@ -593,12 +593,12 @@ def editReservation(reservationId : int, endDate : str) -> object:
     if reservation is None:
       return api_response(False, "Reservation not found.")
     else:
-      reservation.endDate = endDate
+      reservation.endDate = parsed_end_date
       session.commit()
 
   return api_response(True, "Reservation was edited succesfully.")
 
-def getAllRoles() -> object:
+def get_all_roles() -> object:
     '''
     Returns a list of all roles with mount counts.
     Returns:
@@ -609,7 +609,7 @@ def getAllRoles() -> object:
     
     return api_response(True, "Roles fetched successfully.", {"roles": data})
 
-def addRole(name: str) -> object:
+def add_role(name: str) -> object:
     '''
     Adds a new role.
     Parameters:
@@ -622,7 +622,7 @@ def addRole(name: str) -> object:
         return api_response(False, message)
     return api_response(True, message, role_dict)
 
-def editRole(roleId: int, name: str) -> object:
+def edit_role(roleId: int, name: str) -> object:
     '''
     Edits an existing role.
     Parameters:
@@ -636,7 +636,7 @@ def editRole(roleId: int, name: str) -> object:
         return api_response(False, message)
     return api_response(True, message, role_dict)
 
-def removeRole(roleId: int) -> object:
+def remove_role(roleId: int) -> object:
     '''
     Removes a role.
     Parameters:
@@ -649,7 +649,7 @@ def removeRole(roleId: int) -> object:
         return api_response(False, message)
     return api_response(True, message)
 
-def getRoleMounts(roleId: int) -> object:
+def get_role_mounts(roleId: int) -> object:
     '''
     Gets all mounts for a specific role.
     
@@ -666,7 +666,7 @@ def getRoleMounts(roleId: int) -> object:
     except Exception as e:
         return api_response(False, f"Error retrieving role mounts: {str(e)}")
 
-def saveRoleMounts(roleId: int, mounts: list) -> object:
+def save_role_mounts(roleId: int, mounts: list) -> object:
     '''
     Saves role mounts, replacing existing ones.
     
@@ -684,7 +684,7 @@ def saveRoleMounts(roleId: int, mounts: list) -> object:
     except Exception as e:
         return api_response(False, f"Error saving role mounts: {str(e)}")
 
-def getRoleHardwareLimits(roleId: int) -> object:
+def get_role_hardware_limits(roleId: int) -> object:
     '''
     Retrieves hardware limits for a specific role.
     
@@ -701,7 +701,7 @@ def getRoleHardwareLimits(roleId: int) -> object:
     except Exception as e:
         return api_response(False, f"Error retrieving role hardware limits: {str(e)}")
 
-def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> object:
+def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> object:
     '''
     Saves role hardware limits, replacing existing ones.
     
@@ -719,7 +719,7 @@ def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> object:
     except Exception as e:
         return api_response(False, f"Error saving role hardware limits: {str(e)}")
 
-def getRoleReservationLimits(roleId: int) -> object:
+def get_role_reservation_limits(roleId: int) -> object:
     '''
     Retrieves reservation limits for a specific role.
     
@@ -736,7 +736,7 @@ def getRoleReservationLimits(roleId: int) -> object:
     except Exception as e:
         return api_response(False, f"Error retrieving role reservation limits: {str(e)}")
 
-def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> object:
+def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> object:
     '''
     Saves role reservation limits, replacing existing ones.
     
@@ -754,7 +754,7 @@ def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> object:
     except Exception as e:
         return api_response(False, f"Error saving role reservation limits: {str(e)}")
 
-def getServerMonitoring(computer_id: int) -> object:
+def get_server_monitoring(computer_id: int) -> object:
     '''
     Returns monitoring data (metrics and logs) for a specific server.
     
@@ -854,7 +854,7 @@ def getServerMonitoring(computer_id: int) -> object:
         
         return api_response(True, "Server monitoring data retrieved", monitoring_data)
 
-def getServersForMonitoring() -> object:
+def get_servers_for_monitoring() -> object:
     '''
     Returns a list of all servers/computers available for monitoring.
     
@@ -877,7 +877,7 @@ def getServersForMonitoring() -> object:
         
         return api_response(True, "Servers retrieved successfully", {"servers": servers_list})
 
-def getGeneralSettings() -> object:
+def get_general_settings() -> object:
     '''
     Returns all general admin settings with default values if not set.
     
@@ -987,7 +987,7 @@ def getGeneralSettings() -> object:
     except Exception as e:
         return api_response(False, f"Error retrieving settings: {str(e)}")
 
-def saveGeneralSettings(section: str, settings: dict) -> object:
+def save_general_settings(section: str, settings: dict) -> object:
     '''
     Saves general admin settings for a specific section.
     
@@ -1096,7 +1096,7 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
     except Exception as e:
         return api_response(False, f"Error saving settings: {str(e)}")
 
-def sendTestEmail(email: str) -> object:
+def send_test_email(email: str) -> object:
     '''
     Sends a test email to verify SMTP configuration.
     

@@ -22,23 +22,23 @@ def login(username, password):
 
   with Session() as session:
     # Get auth settings from database
-    loginType = get_setting('auth.loginType')
-    useWhitelisting = get_setting('access.whitelistEnabled')
-    useBlacklisting = get_setting('access.blacklistEnabled')
+    login_type = get_setting('auth.loginType')
+    use_whitelisting = get_setting('access.whitelistEnabled')
+    use_blacklisting = get_setting('access.blacklistEnabled')
 
     # Look up user by email first for any auth type
     user = session.query(User).filter(User.email == username).first()
     
     # Check blacklist first - this overrides whitelist and denies access immediately
-    if useBlacklisting:
-      blacklistEmail = session.query(UserBlacklist).filter(UserBlacklist.email == username).first()
-      if blacklistEmail is not None:
+    if use_blacklisting:
+      blacklist_email = session.query(UserBlacklist).filter(UserBlacklist.email == username).first()
+      if blacklist_email is not None:
         return api_response(False, "You are not allowed to login (blacklisted).")
 
     # Check whitelist if enabled
-    if useWhitelisting:
-      whitelistEmail = session.query(UserWhitelist).filter(UserWhitelist.email == username).first()
-      if whitelistEmail is None:
+    if use_whitelisting:
+      whitelist_email = session.query(UserWhitelist).filter(UserWhitelist.email == username).first()
+      if whitelist_email is None:
         return api_response(False, "You are not allowed to login (not whitelisted).")
 
     # Helper function to create login token
@@ -77,15 +77,15 @@ def login(username, password):
       return create_successful_login(ldap_user)
     
     # Handle different login types
-    if loginType == "password":
+    if login_type == "password":
       return try_password_auth()
-      
+
     # For backward compatibility, support the legacy LDAP-only option in case
     # it's still in the config file
-    elif loginType == "LDAP":
+    elif login_type == "LDAP":
       return try_ldap_auth()
-      
-    elif loginType == "hybrid":
+
+    elif login_type == "hybrid":
       # Try password first if user exists and has password set
       if user and user.password and user.password != "":
         try:
@@ -104,7 +104,7 @@ def login(username, password):
       # Unknown login type - fall back to password authentication as the safest option
       return try_password_auth()
 
-def checkToken(token):
+def check_user_token(token):
   ''' Checks that the given token is valid and has not expired.
 
       Parameters:
@@ -124,7 +124,7 @@ def checkToken(token):
       headers={"WWW-Authenticate": "Bearer"},
     )
 
-def createPassword(password):
+def create_password(password):
   ''' For generating encrypted password for a user
       Parameters:
         password: password
@@ -146,14 +146,14 @@ def profile(token):
     user = session.query(User).filter( User.loginToken == token ).first()
   if user is None: return api_response(False, "User not found.")
   else:
-    userDetails = {}
-    userDetails["userId"] = user.userId
-    userDetails["email"] = user.email
-    userDetails["createdAt"] = user.userCreatedAt
-    userDetails["role"] = get_role(user.email)
-    return api_response(True, "User details found", { "user": userDetails })
+    user_details = {}
+    user_details["userId"] = user.userId
+    user_details["email"] = user.email
+    user_details["createdAt"] = user.userCreatedAt
+    user_details["role"] = get_role(user.email)
+    return api_response(True, "User details found", { "user": user_details })
 
-def hasPassword(token):
+def has_password(token):
   ''' Checks if the user has a password set.
       Parameters:
         token: User login token
@@ -162,42 +162,42 @@ def hasPassword(token):
     user = session.query(User).filter(User.loginToken == token).first()
     if user is None:
       return api_response(False, "User not found.")
-    
-    # Check if password is set (not None and not empty string)
-    hasPassword = user.password is not None and user.password != ""
-    return api_response(True, "Password status checked", {"hasPassword": hasPassword})
 
-def changePassword(token, currentPassword, newPassword):
+    # Check if password is set (not None and not empty string)
+    has_password_set = user.password is not None and user.password != ""
+    return api_response(True, "Password status checked", {"hasPassword": has_password_set})
+
+def change_password(token, current_password, new_password):
   ''' Changes the user's password.
       Parameters:
         token: User login token
-        currentPassword: Current password
-        newPassword: New password
+        current_password: Current password
+        new_password: New password
   '''
-  if currentPassword == "" or currentPassword is None:
+  if current_password == "" or current_password is None:
     return api_response(False, "Current password cannot be empty.")
-  if newPassword == "" or newPassword is None:
+  if new_password == "" or new_password is None:
     return api_response(False, "New password cannot be empty.")
-  if len(newPassword) < 5:
+  if len(new_password) < 5:
     return api_response(False, "New password must be at least 5 characters long.")
-  
+
   with Session() as session:
     user = session.query(User).filter(User.loginToken == token).first()
     if user is None:
       return api_response(False, "User not found.")
-    
+
     # Check if user has a password set
     if user.password is None or user.password == "":
       return api_response(False, "Password is not set for this account. Cannot change password.")
-    
+
     # Verify current password
-    if not is_correct_password(base64.b64decode(user.passwordSalt), base64.b64decode(user.password), currentPassword):
+    if not is_correct_password(base64.b64decode(user.passwordSalt), base64.b64decode(user.password), current_password):
       return api_response(False, "Current password is incorrect.")
-    
+
     # Hash and set new password
-    hash = hash_password(newPassword)
+    hash = hash_password(new_password)
     user.password = base64.b64encode(hash["hashedPassword"]).decode('utf-8')
     user.passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
     session.commit()
-    
+
     return api_response(True, "Password changed successfully.")

@@ -21,132 +21,132 @@ router = APIRouter(
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/login")  # Make sure the tokenUrl is correct
 
 @router.post("/reservations")
-async def getReservations(filters : ReservationFilters, token: str = Depends(oauth2_scheme)):
+async def get_reservations(filters : ReservationFilters, token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.getReservations(filters)
+  return functionality.get_reservations(filters)
 
 @router.get("/users")
-async def getUsers(token: str = Depends(oauth2_scheme)):
+async def get_users(token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.getUsers()
+  return functionality.get_users()
 
 @router.get("/hardware")
-async def getHardware(token: str = Depends(oauth2_scheme)):
+async def get_hardware(token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.getHardware()
+  return functionality.get_hardware()
 
 @router.get("/containers")
-async def getContainers(token: str = Depends(oauth2_scheme)):
+async def get_containers(token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.getContainers()
+  return functionality.get_containers()
 
 @router.get("/computers")
-async def getComputers(token: str = Depends(oauth2_scheme)):
+async def get_computers(token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.getComputers()
+  return functionality.get_computers()
 
 @router.get("/computer")
-async def getComputer(computerId : int, token: str = Depends(oauth2_scheme)):
+async def get_computer(computerId : int, token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.getComputer(computerId)
+  return functionality.get_computer(computerId)
 
 @router.post("/save_computer")
-async def saveComputer(computerEdit : ComputerEdit, token: str = Depends(oauth2_scheme)):
+async def save_computer(computerEdit : ComputerEdit, token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.saveComputer(computerEdit)
+  return functionality.save_computer(computerEdit)
 
 @router.post("/remove_computer")
-async def removeComputer(computerId : int, token: str = Depends(oauth2_scheme)):
+async def remove_computer(computerId : int, token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.removeComputer(computerId)
+  return functionality.remove_computer(computerId)
 
 @router.get("/container")
-async def getContainer(containerId : int, token: str = Depends(oauth2_scheme)):
+async def get_container(containerId : int, token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.getContainer(containerId)
+  return functionality.get_container(containerId)
 
 @router.post("/save_container")
-async def saveContainer(containerEdit : ContainerEdit, token: str = Depends(oauth2_scheme)):
+async def save_container(containerEdit : ContainerEdit, token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.saveContainer(containerEdit)
+  return functionality.save_container(containerEdit)
 
 @router.post("/remove_container")
-async def removeContainer(containerId : int, token: str = Depends(oauth2_scheme)):
+async def remove_container(containerId : int, token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.removeContainer(containerId)
+  return functionality.remove_container(containerId)
 
 @router.post("/edit_reservation")
-async def editReservation(reservationId : int, endDate : str, token: str = Depends(oauth2_scheme)):
+async def edit_reservation(reservationId : int, endDate : str, token: str = Depends(oauth2_scheme)):
   force_authentication(token, "admin")
-  return functionality.editReservation(reservationId, endDate)
+  return functionality.edit_reservation(reservationId, endDate)
 
 @router.get("/user")
-async def getUser(userId: int, token: str = Depends(oauth2_scheme)):
+async def get_user(userId: int, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.getUser(userId)
+    return functionality.get_user(userId)
 
 @router.post("/save_user")
-async def saveUser(userEdit: UserEdit, token: str = Depends(oauth2_scheme)):
+async def save_user(userEdit: UserEdit, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.saveUser(userEdit.userId, userEdit.data)
+    return functionality.save_user(userEdit.userId, userEdit.data)
 
 @router.get("/roles")
-async def getRoles(token: str = Depends(oauth2_scheme)):
+async def get_roles(token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.getAllRoles()
+    return functionality.get_all_roles()
 
 @router.post("/save_role")
-async def saveRole(roleId: int = None, name: str = None, token: str = Depends(oauth2_scheme)):
+async def save_role(roleId: int = None, name: str = None, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
     if roleId:
-        return functionality.editRole(roleId, name)
+        return functionality.edit_role(roleId, name)
     else:
-        return functionality.addRole(name)
+        return functionality.add_role(name)
 
 @router.post("/remove_role")
-async def removeRole(roleId: int, token: str = Depends(oauth2_scheme)):
+async def remove_role(roleId: int, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.removeRole(roleId)
+    return functionality.remove_role(roleId)
 
 @router.get("/role_mounts")
-async def getRoleMounts(roleId: int, token: str = Depends(oauth2_scheme)):
+async def get_role_mounts(roleId: int, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.getRoleMounts(roleId)
+    return functionality.get_role_mounts(roleId)
 
 @router.post("/save_role_mounts")
-async def saveRoleMounts(roleMountsEdit: RoleMountsEdit, token: str = Depends(oauth2_scheme)):
+async def save_role_mounts(roleMountsEdit: RoleMountsEdit, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.saveRoleMounts(roleMountsEdit.roleId, roleMountsEdit.mounts)
+    return functionality.save_role_mounts(roleMountsEdit.roleId, roleMountsEdit.mounts)
 
 @router.get("/role_hardware_limits")
-async def getRoleHardwareLimits(roleId: int, token: str = Depends(oauth2_scheme)):
+async def get_role_hardware_limits(roleId: int, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.getRoleHardwareLimits(roleId)
+    return functionality.get_role_hardware_limits(roleId)
 
 @router.post("/save_role_hardware_limits")
-async def saveRoleHardwareLimits(roleHardwareLimitsEdit: RoleHardwareLimitsEdit, token: str = Depends(oauth2_scheme)):
+async def save_role_hardware_limits(roleHardwareLimitsEdit: RoleHardwareLimitsEdit, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.saveRoleHardwareLimits(roleHardwareLimitsEdit.roleId, roleHardwareLimitsEdit.hardwareLimits)
+    return functionality.save_role_hardware_limits(roleHardwareLimitsEdit.roleId, roleHardwareLimitsEdit.hardwareLimits)
 
 @router.get("/role_reservation_limits")
-async def getRoleReservationLimits(roleId: int, token: str = Depends(oauth2_scheme)):
+async def get_role_reservation_limits(roleId: int, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.getRoleReservationLimits(roleId)
+    return functionality.get_role_reservation_limits(roleId)
 
 @router.post("/save_role_reservation_limits")
-async def saveRoleReservationLimits(roleReservationLimitsEdit: RoleReservationLimitsEdit, token: str = Depends(oauth2_scheme)):
+async def save_role_reservation_limits(roleReservationLimitsEdit: RoleReservationLimitsEdit, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.saveRoleReservationLimits(roleReservationLimitsEdit.roleId, roleReservationLimitsEdit.reservationLimits)
+    return functionality.save_role_reservation_limits(roleReservationLimitsEdit.roleId, roleReservationLimitsEdit.reservationLimits)
 
 @router.get("/server/{computer_id}/monitoring")
-async def getServerMonitoring(computer_id: int, token: str = Depends(oauth2_scheme)):
+async def get_server_monitoring(computer_id: int, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.getServerMonitoring(computer_id)
+    return functionality.get_server_monitoring(computer_id)
 
 @router.get("/servers")
-async def getServersForMonitoring(token: str = Depends(oauth2_scheme)):
+async def get_servers_for_monitoring(token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.getServersForMonitoring()
+    return functionality.get_servers_for_monitoring()
 
 # General admin settings endpoints
 class GeneralSettingsData(BaseModel):
@@ -157,17 +157,17 @@ class TestEmailData(BaseModel):
     email: str
 
 @router.get("/general-settings")
-async def getGeneralSettings(token: str = Depends(oauth2_scheme)):
+async def get_general_settings(token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.getGeneralSettings()
+    return functionality.get_general_settings()
 
 @router.post("/general-settings")
-async def saveGeneralSettings(data: GeneralSettingsData, token: str = Depends(oauth2_scheme)):
+async def save_general_settings(data: GeneralSettingsData, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.saveGeneralSettings(data.section, data.settings)
+    return functionality.save_general_settings(data.section, data.settings)
 
 @router.post("/test-email")
-async def sendTestEmail(data: TestEmailData, token: str = Depends(oauth2_scheme)):
+async def send_test_email(data: TestEmailData, token: str = Depends(oauth2_scheme)):
     force_authentication(token, "admin")
-    return functionality.sendTestEmail(data.email)
+    return functionality.send_test_email(data.email)
 

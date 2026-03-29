@@ -13,7 +13,7 @@ The application follows a multi-component architecture:
 - **Frontend**: Vue.js 2 + Vuetify UI framework (`webapp/frontend/`)
 - **Backend**: Python 3 + FastAPI + SQLAlchemy ORM (`webapp/backend/`)
 - **Database**: MariaDB with Alembic migrations
-- **Container Management**: Docker + custom Python utility (`dockerUtil.py`)
+- **Container Management**: Docker + custom Python utility (`docker_util.py`)
 - **Reverse Proxy**: Caddy with automatic HTTPS
 - **Process Management**: pm2 for production deployment
 - **Build System**: Make-based automation with comprehensive setup scripts
@@ -59,7 +59,7 @@ npm run production     # Production mode serve
 ```bash
 cd webapp/backend
 python main.py         # Start FastAPI server
-python dockerUtil.py   # Start Docker container utility
+python docker_util.py   # Start Docker container utility
 alembic upgrade head   # Apply database migrations
 ```
 

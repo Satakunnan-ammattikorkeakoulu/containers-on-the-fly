@@ -344,7 +344,7 @@ def restartDockerContainer(reservationId: str):
 # ---------------------------------------------------------------------------
 
 def run():
-  """Initialize and start the daemon. Called from dockerUtil.py shim."""
+  """Initialize and start the daemon. Called from docker_util.py shim."""
   global computerId
 
   print("AI Server Docker utility started.")

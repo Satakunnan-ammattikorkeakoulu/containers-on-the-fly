@@ -12,7 +12,7 @@ from helpers.auth import HashPassword, IsCorrectPassword
 import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
-from helpers.tables.Role import getRoles, getRoleById, addRole as addRoleHelper, editRole as editRoleHelper, removeRole as removeRoleHelper
+from helpers.tables.role import getRoles, getRoleById, addRole as addRoleHelper, editRole as editRoleHelper, removeRole as removeRoleHelper
 from sqlalchemy import func
 
 def getReservations(filters : ReservationFilters) -> object:
@@ -201,7 +201,7 @@ def getUsers() -> object:
                 role_user_counts[role.name] += 1
 
     # Get available roles
-    from helpers.tables.Role import getRolesWithMountCounts
+    from helpers.tables.role import getRolesWithMountCounts
     availableRoles = getRolesWithMountCounts()
     
     # Add user counts to each role
@@ -604,7 +604,7 @@ def getAllRoles() -> object:
     Returns:
         object: Response object with status, message and data.
     '''
-    from helpers.tables.Role import getRolesWithMountCounts
+    from helpers.tables.role import getRolesWithMountCounts
     data = getRolesWithMountCounts()
     
     return Response(True, "Roles fetched successfully.", {"roles": data})
@@ -660,7 +660,7 @@ def getRoleMounts(roleId: int) -> object:
         object: Response object with status, message and data containing mounts
     '''
     try:
-        from helpers.tables.Role import getRoleMounts as getRoleMountsHelper
+        from helpers.tables.role import getRoleMounts as getRoleMountsHelper
         mounts = getRoleMountsHelper(roleId)
         return Response(True, "Role mounts retrieved successfully", {"mounts": mounts})
     except Exception as e:
@@ -678,7 +678,7 @@ def saveRoleMounts(roleId: int, mounts: list) -> object:
         object: Response object with status and message
     '''
     try:
-        from helpers.tables.Role import saveRoleMounts as saveRoleMountsHelper
+        from helpers.tables.role import saveRoleMounts as saveRoleMountsHelper
         success, message = saveRoleMountsHelper(roleId, mounts)
         return Response(success, message)
     except Exception as e:
@@ -695,7 +695,7 @@ def getRoleHardwareLimits(roleId: int) -> object:
         object: Response object with hardware limits data
     '''
     try:
-        from helpers.tables.Role import getRoleHardwareLimits as getRoleHardwareLimitsHelper
+        from helpers.tables.role import getRoleHardwareLimits as getRoleHardwareLimitsHelper
         limits = getRoleHardwareLimitsHelper(roleId)
         return Response(True, "Role hardware limits retrieved successfully", {"hardwareLimits": limits})
     except Exception as e:
@@ -713,7 +713,7 @@ def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> object:
         object: Response object with status and message
     '''
     try:
-        from helpers.tables.Role import saveRoleHardwareLimits as saveRoleHardwareLimitsHelper
+        from helpers.tables.role import saveRoleHardwareLimits as saveRoleHardwareLimitsHelper
         success, message = saveRoleHardwareLimitsHelper(roleId, hardwareLimits)
         return Response(success, message)
     except Exception as e:
@@ -730,7 +730,7 @@ def getRoleReservationLimits(roleId: int) -> object:
         object: Response object with reservation limits data
     '''
     try:
-        from helpers.tables.Role import getRoleReservationLimits as getRoleReservationLimitsHelper
+        from helpers.tables.role import getRoleReservationLimits as getRoleReservationLimitsHelper
         limits = getRoleReservationLimitsHelper(roleId)
         return Response(True, "Role reservation limits retrieved successfully", {"reservationLimits": limits})
     except Exception as e:
@@ -748,7 +748,7 @@ def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> object:
         object: Response object indicating success or failure
     '''
     try:
-        from helpers.tables.Role import saveRoleReservationLimits as saveRoleReservationLimitsHelper
+        from helpers.tables.role import saveRoleReservationLimits as saveRoleReservationLimitsHelper
         success, message = saveRoleReservationLimitsHelper(roleId, reservationLimits)
         return Response(success, message)
     except Exception as e:
@@ -886,7 +886,7 @@ def getGeneralSettings() -> object:
     '''
     try:
         from settings_handler import getSetting, getMultipleSettings
-        from helpers.tables.UserAccessControl import getBlacklistedEmails, getWhitelistedEmails
+        from helpers.tables.user_access_control import getBlacklistedEmails, getWhitelistedEmails
         
         # Define all settings with their defaults
         setting_keys = [
@@ -1000,7 +1000,7 @@ def saveGeneralSettings(section: str, settings: dict) -> object:
     '''
     try:
         from settings_handler import setSetting
-        from helpers.tables.UserAccessControl import setBlacklistedEmails, setWhitelistedEmails
+        from helpers.tables.user_access_control import setBlacklistedEmails, setWhitelistedEmails
         
         if section == "general":
             # Save general application settings

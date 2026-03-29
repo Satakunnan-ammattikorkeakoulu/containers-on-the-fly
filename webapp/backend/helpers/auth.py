@@ -79,7 +79,7 @@ def GetUserReservationLimits(userId: int) -> dict:
     Dict with minDuration, maxDuration, and maxActiveReservations
   '''
   from database import UserRole, Role
-  from helpers.tables.Role import getRoleReservationLimits
+  from helpers.tables.role import getRoleReservationLimits
   
   with Session() as session:
     # Get all user roles explicitly assigned

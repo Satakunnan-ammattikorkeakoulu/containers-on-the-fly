@@ -2,7 +2,7 @@ import os
 import shutil
 import getpass
 import subprocess
-from helpers.Utils import removeSpecialCharacters
+from helpers.utils import removeSpecialCharacters
 
 
 def substitute_mount_variables(path, user_email, user_id):

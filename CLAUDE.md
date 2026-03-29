@@ -164,6 +164,33 @@ fix: Fix group removal logic to not break on empty usernames
 
 ## Important Development Guidelines
 
+### AI Workflow Rules
+
+- **Plan before implementing**: When asked for a plan or design, present the plan and wait for approval before writing any code. Do not implement unless explicitly asked.
+- **UI changes — change only what was requested**: When modifying frontend components, only change the elements explicitly requested. Do not move, resize, restyle, or reorganize other elements in the same component or page. If an adjacent change seems beneficial, mention it and wait for approval.
+- **Respect existing structure**: When adding new items to arrays, config objects, endpoint lists (like `AppUrls.js`), database models, or Vuex store modules, study the existing entries first and replicate their exact pattern (spacing, naming, ordering conventions).
+
+### Common Pitfalls
+
+- **Session management**: Always use `with Session() as session:` context manager. Do NOT call `session.close()` inside a `with` block (it is redundant). Access ORM objects only within the session scope.
+- **Authentication patterns**: The codebase uses two auth patterns: `ForceAuthentication(token)` raises HTTPException if not authenticated, and `ForceAuthentication(token, "admin")` additionally checks for admin role. For admin endpoints always pass `"admin"` as the second argument.
+- **Response wrapper**: Always return via `Response(status, message, data)` from `helpers.server`. Never return raw dicts from endpoint response functions.
+- **Frontend date handling**: Always use Day.js via `helpers/time.js` utilities (`DisplayTime` and `TimestampToLocalTimeZone`). Never use raw `Date()` or `moment`.
+- **Pydantic models for POST bodies**: POST endpoints that accept JSON bodies must define a Pydantic model in `endpoints/models/`. GET endpoints use query parameters directly.
+- **AppUrls.js**: All API URLs must be registered in `src/AppUrls.js`. Never hardcode API paths in components.
+
+### Documentation Standards
+
+**Python Backend:**
+- All new functions should have docstrings describing purpose, parameters, and return values
+- Endpoint response functions should document what the endpoint does and its expected inputs
+- No inline type annotations are required, but Pydantic models must have field descriptions for complex types
+
+**Vue Frontend:**
+- Component files should have a comment block at the top of `<script>` explaining the component's purpose if it is not obvious from the filename
+- Complex computed properties and methods should have brief JSDoc-style comments
+- No documentation is required for simple template bindings or obvious Vuetify component usage
+
 ### Version Management
 The project maintains a `.version` file in the root directory to track releases:
 - Format: `version: X.Y.Z` and `updated: YYYY-MM-DD HH:MM:SS UTC`
@@ -180,6 +207,23 @@ After making code changes, especially to frontend/backend configuration or busin
 ```bash
 pm2 restart all    # Restart all services to apply changes
 ```
+
+### Automated Code Review (Post-Implementation)
+
+After completing a feature or task (not after every individual edit), automatically run both review skills **in the background** against unstaged changes:
+
+1. Run `/code-review` and `/security-review` **in parallel as background agents**
+2. Each agent should review the **unstaged git diff** (`git diff`) to see what changed
+3. Wait for both to finish, then present a combined summary:
+   - Code convention issues (if any)
+   - Security issues (if any)
+   - "No issues found" if clean
+
+**When to trigger:** After finishing implementation work, before the user commits. Do NOT trigger on trivial changes (typo fixes, single-line config edits, documentation-only changes).
+
+**Skills available:**
+- `/code-review` — Checks naming conventions, auth patterns, Response() usage, session management, Vuetify patterns, and ESLint compliance
+- `/security-review` — Checks authentication on endpoints, role authorization, input validation, ORM usage, and Docker security
 
 ### Database Migrations
 ```bash

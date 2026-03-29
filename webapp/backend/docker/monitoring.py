@@ -6,7 +6,7 @@ from database import ServerStatus, ServerLogs, Computer, Session
 from settings_handler import settings_handler
 
 
-def readVersionFile():
+def read_version_file():
     """Read version information from .version file"""
     try:
         import os
@@ -32,7 +32,7 @@ def readVersionFile():
         return None, None
 
 
-def updateServerMonitoring():
+def update_server_monitoring():
     """Update server monitoring data in database"""
     try:
         with Session() as session:
@@ -102,7 +102,7 @@ def updateServerMonitoring():
 
             # Update software version information
             try:
-                version, updated_str = readVersionFile()
+                version, updated_str = read_version_file()
                 if version:
                     status.softwareVersion = version
 
@@ -121,13 +121,13 @@ def updateServerMonitoring():
             session.commit()
 
             # Update logs
-            updateServerLogs(computer.computerId, session)
+            update_server_logs(computer.computerId, session)
 
     except Exception as e:
         print(f"Error updating server monitoring: {e}")
 
 
-def updateServerLogs(computer_id: int, session):
+def update_server_logs(computer_id: int, session):
     """Update server logs in database"""
     try:
         # Backend logs
@@ -136,7 +136,7 @@ def updateServerLogs(computer_id: int, session):
                 ["pm2", "logs", "backend", "--lines", "300", "--nostream"],
                 text=True, stderr=subprocess.STDOUT, timeout=10
             )
-            updateLogRecord(session, computer_id, "backend", backend_logs, 300)
+            update_log_record(session, computer_id, "backend", backend_logs, 300)
         except:
             pass
 
@@ -146,7 +146,7 @@ def updateServerLogs(computer_id: int, session):
                 ["pm2", "logs", "frontend", "--lines", "300", "--nostream"],
                 text=True, stderr=subprocess.STDOUT, timeout=10
             )
-            updateLogRecord(session, computer_id, "frontend", frontend_logs, 300)
+            update_log_record(session, computer_id, "frontend", frontend_logs, 300)
         except:
             pass
 
@@ -156,7 +156,7 @@ def updateServerLogs(computer_id: int, session):
                 ["pm2", "logs", "backendDockerUtil", "--lines", "300", "--nostream"],
                 text=True, stderr=subprocess.STDOUT, timeout=10
             )
-            updateLogRecord(session, computer_id, "docker_utility", docker_logs, 300)
+            update_log_record(session, computer_id, "docker_utility", docker_logs, 300)
         except:
             pass
 
@@ -164,7 +164,7 @@ def updateServerLogs(computer_id: int, session):
         print(f"Error updating server logs: {e}")
 
 
-def updateLogRecord(session, computer_id: int, log_type: str, content: str, lines: int):
+def update_log_record(session, computer_id: int, log_type: str, content: str, lines: int):
     """Helper function to upsert log records"""
     try:
         log_record = session.query(ServerLogs).filter(

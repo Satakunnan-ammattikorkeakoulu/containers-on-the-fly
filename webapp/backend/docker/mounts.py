@@ -2,7 +2,7 @@ import os
 import shutil
 import getpass
 import subprocess
-from helpers.utils import removeSpecialCharacters
+from helpers.utils import remove_special_characters
 
 
 def substitute_mount_variables(path, user_email, user_id):
@@ -11,7 +11,7 @@ def substitute_mount_variables(path, user_email, user_id):
         return path
 
     # Sanitize email for filesystem use
-    email_sanitized = removeSpecialCharacters(user_email)
+    email_sanitized = remove_special_characters(user_email)
 
     substitutions = {
         '{email}': email_sanitized,
@@ -28,8 +28,8 @@ def substitute_mount_variables(path, user_email, user_id):
 def prepare_mount_directory(host_path):
     """Create mount directory on host with correct permissions and ACLs"""
     # Set mounting user and group
-    mountUser = os.getenv('USER') or os.getenv('USERNAME') or getpass.getuser()
-    mountGroup = "docker"
+    mount_user = os.getenv('USER') or os.getenv('USERNAME') or getpass.getuser()
+    mount_group = "docker"
 
     if not host_path:
         return
@@ -38,7 +38,7 @@ def prepare_mount_directory(host_path):
     if not os.path.isdir(host_path):
         os.makedirs(host_path, exist_ok=True)
     # Set correct owner and group for the mount folder (keep docker group for mounting)
-    shutil.chown(host_path, user=mountUser, group=mountGroup)
+    shutil.chown(host_path, user=mount_user, group=mount_group)
     # Set correct file permissions for the mount folder
     os.chmod(host_path, 0o775)
 

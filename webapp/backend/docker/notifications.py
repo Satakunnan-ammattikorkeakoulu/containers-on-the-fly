@@ -3,7 +3,7 @@ from helpers.email import send_email
 from settings_handler import get_setting
 
 
-def generate_connection_text(image, ip, ports, password, includeEmailDetails, non_critical_errors, endDate=None):
+def generate_connection_text(image, ip, ports, password, include_email_details, non_critical_errors, end_date=None):
     '''
     Generates the connection details text for a started container.
     Used both in emails and in the UI.
@@ -13,51 +13,51 @@ def generate_connection_text(image, ip, ports, password, includeEmailDetails, no
         ip (string): The ip of the machine where the container is running.
         ports (list): The ports used by the container. Example format: [ { serviceName: "ssh", localPort: 22, outsidePort: 2283 } ]
         password (string): The password of the container user.
-        includeEmailDetails (bool): Whether to include email-specific details (contact info, noreply notice).
+        include_email_details (bool): Whether to include email-specific details (contact info, noreply notice).
         non_critical_errors (string): Non-critical error messages to include.
-        endDate (datetime): The date when the container will be stopped.
+        end_date (datetime): The date when the container will be stopped.
     '''
 
     linesep = os.linesep
 
-    helpText = ""
-    if includeEmailDetails:
+    help_text = ""
+    if include_email_details:
         contact_email = get_setting('email.contactEmail')
         if contact_email:
-            helpText = f"If you need help, contact: {contact_email}{linesep}{linesep}"
+            help_text = f"If you need help, contact: {contact_email}{linesep}{linesep}"
 
-    helpTextSSH = ""
-    foundItem = None
+    help_text_ssh = ""
+    found_item = None
     for port in ports:
         if (port["serviceName"] == "SSH"):
-            foundItem = port
-            helpTextSSH += f"Connecting with Visual Studio Code (SSH):{linesep}"
-            helpTextSSH += f"user@{ip}:{port['outsidePort']}"
-            helpTextSSH += linesep + linesep
-            helpTextSSH += f"Connecting from the terminal (SSH):{linesep}"
-            helpTextSSH += f"ssh user@{ip} -p {port['outsidePort']}"
-            helpTextSSH += linesep + linesep
-            helpTextSSH += f"Password for the SSH connection:" + linesep
-            helpTextSSH += f"{password}"
-            helpTextSSH += linesep
-    if foundItem is not None:
-        ports.remove(foundItem)
+            found_item = port
+            help_text_ssh += f"Connecting with Visual Studio Code (SSH):{linesep}"
+            help_text_ssh += f"user@{ip}:{port['outsidePort']}"
+            help_text_ssh += linesep + linesep
+            help_text_ssh += f"Connecting from the terminal (SSH):{linesep}"
+            help_text_ssh += f"ssh user@{ip} -p {port['outsidePort']}"
+            help_text_ssh += linesep + linesep
+            help_text_ssh += f"Password for the SSH connection:" + linesep
+            help_text_ssh += f"{password}"
+            help_text_ssh += linesep
+    if found_item is not None:
+        ports.remove(found_item)
 
-    helpTextOther = ""
+    help_text_other = ""
     if len(ports) > 0:
-        helpTextOther += f"{linesep}"
+        help_text_other += f"{linesep}"
         for port in ports:
-            helpTextOther += f"Service {port['serviceName']} is available through: {ip}:{port['outsidePort']} {linesep}"
-        helpTextOther += f"{linesep}-----{linesep}"
+            help_text_other += f"Service {port['serviceName']} is available through: {ip}:{port['outsidePort']} {linesep}"
+        help_text_other += f"{linesep}-----{linesep}"
 
-    generalText = ""
+    general_text = ""
     try:
-        generalText = get_setting('instructions.email')
+        general_text = get_setting('instructions.email')
     except Exception:
         pass
 
-    endDateText = ""
-    if endDate is not None:
+    end_date_text = ""
+    if end_date is not None:
         # Get timezone from database settings
         timezone_name = "UTC"  # Default timezone
         try:
@@ -65,31 +65,31 @@ def generate_connection_text(image, ip, ports, password, includeEmailDetails, no
         except Exception:
             pass
 
-        # convert endDate from UTC to configured timezone
+        # convert end_date from UTC to configured timezone
         from dateutil import tz
-        endDate.replace(tzinfo=None)
-        endDate = endDate.astimezone(tz.gettz(timezone_name))
-        endDateText = f"Your reservation will end at ({timezone_name}): {endDate.strftime('%Y-%m-%d %H:%M:%S')}"
+        end_date.replace(tzinfo=None)
+        end_date = end_date.astimezone(tz.gettz(timezone_name))
+        end_date_text = f"Your reservation will end at ({timezone_name}): {end_date.strftime('%Y-%m-%d %H:%M:%S')}"
 
-    startMessage = ""
-    if includeEmailDetails:
-        startMessage = f"Container with image {image} is ready to use.{linesep}{linesep}-----{linesep}"
+    start_message = ""
+    if include_email_details:
+        start_message = f"Container with image {image} is ready to use.{linesep}{linesep}-----{linesep}"
 
-    noReply = ""
-    if includeEmailDetails:
-        noReply = f"This is a noreply email account. Please do not reply to this email.{linesep}{linesep}"
+    no_reply = ""
+    if include_email_details:
+        no_reply = f"This is a noreply email account. Please do not reply to this email.{linesep}{linesep}"
 
     # Body text
     body = f"""
-{startMessage}
-{helpTextSSH}
+{start_message}
+{help_text_ssh}
 -----
-{helpTextOther}
+{help_text_other}
 IP address of the machine: {ip}
 
-{generalText}
+{general_text}
 
-{noReply}{helpText}{non_critical_errors}
+{no_reply}{help_text}{non_critical_errors}
 """
 
     return body

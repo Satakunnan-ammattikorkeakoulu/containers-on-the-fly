@@ -16,7 +16,7 @@ class CustomLogger(logging.Logger):
   def __init__(self, name):
     super().__init__(name)
 
-  def getMsg(self, msg):
+  def get_msg(self, msg):
     try:
       # Print database objects as dictionaries
       if isinstance(msg, Base):
@@ -27,15 +27,15 @@ class CustomLogger(logging.Logger):
       return f"{linesep}{msg}"
 
   def debug(self, msg, *args, **kwargs):
-    super().debug(self.getMsg(msg), *args, **kwargs)
+    super().debug(self.get_msg(msg), *args, **kwargs)
   def info(self, msg, *args, **kwargs):
-    super().info(self.getMsg(msg), *args, **kwargs)
+    super().info(self.get_msg(msg), *args, **kwargs)
   def warning(self, msg, *args, **kwargs):
-    super().warning(self.getMsg(msg), *args, **kwargs)
+    super().warning(self.get_msg(msg), *args, **kwargs)
   def error(self, msg, *args, **kwargs):
-    super().error(self.getMsg(msg), *args, **kwargs)
+    super().error(self.get_msg(msg), *args, **kwargs)
   def critical(self, msg, *args, **kwargs):
-    super().critical(self.getMsg(msg), *args, **kwargs)
+    super().critical(self.get_msg(msg), *args, **kwargs)
 
 class ColoredFormatter(logging.Formatter):
   """Logging Formatter to add colors based on the log level."""

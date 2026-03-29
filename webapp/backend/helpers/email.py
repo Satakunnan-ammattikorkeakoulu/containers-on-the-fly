@@ -25,8 +25,8 @@ def send_email(to, mail_subject, mail_body):
     username = smtp_username
     mail_from = from_email
     password = smtp_password
-    smtpAddress = smtp_server
-    smtpPort = smtp_port
+    smtp_address = smtp_server
+    smtp_port_num = smtp_port
 
     mimemsg = MIMEMultipart()
     mimemsg['From'] = mail_from
@@ -35,10 +35,10 @@ def send_email(to, mail_subject, mail_body):
     mimemsg.attach(MIMEText(mail_body, 'plain'))
     try:
         # Use SSL/TLS for port 465, STARTTLS for other ports (typically 587)
-        if smtpPort == 465:
-            connection = smtplib.SMTP_SSL(host = smtpAddress, port = smtpPort)
+        if smtp_port_num == 465:
+            connection = smtplib.SMTP_SSL(host = smtp_address, port = smtp_port_num)
         else:
-            connection = smtplib.SMTP(host = smtpAddress, port = smtpPort)
+            connection = smtplib.SMTP(host = smtp_address, port = smtp_port_num)
             connection.starttls()
         connection.login(username,password)
         connection.send_message(mimemsg)

@@ -178,22 +178,22 @@ def stop_container(container_name):
     Returns:
         (boolean) True if the container was stopped successfully, otherwise false (as it did not exist)
     '''
-    noErrors = True
+    no_errors = True
     try:
         docker.stop(container_name)
         print(f"Stopped container {container_name}")
     except NoSuchContainer as e:
         print(f"Error stopping container: {container_name}")
-        noErrors = False
+        no_errors = False
 
     try:
         docker.remove(container_name)
         print(f"Removed container {container_name}")
     except NoSuchContainer as e:
         print(f"Error removing container: {container_name}")
-        noErrors = False
+        no_errors = False
 
-    return noErrors
+    return no_errors
 
 def restart_container(container_name):
     '''

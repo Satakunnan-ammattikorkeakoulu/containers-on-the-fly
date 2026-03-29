@@ -4,15 +4,15 @@ import datetime
 from datetime import timezone
 
 
-def timeNow():
+def time_now():
   return datetime.datetime.now(datetime.timezone.utc)
 
 
-def getReservationsRequiringStart(computerId: int):
+def get_reservations_requiring_start(computer_id: int):
   '''
   Returns all reservations requiring start in the given computer.
   Parameters:
-    computerId: ID of the computer.
+    computer_id: ID of the computer.
 
   Returns:
     List of reservations requiring start in the given computer.
@@ -20,17 +20,17 @@ def getReservationsRequiringStart(computerId: int):
   with Session() as session:
     reservations = session.query(Reservation).filter(
       Reservation.status == "reserved",
-      Reservation.computerId == computerId,
-      Reservation.startDate < timeNow()
+      Reservation.computerId == computer_id,
+      Reservation.startDate < time_now()
     )
     return reservations
 
 
-def getRunningReservations(computerId: int):
+def get_running_reservations(computer_id: int):
   '''
   Returns all running reservations in the given computer.
   Parameters:
-    computerId: ID of the computer.
+    computer_id: ID of the computer.
 
   Returns:
     List of running reservations in the given computer.
@@ -38,36 +38,36 @@ def getRunningReservations(computerId: int):
   with Session() as session:
     reservations = session.query(Reservation).filter(
       Reservation.status == "started",
-      Reservation.startDate < timeNow(),
-      Reservation.computerId == computerId,
-      Reservation.endDate > timeNow()
+      Reservation.startDate < time_now(),
+      Reservation.computerId == computer_id,
+      Reservation.endDate > time_now()
     )
     return reservations
 
 
-def getReservationsRequiringStop(computerId: int):
+def get_reservations_requiring_stop(computer_id: int):
   '''
   Returns all reservations requiring stop in the given computer.
   Parameters:
-    computerId: ID of the computer.
+    computer_id: ID of the computer.
 
   Returns:
     List of reservations requiring stop in the given computer.
   '''
   with Session() as session:
     reservations = session.query(Reservation).filter(
-      Reservation.computerId == computerId,
+      Reservation.computerId == computer_id,
       Reservation.status.in_(["started", "reserved"]),
-      Reservation.endDate < timeNow()
+      Reservation.endDate < time_now()
     )
     return reservations
 
 
-def getReservationsRequiringRestart(computerId: int):
+def get_reservations_requiring_restart(computer_id: int):
   '''
   Returns all reservations requiring restart in the given computer.
   Parameters:
-    computerId: ID of the computer.
+    computer_id: ID of the computer.
 
   Returns:
     List of reservations requiring restart in the given computer.
@@ -75,13 +75,13 @@ def getReservationsRequiringRestart(computerId: int):
   with Session() as session:
     reservations = session.query(Reservation).filter(
       Reservation.status == "restart",
-      Reservation.computerId == computerId,
-      Reservation.endDate > timeNow()
+      Reservation.computerId == computer_id,
+      Reservation.endDate > time_now()
     )
     return reservations
 
 
-def getContainerInformation(reservationId: str):
+def get_container_information(reservation_id: str):
   '''
     Returns:
       On error or if cannot find the container:
@@ -107,40 +107,40 @@ def getContainerInformation(reservationId: str):
   '''
   try:
     with Session() as session:
-      reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
+      reservation = session.query(Reservation).filter( Reservation.reservationId == reservation_id ).first()
       if reservation == None:
         return None, {}
-      containerState = docker.container.inspect(reservation.reservedContainer.containerDockerName)
-      return reservation.reservedContainer.containerDockerName, containerState
+      container_state = docker.container.inspect(reservation.reservedContainer.containerDockerName)
+      return reservation.reservedContainer.containerDockerName, container_state
   except Exception as e:
-    print(f"Something went wrong getting container information for reservation {reservationId}. Error:")
+    print(f"Something went wrong getting container information for reservation {reservation_id}. Error:")
     print(e)
     return None, {}
 
 
-def getComputerId(computerName: str):
+def get_computer_id(computer_name: str):
   '''
   Gets the ID of the computer in the database with the given name.
 
   Parameters:
-    computerName: Name of the computer (in the database)
+    computer_name: Name of the computer (in the database)
 
   Returns:
     ID of the computer, or None if it was not found or we encounter any exception.
   '''
   try:
     with Session() as session:
-      computer = session.query(Computer).filter( Computer.name == computerName ).first()
+      computer = session.query(Computer).filter( Computer.name == computer_name ).first()
       if computer == None:
         return None
       return computer.computerId
   except Exception as e:
-    print(f"Something went wrong getting computer ID for name: {computerName}. Error:")
+    print(f"Something went wrong getting computer ID for name: {computer_name}. Error:")
     print(e)
     return None
 
 
-def getRunningReservedDockerContainers():
+def get_running_reserved_docker_containers():
   '''
   Finds all Docker containers with name starting with "reservation-".
   Basically all reservations that are physically running on this computer.

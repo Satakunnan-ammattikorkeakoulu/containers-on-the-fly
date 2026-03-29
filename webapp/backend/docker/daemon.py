@@ -15,22 +15,22 @@ from database import Session, Reservation, ReservedContainerPort, Role
 from helpers.auth import create_password
 
 from docker.containers import start_container, stop_container, restart_container
-from docker.monitoring import updateServerMonitoring
+from docker.monitoring import update_server_monitoring
 from docker.notifications import send_container_started_email, send_container_error_email, send_admin_failure_alert
 from docker.ports import get_available_port
 from docker.queries import (
-    getReservationsRequiringStart, getRunningReservations,
-    getReservationsRequiringStop, getReservationsRequiringRestart,
-    getContainerInformation, getComputerId, getRunningReservedDockerContainers
+    get_reservations_requiring_start, get_running_reservations,
+    get_reservations_requiring_stop, get_reservations_requiring_restart,
+    get_container_information, get_computer_id, get_running_reserved_docker_containers
 )
 
 # Runs the script forever
 run: bool = True
 # The ID of the computer from the database which this script should react to is saved here
-computerId: int = None
+computer_id: int = None
 
 
-def timeNow():
+def time_now():
   return datetime.now(timezone.utc)
 
 
@@ -41,82 +41,82 @@ def timeNow():
 def main():
   while (run):
     for i in range(6):
-      stopFinishedServers()
-      startNewServers()
-      restartCrashedServers()
-      restartServersRequiringRestart()
+      stop_finished_servers()
+      start_new_servers()
+      restart_crashed_servers()
+      restart_servers_requiring_restart()
 
       # Update monitoring data every 3rd iteration (every 30 seconds)
       if i % 3 == 0:
-        updateServerMonitoring()
+        update_server_monitoring()
 
       sleep(10)
     # Run this larger cleanup below every 60 seconds (1 minute)
-    stopOrphanContainerReservations()
+    stop_orphan_container_reservations()
 
 
 # ---------------------------------------------------------------------------
 # Lifecycle handlers (called from main loop)
 # ---------------------------------------------------------------------------
 
-def stopFinishedServers():
+def stop_finished_servers():
   '''
   Gathers a list of reservations (containers) which reservation is due, status is "started"
   and stops them one by one.
   '''
-  global computerId
-  reservations = getReservationsRequiringStop(computerId)
+  global computer_id
+  reservations = get_reservations_requiring_stop(computer_id)
   for reservation in reservations:
     if settings_handler.get_setting("docker.enabled") == True:
-      print(timeNow(), ": Stopping Docker server for reservation with reservationId: ",  reservation.reservationId)
-      stopDockerContainer(reservation.reservationId)
+      print(time_now(), ": Stopping Docker server for reservation with reservationId: ",  reservation.reservationId)
+      stop_docker_container(reservation.reservationId)
 
-def startNewServers():
+def start_new_servers():
   '''
   Gathers a list of reservations (containers) requiring to be started in the current computer (state is 'reserved')
   and starts them one by one.
   '''
-  global computerId
-  reservations = getReservationsRequiringStart(computerId)
+  global computer_id
+  reservations = get_reservations_requiring_start(computer_id)
   for reservation in reservations:
     if settings_handler.get_setting("docker.enabled") == True:
-      print(timeNow(), ": Starting Docker server for reservation with reservationId: ",  reservation.reservationId)
-      startDockerContainer(reservation.reservationId)
+      print(time_now(), ": Starting Docker server for reservation with reservationId: ",  reservation.reservationId)
+      start_docker_container(reservation.reservationId)
 
-def restartCrashedServers():
+def restart_crashed_servers():
   '''
   Gathers a list of crashed reservations (containers) requiring to be restarted in the current computer (state is 'error')
   and starts them one by one.
   '''
-  global computerId
-  reservations = getRunningReservations(computerId)
+  global computer_id
+  reservations = get_running_reservations(computer_id)
   for reservation in reservations:
     if settings_handler.get_setting("docker.enabled") == True:
       try:
-        containerName, containerState = getContainerInformation(reservation.reservationId)
-        if containerState.state.status == "exited":
-          restartDockerContainer(reservation.reservationId)
+        container_name, container_state = get_container_information(reservation.reservationId)
+        if container_state.state.status == "exited":
+          restart_docker_container(reservation.reservationId)
       except Exception as e:
         print(f"Error restarting a crashed container:")
         print(e)
 
-def restartServersRequiringRestart():
+def restart_servers_requiring_restart():
   '''
   Gathers a list of reservations (containers) requiring to be restarted in the current computer (state is 'restart')
   and starts them one by one.
   '''
-  global computerId
-  reservations = getReservationsRequiringRestart(computerId)
+  global computer_id
+  reservations = get_reservations_requiring_restart(computer_id)
 
   for reservation in reservations:
     if settings_handler.get_setting("docker.enabled") == True:
       try:
-        restartDockerContainer(reservation.reservationId)
+        restart_docker_container(reservation.reservationId)
       except Exception as e:
         print(f"Error restarting a container:")
         print(e)
 
-def stopOrphanContainerReservations():
+def stop_orphan_container_reservations():
   '''
   Gathers a list of orphan (not bound to started server) reservations and stops & removes them.
   Basically, we verify for each container running in Docker that the reservation is also marked as started in database.
@@ -126,12 +126,12 @@ def stopOrphanContainerReservations():
 
   try:
     # Get all containers marked as started in the database
-    reservations = getRunningReservations(computerId)
+    reservations = get_running_reservations(computer_id)
     for reservation in reservations:
       pass  # containerDockerId might be None
 
     # Get all Docker container reservations (container name starting with "reservation-"") really running on this computer
-    docker_reservation_containers = getRunningReservedDockerContainers()
+    docker_reservation_containers = get_running_reserved_docker_containers()
     for container in docker_reservation_containers:
       time_running = datetime.now(timezone.utc) - container.state.started_at
       # If the container has been running for over 30 minutes, check that it is really marked as running in the database
@@ -143,7 +143,7 @@ def stopOrphanContainerReservations():
           pass
         else:
           print("Container Docker reservation not synchronized with database! Reservation ID: " + str(reservation.reservationId) + " and container name: " + container.name)
-          stopOrphanDockerContainer(container.name)
+          stop_orphan_docker_container(container.name)
   except Exception as e:
     print("Error stopping (cleaning up) orphan containers:")
     print(e)
@@ -153,65 +153,65 @@ def stopOrphanContainerReservations():
 # Orchestration functions (bridge between DB reservations and Docker operations)
 # ---------------------------------------------------------------------------
 
-def startDockerContainer(reservationId: str):
+def start_docker_container(reservation_id: str):
   with Session() as session:
-    reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
+    reservation = session.query(Reservation).filter( Reservation.reservationId == reservation_id ).first()
     if reservation == None: return False
-    sshPassword = create_password()
+    ssh_password = create_password()
 
-    imageName = reservation.reservedContainer.container.imageName
-    hwSpecs = {}
-    gpuSpecs = {}
+    image_name = reservation.reservedContainer.container.imageName
+    hw_specs = {}
+    gpu_specs = {}
     for spec in reservation.reservedHardwareSpecs:
       if spec.hardwareSpec.type == "gpu":
-        gpuSpecs[spec.hardwareSpec.internalId] = { "amount": spec.amount }
+        gpu_specs[spec.hardwareSpec.internalId] = { "amount": spec.amount }
       else:
-        hwSpecs[spec.hardwareSpec.type] = { "amount": spec.amount }
+        hw_specs[spec.hardwareSpec.type] = { "amount": spec.amount }
 
-    timeNowParsed = timeNow().strftime('%m_%d_%Y_%H_%M_%S')
+    time_now_parsed = time_now().strftime('%m_%d_%Y_%H_%M_%S')
 
-    containerName = f"reservation-{reservation.reservationId}-{imageName.replace(':', '').replace('/', '')}-{timeNowParsed}"
-    reservation.reservedContainer.containerDockerName = containerName
+    container_name = f"reservation-{reservation.reservationId}-{image_name.replace(':', '').replace('/', '')}-{time_now_parsed}"
+    reservation.reservedContainer.containerDockerName = container_name
 
     ports = []
 
     # Set bindable ports for the reservation container
     for port in reservation.reservedContainer.container.containerPorts:
-      outsidePort = get_available_port()
+      outside_port = get_available_port()
       ports.append({
         "containerPortId" : port.containerPortId,
         "serviceName": port.serviceName,
         "localPort": port.port,
-        "outsidePort": outsidePort
+        "outsidePort": outside_port
       })
 
     # Create the GPUs string to be passed to Docker
-    gpusString = ""
-    # Loop through all hwSpecs and find the reserved GPU internal IDs (Nvidia / cuda IDs), if any
-    if len(gpuSpecs) > 0:
-      gpusString = "device="
-      for gpu in gpuSpecs:
-        gpusString = gpusString + gpu + ","
-      # Remove the trailing , from gpuSpecs, if it exists
-      if gpusString[-1] == ",": gpusString = gpusString[:-1]
+    gpus_string = ""
+    # Loop through all hw_specs and find the reserved GPU internal IDs (Nvidia / cuda IDs), if any
+    if len(gpu_specs) > 0:
+      gpus_string = "device="
+      for gpu in gpu_specs:
+        gpus_string = gpus_string + gpu + ","
+      # Remove the trailing , from gpu_specs, if it exists
+      if gpus_string[-1] == ",": gpus_string = gpus_string[:-1]
 
 
     # Create the port string to be passed to Docker
-    portsForContainer = []
+    ports_for_container = []
     for port in ports:
-      portsForContainer.append( (port["outsidePort"], port["localPort"]) )
+      ports_for_container.append( (port["outsidePort"], port["localPort"]) )
 
     details = {
-      "name": containerName,
-      "image": imageName,
+      "name": container_name,
+      "image": image_name,
       "username": "user",
-      "cpus": int(hwSpecs['cpus']["amount"]),
-      "gpus": gpusString if gpusString else None,  # Convert empty string to None
-      "memory": f"{hwSpecs['ram']['amount']}g",
+      "cpus": int(hw_specs['cpus']["amount"]),
+      "gpus": gpus_string if gpus_string else None,  # Convert empty string to None
+      "memory": f"{hw_specs['ram']['amount']}g",
       "shm_size_percent": reservation.reservedContainer.shmSizePercent if reservation.reservedContainer.shmSizePercent is not None else 50,
       "ram_disk_percent": reservation.reservedContainer.ramDiskSizePercent if reservation.reservedContainer.ramDiskSizePercent is not None else 0,
-      "ports": portsForContainer,
-      "password": sshPassword,
+      "ports": ports_for_container,
+      "password": ssh_password,
       "dbUserId": reservation.userId,
       "reservation": {
         "computerId": reservation.computerId,
@@ -274,10 +274,10 @@ def startDockerContainer(reservationId: str):
       # Set basic reservation status
       reservation.status = "started"
       reservation.reservedContainer.sshPassword = cont_password
-      reservation.reservedContainer.startedAt = timeNow()
+      reservation.reservedContainer.startedAt = time_now()
       send_container_started_email(
-        reservation.user.email, imageName, reservation.computer.ip,
-        ports, sshPassword, non_critical_errors, reservation.endDate
+        reservation.user.email, image_name, reservation.computer.ip,
+        ports, ssh_password, non_critical_errors, reservation.endDate
       )
 
       session.commit()
@@ -297,38 +297,38 @@ def startDockerContainer(reservationId: str):
       send_container_error_email(reservation.user.email, errors)
       send_admin_failure_alert(
         reservation.user.email, reservation.reservationId,
-        imageName, reservation.computer.name, errors
+        image_name, reservation.computer.name, errors
       )
 
       print("Container was not started. Logged the error to ReservedContainer.")
 
-def stopDockerContainer(reservationId: str):
+def stop_docker_container(reservation_id: str):
   try:
     with Session() as session:
-      reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
+      reservation = session.query(Reservation).filter( Reservation.reservationId == reservation_id ).first()
       if reservation == None: return False
 
       if (reservation.status == "started"):
         stop_container(reservation.reservedContainer.containerDockerName)
       reservation.status = "stopped"
-      reservation.reservedContainer.stoppedAt = timeNow()
+      reservation.reservedContainer.stoppedAt = time_now()
       session.commit()
   except Exception as e:
     print("Error stopping server:")
     print(e)
 
-def stopOrphanDockerContainer(containerName):
-  if not containerName: return
+def stop_orphan_docker_container(container_name):
+  if not container_name: return
   try:
-    stop_container(containerName)
+    stop_container(container_name)
   except Exception as e:
     print("Error stopping orphan container:")
     print(e)
 
-def restartDockerContainer(reservationId: str):
+def restart_docker_container(reservation_id: str):
   try:
     with Session() as session:
-      reservation = session.query(Reservation).filter( Reservation.reservationId == reservationId ).first()
+      reservation = session.query(Reservation).filter( Reservation.reservationId == reservation_id ).first()
       if reservation == None: return False
 
       restart_container(reservation.reservedContainer.containerDockerName)
@@ -345,7 +345,7 @@ def restartDockerContainer(reservationId: str):
 
 def run():
   """Initialize and start the daemon. Called from docker_util.py shim."""
-  global computerId
+  global computer_id
 
   print("AI Server Docker utility started.")
   print("This software will run infinitely and start / stop servers for reservations." + linesep)
@@ -356,12 +356,12 @@ def run():
 
   # Get ID of the computer from the database based on the settings.json key docker.serverName.
   # Exit on any errors
-  serverName = settings_handler.get_setting("docker.serverName")
-  if not serverName:
+  server_name = settings_handler.get_setting("docker.serverName")
+  if not server_name:
     print("!!! You need to specify the name of the server in settings.json file, in key docker.serverName. The name should be exactly the same as in database !!! Exiting." + linesep)
     sys.exit()
-  computerId = getComputerId(serverName)
-  if not computerId:
+  computer_id = get_computer_id(server_name)
+  if not computer_id:
     print("!!! Could not find computer with this name from the database. settings.json should contain docker.serverName and the name should be exactly the same as the computer in the database. !!! Exiting." + linesep)
     sys.exit()
 

@@ -2,9 +2,9 @@
   <v-container>
     <v-row class="text-center">
       <v-col cols="12">
-        <h4>Admin</h4>
-        <h2>General Settings</h2>
-        <p class="subtitle-1 text-grey">Configure system-wide settings and preferences</p>
+        <h4 class="m-0">Admin</h4>
+        <h2 class="m-0">General Settings</h2>
+        <p class="subtitle-1 text-grey m-0 mb-40">Configure system-wide settings and preferences</p>
       </v-col>
     </v-row>
 

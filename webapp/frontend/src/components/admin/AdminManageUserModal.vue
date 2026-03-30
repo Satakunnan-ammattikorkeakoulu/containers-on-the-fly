@@ -6,8 +6,8 @@
           <v-container>
             <v-row>
               <v-col cols="12" style="margin-bottom: 15px;">
-                <h2 class="title" v-if="isCreatingNew">Create new User</h2>
-                <h2 class="title" v-else>Edit User</h2>
+                <h2 v-if="isCreatingNew">Create new User</h2>
+                <h2 v-else>Edit User</h2>
               </v-col>
 
               <!-- EMAIL -->

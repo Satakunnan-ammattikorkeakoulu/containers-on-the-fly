@@ -54,6 +54,20 @@ body .section {
   height: 32px;
 }
 
+/* Vuetify 4 data table items-per-page select */
+.v-data-table-footer .v-field {
+  min-height: 32px;
+  font-size: 14px;
+}
+
+.v-data-table-footer .v-field__append-inner {
+  padding-left: 0;
+}
+
+.v-data-table-footer .v-select__selection {
+  overflow: visible;
+}
+
 /* Vuetify 4 tooltip */
 .v-overlay--active .v-overlay__content {
   opacity: 1 !important;
@@ -104,4 +118,27 @@ a,
 
 .v-btn__content > .v-icon {
   margin-right: 7px;
+}
+
+.v-application a {
+    color: #2196f3;
+    transition: 0.3s all ease;
+}
+
+.v-application a:hover {
+    color: #007cd6;
+}
+
+.v-card {
+    background-color: #1e1e1e;
+    color: #fff;
+    border: thin solid hsla(0, 0%, 100%, .12);
+}
+
+.m-0 {
+  margin: 0px;
+}
+
+.mb-40 {
+  margin-bottom: 40px;
 }

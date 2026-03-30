@@ -44,8 +44,8 @@
     <!-- Title -->
     <v-row class="text-center">
       <v-col cols="12">
-        <h2>Your Reservations</h2>
-        <p class="dim">Listing reservations from past 3 months</p>
+        <h2 class="m-0">Your Reservations</h2>
+        <p class="dim m-0">Listing reservations from past 3 months</p>
       </v-col>
     </v-row>
 

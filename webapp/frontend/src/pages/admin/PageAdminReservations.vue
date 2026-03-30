@@ -3,9 +3,9 @@
 
     <v-row class="text-center">
       <v-col cols="12">
-        <h4>Admin</h4>
-        <h2>All Reservations</h2>
-        <p class="dim">Listing reservations from past 3 months</p>
+        <h4 class="m-0">Admin</h4>
+        <h2 class="m-0">All Reservations</h2>
+        <p class="dim m-0 mb-40">Listing reservations from past 3 months</p>
       </v-col>
     </v-row>
 
@@ -213,9 +213,9 @@
         let filtered = this.reservations;
         
         // Filter by Status
-        if (this.filters.status && this.filters.status.value !== 'All') {
-          filtered = filtered.filter(reservation => 
-            reservation.status === this.filters.status.value
+        if (this.filters.status && this.filters.status !== 'All') {
+          filtered = filtered.filter(reservation =>
+            reservation.status === this.filters.status
           );
         }
         

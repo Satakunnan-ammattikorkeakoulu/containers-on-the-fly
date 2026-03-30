@@ -1,78 +1,73 @@
 <template>
   <div v-if="!isInitializing">
     <v-app v-if="isLoggedIn">
-      <v-app-bar app elevation="4" class="px-8">
-        <div class="app-logo" @click="reservations">
-          <img :src="frontBgImg" class="app-logo-img" alt="Logo" />
-        </div>
-        <a @click="reservations">Reservations</a>
-        <!-- Admin links: inline on wide screens -->
-        <div class="admin-block admin-inline" v-if="isAdmin">
-          <p class="admin-text">Admin</p>
-          <a href="/admin/general">General</a>
-          <a href="/admin/reservations">Reservations</a>
-          <a href="/admin/users">Users</a>
-          <a href="/admin/roles">Roles</a>
-          <a href="/admin/computers">Computers</a>
-          <a href="/admin/containers">Containers</a>
-        </div>
-        <!-- Admin links: dropdown on narrow screens -->
-        <div class="admin-dropdown" v-if="isAdmin">
-          <v-menu offset-y>
-            <template v-slot:activator="{ props }">
-              <span class="admin-dropdown-trigger" v-bind="props">Admin <v-icon size="small">mdi-chevron-down</v-icon></span>
-            </template>
-            <v-list>
-              <v-list-item href="/admin/general"><v-list-item-title>General</v-list-item-title></v-list-item>
-              <v-list-item href="/admin/reservations"><v-list-item-title>Reservations</v-list-item-title></v-list-item>
-              <v-list-item href="/admin/users"><v-list-item-title>Users</v-list-item-title></v-list-item>
-              <v-list-item href="/admin/roles"><v-list-item-title>Roles</v-list-item-title></v-list-item>
-              <v-list-item href="/admin/computers"><v-list-item-title>Computers</v-list-item-title></v-list-item>
-              <v-list-item href="/admin/containers"><v-list-item-title>Containers</v-list-item-title></v-list-item>
-            </v-list>
-          </v-menu>
-        </div>
-        <div class="user-info-container" v-if="isLoggedIn == true">
-          <v-menu offset-y open-on-hover>
-            <template v-slot:activator="{ props }">
-              <span
-                class="user-email-link"
-                v-bind="props"
-              >
-                {{userEmail}}
-              </span>
-            </template>
-            <v-list>
-              <v-list-item @click="profile">
-                <v-list-item-title>Profile</v-list-item-title>
-              </v-list-item>
-              <v-list-item @click="logout">
-                <v-list-item-title>Logout</v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
-          <v-tooltip bottom v-if="userRoles.length > 0">
-            <template v-slot:activator="{ props }">
-              <v-chip
-                size="x-small"
-                variant="outlined"
-                class="ml-2"
-                v-bind="props"
-              >
-                {{ userRoles.length }} {{ userRoles.length === 1 ? 'role' : 'roles' }}
-              </v-chip>
-            </template>
-            <span>{{ userRoles.join(', ') }}</span>
-          </v-tooltip>
-        </div>
-      </v-app-bar>
+      <div class="navbar" :class="{ 'navbar-compact': scrolled }">
+        <v-container class="navbar-inner">
+          <div class="app-logo" @click="reservations">
+            <img :src="frontBgImg" class="app-logo-img" alt="Logo" />
+          </div>
+          <a @click="reservations" :class="{ 'nav-active': $route.path.startsWith('/user/reserv') }">Reservations</a>
+          <!-- Admin links: inline on wide screens -->
+          <div class="admin-block admin-inline" v-if="isAdmin">
+            <p class="admin-text">Admin</p>
+            <a href="/admin/general" :class="{ 'nav-active': $route.path === '/admin/general' }">General</a>
+            <a href="/admin/reservations" :class="{ 'nav-active': $route.path === '/admin/reservations' }">Reservations</a>
+            <a href="/admin/users" :class="{ 'nav-active': $route.path === '/admin/users' }">Users</a>
+            <a href="/admin/roles" :class="{ 'nav-active': $route.path === '/admin/roles' }">Roles</a>
+            <a href="/admin/computers" :class="{ 'nav-active': $route.path === '/admin/computers' }">Computers</a>
+            <a href="/admin/containers" :class="{ 'nav-active': $route.path === '/admin/containers' }">Containers</a>
+          </div>
+          <!-- Admin links: dropdown on narrow screens -->
+          <div class="admin-dropdown" v-if="isAdmin">
+            <v-menu offset-y>
+              <template v-slot:activator="{ props }">
+                <span class="admin-dropdown-trigger" v-bind="props">Admin <v-icon size="small">mdi-chevron-down</v-icon></span>
+              </template>
+              <v-list>
+                <v-list-item href="/admin/general"><v-list-item-title>General</v-list-item-title></v-list-item>
+                <v-list-item href="/admin/reservations"><v-list-item-title>Reservations</v-list-item-title></v-list-item>
+                <v-list-item href="/admin/users"><v-list-item-title>Users</v-list-item-title></v-list-item>
+                <v-list-item href="/admin/roles"><v-list-item-title>Roles</v-list-item-title></v-list-item>
+                <v-list-item href="/admin/computers"><v-list-item-title>Computers</v-list-item-title></v-list-item>
+                <v-list-item href="/admin/containers"><v-list-item-title>Containers</v-list-item-title></v-list-item>
+              </v-list>
+            </v-menu>
+          </div>
+          <div class="user-info-container" v-if="isLoggedIn == true">
+            <v-menu offset-y>
+              <template v-slot:activator="{ props }">
+                <v-icon
+                  v-bind="props"
+                  class="user-menu-icon"
+                  size="28"
+                >mdi-account-circle</v-icon>
+              </template>
+              <v-list>
+                <v-list-item :disabled="true" class="user-info-header">
+                  <v-list-item-title style="font-size: 12px; opacity: 0.7;">Logged in as <strong>{{ userEmail }}</strong></v-list-item-title>
+                  <v-list-item-subtitle v-if="userRoles.length > 0" style="font-size: 11px; margin-top: 4px;">
+                    Roles: {{ userRoles.join(', ') }}
+                  </v-list-item-subtitle>
+                </v-list-item>
+                <v-divider></v-divider>
+                <v-list-item @click="profile">
+                  <v-list-item-title>Profile</v-list-item-title>
+                </v-list-item>
+                <v-list-item @click="logout">
+                  <v-list-item-title>Logout</v-list-item-title>
+                </v-list-item>
+              </v-list>
+            </v-menu>
+          </div>
+        </v-container>
+      </div>
 
       <v-main>
         <v-container>
           <slot></slot>
         </v-container>
       </v-main>
-      
+
       <Snackbar></Snackbar>
     </v-app>
   </div>
@@ -95,6 +90,7 @@
     data: () => ({
       show: true,
       frontBgImg,
+      scrolled: false,
     }),
     mounted() {
       if (!this.isInitializing) {
@@ -103,6 +99,13 @@
           this.$router.push("/user/logout")
         }
       }
+      this.handleScroll = () => {
+        this.scrolled = window.scrollY > 20
+      }
+      window.addEventListener('scroll', this.handleScroll)
+    },
+    beforeUnmount() {
+      window.removeEventListener('scroll', this.handleScroll)
     },
     methods: {
       logout() {
@@ -159,20 +162,73 @@
 </script>
 
 <style scoped lang="scss">
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background-color: #212121;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, .2), 0 4px 5px 0 rgba(0, 0, 0, .14), 0 1px 10px 0 rgba(0, 0, 0, .12);
+}
+
+.navbar-inner {
+  display: flex !important;
+  align-items: center;
+  height: 68px;
+  transition: height 0.25s ease;
+  flex-wrap: nowrap;
+}
+
+.app-logo-img {
+  transition: height 0.25s ease;
+}
+
+.navbar a {
+  color: white !important;
+  margin: 0 15px !important;
+  transition: 0.2s all ease;
+  text-decoration: none;
+  font-size: 15px;
+}
+
+.navbar a:hover {
+  color: #2096f3 !important;
+}
+
+.navbar-compact .navbar-inner {
+  height: 48px;
+}
+
+.navbar-compact a {
+  font-size: 14px !important;
+}
+
+.navbar-compact .app-logo-img {
+  height: 26px;
+}
+
+.navbar-compact .admin-text {
+  font-size: 13px !important;
+}
+
 .user-info-container {
   margin-left: auto;
   display: flex;
   align-items: center;
-  padding-right: 10px;
 }
 
-.user-email-link {
-  color: white;
-  opacity: 90%;
+.user-menu-icon {
+  color: rgba(255, 255, 255, 0.85);
   cursor: pointer;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  font-size: 14px;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: white;
+  }
+}
+
+.user-info-header {
+  padding: 12px 20px !important;
+  margin-bottom: 4px;
 }
 
 .admin-block {
@@ -195,25 +251,21 @@
   display: inline-block;
 }
 
+.nav-active {
+  font-weight: bold !important;
+}
+
 .app-logo {
   display: flex;
   align-items: center;
   cursor: pointer;
-  margin-right: 24px;
+  margin-right: 10px;
   white-space: nowrap;
 }
 
 .app-logo-img {
   height: 32px;
-  margin-right: 10px;
   object-fit: contain;
-}
-
-.app-logo-text {
-  font-size: 16px;
-  font-weight: 600;
-  color: white;
-  letter-spacing: 0.3px;
 }
 
 .admin-dropdown {
@@ -229,7 +281,7 @@
   align-items: center;
 }
 
-@media (max-width: 1050px) {
+@media (max-width: 1150px) {
   .admin-inline {
     display: none !important;
   }

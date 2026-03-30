@@ -1,11 +1,13 @@
 <template>
   <div>
+    <v-row class="mt-4">
+      <v-col cols="12">
+        <h2 class="mb-4">Profile</h2>
+      </v-col>
+    </v-row>
     <v-row>
       <v-col cols="12" md="6">
         <v-card>
-          <v-card-title>
-            Profile
-          </v-card-title>
           <v-card-text>
             <div class="user-info mb-4">
               <p><strong>Email:</strong> {{ userEmail }}</p>

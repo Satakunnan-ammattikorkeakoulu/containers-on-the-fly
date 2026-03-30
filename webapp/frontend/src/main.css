@@ -26,16 +26,7 @@ body {
   padding: 18px !important;
 }
 
-/* Toolbar link styling */
-.v-toolbar a {
-  color: white !important;
-  margin: 0px 15px !important;
-  transition: 0.3s all ease;
-}
 
-.v-toolbar a:hover {
-  color: #2096f3 !important;
-}
 
 body .section {
   margin-bottom: 50px;

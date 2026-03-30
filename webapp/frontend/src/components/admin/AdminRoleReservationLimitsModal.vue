@@ -15,7 +15,7 @@
           <div class="text-body-2">
             <strong>Reservation Limits</strong> allow you to customize reservation duration and count limits for users with this role.
           </div>
-          <div class="mt-2 text-caption text-grey">
+          <div class="mt-2 text-caption" style="color: rgba(255, 255, 255, 0.75);">
             Note: Users will inherit the highest limits from all their assigned roles.
           </div>
         </v-alert>

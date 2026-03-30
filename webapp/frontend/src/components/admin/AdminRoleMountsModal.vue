@@ -23,7 +23,7 @@
               <li><code>&#123;userid&#125;</code> - User's database ID (e.g., "123")</li>
             </ul>
           </div>
-          <div class="mt-2 text-caption text-grey">
+          <div class="mt-2 text-caption" style="color: rgba(255, 255, 255, 0.75);">
             Example: <code>/data/users/&#123;email&#125;</code> → <code>/home/user/persistent</code>
           </div>
         </v-alert>

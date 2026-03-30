@@ -16,7 +16,7 @@
             <strong>Hardware Limits</strong> allow you to override the default hardware allocation limits for users with this role.
             Leave fields empty to use the computer's default limits.
           </div>
-          <div class="mt-2 text-caption text-grey">
+          <div class="mt-2 text-caption" style="color: rgba(255, 255, 255, 0.75);">
             Note: These limits override the computer's default user limits but cannot exceed the system maximum.
           </div>
         </v-alert>

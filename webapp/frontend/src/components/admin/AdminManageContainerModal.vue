@@ -161,7 +161,7 @@
             // Fail
             else {
               console.log("Failed saving "+_this.dataName+" information...")
-              _this.store.showMessage({ text: "There was an error saving "+_this.dataName+" information.", color: "red" })
+              _this.store.showMessage({ text: response.data.message || "There was an error saving "+_this.dataName+" information.", color: "red" })
             }
             _this.isSubmitting = false
         })

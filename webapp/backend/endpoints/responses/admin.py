@@ -107,12 +107,20 @@ def save_container(containerEdit : ContainerEdit) -> object:
   '''
 
   with Session() as session:
+    # Check for duplicate image name
+    new_image_name = containerEdit.data.get("imageName")
+    existing = session.execute(
+      select(Container).where(Container.imageName == new_image_name)
+    ).scalar_one_or_none()
+    if existing and existing.containerId != containerEdit.containerId:
+      return api_response(False, "A container with this image name already exists.")
+
     # If new, create a new container
     if containerEdit.containerId == -1:
       container = Container()
       container.public = containerEdit.data.get("public", False)
       container.name = containerEdit.data.get("name")
-      container.imageName = containerEdit.data.get("imageName")
+      container.imageName = new_image_name
       container.description = containerEdit.data.get("description", "")
       # Add ports
       for port in containerEdit.data.get("ports", []):
@@ -127,7 +135,7 @@ def save_container(containerEdit : ContainerEdit) -> object:
       else:
         container.public = containerEdit.data.get("public", False)
         container.name = containerEdit.data.get("name")
-        container.imageName = containerEdit.data.get("imageName")
+        container.imageName = new_image_name
         container.description = containerEdit.data.get("description", "")
         container.updatedAt = datetime.datetime.now(datetime.timezone.utc)
         # Remove all removable ports

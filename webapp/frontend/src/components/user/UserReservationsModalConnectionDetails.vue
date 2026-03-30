@@ -1,12 +1,139 @@
 <template>
   <div class="text-center">
-    <v-dialog v-model="isOpen" width="500">
+    <v-dialog v-model="isOpen" width="600">
       <v-card>
         <v-card-title class="text-h5 lighten-2 pt-6">
-          Connecting to Container
+          Connection Details
         </v-card-title>
 
-        <v-card-text v-html="text" v-if="!isLoading">
+        <v-card-text v-if="!isLoading && details">
+
+          <!-- SSH Connection -->
+          <div v-if="details.sshPort">
+            <div class="d-flex align-center mb-5 mt-2">
+              <v-icon class="mr-2" size="small">mdi-console</v-icon>
+              <span class="text-subtitle-1 font-weight-medium">SSH Connection</span>
+            </div>
+
+            <v-text-field
+              :model-value="vscodeConnectionString"
+              label="VS Code (Remote SSH)"
+              prepend-inner-icon="mdi-microsoft-visual-studio-code"
+              readonly
+              variant="outlined"
+              density="compact"
+              class="mb-2"
+            >
+              <template v-slot:append-inner>
+                <v-icon size="small" class="copy-icon" @click="copyToClipboard(vscodeConnectionString, 'VS Code connection string')">mdi-content-copy</v-icon>
+              </template>
+            </v-text-field>
+
+            <v-text-field
+              :model-value="sshCommand"
+              label="Terminal Command"
+              prepend-inner-icon="mdi-console"
+              readonly
+              variant="outlined"
+              density="compact"
+              class="mb-2"
+            >
+              <template v-slot:append-inner>
+                <v-icon size="small" class="copy-icon" @click="copyToClipboard(sshCommand, 'SSH command')">mdi-content-copy</v-icon>
+              </template>
+            </v-text-field>
+
+            <v-text-field
+              :model-value="details.sshPassword"
+              label="SSH Password"
+              prepend-inner-icon="mdi-key-variant"
+              readonly
+              variant="outlined"
+              density="compact"
+              class="mb-2"
+            >
+              <template v-slot:append-inner>
+                <v-icon size="small" class="copy-icon" @click="copyToClipboard(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
+              </template>
+            </v-text-field>
+          </div>
+
+          <!-- Other Services -->
+          <div v-if="hasOtherPorts">
+            <div class="d-flex align-center mb-5">
+              <v-icon class="mr-2" size="small">mdi-lan</v-icon>
+              <span class="text-subtitle-1 font-weight-medium">Other Services</span>
+            </div>
+
+            <v-text-field
+              v-for="port in details.otherPorts"
+              :key="port.serviceName"
+              :model-value="`${details.ip}:${port.outsidePort}`"
+              :label="port.serviceName"
+              prepend-inner-icon="mdi-open-in-new"
+              readonly
+              variant="outlined"
+              density="compact"
+              class="mb-2"
+            >
+              <template v-slot:append-inner>
+                <v-icon size="small" class="copy-icon" @click="copyToClipboard(`${details.ip}:${port.outsidePort}`, port.serviceName)">mdi-content-copy</v-icon>
+              </template>
+            </v-text-field>
+          </div>
+
+          <!-- Server Information -->
+          <div class="d-flex align-center mb-5 mt-4">
+            <v-icon class="mr-2" size="small">mdi-server</v-icon>
+            <span class="text-subtitle-1 font-weight-medium">Server Information</span>
+          </div>
+
+          <v-text-field
+            :model-value="details.ip"
+            label="IP Address"
+            prepend-inner-icon="mdi-ip-network"
+            readonly
+            variant="outlined"
+            density="compact"
+            class="mb-2"
+          >
+            <template v-slot:append-inner>
+              <v-icon size="small" class="copy-icon" @click="copyToClipboard(details.ip, 'IP address')">mdi-content-copy</v-icon>
+            </template>
+          </v-text-field>
+
+          <v-text-field
+            v-if="formattedEndDate"
+            :model-value="formattedEndDate"
+            label="Reservation Ends"
+            prepend-inner-icon="mdi-clock-outline"
+            readonly
+            variant="outlined"
+            density="compact"
+            class="mb-2"
+          ></v-text-field>
+
+          <!-- General Instructions -->
+          <div v-if="hasInstructions">
+            <div class="d-flex align-center mb-5 mt-4">
+              <v-icon class="mr-2" size="small">mdi-information-outline</v-icon>
+              <span class="text-subtitle-1 font-weight-medium">Instructions</span>
+            </div>
+
+            <v-textarea
+              :model-value="details.instructions"
+              readonly
+              variant="outlined"
+              density="compact"
+              rows="3"
+              auto-grow
+            ></v-textarea>
+          </div>
+
+        </v-card-text>
+
+        <!-- Fallback for legacy response without structured data -->
+        <v-card-text v-else-if="!isLoading && !details" v-html="connectionText">
         </v-card-text>
 
         <Loading style="margin: 60px 0px;" v-if="isLoading"></Loading>
@@ -26,6 +153,7 @@
   import Loading from '/src/components/global/Loading.vue';
   import axios from 'axios';
   import { useMainStore } from '@/store/store'
+  import { DisplayTime } from '/src/helpers/time.js'
 
   export default {
     components: {
@@ -44,31 +172,56 @@
     },
     data: () => ({
       isOpen: true,
-      text: "",
+      details: null,
+      connectionText: "",
       isLoading: true,
     }),
+    computed: {
+      vscodeConnectionString() {
+        if (!this.details || !this.details.sshPort) return null
+        return `user@${this.details.ip}:${this.details.sshPort}`
+      },
+      sshCommand() {
+        if (!this.details || !this.details.sshPort) return null
+        return `ssh user@${this.details.ip} -p ${this.details.sshPort}`
+      },
+      formattedEndDate() {
+        if (!this.details || !this.details.endDate) return null
+        return DisplayTime(this.details.endDate)
+      },
+      hasOtherPorts() {
+        return this.details && this.details.otherPorts && this.details.otherPorts.length > 0
+      },
+      hasInstructions() {
+        return this.details && this.details.instructions && this.details.instructions.trim().length > 0
+      }
+    },
+    methods: {
+      copyToClipboard(text, label) {
+        navigator.clipboard.writeText(text).then(() => {
+          this.store.showMessage({ text: `${label} copied to clipboard`, color: "green" })
+        }).catch(() => {
+          this.store.showMessage({ text: "Failed to copy to clipboard", color: "red" })
+        })
+      }
+    },
     mounted () {
-      let _this = this
       let currentUser = this.store.user
 
-      this.text = ""
-      if (this.reservationId != null) {
-        //console.log("Mounted and got res id: " + this.reservationId)
-      }
       axios({
           method: "get",
           url: this.$appSettings.APIServer.reservation.get_own_reservation_details,
           params: { "reservationId": this.reservationId },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
-        .then(function (response) {
-          //console.log(response)´
-          _this.text = response.data.data.connectionText
-          _this.isLoading = false
+        .then((response) => {
+          this.details = response.data.data.connectionDetails || null
+          this.connectionText = response.data.data.connectionText || ""
+          this.isLoading = false
         })
-        .catch(function (error) {
+        .catch((error) => {
           console.log(error)
-          _this.isLoading = false
+          this.isLoading = false
         });
     },
     watch: {
@@ -77,14 +230,16 @@
           this.$emit("emitModalClose");
         }
       },
-      reservationId: function() {
-        /*if (newVal !== this.reservationId) {
-          console.log("Reservation ID changed to: " + newVal)
-        }*/
-      },
     }
   }
 </script>
 
 <style scoped lang="scss">
+  .copy-icon {
+    cursor: pointer;
+    opacity: 0.6;
+    &:hover {
+      opacity: 1;
+    }
+  }
 </style>

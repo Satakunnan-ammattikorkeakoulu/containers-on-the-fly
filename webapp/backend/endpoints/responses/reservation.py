@@ -10,6 +10,7 @@ from docker import stop_container
 from endpoints.models.reservation import ReservationFilters
 from sqlalchemy import select, delete, func
 from sqlalchemy.orm import joinedload
+from settings_handler import get_setting
 
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
 # TODO: Should also be able to only fail there is not enough resources any computer. Right now it fails if any of the computers are out of resources for the given time period.
@@ -252,10 +253,11 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
       local_port = port.containerPort.port
       ports_for_email.append({ "serviceName": service_name, "localPort": local_port, "outsidePort": outside_port })
 
+    # Pass a copy of ports list — generate_connection_text mutates it by removing the SSH entry
     connection_text = get_email_container_started(
       reservation.reservedContainer.container.imageName,
       reservation.computer.ip,
-      ports_for_email,
+      list(ports_for_email),
       reservation.reservedContainer.sshPassword,
       False,
       "",
@@ -264,7 +266,31 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
 
     connection_text = connection_text.replace("\n", "<br>")
 
-  return api_response(True, "Details fetched.", { "connectionText": connection_text } )
+    # Build structured connection details for the frontend
+    ssh_port = None
+    other_ports = []
+    for port in ports_for_email:
+      if port["serviceName"] == "SSH":
+        ssh_port = port["outsidePort"]
+      else:
+        other_ports.append({ "serviceName": port["serviceName"], "outsidePort": port["outsidePort"] })
+
+    instructions = ""
+    try:
+      instructions = get_setting('instructions.email') or ""
+    except Exception:
+      pass
+
+    connection_details = {
+      "ip": reservation.computer.ip,
+      "sshPassword": reservation.reservedContainer.sshPassword,
+      "sshPort": ssh_port,
+      "otherPorts": other_ports,
+      "endDate": reservation.endDate.isoformat() if reservation.endDate else None,
+      "instructions": instructions,
+    }
+
+  return api_response(True, "Details fetched.", { "connectionText": connection_text, "connectionDetails": connection_details } )
 
 def get_current_reservations() -> object:
   reservations = []

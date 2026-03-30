@@ -116,6 +116,18 @@ async def extend_reservation(reservationId: str, duration : int, token: str = De
   userId = get_authenticated_user_id(token)
   return functionality.extend_reservation(userId, reservationId, duration)
 
+@router.post("/update_reservation_description")
+async def update_reservation_description(reservationId: str, description: str = "", token: str = Depends(oauth2_scheme)):
+  userId = get_authenticated_user_id(token)
+
+  # Validate and sanitize description
+  description = str(description).strip()
+  if len(description) > 50:
+    return api_response(False, "Description too long (max 50 characters).")
+  description = re.sub(r'[<>"\']', '', description)
+
+  return functionality.update_reservation_description(userId, reservationId, description)
+
 @router.post("/restart_container")
 async def restart_container(reservationId: str, token: str = Depends(oauth2_scheme)):
   userId = get_authenticated_user_id(token)

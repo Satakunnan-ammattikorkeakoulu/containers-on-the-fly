@@ -519,6 +519,35 @@ def cancel_reservation(userId : int, reservationId: str):
 
   return api_response(True, "Reservation cancelled.")
 
+def update_reservation_description(userId: int, reservationId: str, description: str):
+  """Updates the description of a reservation owned by the user.
+  Only allowed for reservations with status 'reserved' or 'started'.
+  Admins can update any reservation's description.
+
+  Args:
+    userId (int): The ID of the user making the request
+    reservationId (str): The ID of the reservation to update
+    description (str): The new description (already validated/sanitized by the endpoint)
+
+  Returns:
+    object: Response indicating success or failure
+  """
+  with Session() as session:
+    reservation = None
+    if is_admin(userId) == False:
+      reservation = session.execute(select(Reservation).where( Reservation.reservationId == reservationId, Reservation.userId == userId )).scalar_one_or_none()
+    else:
+      reservation = session.execute(select(Reservation).where( Reservation.reservationId == reservationId )).scalar_one_or_none()
+    if reservation is None: return api_response(False, "No reservation found.")
+
+    if reservation.status not in ("reserved", "started"):
+      return api_response(False, "Cannot edit description: reservation is not active.")
+
+    reservation.description = description if description else None
+    session.commit()
+
+  return api_response(True, "Description updated.")
+
 def extend_reservation(userId : int, reservationId: str, duration: int):
   # Check that user owns the given reservation and it can be found
   # Admins can extend any reservation

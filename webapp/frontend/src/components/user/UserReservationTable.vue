@@ -84,6 +84,9 @@
             <v-list-item v-if="item.status === 'started'" @click="emitShowReservationDetails(item.reservationId)">
               <v-list-item-title>Show Details</v-list-item-title>
             </v-list-item>
+            <v-list-item @click="emitEditDescription(item.reservationId, item.description)">
+              <v-list-item-title>Edit Description</v-list-item-title>
+            </v-list-item>
           </v-list>
         </v-menu>
       </template>
@@ -177,6 +180,9 @@
       },
       emitShowReservationDetails(reservationId) {
         this.$emit('emitShowReservationDetails', reservationId)
+      },
+      emitEditDescription(reservationId, currentDescription) {
+        this.$emit('emitEditDescription', reservationId, currentDescription)
       },
       getStatusColor(status) {
         if (status == "reserved") return "primary"

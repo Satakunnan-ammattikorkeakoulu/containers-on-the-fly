@@ -70,7 +70,7 @@
       <v-col cols="12">
         <v-slide-x-transition mode="out-in">
           <div v-if="reservations && reservations.length > 0" style="margin-top: 50px">
-            <UserReservationTable @emitCancelReservation="cancelReservation" @emitExtendReservation="extendReservation" @emitRestartContainer="restartContainer" @emitShowReservationDetails="showReservationDetails" v-bind:propReservations="reservations" />
+            <UserReservationTable @emitCancelReservation="cancelReservation" @emitExtendReservation="extendReservation" @emitRestartContainer="restartContainer" @emitShowReservationDetails="showReservationDetails" @emitEditDescription="editDescription" v-bind:propReservations="reservations" />
           </div>
           <p v-else class="dim text-center">No reservations found.</p>
         </v-slide-x-transition>
@@ -353,6 +353,54 @@
               _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.restartingContainer = false
+        });
+      },
+      editDescription(reservationId, currentDescription) {
+        let newDescription = prompt("Enter a new description (max 50 characters):", currentDescription || "");
+        if (newDescription === null) return;
+
+        if (newDescription.length > 50) {
+          this.store.showMessage({ text: "Description is too long (max 50 characters).", color: "red" })
+          return;
+        }
+
+        let params = {
+          "reservationId": reservationId,
+          "description": newDescription
+        }
+
+        let _this = this
+        let currentUser = this.store.user
+
+        axios({
+          method: "post",
+          url: this.$appSettings.APIServer.reservation.update_reservation_description,
+          params: params,
+          headers: {
+            "Authorization" : `Bearer ${currentUser.loginToken}`
+          }
+        })
+        .then(function (response) {
+            // Success
+            if (response.data.status == true) {
+              _this.store.showMessage({ text: "Description updated.", color: "green" })
+              _this.fetchReservations()
+            }
+            // Fail
+            else {
+              let msg = response && response.data && response.data.message ? response.data.message : "There was an error updating the description."
+              _this.store.showMessage({ text: msg, color: "red" })
+            }
+        })
+        .catch(function (error) {
+            // Error
+            if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
+            }
+            else {
+              console.log(error)
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
+            }
         });
       },
       showReservationDetails(reservationId) {

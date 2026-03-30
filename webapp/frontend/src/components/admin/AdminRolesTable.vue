@@ -30,18 +30,24 @@
           </template>
           <v-list density="compact">
             <v-list-item v-if="!isBuiltInRole(item.name)" @click="emitEditRole(item.roleId)">
+              <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
               <v-list-item-title>Edit Name</v-list-item-title>
             </v-list-item>
             <v-list-item @click="emitManageMounts(item)">
+              <template v-slot:prepend><v-icon size="small">mdi-folder-outline</v-icon></template>
               <v-list-item-title>Mounts</v-list-item-title>
             </v-list-item>
             <v-list-item @click="emitManageReservationLimits(item)">
+              <template v-slot:prepend><v-icon size="small">mdi-clock-outline</v-icon></template>
               <v-list-item-title>Reservation Limits</v-list-item-title>
             </v-list-item>
             <v-list-item v-if="!isBuiltInRole(item.name)" @click="emitManageHardwareLimits(item)">
+              <template v-slot:prepend><v-icon size="small">mdi-memory</v-icon></template>
               <v-list-item-title>Hardware Limits</v-list-item-title>
             </v-list-item>
-            <v-list-item v-if="!isBuiltInRole(item.name)" @click="emitRemoveRole(item.roleId)">
+            <v-divider v-if="!isBuiltInRole(item.name)" class="my-1" />
+            <v-list-item v-if="!isBuiltInRole(item.name)" @click="emitRemoveRole(item.roleId)" class="destructive-action">
+              <template v-slot:prepend><v-icon size="small">mdi-delete-outline</v-icon></template>
               <v-list-item-title>Remove Role</v-list-item-title>
             </v-list-item>
           </v-list>
@@ -133,6 +139,11 @@ export default {
   &:hover {
     text-decoration: underline;
   }
+}
+
+.destructive-action .v-list-item-title,
+.destructive-action .v-icon {
+  color: #ef5350;
 }
 .role-description {
   color: #666;

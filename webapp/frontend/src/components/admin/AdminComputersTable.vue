@@ -62,12 +62,16 @@
           </template>
           <v-list density="compact">
             <v-list-item @click="toggleExpand(item)">
+              <template v-slot:prepend><v-icon size="small">mdi-chart-line</v-icon></template>
               <v-list-item-title>{{ isExpanded(item) ? 'Hide' : 'Show' }} Monitoring</v-list-item-title>
             </v-list-item>
             <v-list-item @click="emitEditComputer(item.computerId)">
+              <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
               <v-list-item-title>Edit Computer</v-list-item-title>
             </v-list-item>
-            <v-list-item @click="emitRemoveComputer(item.computerId)">
+            <v-divider class="my-1" />
+            <v-list-item @click="emitRemoveComputer(item.computerId)" class="destructive-action">
+              <template v-slot:prepend><v-icon size="small">mdi-delete-outline</v-icon></template>
               <v-list-item-title>Remove Computer</v-list-item-title>
             </v-list-item>
           </v-list>
@@ -575,6 +579,11 @@
     &:hover {
       text-decoration: underline;
     }
+  }
+
+  .destructive-action .v-list-item-title,
+  .destructive-action .v-icon {
+    color: #ef5350;
   }
 
   .link-toggle-read-all {

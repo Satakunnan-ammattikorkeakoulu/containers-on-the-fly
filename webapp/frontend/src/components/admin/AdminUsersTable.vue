@@ -17,6 +17,7 @@
           </template>
           <v-list density="compact">
             <v-list-item @click="emitEditUser(item.userId)">
+              <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
               <v-list-item-title>Edit User</v-list-item-title>
             </v-list-item>
           </v-list>

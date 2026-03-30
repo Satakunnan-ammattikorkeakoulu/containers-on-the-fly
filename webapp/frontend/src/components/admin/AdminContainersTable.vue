@@ -38,9 +38,12 @@
           </template>
           <v-list density="compact">
             <v-list-item @click="emitEditContainer(item.containerId)">
+              <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
               <v-list-item-title>Edit Container</v-list-item-title>
             </v-list-item>
-            <v-list-item @click="emitRemoveContainer(item.containerId)">
+            <v-divider class="my-1" />
+            <v-list-item @click="emitRemoveContainer(item.containerId)" class="destructive-action">
+              <template v-slot:prepend><v-icon size="small">mdi-delete-outline</v-icon></template>
               <v-list-item-title>Remove Container</v-list-item-title>
             </v-list-item>
           </v-list>
@@ -122,6 +125,11 @@
     &:hover {
       text-decoration: underline;
     }
+  }
+
+  .destructive-action .v-list-item-title,
+  .destructive-action .v-icon {
+    color: #ef5350;
   }
 
   .link-toggle-read-all {

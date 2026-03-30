@@ -258,6 +258,8 @@ export default {
 
 .help-text {
   margin-top: -7px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .roles-container {

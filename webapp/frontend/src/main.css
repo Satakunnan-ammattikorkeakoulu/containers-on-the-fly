@@ -32,6 +32,12 @@ body .section {
   margin-bottom: 50px;
 }
 
+/* Vuetify 4 data table row padding */
+.v-data-table tbody tr td {
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+
 /* Vuetify 4 data table hover */
 .v-data-table tbody tr:hover {
   background: #181818 !important;
@@ -132,4 +138,9 @@ a,
 
 .mb-40 {
   margin-bottom: 40px;
+}
+
+.v-container .title {
+  margin-top: 0px !important;
+  margin-bottom: 0px;
 }

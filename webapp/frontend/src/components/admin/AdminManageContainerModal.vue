@@ -31,8 +31,8 @@
               </v-col>
               <!-- PORTS -->
               <v-col cols="12">
-                <h2 style="margin-top: 40px; margin-bottom: 10px;">Ports</h2>
-                <p style="margin-bottom: 20px;">Local ports of the container that will be bound to random outside ports.</p>
+                <h2 style="margin-top: 20px; margin-bottom: 3px;">Ports</h2>
+                <p style="margin-bottom: 20px; margin-top: 0px;">Local ports of the container that will be bound to random outside ports.</p>
                 <v-row>
                   <!-- Loop through all ports and add them here one by one -->
                   <v-col cols="12" v-for="(port, index) in data.ports" :key="index">
@@ -232,6 +232,8 @@
 
   .help-text {
     margin-top: -7px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
   }
 
 </style>

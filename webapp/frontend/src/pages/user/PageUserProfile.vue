@@ -2,21 +2,22 @@
   <div>
     <v-row class="mt-4">
       <v-col cols="12">
-        <h2 class="mb-4">Profile</h2>
+        <h2 class="mb-0">Profile</h2>
+      </v-col>
+    </v-row>
+    <v-row>
+      <v-col cols="12">
+        <div class="user-info mb-4">
+          <p class="mt-0"><strong>Email:</strong> {{ userEmail }}</p>
+          <p><strong>Member since:</strong> {{ userCreatedAt }}</p>
+          <p v-if="userRoles.length > 0"><strong>Roles:</strong> {{ userRoles.join(', ') }}</p>
+        </div>
       </v-col>
     </v-row>
     <v-row>
       <v-col cols="12" md="6">
         <v-card>
           <v-card-text>
-            <div class="user-info mb-4">
-              <p><strong>Email:</strong> {{ userEmail }}</p>
-              <p><strong>Member since:</strong> {{ userCreatedAt }}</p>
-              <p v-if="userRoles.length > 0"><strong>Roles:</strong> {{ userRoles.join(', ') }}</p>
-            </div>
-            
-            <v-divider class="my-4"></v-divider>
-            
             <div class="password-section">
               <h3 class="subtitle-1 mb-3">Change Password</h3>
               

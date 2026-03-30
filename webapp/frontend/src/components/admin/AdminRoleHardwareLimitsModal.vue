@@ -79,7 +79,6 @@
                             hide-details
                             class="flex-grow-1 mr-2"
                             style="max-width: 300px;"
-                            @input="handleInputChange(computer.computerId, spec.hardwareSpecId, $event)"
                           >
                             <template v-slot:append>
                               <v-tooltip bottom>
@@ -299,14 +298,6 @@ export default {
       // For other hardware types, use the regular maximumAmount
       return spec.maximumAmount;
     },
-    handleInputChange(computerId, hardwareSpecId, value) {
-      // Convert empty string to null
-      if (value === '' || value === null || value === undefined) {
-        this.hardwareLimits[computerId][hardwareSpecId].maximum = null;
-      } else {
-        this.hardwareLimits[computerId][hardwareSpecId].maximum = parseInt(value);
-      }
-    }
   }
 }
 </script>

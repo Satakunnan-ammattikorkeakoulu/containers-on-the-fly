@@ -6,7 +6,8 @@
           <img :src="frontBgImg" class="app-logo-img" alt="Logo" />
         </div>
         <a @click="reservations">Reservations</a>
-        <div class="admin-block" v-if="isAdmin">
+        <!-- Admin links: inline on wide screens -->
+        <div class="admin-block admin-inline" v-if="isAdmin">
           <p class="admin-text">Admin</p>
           <a href="/admin/general">General</a>
           <a href="/admin/reservations">Reservations</a>
@@ -14,6 +15,22 @@
           <a href="/admin/roles">Roles</a>
           <a href="/admin/computers">Computers</a>
           <a href="/admin/containers">Containers</a>
+        </div>
+        <!-- Admin links: dropdown on narrow screens -->
+        <div class="admin-dropdown" v-if="isAdmin">
+          <v-menu offset-y>
+            <template v-slot:activator="{ props }">
+              <span class="admin-dropdown-trigger" v-bind="props">Admin <v-icon size="small">mdi-chevron-down</v-icon></span>
+            </template>
+            <v-list>
+              <v-list-item href="/admin/general"><v-list-item-title>General</v-list-item-title></v-list-item>
+              <v-list-item href="/admin/reservations"><v-list-item-title>Reservations</v-list-item-title></v-list-item>
+              <v-list-item href="/admin/users"><v-list-item-title>Users</v-list-item-title></v-list-item>
+              <v-list-item href="/admin/roles"><v-list-item-title>Roles</v-list-item-title></v-list-item>
+              <v-list-item href="/admin/computers"><v-list-item-title>Computers</v-list-item-title></v-list-item>
+              <v-list-item href="/admin/containers"><v-list-item-title>Containers</v-list-item-title></v-list-item>
+            </v-list>
+          </v-menu>
         </div>
         <div class="user-info-container" v-if="isLoggedIn == true">
           <v-menu offset-y open-on-hover>
@@ -197,5 +214,28 @@
   font-weight: 600;
   color: white;
   letter-spacing: 0.3px;
+}
+
+.admin-dropdown {
+  display: none;
+  margin-left: 20px;
+}
+
+.admin-dropdown-trigger {
+  color: white;
+  cursor: pointer;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 1050px) {
+  .admin-inline {
+    display: none !important;
+  }
+
+  .admin-dropdown {
+    display: block;
+  }
 }
 </style>

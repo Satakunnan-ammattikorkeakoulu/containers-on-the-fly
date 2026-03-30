@@ -1,5 +1,5 @@
 <template>
-  <v-form ref="form">
+  <v-form ref="form" v-model="formValid">
     <v-dialog v-model="isOpen" persistent max-width="900px">
       <v-card>
         <v-card-text v-if="item">
@@ -69,7 +69,7 @@
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn color="red" variant="text" @click="closeDialog">Cancel</v-btn>
-          <v-btn color="blue" variant="text" @click="submit" :disabled="isSubmitting">
+          <v-btn color="blue" variant="text" @click="submit" :disabled="isSubmitting || !formValid">
             <span v-if="isCreatingNew">Add User</span>
             <span v-else>Save User</span>
           </v-btn>
@@ -97,6 +97,7 @@ export default {
       item: this.propData,
       data: { roles: [] },
       availableRoles: [],
+      formValid: false,
       isCreatingNew: false,
       isOpen: true,
       isFetching: true,

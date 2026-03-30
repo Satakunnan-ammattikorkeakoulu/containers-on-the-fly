@@ -40,7 +40,7 @@
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
-                      <v-select
+                      <v-autocomplete
                         v-model="settings.general.timezone"
                         :items="timezoneOptions"
                         label="System Timezone"
@@ -48,18 +48,14 @@
                         required
                         :rules="[rules.required]"
                         hide-details
-                        v-model:search="timezoneSearch"
                         item-title="label"
                         item-value="value"
-                        filterable
                       >
-                        <template v-slot:item="{ item }">
-                          <div>
-                            <div class="font-weight-medium">{{ item.value }}</div>
-                            <div class="caption text-grey">{{ item.description }}</div>
-                          </div>
+                        <template v-slot:item="{ item, props }">
+                          <v-list-item v-bind="props" :subtitle="item.raw?.description || ''">
+                          </v-list-item>
                         </template>
-                      </v-select>
+                      </v-autocomplete>
                     </v-col>
                   </v-row>
                 </div>

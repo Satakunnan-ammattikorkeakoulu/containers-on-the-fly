@@ -1,7 +1,7 @@
 """
 Entry point shim for the Docker utility daemon.
 
-This file is referenced by pm2 (Makefile line 468) as "backendDockerUtil".
+Started by pm2 as "backendDockerUtil" (see Makefile start-docker-utility target).
 All logic lives in docker/daemon.py.
 """
 

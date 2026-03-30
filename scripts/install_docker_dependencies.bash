@@ -257,22 +257,32 @@ echo "Starting private (local) docker registry (only on main server)"
 IS_MAIN_SERVER=$(cat "${CURRENT_DIR}/.server_type" 2>/dev/null || echo "false")
 if [ "$IS_MAIN_SERVER" = "true" ]; then
     echo "This is main server, starting private (local) docker registry..."
+    REGISTRY_OK=true
     if [ ! "$(sudo -u $CURRENT_USER docker ps -q -f name=registry)" ]; then
         if [ "$(sudo -u $CURRENT_USER docker ps -aq -f status=exited -f name=registry)" ]; then
             # Cleanup any exited registry container
             sudo -u $CURRENT_USER docker rm registry
         fi
         # Start the Docker registry container
-        sudo -u $CURRENT_USER docker run -d -p ${DOCKER_REGISTRY_PORT}:5000 --restart=always --name registry registry:2
+        if ! sudo -u $CURRENT_USER docker run -d -p ${DOCKER_REGISTRY_PORT}:5000 --restart=always --name registry registry:2; then
+            echo -e "${RED}Warning: Could not start Docker registry container.${RESET}"
+            echo "This can happen when running inside a Docker container (Docker-in-Docker)."
+            echo "The registry can be started manually later. Continuing with setup..."
+            REGISTRY_OK=false
+        fi
     fi
 
-    # Wait a moment for registry to start
-    echo "Waiting for registry to be ready..."
-    sleep 5
+    if [ "$REGISTRY_OK" = "true" ]; then
+        # Wait a moment for registry to start
+        echo "Waiting for registry to be ready..."
+        sleep 5
 
-    # Build base-ubuntu image to be used as an example with default setup
-    sudo -u $CURRENT_USER docker build -t $INSECURE_REGISTRY/ubuntu-base:latest -f DockerfileContainerExample .
-    sudo -u $CURRENT_USER docker push $INSECURE_REGISTRY/ubuntu-base:latest
+        # Build base-ubuntu image to be used as an example with default setup
+        sudo -u $CURRENT_USER docker build -t $INSECURE_REGISTRY/ubuntu-base:latest -f DockerfileContainerExample . || \
+            echo -e "${RED}Warning: Could not build base image. You can build it manually later.${RESET}"
+        sudo -u $CURRENT_USER docker push $INSECURE_REGISTRY/ubuntu-base:latest || \
+            echo -e "${RED}Warning: Could not push base image to registry. You can push it manually later.${RESET}"
+    fi
 else
     echo "Container server detected - skipping Docker registry setup (will connect to main server registry)"
 fi

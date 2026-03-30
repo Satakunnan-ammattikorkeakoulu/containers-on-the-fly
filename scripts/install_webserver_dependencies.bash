@@ -21,11 +21,16 @@ fi
 
 echo "Running with sudo privileges."
 
+# Always refresh Caddy GPG key and repository source to prevent expired key errors
+echo "Refreshing Caddy repository GPG key..."
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+
 # Update and install initial packages
 sudo apt update -qq
 
 # Install required libraries
-sudo apt --assume-yes -qq install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev acl
+sudo apt --assume-yes -qq install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev acl debian-keyring debian-archive-keyring apt-transport-https
 sudo apt --assume-yes -qq install python3-ldap
 
 # Create containerfly group if it doesn't exist
@@ -37,25 +42,11 @@ else
     echo -e "${GREEN}Group 'containerfly' already exists.${RESET}"
 fi
 
-# Function to check if Caddy is installed
-check_caddy_installed() {
-    if command -v caddy >/dev/null 2>&1; then
-        echo -e "${GREEN}Caddy is already installed.${RESET}"
-        return 0
-    else
-        echo "Caddy is not installed."
-        return 1
-    fi
-}
-
-# Function to install Caddy
-install_caddy() {
+# Install Caddy if not already installed
+if command -v caddy >/dev/null 2>&1; then
+    echo -e "${GREEN}Caddy is already installed.${RESET}"
+else
     echo "Installing Caddy..."
-    
-    # Install Caddy from official repository
-    sudo apt install -y -qq debian-keyring debian-archive-keyring apt-transport-https
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
     sudo apt update -qq
     sudo apt install -y -qq caddy
 
@@ -65,12 +56,6 @@ install_caddy() {
         echo -e "${RED}Failed to install Caddy.${RESET}"
         exit 1
     fi
-}
-
-# Check if Caddy is installed
-check_caddy_installed
-if [ $? -ne 0 ]; then
-    install_caddy
 fi
 
 CADDYFILE_PATH="$CURRENT_DIR/user_config/Caddyfile"

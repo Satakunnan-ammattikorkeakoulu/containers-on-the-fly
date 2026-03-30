@@ -13,7 +13,7 @@ The application follows a multi-component architecture:
 - **Frontend**: Vue.js 2 + Vuetify UI framework (`webapp/frontend/`)
 - **Backend**: Python 3 + FastAPI + SQLAlchemy ORM (`webapp/backend/`)
 - **Database**: MariaDB with Alembic migrations
-- **Container Management**: Docker + custom Python utility (`dockerUtil.py`)
+- **Container Management**: Docker + custom Python utility (`docker_utility.py`)
 - **Reverse Proxy**: Caddy with automatic HTTPS
 - **Process Management**: pm2 for production deployment
 - **Build System**: Make-based automation with comprehensive setup scripts
@@ -59,7 +59,7 @@ npm run production     # Production mode serve
 ```bash
 cd webapp/backend
 python main.py         # Start FastAPI server
-python dockerUtil.py   # Start Docker container utility
+python docker_utility.py   # Start Docker container utility
 alembic upgrade head   # Apply database migrations
 ```
 
@@ -169,7 +169,6 @@ fix: Fix group removal logic to not break on empty usernames
 - **Functions, methods, variables, parameters**: `snake_case` (e.g., `get_roles()`, `computer_id`)
 - **Classes**: `PascalCase` (e.g., `Reservation`, `UnifiedSettings`)
 - **Exception — database layer stays camelCase**: SQLAlchemy column attributes (e.g., `userId`, `computerId`), relationship names (e.g., `reservedContainer`), `__tablename__` values, API response JSON field names, Pydantic request model fields, and settings keys (e.g., `docker.serverName`) all remain camelCase because they are part of the API contract with the frontend.
-- **Exception — `dockerUtil.py` keeps its name**: This file is referenced by pm2 on all deployed systems. Renaming it would break existing installations.
 
 ### AI Workflow Rules
 

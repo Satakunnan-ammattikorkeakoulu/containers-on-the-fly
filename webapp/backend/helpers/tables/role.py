@@ -66,6 +66,9 @@ def validate_role_name(name: str) -> tuple[bool, str]:
     Returns:
         tuple[bool, str]: (is_valid, error_message)
     '''
+    if not name or not name.strip():
+        return False, "Role name is required"
+
     # Check for reserved names (case insensitive)
     reserved_names = ["admin", "everyone"]
     if name.lower() in reserved_names:

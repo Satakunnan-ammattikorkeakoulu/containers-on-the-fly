@@ -3,7 +3,7 @@
     <v-col>
       <v-sheet height="64">
         <v-toolbar flat>
-          <v-btn variant="outlined" class="mr-4" color="grey darken-2" @click="setToday">
+          <v-btn variant="flat" class="mr-4" color="#424242" @click="setToday">
             Today
           </v-btn>
           <v-btn fab variant="text" size="small" color="grey darken-2" @click="prev">
@@ -30,19 +30,21 @@
             mandatory
             dense
             class="ma-2 availability-toggle"
+            color="primary"
           >
-            <v-btn size="small" value="reservations">
+            <v-btn size="small" value="reservations" variant="flat" :color="viewMode === 'reservations' ? 'primary' : '#424242'">
               <v-icon size="small">mdi-calendar-clock</v-icon>
               Reservations
             </v-btn>
-            <v-btn size="small" value="availability">
+            <v-btn size="small" value="availability" variant="flat" :color="viewMode === 'availability' ? 'primary' : '#424242'">
               <v-icon size="small">mdi-server</v-icon>
               Availability
             </v-btn>
           </v-btn-toggle>
           <v-btn
             size="small"
-            variant="outlined"
+            variant="flat"
+            color="#424242"
             class="ma-2"
             @click="refreshCalendarData"
           >
@@ -495,8 +497,10 @@
 }
 
 .availability-toggle {
-  .v-btn--active {
-    background-color: primary !important;
+  border: none !important;
+  height: auto !important;
+  .v-btn {
+    height: 32px !important;
   }
 }
 

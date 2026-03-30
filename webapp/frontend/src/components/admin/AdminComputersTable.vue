@@ -6,8 +6,7 @@
       :items="data"
       :sort-by="[{key: 'computerId', order: 'desc'}]"
       v-model:expanded="expanded"
-      single-expand
-      item-key="computerId"
+      item-value="computerId"
       class="elevation-1">
 
       <!-- Status Badge -->
@@ -51,8 +50,8 @@
       </template>
 
       <!-- Expanded content -->
-      <template v-slot:expanded-item="{ headers, item }">
-        <td :colspan="headers.length" class="pa-0">
+      <template v-slot:expanded-row="{ columns, item }">
+        <td :colspan="columns.length" class="pa-0">
           <v-card flat class="ma-4">
             <v-card-title class="headline">
               <v-icon class="mr-2">mdi-monitor-eye</v-icon>
@@ -434,16 +433,16 @@
         return DisplayTime(timestamp)
       },
       toggleExpand(item) {
-        const index = this.expanded.findIndex(i => i.computerId === item.computerId);
+        const index = this.expanded.indexOf(item.computerId);
         if (index >= 0) {
           this.expanded.splice(index, 1);
         } else {
-          this.expanded = [item]; // Single expand mode
+          this.expanded = [item.computerId]; // Single expand mode
           this.fetchMonitoringData(item.computerId);
         }
       },
       isExpanded(item) {
-        return this.expanded.some(i => i.computerId === item.computerId);
+        return this.expanded.includes(item.computerId);
       },
       fetchMonitoringData(computerId) {
         this.$emit('emitFetchMonitoring', computerId);

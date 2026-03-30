@@ -1,7 +1,7 @@
 <template>
   <v-dialog v-model="isOpen" persistent max-width="800px">
     <v-card>
-      <v-card-title>
+      <v-card-title class="pt-6">
         <span class="headline">Reservation Limits - {{ roleName }}</span>
       </v-card-title>
       

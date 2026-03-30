@@ -1,7 +1,7 @@
 <template>
   <v-dialog v-model="isOpen" persistent max-width="1200px">
     <v-card>
-      <v-card-title>
+      <v-card-title class="pt-6">
         <span class="headline">Hardware Limits - {{ roleName }}</span>
       </v-card-title>
       

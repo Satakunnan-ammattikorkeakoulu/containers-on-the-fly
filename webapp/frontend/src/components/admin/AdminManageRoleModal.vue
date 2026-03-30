@@ -1,11 +1,27 @@
 <template>
   <v-dialog v-model="isOpen" persistent max-width="500px">
     <v-card>
-      <v-card-title>
+      <v-card-title class="pt-6">
         <span class="headline">{{ modalTitle }}</span>
       </v-card-title>
       <v-card-text>
         <v-container>
+          <v-alert
+            v-if="isCreatingNew"
+            variant="outlined"
+            color="info"
+            class="mb-4"
+          >
+            <div class="text-body-2">
+              Roles define what users can do when reserving containers. After creating a role, you can configure:
+              <ul class="mt-1" style="padding-left: 20px;">
+                <li><strong>Hardware Limits</strong> — maximum GPUs, CPUs, and other resources users can request</li>
+                <li><strong>Reservation Limits</strong> — minimum/maximum duration and how many active reservations are allowed</li>
+                <li><strong>Mounts</strong> — host folders automatically mounted into user containers</li>
+              </ul>
+              <div class="mt-1">Users can have multiple roles and will inherit the most permissive limits across all their assigned roles.</div>
+            </div>
+          </v-alert>
           <v-form ref="form" v-model="isValid">
             <v-row>
               <v-col cols="12">

@@ -1,7 +1,10 @@
 <template>
   <div v-if="!isInitializing">
     <v-app v-if="isLoggedIn">
-      <v-app-bar app elevation="4">
+      <v-app-bar app elevation="4" class="px-8">
+        <div class="app-logo" @click="reservations">
+          <img :src="frontBgImg" class="app-logo-img" alt="Logo" />
+        </div>
         <a @click="reservations">Reservations</a>
         <div class="admin-block" v-if="isAdmin">
           <p class="admin-text">Admin</p>
@@ -61,6 +64,7 @@
 <script>
   import Snackbar from '/src/components/global/Snackbar.vue';
   import { useMainStore } from '@/store/store'
+  import frontBgImg from '/src/assets/images/front_bg.png'
 
   export default {
     name: 'LayoutApp',
@@ -73,6 +77,7 @@
     },
     data: () => ({
       show: true,
+      frontBgImg,
     }),
     mounted() {
       if (!this.isInitializing) {
@@ -115,6 +120,9 @@
       userRoles() {
         if (!this.store.user) return []
         return this.store.user.roles || []
+      },
+      appName() {
+        return this.store.appName
       },
     },
     beforeRouteUpdate(to, from, next) {
@@ -168,5 +176,26 @@
 
 .admin-block > * {
   display: inline-block;
+}
+
+.app-logo {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  margin-right: 24px;
+  white-space: nowrap;
+}
+
+.app-logo-img {
+  height: 32px;
+  margin-right: 10px;
+  object-fit: contain;
+}
+
+.app-logo-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.3px;
 }
 </style>

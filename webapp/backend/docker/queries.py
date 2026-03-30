@@ -1,6 +1,7 @@
 from python_on_whales import docker
 from database import Session, Reservation, Computer
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 import datetime
 from datetime import timezone
 
@@ -40,7 +41,9 @@ def get_running_reservations(computer_id: int):
   '''
   with Session() as session:
     reservations = session.execute(
-      select(Reservation).where(
+      select(Reservation).options(
+        joinedload(Reservation.reservedContainer)
+      ).where(
         Reservation.status == "started",
         Reservation.startDate < time_now(),
         Reservation.computerId == computer_id,

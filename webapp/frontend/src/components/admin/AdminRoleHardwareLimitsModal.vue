@@ -90,14 +90,6 @@
                               </v-tooltip>
                             </template>
                           </v-text-field>
-                          <v-btn
-                            icon
-                            size="small"
-                            @click="resetHardwareLimit(computer.computerId, spec.hardwareSpecId)"
-                            :disabled="!hasCustomLimit(computer.computerId, spec.hardwareSpecId)"
-                          >
-                            <v-icon size="small">mdi-restore</v-icon>
-                          </v-btn>
                         </div>
                       </div>
                     </v-col>
@@ -272,17 +264,6 @@ export default {
       const limits = this.hardwareLimits[computerId];
       if (!limits) return false;
       return Object.values(limits).some(limit => limit.maximum !== null);
-    },
-    hasCustomLimit(computerId, hardwareSpecId) {
-      const limit = this.hardwareLimits[computerId]?.[hardwareSpecId];
-      return limit && limit.maximum !== null;
-    },
-    resetHardwareLimit(computerId, hardwareSpecId) {
-      if (this.hardwareLimits[computerId] && this.hardwareLimits[computerId][hardwareSpecId]) {
-        this.hardwareLimits[computerId][hardwareSpecId] = {
-          maximum: null
-        };
-      }
     },
     formatHardwareLimitsForBackend() {
       const formattedLimits = [];

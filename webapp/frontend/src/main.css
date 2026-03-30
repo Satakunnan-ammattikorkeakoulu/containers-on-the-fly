@@ -144,3 +144,12 @@ a,
   margin-top: 0px !important;
   margin-bottom: 0px;
 }
+
+/* Vuetify 4: alert font size and hide icon */
+.v-alert {
+  font-size: 0.95rem;
+}
+
+.v-alert__prepend {
+  display: none;
+}

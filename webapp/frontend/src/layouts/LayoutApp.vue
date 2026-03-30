@@ -10,12 +10,12 @@
           <!-- Admin links: inline on wide screens -->
           <div class="admin-block admin-inline" v-if="isAdmin">
             <p class="admin-text">Admin</p>
-            <a href="/admin/general" :class="{ 'nav-active': $route.path === '/admin/general' }">General</a>
-            <a href="/admin/reservations" :class="{ 'nav-active': $route.path === '/admin/reservations' }">Reservations</a>
-            <a href="/admin/users" :class="{ 'nav-active': $route.path === '/admin/users' }">Users</a>
-            <a href="/admin/roles" :class="{ 'nav-active': $route.path === '/admin/roles' }">Roles</a>
-            <a href="/admin/computers" :class="{ 'nav-active': $route.path === '/admin/computers' }">Computers</a>
-            <a href="/admin/containers" :class="{ 'nav-active': $route.path === '/admin/containers' }">Containers</a>
+            <router-link to="/admin/general" :class="{ 'nav-active': $route.path === '/admin/general' }">General</router-link>
+            <router-link to="/admin/reservations" :class="{ 'nav-active': $route.path === '/admin/reservations' }">Reservations</router-link>
+            <router-link to="/admin/users" :class="{ 'nav-active': $route.path === '/admin/users' }">Users</router-link>
+            <router-link to="/admin/roles" :class="{ 'nav-active': $route.path === '/admin/roles' }">Roles</router-link>
+            <router-link to="/admin/computers" :class="{ 'nav-active': $route.path === '/admin/computers' }">Computers</router-link>
+            <router-link to="/admin/containers" :class="{ 'nav-active': $route.path === '/admin/containers' }">Containers</router-link>
           </div>
           <!-- Admin links: dropdown on narrow screens -->
           <div class="admin-dropdown" v-if="isAdmin">
@@ -24,12 +24,12 @@
                 <span class="admin-dropdown-trigger" v-bind="props">Admin <v-icon size="small">mdi-chevron-down</v-icon></span>
               </template>
               <v-list>
-                <v-list-item href="/admin/general"><v-list-item-title>General</v-list-item-title></v-list-item>
-                <v-list-item href="/admin/reservations"><v-list-item-title>Reservations</v-list-item-title></v-list-item>
-                <v-list-item href="/admin/users"><v-list-item-title>Users</v-list-item-title></v-list-item>
-                <v-list-item href="/admin/roles"><v-list-item-title>Roles</v-list-item-title></v-list-item>
-                <v-list-item href="/admin/computers"><v-list-item-title>Computers</v-list-item-title></v-list-item>
-                <v-list-item href="/admin/containers"><v-list-item-title>Containers</v-list-item-title></v-list-item>
+                <v-list-item :to="'/admin/general'"><v-list-item-title>General</v-list-item-title></v-list-item>
+                <v-list-item :to="'/admin/reservations'"><v-list-item-title>Reservations</v-list-item-title></v-list-item>
+                <v-list-item :to="'/admin/users'"><v-list-item-title>Users</v-list-item-title></v-list-item>
+                <v-list-item :to="'/admin/roles'"><v-list-item-title>Roles</v-list-item-title></v-list-item>
+                <v-list-item :to="'/admin/computers'"><v-list-item-title>Computers</v-list-item-title></v-list-item>
+                <v-list-item :to="'/admin/containers'"><v-list-item-title>Containers</v-list-item-title></v-list-item>
               </v-list>
             </v-menu>
           </div>

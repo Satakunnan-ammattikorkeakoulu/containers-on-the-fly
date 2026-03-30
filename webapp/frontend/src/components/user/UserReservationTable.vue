@@ -72,20 +72,26 @@
             </a>
           </template>
           <v-list density="compact">
-            <v-list-item @click="emitCancelReservation(item.reservationId)">
-              <v-list-item-title>Cancel Reservation</v-list-item-title>
-            </v-list-item>
-            <v-list-item v-if="item.status === 'started' && lessHoursThan(new Date(item.endDate), 24)" @click="emitExtendReservation(item.reservationId)">
-              <v-list-item-title>Extend Reservation</v-list-item-title>
-            </v-list-item>
-            <v-list-item v-if="item.status === 'started'" @click="emitRestartContainer(item.reservationId)">
-              <v-list-item-title>Restart Container</v-list-item-title>
-            </v-list-item>
             <v-list-item v-if="item.status === 'started'" @click="emitShowReservationDetails(item.reservationId)">
+              <template v-slot:prepend><v-icon size="small">mdi-information-outline</v-icon></template>
               <v-list-item-title>Show Details</v-list-item-title>
             </v-list-item>
+            <v-list-item v-if="item.status === 'started' && lessHoursThan(new Date(item.endDate), 24)" @click="emitExtendReservation(item.reservationId)">
+              <template v-slot:prepend><v-icon size="small">mdi-clock-plus-outline</v-icon></template>
+              <v-list-item-title>Extend Reservation</v-list-item-title>
+            </v-list-item>
             <v-list-item @click="emitEditDescription(item.reservationId, item.description)">
+              <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
               <v-list-item-title>Edit Description</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="item.status === 'started'" @click="emitRestartContainer(item.reservationId)">
+              <template v-slot:prepend><v-icon size="small">mdi-restart</v-icon></template>
+              <v-list-item-title>Restart Container</v-list-item-title>
+            </v-list-item>
+            <v-divider class="my-1" />
+            <v-list-item @click="emitCancelReservation(item.reservationId)" class="cancel-action">
+              <template v-slot:prepend><v-icon size="small">mdi-cancel</v-icon></template>
+              <v-list-item-title>Cancel Reservation</v-list-item-title>
             </v-list-item>
           </v-list>
         </v-menu>
@@ -237,6 +243,11 @@
   
   .description-empty {
     color: #999;
+  }
+
+  .cancel-action .v-list-item-title,
+  .cancel-action .v-icon {
+    color: #ef5350;
   }
 
   .actions-link {

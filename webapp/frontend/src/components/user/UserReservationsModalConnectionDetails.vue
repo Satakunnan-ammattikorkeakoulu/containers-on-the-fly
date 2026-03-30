@@ -69,7 +69,7 @@
               v-for="port in details.otherPorts"
               :key="port.serviceName"
               :model-value="`${details.ip}:${port.outsidePort}`"
-              :label="port.serviceName"
+              :label="`${port.serviceName} (local port ${port.localPort})`"
               prepend-inner-icon="mdi-open-in-new"
               readonly
               variant="outlined"
@@ -82,53 +82,111 @@
             </v-text-field>
           </div>
 
-          <!-- Server Information -->
-          <div class="d-flex align-center mb-5 mt-4">
-            <v-icon class="mr-2" size="small">mdi-server</v-icon>
-            <span class="text-subtitle-1 font-weight-medium">Server Information</span>
-          </div>
+          <!-- Collapsible sections -->
+          <v-expansion-panels variant="accordion" class="mt-4">
 
-          <v-text-field
-            :model-value="details.ip"
-            label="IP Address"
-            prepend-inner-icon="mdi-ip-network"
-            readonly
-            variant="outlined"
-            density="compact"
-            class="mb-2"
-          >
-            <template v-slot:append-inner>
-              <v-icon size="small" class="copy-icon" @click="copyToClipboard(details.ip, 'IP address')">mdi-content-copy</v-icon>
-            </template>
-          </v-text-field>
+            <!-- Container Details -->
+            <v-expansion-panel v-if="details.containerName">
+              <v-expansion-panel-title>
+                <div class="d-flex align-center">
+                  <v-icon class="mr-2" size="small">mdi-cube-outline</v-icon>
+                  <span class="text-subtitle-1 font-weight-medium">Container Details</span>
+                </div>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <v-text-field
+                  :model-value="details.containerName"
+                  label="Name"
+                  prepend-inner-icon="mdi-label-outline"
+                  readonly
+                  variant="outlined"
+                  density="compact"
+                  class="mb-2 mt-2"
+                ></v-text-field>
 
-          <v-text-field
-            v-if="formattedEndDate"
-            :model-value="formattedEndDate"
-            label="Reservation Ends"
-            prepend-inner-icon="mdi-clock-outline"
-            readonly
-            variant="outlined"
-            density="compact"
-            class="mb-2"
-          ></v-text-field>
+                <v-text-field
+                  :model-value="details.containerImage"
+                  label="Image"
+                  prepend-inner-icon="mdi-docker"
+                  readonly
+                  variant="outlined"
+                  density="compact"
+                  class="mb-2"
+                ></v-text-field>
 
-          <!-- General Instructions -->
-          <div v-if="hasInstructions">
-            <div class="d-flex align-center mb-5 mt-4">
-              <v-icon class="mr-2" size="small">mdi-information-outline</v-icon>
-              <span class="text-subtitle-1 font-weight-medium">Instructions</span>
-            </div>
+                <v-textarea
+                  v-if="details.containerDescription"
+                  :model-value="details.containerDescription"
+                  label="Description"
+                  prepend-inner-icon="mdi-text"
+                  readonly
+                  variant="outlined"
+                  density="compact"
+                  rows="2"
+                  auto-grow
+                  class="mb-2"
+                ></v-textarea>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
 
-            <v-textarea
-              :model-value="details.instructions"
-              readonly
-              variant="outlined"
-              density="compact"
-              rows="3"
-              auto-grow
-            ></v-textarea>
-          </div>
+            <!-- Server Information -->
+            <v-expansion-panel>
+              <v-expansion-panel-title>
+                <div class="d-flex align-center">
+                  <v-icon class="mr-2" size="small">mdi-server</v-icon>
+                  <span class="text-subtitle-1 font-weight-medium">Server Information</span>
+                </div>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <v-text-field
+                  :model-value="details.ip"
+                  label="IP Address"
+                  prepend-inner-icon="mdi-ip-network"
+                  readonly
+                  variant="outlined"
+                  density="compact"
+                  class="mb-2 mt-2"
+                >
+                  <template v-slot:append-inner>
+                    <v-icon size="small" class="copy-icon" @click="copyToClipboard(details.ip, 'IP address')">mdi-content-copy</v-icon>
+                  </template>
+                </v-text-field>
+
+                <v-text-field
+                  v-if="formattedEndDate"
+                  :model-value="formattedEndDate"
+                  label="Reservation Ends"
+                  prepend-inner-icon="mdi-clock-outline"
+                  readonly
+                  variant="outlined"
+                  density="compact"
+                  class="mb-2"
+                ></v-text-field>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+
+            <!-- General Instructions -->
+            <v-expansion-panel v-if="hasInstructions">
+              <v-expansion-panel-title>
+                <div class="d-flex align-center">
+                  <v-icon class="mr-2" size="small">mdi-information-outline</v-icon>
+                  <span class="text-subtitle-1 font-weight-medium">Instructions</span>
+                </div>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <v-textarea
+                  :model-value="details.instructions"
+                  readonly
+                  variant="outlined"
+                  density="compact"
+                  rows="3"
+                  auto-grow
+                  class="mt-2"
+                ></v-textarea>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
+
+          </v-expansion-panels>
 
         </v-card-text>
 

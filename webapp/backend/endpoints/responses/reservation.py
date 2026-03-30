@@ -273,7 +273,7 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
       if port["serviceName"] == "SSH":
         ssh_port = port["outsidePort"]
       else:
-        other_ports.append({ "serviceName": port["serviceName"], "outsidePort": port["outsidePort"] })
+        other_ports.append({ "serviceName": port["serviceName"], "outsidePort": port["outsidePort"], "localPort": port["localPort"] })
 
     instructions = ""
     try:
@@ -281,6 +281,7 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
     except Exception:
       pass
 
+    container = reservation.reservedContainer.container
     connection_details = {
       "ip": reservation.computer.ip,
       "sshPassword": reservation.reservedContainer.sshPassword,
@@ -288,6 +289,9 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
       "otherPorts": other_ports,
       "endDate": reservation.endDate.isoformat() if reservation.endDate else None,
       "instructions": instructions,
+      "containerName": container.name,
+      "containerDescription": container.description,
+      "containerImage": container.imageName,
     }
 
   return api_response(True, "Details fetched.", { "connectionText": connection_text, "connectionDetails": connection_details } )

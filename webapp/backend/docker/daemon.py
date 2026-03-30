@@ -221,7 +221,8 @@ def start_docker_container(reservation_id: str):
         "user": {
           "email": reservation.user.email
         }
-      }
+      },
+      "sshPublicKey": reservation.user.sshPublicKey
     }
 
     # Add role-based mounts (now the unified mounting system)

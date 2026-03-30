@@ -152,6 +152,7 @@ def profile(token):
       user_details["email"] = user.email
       user_details["createdAt"] = user.userCreatedAt
       user_details["role"] = get_role(user.email)
+      user_details["sshPublicKey"] = user.sshPublicKey
       return api_response(True, "User details found", { "user": user_details })
 
 def has_password(token):
@@ -202,3 +203,31 @@ def change_password(token, current_password, new_password):
     session.commit()
 
     return api_response(True, "Password changed successfully.")
+
+def update_ssh_key(token, ssh_public_key):
+  '''Updates the user's SSH public key.
+      Parameters:
+        token: User login token
+        ssh_public_key: The SSH public key string, or None/empty to remove
+  '''
+  with Session() as session:
+    user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
+    if user is None:
+      return api_response(False, "User not found.")
+
+    if ssh_public_key and ssh_public_key.strip():
+      ssh_public_key = ssh_public_key.strip()
+      valid_prefixes = ('ssh-rsa', 'ssh-ed25519', 'ssh-dss', 'ecdsa-sha2-')
+      # Validate each non-empty line is a valid SSH key or a comment
+      for line in ssh_public_key.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+          continue
+        if not any(line.startswith(p) for p in valid_prefixes):
+          return api_response(False, "Invalid SSH public key format. Each key line should start with ssh-rsa, ssh-ed25519, ecdsa-sha2-, or ssh-dss.")
+      user.sshPublicKey = ssh_public_key
+    else:
+      user.sshPublicKey = None
+
+    session.commit()
+    return api_response(True, "SSH public key updated successfully.")

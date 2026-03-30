@@ -72,6 +72,43 @@
           </v-card-text>
         </v-card>
       </v-col>
+      <v-col cols="12" md="6">
+        <v-card>
+          <v-card-text>
+            <div class="ssh-key-section">
+              <h3 class="subtitle-1 mb-3">SSH Public Key</h3>
+              <p class="text-caption mb-2">
+                Paste your SSH public key here. It will be automatically deployed to your containers on launch.
+              </p>
+              <v-textarea
+                v-model="sshPublicKey"
+                label="SSH Public Key"
+                placeholder="ssh-rsa AAAA... or ssh-ed25519 AAAA..."
+                outlined
+                dense
+                rows="4"
+                auto-grow
+              ></v-textarea>
+              <v-btn
+                color="primary"
+                :disabled="sshKeyLoading"
+                :loading="sshKeyLoading"
+                @click="updateSshKey"
+              >
+                Save SSH Key
+              </v-btn>
+              <v-btn
+                v-if="sshPublicKey"
+                text
+                class="ml-2"
+                @click="removeSshKey"
+              >
+                Remove Key
+              </v-btn>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
     </v-row>
   </div>
 </template>
@@ -100,6 +137,8 @@ export default {
       showConfirm: false,
       passwordFormValid: false,
       loading: false,
+      sshPublicKey: '',
+      sshKeyLoading: false,
       userProfile: null,
       rules: {
         required: v => !!v || 'This field is required',
@@ -140,6 +179,7 @@ export default {
         })
         if (response.data.status && response.data.data.user) {
           this.userProfile = response.data.data.user
+          this.sshPublicKey = response.data.data.user.sshPublicKey || ''
         }
       } catch (error) {
         console.error('Error loading user profile:', error)
@@ -220,6 +260,54 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    async updateSshKey() {
+      const currentUser = this.store.user
+      if (!currentUser || !currentUser.loginToken) {
+        console.error('No login token available')
+        return
+      }
+
+      this.sshKeyLoading = true
+      try {
+        const response = await axios.post('/api/user/update_ssh_key', {
+          sshPublicKey: this.sshPublicKey || null
+        }, {
+          headers: {
+            'Authorization': `Bearer ${currentUser.loginToken}`
+          }
+        })
+
+        if (response.data.status) {
+          this.store.showMessage({
+            text: 'SSH public key updated successfully',
+            color: 'green'
+          })
+        } else {
+          this.store.showMessage({
+            text: response.data.message || 'Failed to update SSH key',
+            color: 'red'
+          })
+        }
+      } catch (error) {
+        console.error('Error updating SSH key:', error)
+        let errorMessage = 'Error updating SSH key'
+        if (error.response?.data?.detail) {
+          errorMessage = error.response.data.detail
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message
+        }
+        this.store.showMessage({
+          text: errorMessage,
+          color: 'red'
+        })
+      } finally {
+        this.sshKeyLoading = false
+      }
+    },
+    async removeSshKey() {
+      this.sshPublicKey = ''
+      await this.updateSshKey()
     }
   }
 }

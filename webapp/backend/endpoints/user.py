@@ -3,6 +3,7 @@ from helpers.server import api_response, force_authentication
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from endpoints.responses import user as functionality
 from pydantic import BaseModel
+from typing import Optional
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/login")
 
@@ -43,3 +44,11 @@ class ChangePasswordRequest(BaseModel):
 async def change_password(request: ChangePasswordRequest, token: str = Depends(oauth2_scheme)):
   force_authentication(token)
   return functionality.change_password(token, request.currentPassword, request.newPassword)
+
+class UpdateSshKeyRequest(BaseModel):
+  sshPublicKey: Optional[str] = None
+
+@router.post("/update_ssh_key")
+async def update_ssh_key(request: UpdateSshKeyRequest, token: str = Depends(oauth2_scheme)):
+  force_authentication(token)
+  return functionality.update_ssh_key(token, request.sshPublicKey)

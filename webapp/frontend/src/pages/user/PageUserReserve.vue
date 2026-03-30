@@ -61,7 +61,7 @@
             <h2>Reservation Time</h2>
             <p>{{parsedTime}}</p>
           </v-col>
-          <v-col cols="3" style="margin: 0 auto">
+          <v-col cols="12" sm="6" md="4" lg="3" style="margin: 0 auto; min-width: 320px">
             <h2>Reservation duration</h2>
             <p style="color: gray;">Minimum duration is <b>{{ minimumDuration }}</b> hours.</p>
             <v-row>

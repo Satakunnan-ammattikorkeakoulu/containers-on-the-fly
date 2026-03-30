@@ -28,6 +28,7 @@ class User(Base):
   loginTokenCreatedAt = Column(DateTime, nullable = True)
   userCreatedAt = Column(DateTime(timezone=True), server_default=func.now())
   userUpdatedAt = Column(DateTime(timezone=True), onupdate=func.now())
+  sshPublicKey = Column(Text, nullable = True)
 
   roles = relationship("Role", secondary = "UserRole", back_populates = "users", single_parent=True)
   reservations = relationship("Reservation", back_populates = "user")

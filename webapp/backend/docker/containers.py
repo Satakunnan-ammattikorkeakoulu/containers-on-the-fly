@@ -159,6 +159,7 @@ def start_container(pars):
 
         cont = docker.run(full_image_name, **run_params)
         docker.execute(container=container_name, command=["/bin/bash","-c", f"/bin/echo 'user:{pars['password']}' | /usr/sbin/chpasswd"], user="root")
+
     except Exception as e:
         print(f"Something went wrong starting container {container_name or 'unknown'}. Trying to stop the container. Error:")
         print(e)
@@ -167,6 +168,31 @@ def start_container(pars):
         if container_name:  # Only try to stop if we have a name
             stop_container(container_name)
         return False, "", "", e, None
+
+    # Deploy SSH public key if provided (non-critical — don't fail the container)
+    if pars.get("sshPublicKey"):
+        try:
+            ssh_key = pars["sshPublicKey"]
+            docker.execute(
+                container=container_name,
+                command=["/bin/bash", "-c",
+                         "mkdir -p /home/user/.ssh && chmod 700 /home/user/.ssh"],
+                user="root"
+            )
+            docker.execute(
+                container=container_name,
+                command=["/bin/bash", "-c",
+                         f"cat <<'SSHEOF' > /home/user/.ssh/authorized_keys\n{ssh_key}\nSSHEOF"],
+                user="root"
+            )
+            docker.execute(
+                container=container_name,
+                command=["/bin/bash", "-c",
+                         "chmod 600 /home/user/.ssh/authorized_keys && chown -R user:$(id -gn user) /home/user/.ssh"],
+                user="root"
+            )
+        except Exception as e:
+            print(f"Non-critical error deploying SSH public key to container {container_name}: {e}")
 
     non_critical_errors = run_user_config_script(pars["roleMounts"], computer_id, user_email, user_id, container_name)
 

@@ -42,6 +42,16 @@
         </div>
       </template>
 
+      <!-- Created At -->
+      <template v-slot:item.createdAt="{item}">
+        {{ item.createdAt ? parseTime(item.createdAt) : '' }}
+      </template>
+
+      <!-- Updated At -->
+      <template v-slot:item.updatedAt="{item}">
+        {{ item.updatedAt ? parseTime(item.updatedAt) : '' }}
+      </template>
+
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
         <v-menu>

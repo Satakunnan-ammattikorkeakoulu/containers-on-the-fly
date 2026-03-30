@@ -145,6 +145,11 @@ a,
   margin-bottom: 0px;
 }
 
+/* Vuetify 4: dropdown menu font size */
+.v-list-item-title {
+  font-size: 0.9rem !important;
+}
+
 /* Vuetify 4: alert font size and hide icon */
 .v-alert {
   font-size: 0.95rem;

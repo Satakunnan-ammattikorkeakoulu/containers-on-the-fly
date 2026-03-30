@@ -101,3 +101,7 @@ a,
   font-weight: 500;
   margin: 10px;
 }
+
+.v-btn__content > .v-icon {
+  margin-right: 7px;
+}

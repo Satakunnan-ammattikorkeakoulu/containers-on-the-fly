@@ -3,8 +3,8 @@
 
     <v-row class="text-center">
       <v-col cols="12">
-        <h4>Admin</h4>
-        <h2>All Containers (Images)</h2>
+        <h4 class="m-0">Admin</h4>
+        <h2 class="m-0">All Containers (Images)</h2>
       </v-col>
     </v-row>
 

@@ -2,7 +2,7 @@
   <div class="text-center">
     <v-dialog v-model="isOpen" width="500">
       <v-card>
-        <v-card-title class="text-h5 lighten-2">
+        <v-card-title class="text-h5 lighten-2 pt-6">
           Connecting to Container
         </v-card-title>
 

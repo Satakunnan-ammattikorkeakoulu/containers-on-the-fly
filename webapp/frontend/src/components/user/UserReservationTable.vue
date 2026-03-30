@@ -65,10 +65,27 @@
       </template>
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
-        <a class="link-action" v-if="item.status == 'reserved' || item.status == 'started'" @click="emitCancelReservation(item.reservationId)">Cancel Reservation</a>
-        <a class="link-action" v-if="item.status == 'started' && lessHoursThan(new Date(item.endDate), 24)" @click="emitExtendReservation(item.reservationId)">Extend Reservation</a>
-        <a class="link-action" v-if="item.status == 'started'" @click="emitRestartContainer(item.reservationId)">Restart Container</a>
-        <a class="link-action" v-if="item.status == 'started'" @click="emitShowReservationDetails(item.reservationId)">Show Details</a>
+        <v-menu v-if="item.status === 'reserved' || item.status === 'started'">
+          <template v-slot:activator="{ props }">
+            <a class="actions-link" v-bind="props">
+              Actions <v-icon size="small">mdi-chevron-down</v-icon>
+            </a>
+          </template>
+          <v-list density="compact">
+            <v-list-item @click="emitCancelReservation(item.reservationId)">
+              <v-list-item-title>Cancel Reservation</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="item.status === 'started' && lessHoursThan(new Date(item.endDate), 24)" @click="emitExtendReservation(item.reservationId)">
+              <v-list-item-title>Extend Reservation</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="item.status === 'started'" @click="emitRestartContainer(item.reservationId)">
+              <v-list-item-title>Restart Container</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="item.status === 'started'" @click="emitShowReservationDetails(item.reservationId)">
+              <v-list-item-title>Show Details</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
       </template>
     </v-data-table>
   </div>
@@ -104,7 +121,7 @@
           { title: 'Resources', key: 'resourcesInfo' },
           { title: 'Description', key: 'description' },
           { title: 'Issues', key: 'containerStatus' },
-          { title: 'actions', key: 'actions' },
+          { title: '', key: 'actions', sortable: false },
         ],
       }
     }),
@@ -193,11 +210,6 @@
 </script>
 
 <style scoped lang="scss">
-  .link-action {
-    display: block;
-    min-width: 150px;
-    margin: 10px 0px;
-  }
   
   .link-toggle-read-all {
     margin-bottom: 20px;
@@ -219,5 +231,15 @@
   
   .description-empty {
     color: #999;
+  }
+
+  .actions-link {
+    color: #2196f3;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    &:hover {
+      text-decoration: underline;
+    }
   }
 </style>

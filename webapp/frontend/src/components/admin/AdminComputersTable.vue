@@ -44,9 +44,24 @@
 
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
-        <a class="link-action" @click="toggleExpand(item)">{{ isExpanded(item) ? 'Hide' : 'Show' }} Monitoring</a>
-        <a class="link-action" @click="emitEditComputer(item.computerId)">Edit Computer</a>
-        <a class="link-action" @click="emitRemoveComputer(item.computerId)">Remove Computer</a>
+        <v-menu>
+          <template v-slot:activator="{ props }">
+            <a class="actions-link" v-bind="props">
+              Actions <v-icon size="small">mdi-chevron-down</v-icon>
+            </a>
+          </template>
+          <v-list density="compact">
+            <v-list-item @click="toggleExpand(item)">
+              <v-list-item-title>{{ isExpanded(item) ? 'Hide' : 'Show' }} Monitoring</v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="emitEditComputer(item.computerId)">
+              <v-list-item-title>Edit Computer</v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="emitRemoveComputer(item.computerId)">
+              <v-list-item-title>Remove Computer</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
       </template>
 
       <!-- Expanded content -->
@@ -403,7 +418,7 @@
           { title: 'IP', key: 'ip' },
           { title: 'Created At', key: 'createdAt' },
           { title: 'Updated At', key: 'updatedAt' },
-          { title: 'Actions', key: 'actions' },
+          { title: '', key: 'actions', sortable: false },
         ],
       }
     }),
@@ -542,10 +557,14 @@
 </script>
 
 <style scoped lang="scss">
-  .link-action {
-    display: block;
-    min-width: 150px;
-    margin: 10px 0px;
+  .actions-link {
+    color: #2196f3;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    &:hover {
+      text-decoration: underline;
+    }
   }
 
   .link-toggle-read-all {

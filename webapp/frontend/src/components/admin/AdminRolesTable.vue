@@ -22,23 +22,30 @@
 
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
-        <!-- Regular role management actions -->
-        <template v-if="!isBuiltInRole(item.name)">
-          <a class="link-action" @click="emitEditRole(item.roleId)">Edit Name</a>
-          <br>
-        </template>
-        <!-- Mounts action available for all roles -->
-        <a class="link-action" @click="emitManageMounts(item)">Mounts</a>
-        <br>
-        <!-- Reservation limits action available for all roles -->
-        <a class="link-action" @click="emitManageReservationLimits(item)">Reservation Limits</a>
-        <br v-if="!isBuiltInRole(item.name)">
-        <!-- Hardware limits action not available for built-in roles -->
-        <a v-if="!isBuiltInRole(item.name)" class="link-action" @click="emitManageHardwareLimits(item)">Hardware Limits</a>
-        <br>
-        <template v-if="!isBuiltInRole(item.name)">
-          <a class="link-action" @click="emitRemoveRole(item.roleId)">Remove Role</a>
-        </template>
+        <v-menu>
+          <template v-slot:activator="{ props }">
+            <a class="actions-link" v-bind="props">
+              Actions <v-icon size="small">mdi-chevron-down</v-icon>
+            </a>
+          </template>
+          <v-list density="compact">
+            <v-list-item v-if="!isBuiltInRole(item.name)" @click="emitEditRole(item.roleId)">
+              <v-list-item-title>Edit Name</v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="emitManageMounts(item)">
+              <v-list-item-title>Mounts</v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="emitManageReservationLimits(item)">
+              <v-list-item-title>Reservation Limits</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="!isBuiltInRole(item.name)" @click="emitManageHardwareLimits(item)">
+              <v-list-item-title>Hardware Limits</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="!isBuiltInRole(item.name)" @click="emitRemoveRole(item.roleId)">
+              <v-list-item-title>Remove Role</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
       </template>
 
       <!-- Format the timestamps -->
@@ -68,7 +75,7 @@ export default {
         { title: 'Name', key: 'name', sortable: true },
         { title: 'Mounts', key: 'mountCount', sortable: true },
         { title: 'Created At', key: 'createdAt', sortable: true },
-        { title: 'Actions', key: 'actions', sortable: false },
+        { title: '', key: 'actions', sortable: false },
       ],
     }
   }),
@@ -118,10 +125,11 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.link-action {
-  margin-right: 10px;
+.actions-link {
+  color: #2196f3;
   cursor: pointer;
-  color: #1976d2;
+  text-decoration: none;
+  white-space: nowrap;
   &:hover {
     text-decoration: underline;
   }

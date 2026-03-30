@@ -9,7 +9,18 @@
       
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
-        <a class="link-action" @click="emitEditUser(item.userId)">Edit User</a>
+        <v-menu>
+          <template v-slot:activator="{ props }">
+            <a class="actions-link" v-bind="props">
+              Actions <v-icon size="small">mdi-chevron-down</v-icon>
+            </a>
+          </template>
+          <v-list density="compact">
+            <v-list-item @click="emitEditUser(item.userId)">
+              <v-list-item-title>Edit User</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
       </template>
 
       <!-- Created At -->
@@ -53,7 +64,7 @@ export default {
         { title: 'Roles', key: 'roles' },
         { title: 'Password Set', key: 'hasPassword' },
         { title: 'Created At', key: 'createdAt' },
-        { title: 'Actions', key: 'actions' },
+        { title: '', key: 'actions', sortable: false },
       ],
     }
   }),
@@ -91,10 +102,13 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.link-action {
-  margin-right: 10px;
+.actions-link {
+  color: #2196f3;
   cursor: pointer;
-  color: #1976D2;
   text-decoration: none;
+  white-space: nowrap;
+  &:hover {
+    text-decoration: underline;
+  }
 }
 </style>

@@ -20,8 +20,21 @@
 
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
-        <a class="link-action" @click="emitEditContainer(item.containerId)">Edit Container</a>
-        <a class="link-action" @click="emitRemoveContainer(item.containerId)">Remove Container</a>
+        <v-menu>
+          <template v-slot:activator="{ props }">
+            <a class="actions-link" v-bind="props">
+              Actions <v-icon size="small">mdi-chevron-down</v-icon>
+            </a>
+          </template>
+          <v-list density="compact">
+            <v-list-item @click="emitEditContainer(item.containerId)">
+              <v-list-item-title>Edit Container</v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="emitRemoveContainer(item.containerId)">
+              <v-list-item-title>Remove Container</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
       </template>
     </v-data-table>
   </div>
@@ -51,7 +64,7 @@
           { title: 'Description', key: 'description' },
           { title: 'Created At', key: 'createdAt' },
           { title: 'Updated At', key: 'updatedAt' },
-          { title: 'Actions', key: 'actions' },
+          { title: '', key: 'actions', sortable: false },
         ],
       }
     }),
@@ -91,10 +104,14 @@
 </script>
 
 <style scoped lang="scss">
-  .link-action {
-    display: block;
-    min-width: 150px;
-    margin: 10px 0px;
+  .actions-link {
+    color: #2196f3;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    &:hover {
+      text-decoration: underline;
+    }
   }
 
   .link-toggle-read-all {

@@ -1,3 +1,11 @@
+"""Response handlers for reservation management endpoints.
+
+Provides business logic for creating, viewing, extending, cancelling, and
+restarting container reservations. Includes hardware availability checking
+with role-based limits, calendar timeline views, and connection detail
+retrieval for active reservations.
+"""
+
 from database import Session, Computer, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec
 from docker import get_email_container_started, restart_container
 from helpers.server import api_response, orm_to_dict
@@ -15,22 +23,30 @@ from settings_handler import get_setting
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
 # TODO: Should also be able to only fail there is not enough resources any computer. Right now it fails if any of the computers are out of resources for the given time period.
 def get_available_hardware(date : str, duration : int, reducable_specs : dict = None, is_admin = False, ignored_reservation_id : int = None, user_id : int = None) -> object:
-  '''
-  Returns a list of all available hardware specs for the given date and duration.
-  
-  Args:
-    date (str): The date when the reservation starts.
-    duration (int): The duration of the reservation in hours.
-    reducableSpecs (dict): If reducableSpecs is given, it will reduce the available hardware specs by the given amount.
-      Example: { "1": 1, "2": 0, ... }
-      Where the key is the hardwareSpecId and the value is the amount to reduce.
-    
-  Returns:
-    object: Response object with status, message and data.
+  """Calculate available hardware resources for a given time slot.
 
-    If status is True, data will contain a list of all available hardware specs for the given date and duration.
-    If status is False, message will contain the error message. The error is usually that there are not enough resources for the given date and duration.
-  '''
+  Fetches all public computers and their hardware specs, subtracts
+  resources already reserved during the requested time period, and
+  applies role-based or default user limits. Admin users receive
+  full maximum amounts without restrictions.
+
+  Args:
+      date: The reservation start date as an ISO-format string.
+      duration: The reservation duration in hours.
+      reducable_specs: Optional dict of {hardwareSpecId: amount} to
+          additionally subtract from availability (used when checking
+          extension feasibility).
+      is_admin: Whether the requesting user has admin privileges.
+      ignored_reservation_id: A reservation ID to exclude from
+          conflict checking (used when editing an existing reservation).
+      user_id: The requesting user's ID, used to look up role-based
+          hardware limits.
+
+  Returns:
+      Response with computers list (each with adjusted hardwareSpecs)
+      and containers list on success, or an error message if resources
+      are insufficient for the requested time period.
+  """
   date = parser.parse(date)
   end_date = date+relativedelta(hours=+duration)
 
@@ -151,16 +167,20 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
   return api_response(True, "Hardware resources fetched.", { "computers": computers, "containers": containers })
 
 def get_own_reservations(userId : int, filters : ReservationFilters) -> object:
-  '''
-  Returns a list of all reservations owned by the given user.
+  """Retrieve all reservations belonging to a specific user.
+
+  Fetches reservations from the last 90 days (or with future end dates),
+  including eager-loaded hardware specs, container details, reserved
+  ports, and computer info. Returns status counts and supports filtering
+  by reservation status.
 
   Args:
-    userId (int): The userId of the user.
-    filters (ReservationFilters): The filters to apply to the query.
+      userId: The ID of the user whose reservations to fetch.
+      filters: ReservationFilters containing status filter criteria.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with a list of reservation dicts and status count summary.
+  """
   reservations = []
   status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
 
@@ -235,6 +255,22 @@ def get_own_reservations(userId : int, filters : ReservationFilters) -> object:
   return api_response(True, "Hardware resources fetched.", { "reservations": reservations, "statusCounts": status_counts })
 
 def get_own_reservation_details(reservationId : int, userId : int) -> object:
+  """Retrieve connection details for a specific reservation.
+
+  Returns structured connection information including SSH credentials,
+  port mappings, container metadata, and formatted connection text.
+  Admin users can view details for any reservation; regular users
+  can only view their own.
+
+  Args:
+      reservationId: The ID of the reservation.
+      userId: The ID of the requesting user (used for ownership check).
+
+  Returns:
+      Response with connectionText (HTML-formatted) and connectionDetails
+      dict containing IP, SSH password/port, other service ports,
+      end date, instructions, and container info.
+  """
   with Session() as session:
     # Check that the reservation exists and is owned by the current user (admins can view any reservation)
     if is_admin(userId):
@@ -297,6 +333,16 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
   return api_response(True, "Details fetched.", { "connectionText": connection_text, "connectionDetails": connection_details } )
 
 def get_current_reservations() -> object:
+  """Retrieve all currently active or recently ended reservations.
+
+  Fetches reservations with status 'reserved' or 'started' that ended
+  within the last 5 days. Used for the reservation calendar to show
+  ongoing and very recent reservations with their hardware specs.
+
+  Returns:
+      Response with a list of reservation summary dicts including
+      reservationId, dates, computer info, and hardware specs.
+  """
   reservations = []
 
   def time_now(): return datetime.datetime.now(datetime.timezone.utc)
@@ -332,6 +378,32 @@ def get_current_reservations() -> object:
   return api_response(True, "Current reservations fetched.", { "reservations": reservations })
 
 def create_reservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0):
+  """Create a new container reservation with hardware resource allocation.
+
+  Validates all inputs including duration limits, resource availability,
+  user permissions, role-based hardware limits, and active reservation
+  caps. Admins can reserve on behalf of other users via email address.
+
+  Args:
+      userId: The ID of the user creating the reservation.
+      date: The reservation start date as an ISO-format string.
+      duration: The reservation duration in hours.
+      computerId: The ID of the target computer/server.
+      containerId: The ID of the container image to use.
+      hardwareSpecs: Dict of {hardwareSpecId: amount} for requested
+          hardware resources (CPUs, RAM, GPUs).
+      adminReserveUserEmail: Optional email to reserve on behalf of
+          another user (admin only).
+      description: Optional short description (max 50 characters).
+      shmSizePercent: Shared memory size as percentage of allocated
+          RAM (10-90, default 50).
+      ramDiskSizePercent: RAM disk size as percentage of allocated
+          RAM (0-60, default 0).
+
+  Returns:
+      Response indicating success with informByEmail flag, or an error
+      message describing validation failure.
+  """
   # Validate description length if provided
   if description and len(description) > 50:
     return api_response(False, "Description must be 50 characters or less.")
@@ -533,6 +605,19 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     return api_response(True, "Reservation created succesfully!", { "informByEmail": inform_by_email })
 
 def cancel_reservation(userId : int, reservationId: str):
+  """Cancel a reservation by setting its end date to now.
+
+  The reservation's end date is set to the current UTC time, which
+  triggers the Docker utility to stop the container. Regular users
+  can only cancel their own reservations; admins can cancel any.
+
+  Args:
+      userId: The ID of the requesting user.
+      reservationId: The ID of the reservation to cancel.
+
+  Returns:
+      Response indicating success or failure with an appropriate message.
+  """
   # Check that user owns the given reservation and it can be found
   # Admins can cancel any reservation
   # print("Starting to cancel reservation: " + reservationId)
@@ -579,6 +664,23 @@ def update_reservation_description(userId: int, reservationId: str, description:
   return api_response(True, "Description updated.")
 
 def extend_reservation(userId : int, reservationId: str, duration: int):
+  """Extend a running reservation by a specified number of hours.
+
+  Checks GPU availability during the extension period to prevent
+  conflicts, then verifies general resource availability. Only started
+  reservations can be extended. Duration must be between 0 and 24 hours.
+  Regular users can only extend their own reservations; admins can
+  extend any.
+
+  Args:
+      userId: The ID of the requesting user.
+      reservationId: The ID of the reservation to extend.
+      duration: Number of hours to extend the reservation.
+
+  Returns:
+      Response indicating success with the extension amount, or an
+      error message if extension is not possible.
+  """
   # Check that user owns the given reservation and it can be found
   # Admins can extend any reservation
 
@@ -643,6 +745,21 @@ def extend_reservation(userId : int, reservationId: str, duration: int):
   return api_response(False, "Error.")
 
 def restart_container(userId : int, reservationId: str):
+  """Request a restart for a reservation's running container.
+
+  Sets the reservation status to 'restart', which the Docker utility
+  picks up to perform the actual container restart. Only started
+  reservations can be restarted. Regular users can only restart their
+  own containers; admins can restart any.
+
+  Args:
+      userId: The ID of the requesting user.
+      reservationId: The ID of the reservation whose container to restart.
+
+  Returns:
+      Response indicating the restart was queued, or an error message
+      if the reservation is not found or not currently started.
+  """
   reservation = None
   # Check that user owns the given container reservation and it can be found
   # Admins can restart any container
@@ -665,18 +782,24 @@ def restart_container(userId : int, reservationId: str):
       return api_response(False, "Reservation is not currently started, so cannot restart the container.")
 
 def get_availability_timeline(startDate: str, endDate: str, is_admin = False) -> object:
-  '''
-  Returns availability timeline data for all servers between the given dates.
-  This creates continuous availability events showing remaining resources for each server.
-  
+  """Generate resource availability timeline for all public servers.
+
+  Creates continuous time-period events between the given dates for
+  each server, showing remaining hardware resources (CPU, RAM, GPU)
+  after subtracting active and upcoming reservations. Each period is
+  color-coded by availability level (high/medium/low) with a
+  consistent server-specific color.
+
   Args:
-    startDate (str): Start date for the timeline
-    endDate (str): End date for the timeline  
-    isAdmin (bool): Whether the user is an admin
-    
+      startDate: Start date for the timeline as an ISO-format string.
+      endDate: End date for the timeline as an ISO-format string.
+      is_admin: Whether the requesting user has admin privileges.
+
   Returns:
-    object: Response object with timeline events for each server
-  '''
+      Response with a list of timeline event dicts, each containing
+      period start/end, server info, availability level, resource
+      text, and available spec details.
+  """
   try:
     start_date = parser.parse(startDate)
     end_date = parser.parse(endDate)
@@ -847,17 +970,20 @@ def get_availability_timeline(startDate: str, endDate: str, is_admin = False) ->
   return api_response(True, "Availability timeline fetched.", {'events': timeline_events})
 
 def get_all_reservations_for_calendar(startDate: str, endDate: str) -> object:
-  '''
-  Returns all reservations within a date range for calendar display.
-  This includes all reservations regardless of status (reserved, started, stopped, etc.)
-  
+  """Retrieve all reservations within a date range for calendar display.
+
+  Fetches reservations of all statuses (reserved, started, stopped,
+  error) that overlap with the given date range, including their
+  hardware specs and computer assignments.
+
   Args:
-    startDate (str): Start date for the query
-    endDate (str): End date for the query
-    
+      startDate: Start date for the query as an ISO-format string.
+      endDate: End date for the query as an ISO-format string.
+
   Returns:
-    object: Response object with all reservations in the date range
-  '''
+      Response with a list of reservation summary dicts containing
+      reservationId, dates, computerName, hardwareSpecs, and status.
+  """
   try:
     start_date = parser.parse(startDate)
     end_date = parser.parse(endDate)

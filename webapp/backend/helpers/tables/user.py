@@ -1,17 +1,27 @@
+"""User table management functionality.
+
+Provides CRUD operations for the User database table, including lookup
+by email or user ID, creation, deletion, editing, and conversion of
+User ORM objects to dictionaries.
+"""
 from database import User, Session
 from helpers.auth import *
 from sqlalchemy import select
 
-# User table management functionality
-
 def get_users(email = None):
-  '''
-Finds users with the given optional filter. If no filter is given, finds all users in the system.
-  Parameters:
-    Filter: email. Example usage: searches the users by entered part of email.
+  """Find users with an optional email filter.
+
+  If no email is given, returns all users. When an email is provided,
+  performs a partial match (LIKE) search against user email addresses.
+
+  Args:
+      email: A partial or full email string to search for. If None,
+          all users are returned.
+
   Returns:
-    All found users in a list.
-'''
+      A list of user dictionaries (via cast_users_to_dict), or None
+      if an email filter was provided but no match was found.
+  """
   with Session() as session:
     all_users_list = []
     email_users_list = []
@@ -30,13 +40,18 @@ Finds users with the given optional filter. If no filter is given, finds all use
         return None
 
 def get_user(findby):
-  '''
-  Finds user with the given optional filter (email or userId). If no filter is given, returns None.
-    Parameters:
-      Example usage: Can be used by email or userId
-    Returns:
-      Found user.
-  '''
+  """Find a single user by email or user ID.
+
+  Attempts to match by email first, then falls back to matching by userId.
+
+  Args:
+      findby: An email address or user ID to search for. If falsy,
+          returns None.
+
+  Returns:
+      A list of user dictionaries (via cast_users_to_dict) containing
+      the matched user, or None if no user was found.
+  """
   with Session() as session:
     if findby:
       found_user = session.execute(select(User).where(User.email == findby)).scalar_one_or_none()
@@ -51,18 +66,28 @@ def get_user(findby):
       return None
 
 def cast_users_to_dict(user_list):
+  """Convert a list of User ORM objects to a list of dictionaries.
+
+  Args:
+      user_list: A list of User ORM objects to convert.
+
+  Returns:
+      A list of dictionaries, each containing userId, email,
+      userCreatedAt, userUpdatedAt, roles, reservations, and
+      userStorage fields.
+  """
   all_users = [dict(userId = user.userId, email = user.email, userCreatedAt = user.userCreatedAt, userUpdatedAt = user.userUpdatedAt, roles = user.roles, reservations = user.reservations, userStorage = user.userStorage) for user in user_list]
   return all_users
 
 def add_user(email, password):
-  '''
-  Adds user to the system.
-  Parameters:
-    email: email
-    password: password
-  Returns:
-    The created user object fetched from database.
-  '''
+  """Add a new user to the system.
+
+  The password is hashed with a generated salt before storage.
+
+  Args:
+      email: The email address for the new user.
+      password: The plaintext password to be hashed and stored.
+  """
   hash = hash_password(password)
   with Session() as session:
     session.add(
@@ -75,13 +100,19 @@ def add_user(email, password):
     session.commit()
 
 def edit_user(email, new_email = None, new_password = None):
-  '''
-Finds user by email and changes email or password.
-  Optional parameters:
-    Example usage: new_email - will change email, new_password - changes password.
+  """Edit an existing user's email or password.
+
+  Only the provided (non-None) fields are updated; others remain unchanged.
+
+  Args:
+      email: The current email address of the user to edit.
+      new_email: The new email address, or None to keep current.
+      new_password: The new plaintext password to hash and store,
+          or None to keep current.
+
   Returns:
-    All found users in a list.
-'''
+      None.
+  """
   if email is None:
     return None
 
@@ -97,26 +128,32 @@ Finds user by email and changes email or password.
     return None
 
 def remove_user(findby):
-  '''
-  Removes user.
-  Parameters:
-    Removes by passed parameter as a user (sql.object).
-  Returns:
-    Nothing.
-  '''
+  """Remove a user from the system.
+
+  Looks up the user server-side before deleting.
+
+  Args:
+      findby: An email address or user ID identifying the user to remove.
+  """
   with Session() as session:
     found_user = get_user_serverside(findby)
     session.delete(found_user)
     session.commit()
 
 def get_user_serverside(search):
-  '''
-Finds user with given search, only to be used serverside.
-  Parameter:
-    search = string used to search for user's email.
+  """Find a user by email or user ID, returning the raw ORM object.
+
+  Unlike get_user(), this returns the SQLAlchemy User object directly
+  (not converted to a dict) and is intended for server-side operations
+  such as editing or deleting.
+
+  Args:
+      search: An email address or user ID to search for. If None,
+          returns None.
+
   Returns:
-    Single database object.
-'''
+      The User ORM object if found, or None if no match exists.
+  """
   with Session() as session:
     if search != None:
       roles = session.execute(select(User).where(User.email == search)).scalar_one_or_none()

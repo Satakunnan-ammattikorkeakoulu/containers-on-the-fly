@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
-"""
-Database initialization script that handles both new and existing environments
+"""Database initialization script for new and existing environments.
+
+Detects whether a database already exists, initializes Alembic version
+tracking if needed, and applies pending migrations. For fresh databases,
+creates all tables directly from ORM models.
+
+Usage:
+    python init_database.py
 """
 import sys
 from sqlalchemy import create_engine, inspect, text
@@ -11,7 +17,11 @@ import os
 from database import Base, engine, Session  # Import Session as well
 
 def database_exists():
-    """Check if database tables exist"""
+    """Check if any tables exist in the database.
+
+    Returns:
+        True if the database has at least one table, False otherwise.
+    """
     try:
         inspector = inspect(engine)
         tables = inspector.get_table_names()
@@ -20,7 +30,11 @@ def database_exists():
         return False
 
 def alembic_table_exists():
-    """Check if alembic_version table exists"""
+    """Check if the alembic_version table exists and is queryable.
+
+    Returns:
+        True if alembic_version table exists and can be queried, False otherwise.
+    """
     try:
         with Session() as session:
             session.execute(text("SELECT version_num FROM alembic_version LIMIT 1"))
@@ -29,7 +43,14 @@ def alembic_table_exists():
         return False
 
 def run_alembic_command(command):
-    """Run an alembic command"""
+    """Run an Alembic CLI command as a subprocess.
+
+    Args:
+        command: The Alembic command string (e.g. "upgrade head", "stamp head").
+
+    Returns:
+        True if the command exited successfully, False otherwise.
+    """
     try:
         result = subprocess.run(
             ["alembic"] + command.split(),
@@ -47,7 +68,14 @@ def run_alembic_command(command):
         return False
 
 def init_alembic():
-    """Initialize alembic version tracking"""
+    """Initialize Alembic version tracking for an existing database.
+
+    Creates the alembic_version table and stamps it with the current
+    head revision so that future migrations can be applied incrementally.
+
+    Returns:
+        True if initialization succeeded, False otherwise.
+    """
     try:
         with Session() as session:
             print("Initializing Alembic version tracking...")
@@ -69,7 +97,14 @@ def init_alembic():
         return False
 
 def init_database():
-    """Initialize database for new or existing environments"""
+    """Initialize the database for new or existing environments.
+
+    For existing databases: applies any pending Alembic migrations.
+    For new databases: creates all tables from ORM models and stamps Alembic.
+
+    Returns:
+        True if initialization completed successfully, False otherwise.
+    """
     
     if database_exists():
         print("Existing database detected...")

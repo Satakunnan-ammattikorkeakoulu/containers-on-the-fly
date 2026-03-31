@@ -1,3 +1,12 @@
+"""Alembic migration environment for the HEAD schema tracking branch.
+
+This is the default Alembic environment generated for schema-only migration
+tracking. Unlike the main alembic/env.py, it does not import application
+models or configure a database URL from settings_handler, so target_metadata
+is None and autogenerate is not supported. It serves as a baseline template
+for offline and online migration execution.
+"""
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -27,16 +36,12 @@ target_metadata = None
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode.
+    """Run migrations in offline mode without a live database connection.
 
-    This configures the context with just a URL
-    and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
-    we don't even need a DBAPI to be available.
-
-    Calls to context.execute() here emit the given string to the
-    script output.
-
+    Configures the Alembic context with just the database URL so that
+    migration SQL statements are emitted as script output. This allows
+    generating migration scripts without requiring a running database
+    or DBAPI driver.
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
@@ -51,11 +56,12 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
+    """Run migrations in online mode with a live database connection.
 
-    In this scenario we need to create an Engine
-    and associate a connection with the context.
-
+    Creates a SQLAlchemy engine from the Alembic ini config, opens a
+    connection, and executes all pending migrations within a transaction.
+    Uses NullPool to avoid keeping idle connections after migration
+    completes.
     """
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),

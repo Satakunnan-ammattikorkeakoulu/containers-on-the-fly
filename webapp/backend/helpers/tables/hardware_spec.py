@@ -1,15 +1,26 @@
-# Hardware specs table management functionality
+"""Hardware specs table management functionality.
+
+Provides CRUD operations for the HardwareSpec database table, including
+lookup by ID, creation, deletion, and editing of hardware specification records
+that define resource limits for container servers.
+"""
 from database import HardwareSpec, Session
 from sqlalchemy import select
 
 def get_hardware_specs(filter = None):
-  '''
-  Finds hardwarespecs with the given optional filter. If no filter is given, finds all hardwarespecs in the system.
-    Parameters:
-      filter: Additional filters. Example usage: ...
-    Returns:
-      All found hardwarespecs in a list.
-  '''
+  """Find hardware specs with an optional filter.
+
+  If no filter is given, returns all hardware specs. When a filter is
+  provided, it attempts to match by hardware spec ID.
+
+  Args:
+      filter: A hardware spec ID (int-like) to search for. If None,
+          all hardware specs are returned.
+
+  Returns:
+      A list of matching HardwareSpec objects, or None if a filter was
+      provided but no match was found.
+  """
   with Session() as session:
     if filter != None:
       try:
@@ -23,19 +34,17 @@ def get_hardware_specs(filter = None):
     return hardwarespecs
 
 def add_hardware_spec(computerId, type, maxAmount, minAmount, maxUserAmount, defaultUserAmount, format):
-  '''
-  Adds the given hardwarespec in the system.
-    Parameters:
-      computerId: The id of the computer to be associated with this hardware.
-      type: The type of hardware.
-      maxAmount: Maximum amount of this hardware.
-      minAmount: Minimum amount of this hardware.
-      maxUserAmount: The maximum amount of this hardware that a user can use.
-      defaultUserAmount: User's default amount of this hardware.
-      format: Format for the amounts.
-    Returns:
-      Nothing for now.
-  '''
+  """Add a new hardware spec to the system.
+
+  Args:
+      computerId: The ID of the computer to associate with this hardware spec.
+      type: The type of hardware (e.g. 'cpu', 'ram', 'gpu').
+      maxAmount: The system-wide maximum amount of this hardware resource.
+      minAmount: The minimum amount of this hardware resource.
+      maxUserAmount: The maximum amount a single user can request.
+      defaultUserAmount: The default amount allocated to a user.
+      format: The unit format for the amounts (e.g. 'cores', 'GB').
+  """
   new_hardware_spec = HardwareSpec(computerId = computerId, type = type, maximumAmount = maxAmount, minimumAmount = minAmount, maximumAmountForUser = maxUserAmount, defaultAmountForUser = defaultUserAmount, format = format)
   with Session() as session:
     session.add(new_hardware_spec)
@@ -43,13 +52,11 @@ def add_hardware_spec(computerId, type, maxAmount, minAmount, maxUserAmount, def
   return
 
 def remove_hardware_spec(hardwarespec_id):
-  '''
-  Removes the given hardwarespec in the system.
-    Parameters:
-      hardwarespec_id: The id of the hardwarespec to be removed.
-    Returns:
-      Nothing
-  '''
+  """Remove a hardware spec from the system by its ID.
+
+  Args:
+      hardwarespec_id: The ID of the hardware spec to be removed.
+  """
   with Session() as session:
     hardwarespec = session.execute(select(HardwareSpec).where(HardwareSpec.hardwareSpecId == hardwarespec_id)).scalar_one_or_none()
     session.delete(hardwarespec)
@@ -57,17 +64,23 @@ def remove_hardware_spec(hardwarespec_id):
 
 
 def edit_hardware_spec(hardwarespec_id, new_computer_id, new_type, new_max, new_min, new_user_max, new_user_default, new_format):
-  '''
-  Edits the given hardwarespec in the system.
-    Parameters:
-      hardwarespec_id: The id of the hardwarespec to be edited.
-      new_name: The new name for the given hardwarespec.
-      new_public: The new boolean for publicity of the hardwarespec.
-      new_description: The new description for the given hardwarespec.
-      new_image_name: The new image name for the given hardwarespec.
-    Returns:
-      The edited hardwarespec object fetched from database. Or None if name or publicity isn't provided.
-  '''
+  """Edit an existing hardware spec's attributes.
+
+  Only the provided (non-None) fields are updated; others remain unchanged.
+
+  Args:
+      hardwarespec_id: The ID of the hardware spec to be edited.
+      new_computer_id: The new computer ID, or None to keep current.
+      new_type: The new hardware type, or None to keep current.
+      new_max: The new system maximum amount, or None to keep current.
+      new_min: The new minimum amount, or None to keep current.
+      new_user_max: The new per-user maximum amount, or None to keep current.
+      new_user_default: The new per-user default amount, or None to keep current.
+      new_format: The new unit format, or None to keep current.
+
+  Returns:
+      The updated HardwareSpec object.
+  """
   with Session() as session:
     hardwarespec = session.execute(select(HardwareSpec).where(HardwareSpec.hardwareSpecId == hardwarespec_id)).scalar_one_or_none()
     if new_computer_id != None: hardwarespec.computerId = new_computer_id

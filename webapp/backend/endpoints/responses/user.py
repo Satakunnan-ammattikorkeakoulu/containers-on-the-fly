@@ -1,3 +1,9 @@
+"""Response handlers for user authentication and profile endpoints.
+
+Provides login (password, LDAP, and hybrid authentication), token validation,
+password management, profile retrieval, and SSH key management for users.
+"""
+
 from database import User, Session, UserWhitelist, UserBlacklist
 from settings_handler import get_setting
 from helpers.server import api_response
@@ -8,16 +14,25 @@ from sqlalchemy import select
 import base64
 
 def login(username, password):
-  '''
-    Logins the user with the given username and password using the configured authentication method.
-      Parameters:
-        username: Email address
-        password: Password
+  """Authenticate a user using the configured authentication method.
 
-      Returns:
-        If login was successful, will return back the generated token that user can use further on.
-        Otherwise tells that the username or password was invalid.
-  '''
+  Supports password-only, LDAP-only, and hybrid (password-then-LDAP)
+  authentication. Checks blacklist/whitelist access controls before
+  attempting authentication. On success, generates and stores a login
+  token for session management.
+
+  Args:
+      username: The user's email address.
+      password: The user's password.
+
+  Returns:
+      On success, a dict with access_token and token_type for bearer auth.
+      On failure, a Response indicating invalid credentials or access denial.
+
+  Raises:
+      HTTPException: If username or password is empty, user is not found,
+          password is not set, or credentials are incorrect.
+  """
   if username == "" or username is None: raise HTTPException(status_code=400, detail="username cannot be empty.")
   if password == "" or password is None: raise HTTPException(status_code=400, detail="password cannot be empty.")
 
@@ -106,15 +121,20 @@ def login(username, password):
       return try_password_auth()
 
 def check_user_token(token):
-  ''' Checks that the given token is valid and has not expired.
+  """Validate a user's authentication token.
 
-      Parameters:
-        token: token
+  Checks that the given token exists, belongs to an active user, and
+  has not expired based on the configured session timeout.
 
-      Returns:
-        If token was ok, returns also back information about the user.
-        Otherwise tells that the user is not currently logged in.
-  '''
+  Args:
+      token: The bearer token to validate.
+
+  Returns:
+      A dict with status True and user information if the token is valid.
+
+  Raises:
+      HTTPException: 401 Unauthorized if the token is invalid or expired.
+  """
   token_check = check_token(token)
 
   if (token_check["status"] == True): return token_check
@@ -126,10 +146,15 @@ def check_user_token(token):
     )
 
 def create_password(password):
-  ''' For generating encrypted password for a user
-      Parameters:
-        password: password
-  '''
+  """Generate an encrypted password hash and salt for a user.
+
+  Args:
+      password: The plaintext password to hash.
+
+  Returns:
+      Response with the base64-encoded hashed password and salt,
+      or an error response if the password is empty.
+  """
   if password == "" or password is None:
     return api_response(False, "Password cannot be empty.")
   hash = hash_password(password)
@@ -139,10 +164,15 @@ def create_password(password):
   })
 
 def profile(token):
-  ''' For getting information about user with the given token.
-      Parameters:
-        token: User login token
-  '''
+  """Retrieve the authenticated user's profile information.
+
+  Args:
+      token: The user's login token.
+
+  Returns:
+      Response with user details including userId, email, createdAt,
+      role, and sshPublicKey, or an error if the user is not found.
+  """
   with Session() as session:
     user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
     if user is None: return api_response(False, "User not found.")
@@ -156,10 +186,15 @@ def profile(token):
       return api_response(True, "User details found", { "user": user_details })
 
 def has_password(token):
-  ''' Checks if the user has a password set.
-      Parameters:
-        token: User login token
-  '''
+  """Check whether the authenticated user has a password set.
+
+  Args:
+      token: The user's login token.
+
+  Returns:
+      Response with hasPassword boolean indicating whether the user
+      has a non-empty password, or an error if the user is not found.
+  """
   with Session() as session:
     user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
     if user is None:
@@ -170,12 +205,20 @@ def has_password(token):
     return api_response(True, "Password status checked", {"hasPassword": has_password_set})
 
 def change_password(token, current_password, new_password):
-  ''' Changes the user's password.
-      Parameters:
-        token: User login token
-        current_password: Current password
-        new_password: New password
-  '''
+  """Change the authenticated user's password.
+
+  Verifies the current password before setting the new one. The new
+  password must be at least 5 characters long and the user must already
+  have a password set (LDAP-only users cannot change passwords here).
+
+  Args:
+      token: The user's login token.
+      current_password: The user's current password for verification.
+      new_password: The desired new password.
+
+  Returns:
+      Response indicating success or failure with an appropriate message.
+  """
   if current_password == "" or current_password is None:
     return api_response(False, "Current password cannot be empty.")
   if new_password == "" or new_password is None:
@@ -205,11 +248,20 @@ def change_password(token, current_password, new_password):
     return api_response(True, "Password changed successfully.")
 
 def update_ssh_key(token, ssh_public_key):
-  '''Updates the user's SSH public key.
-      Parameters:
-        token: User login token
-        ssh_public_key: The SSH public key string, or None/empty to remove
-  '''
+  """Update or remove the authenticated user's SSH public key.
+
+  Validates that each non-comment line starts with a recognized SSH key
+  prefix (ssh-rsa, ssh-ed25519, ecdsa-sha2-, ssh-dss). Supports
+  multi-line key input. Pass None or empty string to remove the key.
+
+  Args:
+      token: The user's login token.
+      ssh_public_key: The SSH public key string to store, or None/empty
+          to remove the existing key.
+
+  Returns:
+      Response indicating success or failure with an appropriate message.
+  """
   with Session() as session:
     user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
     if user is None:

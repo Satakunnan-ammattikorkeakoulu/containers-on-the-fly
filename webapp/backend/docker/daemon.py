@@ -1,8 +1,9 @@
-"""
-Docker utility daemon — manages container lifecycle based on reservation state.
+"""Docker utility daemon -- manages container lifecycle based on reservation state.
 
 Polls the database every 10 seconds to start, stop, restart, and clean up
-Docker containers for reservations.
+Docker containers for reservations. Runs as a long-lived process managed by
+pm2, and coordinates between the database reservation state and the actual
+Docker containers running on the host.
 """
 
 from time import sleep
@@ -32,6 +33,11 @@ computer_id: int = None
 
 
 def time_now():
+  """Return the current UTC datetime.
+
+  Returns:
+      datetime: Current time in UTC timezone.
+  """
   return datetime.now(timezone.utc)
 
 
@@ -40,6 +46,13 @@ def time_now():
 # ---------------------------------------------------------------------------
 
 def main():
+  """Run the daemon's main polling loop.
+
+  Continuously cycles through lifecycle checks every 10 seconds:
+  stop finished containers, start new ones, restart crashed or
+  restart-requested containers. Server monitoring is updated every
+  30 seconds, and orphan container cleanup runs every 60 seconds.
+  """
   while (run):
     for i in range(6):
       stop_finished_servers()
@@ -61,10 +74,12 @@ def main():
 # ---------------------------------------------------------------------------
 
 def stop_finished_servers():
-  '''
-  Gathers a list of reservations (containers) which reservation is due, status is "started"
-  and stops them one by one.
-  '''
+  """Stop containers whose reservations have ended.
+
+  Queries for reservations past their end date with status "started" or
+  "reserved" on this computer, then stops each corresponding Docker
+  container.
+  """
   global computer_id
   reservations = get_reservations_requiring_stop(computer_id)
   for reservation in reservations:
@@ -73,10 +88,11 @@ def stop_finished_servers():
       stop_docker_container(reservation.reservationId)
 
 def start_new_servers():
-  '''
-  Gathers a list of reservations (containers) requiring to be started in the current computer (state is 'reserved')
-  and starts them one by one.
-  '''
+  """Start containers for reservations that are due to begin.
+
+  Queries for reservations with status "reserved" whose start date has
+  passed on this computer, then starts a Docker container for each one.
+  """
   global computer_id
   reservations = get_reservations_requiring_start(computer_id)
   for reservation in reservations:
@@ -85,10 +101,11 @@ def start_new_servers():
       start_docker_container(reservation.reservationId)
 
 def restart_crashed_servers():
-  '''
-  Gathers a list of crashed reservations (containers) requiring to be restarted in the current computer (state is 'error')
-  and starts them one by one.
-  '''
+  """Restart containers that have exited unexpectedly.
+
+  Queries for running reservations on this computer, inspects each
+  container's Docker state, and restarts any that have exited.
+  """
   global computer_id
   reservations = get_running_reservations(computer_id)
   for reservation in reservations:
@@ -102,10 +119,12 @@ def restart_crashed_servers():
         print(e)
 
 def restart_servers_requiring_restart():
-  '''
-  Gathers a list of reservations (containers) requiring to be restarted in the current computer (state is 'restart')
-  and starts them one by one.
-  '''
+  """Restart containers that have been flagged for restart by a user or admin.
+
+  Queries for reservations with status "restart" on this computer whose
+  end date has not yet passed, then restarts each corresponding Docker
+  container.
+  """
   global computer_id
   reservations = get_reservations_requiring_restart(computer_id)
 
@@ -118,12 +137,15 @@ def restart_servers_requiring_restart():
         print(e)
 
 def stop_orphan_container_reservations():
-  '''
-  Gathers a list of orphan (not bound to started server) reservations and stops & removes them.
-  Basically, we verify for each container running in Docker that the reservation is also marked as started in database.
-  Every reservation which is not started in the database will be stopped and removed.
-  These orphan containers can occur when the script errors out, for ex, and the server was never removed.
-  '''
+  """Clean up Docker containers that have no matching active reservation.
+
+  Compares containers physically running in Docker (with names starting
+  with "reservation-") against reservations marked as "started" in the
+  database. Any container running for more than 30 minutes without a
+  matching database record is considered orphaned and is stopped and
+  removed. Orphan containers can occur when the daemon encounters an
+  error and fails to clean up properly.
+  """
 
   try:
     # Get all containers marked as started in the database
@@ -155,6 +177,17 @@ def stop_orphan_container_reservations():
 # ---------------------------------------------------------------------------
 
 def start_docker_container(reservation_id: str):
+  """Build configuration and start a Docker container for a reservation.
+
+  Reads the reservation from the database, assembles all container
+  parameters (image, hardware specs, ports, mounts, GPU assignment),
+  calls the Docker start_container function, and updates the
+  reservation status accordingly. Sends email notifications on both
+  success and failure.
+
+  Args:
+      reservation_id: Database ID of the reservation to start.
+  """
   with Session() as session:
     reservation = session.execute(
       select(Reservation).where(Reservation.reservationId == reservation_id)
@@ -309,6 +342,15 @@ def start_docker_container(reservation_id: str):
       print("Container was not started. Logged the error to ReservedContainer.")
 
 def stop_docker_container(reservation_id: str):
+  """Stop a Docker container and update the reservation to "stopped".
+
+  Looks up the reservation in the database, stops the corresponding
+  Docker container, and records the stop timestamp.
+
+  Args:
+      reservation_id: Database ID of the reservation whose container
+          should be stopped.
+  """
   try:
     with Session() as session:
       reservation = session.execute(
@@ -326,6 +368,11 @@ def stop_docker_container(reservation_id: str):
     print(e)
 
 def stop_orphan_docker_container(container_name):
+  """Stop an orphan Docker container that has no active reservation.
+
+  Args:
+      container_name: Name of the Docker container to stop and remove.
+  """
   if not container_name: return
   try:
     stop_container(container_name)
@@ -334,6 +381,12 @@ def stop_orphan_docker_container(container_name):
     print(e)
 
 def restart_docker_container(reservation_id: str):
+  """Restart a Docker container and reset the reservation status to "started".
+
+  Args:
+      reservation_id: Database ID of the reservation whose container
+          should be restarted.
+  """
   try:
     with Session() as session:
       reservation = session.execute(
@@ -354,7 +407,13 @@ def restart_docker_container(reservation_id: str):
 # ---------------------------------------------------------------------------
 
 def run():
-  """Initialize and start the daemon. Called from docker_utility.py shim."""
+  """Initialize the daemon and start the main loop.
+
+  Reads the server name from settings, resolves it to a database computer
+  ID, and enters the infinite main polling loop. Exits if Docker is not
+  enabled or if the server name cannot be found in the database. Called
+  from the docker_utility.py entry-point shim.
+  """
   global computer_id
 
   print("AI Server Docker utility started.")

@@ -1,3 +1,11 @@
+"""API router configuration and application startup initialization.
+
+Registers all endpoint routers (user, reservation, admin, app) onto a
+single FastAPI APIRouter. Also runs one-time startup logic when the module
+is imported: ensures required roles exist ("everyone", "admin") and
+optionally seeds test data in development mode.
+"""
+
 from fastapi import APIRouter
 from endpoints import user, reservation, admin, app
 from settings_handler import settings_handler

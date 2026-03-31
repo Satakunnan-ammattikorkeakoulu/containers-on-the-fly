@@ -1,3 +1,10 @@
+"""Reservation API endpoints for browsing hardware, creating, managing, and
+cancelling container reservations.
+
+Endpoints handle input validation and sanitization before delegating
+business logic to ``endpoints.responses.reservation``.
+"""
+
 from fastapi import APIRouter, Depends
 from helpers.server import api_response, force_authentication
 from helpers.auth import check_token, is_admin, get_authenticated_user_id
@@ -17,31 +24,103 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login")
 
 @router.get("/get_available_hardware")
 async def get_available_hardware(date : str, duration: int, token: str = Depends(oauth2_scheme)):
+  """Retrieve hardware resources available for a given date and duration.
+
+  Args:
+      date: Desired start date/time string for the reservation.
+      duration: Reservation duration in hours.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Available hardware specs per computer wrapped in an API response.
+  """
   userId = get_authenticated_user_id(token)
   return functionality.get_available_hardware(date, duration, None, is_admin(userId), None, userId)
 
 @router.get("/get_availability_timeline")
 async def get_availability_timeline(startDate: str, endDate: str, token: str = Depends(oauth2_scheme)):
+  """Retrieve a timeline of hardware availability over a date range.
+
+  Args:
+      startDate: Start of the date range.
+      endDate: End of the date range.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Availability timeline data wrapped in an API response.
+  """
   userId = get_authenticated_user_id(token)
   return functionality.get_availability_timeline(startDate, endDate, is_admin(userId))
 
 @router.get("/get_all_reservations_for_calendar")
 async def get_all_reservations_for_calendar(startDate: str, endDate: str, token: str = Depends(oauth2_scheme)):
+  """Retrieve all reservations within a date range for the calendar view.
+
+  Args:
+      startDate: Start of the date range.
+      endDate: End of the date range.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      List of reservations formatted for calendar display.
+  """
   force_authentication(token)
   return functionality.get_all_reservations_for_calendar(startDate, endDate)
 
 @router.post("/get_own_reservations")
 async def get_own_reservations(filters : ReservationFilters, token: str = Depends(oauth2_scheme)):
+  """Retrieve the authenticated user's own reservations with filters.
+
+  Args:
+      filters: Pydantic model with filtering criteria (dates, status, etc.).
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Filtered list of the user's reservations wrapped in an API response.
+  """
   userId = get_authenticated_user_id(token)
   return functionality.get_own_reservations(userId, filters)
 
 @router.get("/get_own_reservation_details")
 async def get_own_reservation_details(reservationId: int, token: str = Depends(oauth2_scheme)):
+  """Retrieve detailed information for one of the user's own reservations.
+
+  Args:
+      reservationId: ID of the reservation to retrieve.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Reservation details (container info, hardware, ports) wrapped in an
+      API response, or an error if the reservation does not belong to the user.
+  """
   userId = get_authenticated_user_id(token)
   return functionality.get_own_reservation_details(reservationId, userId)
 
 @router.post("/create_reservation")
 async def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, token: str = Depends(oauth2_scheme)):
+  """Create a new container reservation after validating all inputs.
+
+  Validates date, duration, IDs, email format, description length,
+  SHM/RAM-disk percentages, and hardware specs JSON before delegating
+  to the business logic layer.
+
+  Args:
+      date: Desired start date/time string (max 50 chars).
+      duration: Reservation duration in hours (1 -- 8760).
+      computerId: ID of the target computer/server.
+      containerId: ID of the container image to launch.
+      hardwareSpecs: JSON string mapping hardware spec IDs to amounts.
+      adminReserveUserEmail: Email of the user to reserve for (admin only),
+          or empty/None for self-reservation.
+      description: Optional short description (max 50 chars).
+      shmSizePercent: Shared memory size as a percentage of RAM (0 -- 90).
+      ramDiskSizePercent: RAM disk size as a percentage of RAM (0 -- 60).
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Success API response with reservation details, or failure response
+      with a validation error message.
+  """
   force_authentication(token)
 
   # Validate date parameter
@@ -103,21 +182,61 @@ async def create_reservation(date: str, duration: int, computerId: int, containe
 
 @router.get("/get_current_reservations")
 async def get_current_reservations(token: str = Depends(oauth2_scheme)):
+  """Retrieve all currently active (running) reservations.
+
+  Args:
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      List of active reservations wrapped in an API response.
+  """
   force_authentication(token)
   return functionality.get_current_reservations()
 
 @router.post("/cancel_reservation")
 async def cancel_reservation(reservationId: str, token: str = Depends(oauth2_scheme)):
+  """Cancel a reservation owned by the authenticated user.
+
+  Args:
+      reservationId: ID of the reservation to cancel.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Success or failure API response.
+  """
   userId = get_authenticated_user_id(token)
   return functionality.cancel_reservation(userId, reservationId)
 
 @router.post("/extend_reservation")
 async def extend_reservation(reservationId: str, duration : int, token: str = Depends(oauth2_scheme)):
+  """Extend the end time of an active reservation.
+
+  Args:
+      reservationId: ID of the reservation to extend.
+      duration: Additional hours to add to the reservation.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Success or failure API response.
+  """
   userId = get_authenticated_user_id(token)
   return functionality.extend_reservation(userId, reservationId, duration)
 
 @router.post("/update_reservation_description")
 async def update_reservation_description(reservationId: str, description: str = "", token: str = Depends(oauth2_scheme)):
+  """Update the description of an existing reservation.
+
+  Sanitizes the description by stripping whitespace and removing
+  potentially harmful characters before saving.
+
+  Args:
+      reservationId: ID of the reservation to update.
+      description: New description text (max 50 chars after sanitization).
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Success or failure API response.
+  """
   userId = get_authenticated_user_id(token)
 
   # Validate and sanitize description
@@ -130,5 +249,14 @@ async def update_reservation_description(reservationId: str, description: str = 
 
 @router.post("/restart_container")
 async def restart_container(reservationId: str, token: str = Depends(oauth2_scheme)):
+  """Restart the Docker container associated with a reservation.
+
+  Args:
+      reservationId: ID of the reservation whose container to restart.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Success or failure API response.
+  """
   userId = get_authenticated_user_id(token)
   return functionality.restart_container(userId, reservationId)

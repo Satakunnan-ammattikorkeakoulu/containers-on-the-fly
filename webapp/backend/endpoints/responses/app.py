@@ -1,13 +1,22 @@
+"""Response handlers for public application endpoints.
+
+Provides configuration data that is accessible without authentication,
+such as application name, timezone, login instructions, and contact info.
+"""
+
 from helpers.server import api_response
 
 def get_public_config() -> object:
-    '''
-    Returns public app configuration that doesn't require authentication.
-    This includes app info, reservation limits, instruction messages, etc.
-    
+    """Return public app configuration that does not require authentication.
+
+    Retrieves application name, timezone, instruction messages, and contact
+    information from database settings and returns them in a structured format
+    for the frontend login and reservation pages.
+
     Returns:
-        object: Response object with public configuration data.
-    '''
+        Response object with public configuration data including app info,
+        instruction texts, and login field labels.
+    """
     try:
         from settings_handler import get_multiple_settings
         

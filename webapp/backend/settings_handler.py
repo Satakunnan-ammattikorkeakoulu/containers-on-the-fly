@@ -1,6 +1,14 @@
-# Settings Handler
-# This module provides a unified interface for accessing all application settings
-# from both settings.json files and the database SystemSetting table
+"""Unified settings handler for file-based and database-stored settings.
+
+Provides a single interface (UnifiedSettings) for reading and writing all
+application settings. File-based settings (infrastructure config) are loaded
+from settings.json at startup. Database settings (runtime config) are loaded
+on demand from the SystemSetting table with caching.
+
+Usage:
+    from settings_handler import settings_handler
+    url = settings_handler.get_setting("app.url")
+"""
 
 import json
 import os

@@ -1,6 +1,10 @@
-# Settings Schema Definition
-# This file defines all settings used throughout the Containers on the Fly application
-# It serves as the single source of truth for setting definitions, validation rules, and metadata
+"""Settings schema definition for the Containers on the Fly application.
+
+Single source of truth for all setting definitions, types, defaults,
+and validation rules. Settings are categorized by source:
+- FILE: Infrastructure settings loaded from settings.json (immutable at runtime)
+- DATABASE: User-configurable settings stored in the SystemSetting table
+"""
 
 from typing import Dict, Any, Optional, List, Union
 from enum import Enum
@@ -18,8 +22,20 @@ class SettingType(Enum):
     FLOAT = "float"
 
 class SettingSetting:
-    """Definition of a single setting with all its metadata"""
-    
+    """Definition of a single setting with its type, source, and validation rules.
+
+    Args:
+        source: Where the setting is stored (FILE or DATABASE).
+        data_type: The value type for parsing and validation.
+        default: Default value when the setting is not explicitly configured.
+        required: Whether the setting must be present at startup.
+        description: Human-readable description of the setting.
+        validation: Optional callable for custom validation.
+        allowed_values: Optional list of permitted values.
+        min_value: Optional minimum for numeric settings.
+        max_value: Optional maximum for numeric settings.
+    """
+
     def __init__(
         self, 
         source: SettingSource, 

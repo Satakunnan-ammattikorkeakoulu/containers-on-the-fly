@@ -1,3 +1,10 @@
+"""Database queries for the Docker utility daemon.
+
+Provides query functions to retrieve reservations in various lifecycle
+states (needing start, stop, restart) and to look up container and
+computer information. Used exclusively by the daemon module.
+"""
+
 from python_on_whales import docker
 from database import Session, Reservation, Computer
 from sqlalchemy import select
@@ -7,18 +14,26 @@ from datetime import timezone
 
 
 def time_now():
+  """Return the current UTC datetime.
+
+  Returns:
+      datetime: Current time in UTC timezone.
+  """
   return datetime.datetime.now(datetime.timezone.utc)
 
 
 def get_reservations_requiring_start(computer_id: int):
-  '''
-  Returns all reservations requiring start in the given computer.
-  Parameters:
-    computer_id: ID of the computer.
+  """Get all reservations that need to be started on the given computer.
+
+  Queries for reservations with status "reserved" whose start date has
+  already passed.
+
+  Args:
+      computer_id: Database ID of the computer to query.
 
   Returns:
-    List of reservations requiring start in the given computer.
-  '''
+      list: Reservation ORM objects that should have their containers started.
+  """
   with Session() as session:
     reservations = session.execute(
       select(Reservation).where(
@@ -31,14 +46,18 @@ def get_reservations_requiring_start(computer_id: int):
 
 
 def get_running_reservations(computer_id: int):
-  '''
-  Returns all running reservations in the given computer.
-  Parameters:
-    computer_id: ID of the computer.
+  """Get all currently running reservations on the given computer.
+
+  Queries for reservations with status "started" whose start date has
+  passed and end date has not yet been reached. Eager-loads the
+  reservedContainer relationship.
+
+  Args:
+      computer_id: Database ID of the computer to query.
 
   Returns:
-    List of running reservations in the given computer.
-  '''
+      list: Reservation ORM objects that are currently running.
+  """
   with Session() as session:
     reservations = session.execute(
       select(Reservation).options(
@@ -54,14 +73,17 @@ def get_running_reservations(computer_id: int):
 
 
 def get_reservations_requiring_stop(computer_id: int):
-  '''
-  Returns all reservations requiring stop in the given computer.
-  Parameters:
-    computer_id: ID of the computer.
+  """Get all reservations that need to be stopped on the given computer.
+
+  Queries for reservations with status "started" or "reserved" whose
+  end date has already passed.
+
+  Args:
+      computer_id: Database ID of the computer to query.
 
   Returns:
-    List of reservations requiring stop in the given computer.
-  '''
+      list: Reservation ORM objects whose containers should be stopped.
+  """
   with Session() as session:
     reservations = session.execute(
       select(Reservation).where(
@@ -74,14 +96,17 @@ def get_reservations_requiring_stop(computer_id: int):
 
 
 def get_reservations_requiring_restart(computer_id: int):
-  '''
-  Returns all reservations requiring restart in the given computer.
-  Parameters:
-    computer_id: ID of the computer.
+  """Get all reservations flagged for restart on the given computer.
+
+  Queries for reservations with status "restart" whose end date has
+  not yet been reached.
+
+  Args:
+      computer_id: Database ID of the computer to query.
 
   Returns:
-    List of reservations requiring restart in the given computer.
-  '''
+      list: Reservation ORM objects whose containers should be restarted.
+  """
   with Session() as session:
     reservations = session.execute(
       select(Reservation).where(
@@ -94,29 +119,22 @@ def get_reservations_requiring_restart(computer_id: int):
 
 
 def get_container_information(reservation_id: str):
-  '''
-    Returns:
-      On error or if cannot find the container:
-        None, {}
-      Otherwise (example, first is container name / ID and second is the python_on_whales.components.container.models.ContainerState object):
-        "yolov7_12_12_12_2023",
-        python_on_whales.components.container.models.ContainerState object {
-          containerName = 'yolov7_12_12_12_2023',
-          status='running',
-          running=True,
-          paused=False,
-          restarting=False,
-          oom_killed=False,
-          dead=False,
-          pid=1042809,
-          exit_code=0,
-          error='',
-          started_at=datetime.datetime(2023, 5, 22, 17, 47, 42, 381981),
-          tzinfo=datetime.timezone.utc),
-          finished_at=datetime.datetime(1, 1, 1, 0, 0, tzinfo=datetime.timezone.utc),
-          health=None
-        }
-  '''
+  """Get the Docker container name and inspection data for a reservation.
+
+  Looks up the reservation in the database, retrieves the associated
+  Docker container name, and calls docker inspect to get full container
+  state information.
+
+  Args:
+      reservation_id: Database ID of the reservation to inspect.
+
+  Returns:
+      tuple: A 2-element tuple of (container_name, container_inspect)
+          where container_name is a string and container_inspect is a
+          python_on_whales Container object with a .state attribute
+          containing status, running, paused, exit_code, started_at, etc.
+          Returns (None, {}) if the reservation is not found or on error.
+  """
   try:
     with Session() as session:
       reservation = session.execute(
@@ -133,15 +151,15 @@ def get_container_information(reservation_id: str):
 
 
 def get_computer_id(computer_name: str):
-  '''
-  Gets the ID of the computer in the database with the given name.
+  """Get the database ID of a computer by its name.
 
-  Parameters:
-    computer_name: Name of the computer (in the database)
+  Args:
+      computer_name: Name of the computer as stored in the database.
 
   Returns:
-    ID of the computer, or None if it was not found or we encounter any exception.
-  '''
+      int or None: The computer's database ID, or None if no computer
+          with that name exists or an exception occurs.
+  """
   try:
     with Session() as session:
       computer = session.execute(
@@ -157,10 +175,16 @@ def get_computer_id(computer_name: str):
 
 
 def get_running_reserved_docker_containers():
-  '''
-  Finds all Docker containers with name starting with "reservation-".
-  Basically all reservations that are physically running on this computer.
-  '''
+  """Find all Docker containers whose name starts with "reservation-".
+
+  Lists all currently running Docker containers on this host and filters
+  for those created by the reservation system (identified by the
+  "reservation-" name prefix).
+
+  Returns:
+      list: python_on_whales Container objects for running reservation
+          containers.
+  """
   running_containers = docker.ps()
 
   # Filter containers whose names start with "reservation-"

@@ -1,3 +1,9 @@
+"""Server helper utilities for API responses and authentication enforcement.
+
+Provides the standard API response wrapper, authentication enforcement for
+endpoints, and ORM-to-dict conversion for SQLAlchemy models.
+"""
+
 from typing import Union
 from fastapi import HTTPException, status
 from sqlalchemy import inspect, select
@@ -8,6 +14,19 @@ from database import User, Session
 from settings_handler import settings_handler
 
 def api_response(status, message, extra_data = None):
+  """Build a standardized API response dict.
+
+  All endpoint response functions should use this to ensure a consistent
+  response format across the API.
+
+  Args:
+      status: Boolean indicating success (True) or failure (False).
+      message: A human-readable message describing the result.
+      extra_data: Optional additional data to include under the 'data' key.
+
+  Returns:
+      A dict with 'status', 'message', and optionally 'data' keys.
+  """
   response = {
     "status": status,
     "message": message
@@ -17,14 +36,24 @@ def api_response(status, message, extra_data = None):
   return response
 
 def force_authentication(token: str, role_required: str = None) -> Union[bool,HTTPException]:
-  '''
-  Checks if user is logged in by using the token passed.
-  Parameters:
-    token: Token
-    role_required: If user is required to be in a specific role, that role should be passed here
+  """Enforce authentication and optionally verify a required role.
+
+  Validates the user's token and, if a role is specified, checks that the
+  user has that role assigned. For admin role checks, uses the is_admin()
+  function. For other roles, checks both the primary role and the full
+  roles list.
+
+  Args:
+      token: The authentication bearer token.
+      role_required: An optional role name the user must have (e.g. 'admin').
+
   Returns:
-    True if is user is logged in, otherwise will raise HTTPException.
-  '''
+      True if the user is authenticated and has the required role.
+
+  Raises:
+      HTTPException: 401 Unauthorized if the token is invalid or the user
+          does not have the required role.
+  """
   wrong_role = False
   if (is_logged_in(token)):
     if role_required is not None:
@@ -71,6 +100,17 @@ def force_authentication(token: str, role_required: str = None) -> Union[bool,HT
   )
 
 def orm_to_dict(self):
+    """Convert a SQLAlchemy ORM model instance to a plain dictionary.
+
+    Iterates over all mapped columns and hybrid properties, converting
+    bytes values to strings. Skips columns whose names start with '_'.
+
+    Args:
+        self: The SQLAlchemy ORM model instance.
+
+    Returns:
+        A dict mapping column/property names to their values.
+    """
     result = {}
     for key in self.__mapper__.c.keys():
         # Going through all the keys one by one

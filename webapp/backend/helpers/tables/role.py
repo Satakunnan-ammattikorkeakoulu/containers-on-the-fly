@@ -1,23 +1,30 @@
-# Role table management functionality
+"""Role table management functionality.
+
+Provides CRUD operations for the Role database table and related tables
+(RoleMount, RoleHardwareLimit, RoleReservationLimit), including role
+creation, editing, deletion, mount management, hardware limit management,
+and reservation limit management.
+"""
 from database import Role, RoleMount, Computer, Session, UserRole
 from helpers.server import api_response
 from sqlalchemy import select, delete, func
 
 def get_roles():
-    '''
-    Gets all roles from the database.
+    """Get all roles from the database.
+
     Returns:
-        List of all roles.
-    '''
+        A list of all Role ORM objects.
+    """
     with Session() as session:
         return session.execute(select(Role)).scalars().all()
 
 def get_roles_with_mount_counts():
-    '''
-    Gets all roles from the database with their mount counts.
+    """Get all roles from the database with their mount counts.
+
     Returns:
-        List of all roles with additional mountCount field.
-    '''
+        A list of role dictionaries, each augmented with a 'mountCount'
+        field indicating how many RoleMount entries the role has.
+    """
     with Session() as session:
         roles = session.execute(select(Role)).scalars().all()
         result = []
@@ -33,39 +40,47 @@ def get_roles_with_mount_counts():
         return result
 
 def get_role_by_id(roleId):
-    '''
-    Gets a role by its ID.
-    Parameters:
-        roleId: The ID of the role to get.
+    """Get a role by its ID.
+
+    Args:
+        roleId: The ID of the role to retrieve.
+
     Returns:
-        The role object or None if not found.
-    '''
+        The Role ORM object, or None if not found.
+    """
     with Session() as session:
         return session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
 
 def is_role_name_taken(session, name: str, excludeRoleId: int = None) -> bool:
-    '''
-    Checks if a role name is already taken.
-    Parameters:
-        session: The database session
-        name: The name to check
-        excludeRoleId: Optional role ID to exclude from the check (for updates)
+    """Check if a role name is already taken (case-insensitive).
+
+    Args:
+        session: The active SQLAlchemy database session.
+        name: The role name to check for uniqueness.
+        excludeRoleId: An optional role ID to exclude from the check,
+            used when updating a role to allow it to keep its own name.
+
     Returns:
-        bool: True if name is taken, False otherwise
-    '''
+        True if another role with the same name exists, False otherwise.
+    """
     stmt = select(func.count()).select_from(Role).where(func.lower(Role.name) == func.lower(name))
     if excludeRoleId is not None:
         stmt = stmt.where(Role.roleId != excludeRoleId)
     return session.execute(stmt).scalar_one() > 0
 
 def validate_role_name(name: str) -> tuple[bool, str]:
-    '''
-    Validates a role name.
-    Parameters:
-        name: The name to validate
+    """Validate a role name against naming rules.
+
+    Checks that the name is non-empty and not a reserved name
+    ('admin', 'everyone').
+
+    Args:
+        name: The role name to validate.
+
     Returns:
-        tuple[bool, str]: (is_valid, error_message)
-    '''
+        A tuple of (is_valid, error_message). If valid, error_message
+        is an empty string.
+    """
     if not name or not name.strip():
         return False, "Role name is required"
 
@@ -76,13 +91,18 @@ def validate_role_name(name: str) -> tuple[bool, str]:
     return True, ""
 
 def add_role(name: str) -> tuple[bool, str, dict]:
-    '''
-    Adds a new role to the database.
-    Parameters:
-        name: The name of the role
+    """Add a new role to the database.
+
+    Validates the name and checks for duplicates before creating.
+
+    Args:
+        name: The name of the new role.
+
     Returns:
-        tuple[bool, str, dict]: (success, message, role_dict)
-    '''
+        A tuple of (success, message, role_dict). On success, role_dict
+        contains the created role as a dictionary. On failure, role_dict
+        is None.
+    """
     with Session() as session:
         try:
             # Validate name
@@ -109,14 +129,19 @@ def add_role(name: str) -> tuple[bool, str, dict]:
             return False, f"Failed to add role: {str(e)}", None
 
 def edit_role(roleId: int, name: str) -> tuple[bool, str, dict]:
-    '''
-    Edits an existing role in the database.
-    Parameters:
-        roleId: The ID of the role to update
-        name: The new name for the role
+    """Edit an existing role's name in the database.
+
+    Validates the new name and checks for duplicates before updating.
+
+    Args:
+        roleId: The ID of the role to update.
+        name: The new name for the role.
+
     Returns:
-        tuple[bool, str, dict]: (success, message, role_dict)
-    '''
+        A tuple of (success, message, role_dict). On success, role_dict
+        contains the updated role as a dictionary. On failure, role_dict
+        is None.
+    """
     with Session() as session:
         try:
             # Validate name
@@ -146,17 +171,18 @@ def edit_role(roleId: int, name: str) -> tuple[bool, str, dict]:
             return False, f"Failed to update role: {str(e)}", None
 
 def remove_role(roleId):
-    '''
-    Removes a role from the system and cleans up all associated data:
-    - Removes all user associations (UserRole entries)
-    - Removes all role mounts (RoleMount entries)
-    - Removes the role itself
+    """Remove a role and all its associated data from the system.
 
-    Parameters:
+    Cleans up UserRole associations, RoleMount entries, and
+    RoleHardwareLimit entries before deleting the role itself.
+    Built-in roles ('admin', 'everyone') cannot be removed.
+
+    Args:
         roleId: The ID of the role to remove.
+
     Returns:
-        tuple[bool, str]: (success, message)
-    '''
+        A tuple of (success, message).
+    """
     with Session() as session:
         try:
             role = session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
@@ -187,13 +213,17 @@ def remove_role(roleId):
             return False, f"Failed to remove role: {str(e)}"
 
 def get_role_mounts(roleId: int) -> list:
-    '''
-    Gets all mounts for a specific role.
-    Parameters:
-        roleId: The ID of the role
+    """Get all mounts for a specific role.
+
+    Args:
+        roleId: The ID of the role to get mounts for.
+
     Returns:
-        List of mount objects with computer information
-    '''
+        A list of mount dictionaries, each containing roleMountId,
+        roleId, computerId, hostPath, containerPath, readOnly, and
+        computerName fields. Returns an empty list if the role is
+        not found.
+    """
     with Session() as session:
         role = session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
         if not role:
@@ -215,14 +245,20 @@ def get_role_mounts(roleId: int) -> list:
         return mounts
 
 def save_role_mounts(roleId: int, mounts: list) -> tuple[bool, str]:
-    '''
-    Saves role mounts, removing old ones and adding new ones.
-    Parameters:
-        roleId: The ID of the role
-        mounts: List of mount dictionaries with computerId, hostPath, containerPath, readOnly
+    """Save role mounts by replacing all existing mounts with new ones.
+
+    Deletes all current mounts for the role, then creates new entries
+    from the provided list. Validates that each referenced computer exists.
+
+    Args:
+        roleId: The ID of the role to save mounts for.
+        mounts: A list of mount dictionaries, each requiring 'computerId',
+            'hostPath', and 'containerPath' keys. 'readOnly' is optional
+            and defaults to False.
+
     Returns:
-        tuple[bool, str]: (success, message)
-    '''
+        A tuple of (success, message).
+    """
     with Session() as session:
         # Check if role exists
         role = session.execute(select(Role).where(Role.roleId == roleId)).scalar_one_or_none()
@@ -257,13 +293,16 @@ def save_role_mounts(roleId: int, mounts: list) -> tuple[bool, str]:
         return True, "Role mounts saved successfully"
 
 def get_role_hardware_limits(roleId: int) -> list:
-    '''
-    Gets hardware limits for a specific role.
-    Parameters:
-        roleId: The ID of the role
+    """Get hardware limits for a specific role.
+
+    Args:
+        roleId: The ID of the role to get hardware limits for.
+
     Returns:
-        List of hardware limits for the role
-    '''
+        A list of hardware limit dictionaries, each containing
+        roleHardwareLimitId, roleId, hardwareSpecId,
+        maximumAmountForRole, computerId, and hardwareType fields.
+    """
     from database import RoleHardwareLimit, HardwareSpec
     from helpers.server import orm_to_dict
 
@@ -289,14 +328,23 @@ def get_role_hardware_limits(roleId: int) -> list:
         return result
 
 def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> tuple[bool, str]:
-    '''
-    Saves role hardware limits, removing old ones and adding new ones.
-    Parameters:
-        roleId: The ID of the role
-        hardwareLimits: List of hardware limit dictionaries with computerId, hardwareSpecId, maximumAmountForRole
+    """Save role hardware limits by replacing all existing limits with new ones.
+
+    Deletes all current hardware limits for the role, then creates new
+    entries from the provided list. Validates that each referenced hardware
+    spec exists, that values are positive integers, and that role limits
+    do not exceed system maximums. Built-in roles ('admin', 'everyone')
+    cannot have hardware limits set.
+
+    Args:
+        roleId: The ID of the role to save hardware limits for.
+        hardwareLimits: A list of hardware limit dictionaries, each
+            requiring 'hardwareSpecId' and 'maximumAmountForRole' keys.
+            Entries with None maximumAmountForRole are skipped.
+
     Returns:
-        tuple[bool, str]: (success, message)
-    '''
+        A tuple of (success, message).
+    """
     from database import RoleHardwareLimit, HardwareSpec
 
     with Session() as session:
@@ -369,15 +417,21 @@ def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> tuple[bool, 
         return True, "Role hardware limits saved successfully"
 
 def get_role_reservation_limits(roleId: int) -> dict:
-    '''
-    Gets reservation limits for a specific role.
+    """Get reservation limits for a specific role, with defaults applied.
 
-    Parameters:
-        roleId: The ID of the role
+    Returns stored limits if they exist, otherwise returns sensible
+    defaults. Admin roles get higher defaults (60-day max duration,
+    99 active reservations) compared to regular roles (2-day max
+    duration, 1 active reservation).
+
+    Args:
+        roleId: The ID of the role to get reservation limits for.
 
     Returns:
-        dict: Reservation limits with defaults applied
-    '''
+        A dictionary with 'minDuration', 'maxDuration', and
+        'maxActiveReservations' keys (values in hours), or an empty
+        dict if the role is not found.
+    """
     from database import RoleReservationLimit
 
     with Session() as session:
@@ -416,16 +470,21 @@ def get_role_reservation_limits(roleId: int) -> dict:
             }
 
 def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> tuple[bool, str]:
-    '''
-    Saves reservation limits for a role.
+    """Save reservation limits for a role (create or update).
 
-    Parameters:
-        roleId: The ID of the role
-        reservationLimits: Dictionary with minDuration, maxDuration, and maxActiveReservations
+    Validates that all required fields are present and within allowed
+    ranges: minDuration (1-720 hours), maxDuration (1-1440 hours),
+    maxActiveReservations (0-99). Also ensures minDuration does not
+    exceed maxDuration.
+
+    Args:
+        roleId: The ID of the role to save reservation limits for.
+        reservationLimits: A dictionary with 'minDuration', 'maxDuration',
+            and 'maxActiveReservations' keys (values in hours).
 
     Returns:
-        tuple[bool, str]: (success, message)
-    '''
+        A tuple of (success, message).
+    """
     from database import RoleReservationLimit
 
     with Session() as session:

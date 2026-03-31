@@ -1,7 +1,9 @@
-# Main entrypoint for the whole app
+"""FastAPI application entry point.
 
-# TODO: Required?
-#from importlib import reload
+Configures CORS, registers API routes, and starts the Uvicorn server.
+In production mode, hot-reload is disabled.
+"""
+
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import FastAPI

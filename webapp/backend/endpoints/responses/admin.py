@@ -1,3 +1,10 @@
+"""Response handlers for admin management endpoints.
+
+Provides business logic for administrative operations including reservation
+management, container and computer (server) CRUD, user management, role and
+permission management, server monitoring, and general application settings.
+"""
+
 from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs
 from dateutil import parser
 from dateutil.relativedelta import *
@@ -16,15 +23,18 @@ from helpers.tables.role import get_roles, get_role_by_id, add_role as add_role_
 from sqlalchemy import select, delete, func
 
 def get_reservations(filters : ReservationFilters) -> object:
-  '''
-  Returns a list of all reservations.
+  """Retrieve all reservations with optional status filtering.
+
+  Fetches reservations from the last 90 days (or with future end dates),
+  including eager-loaded hardware specs, container details, and computer
+  info. Also returns counts of reservations by status.
 
   Args:
-    filters (ReservationFilters): The filters to apply to the query.
+      filters: ReservationFilters containing status filter criteria.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with a list of reservation dicts and status count summary.
+  """
   reservations = []
   status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
 
@@ -94,17 +104,21 @@ def get_reservations(filters : ReservationFilters) -> object:
   return api_response(True, "Reservations fetched.", { "reservations": reservations, "statusCounts": status_counts })
 
 def save_container(containerEdit : ContainerEdit) -> object:
-  '''
-  Edits the given container.
+  """Create or update a container definition.
 
-  Parameters:
-    containerId: id of the container to edit.
-    data: New data for the container.
-  
+  For new containers (containerId == -1), creates a new Container record
+  with the given name, image, description, and ports. For existing
+  containers, updates the fields and handles port additions, removals,
+  and edits. Validates that the image name is unique across containers.
+
+  Args:
+      containerEdit: ContainerEdit model containing containerId and a
+          data dict with name, imageName, description, public flag,
+          ports, and removedPorts.
+
   Returns:
-    object: Response object with status, message and data.
-
-  '''
+      Response indicating success or failure with an appropriate message.
+  """
 
   with Session() as session:
     # Check for duplicate image name
@@ -160,15 +174,14 @@ def save_container(containerEdit : ContainerEdit) -> object:
   return api_response(True, "Container saved successfully")
 
 def remove_container(containerId : int) -> object:
-  '''
-  Removes the given container.
+  """Soft-delete a container by marking it as removed and non-public.
 
-  Parameters:
-    containerId: id of the container to remove.
-  
+  Args:
+      containerId: The ID of the container to remove.
+
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response indicating success or failure with an appropriate message.
+  """
 
   with Session() as session:
     container = session.execute(select(Container).where(Container.containerId == containerId)).scalar_one_or_none()
@@ -182,12 +195,15 @@ def remove_container(containerId : int) -> object:
   return api_response(True, "Container removed successfully")
 
 def get_users() -> object:
-    '''
-    Returns a list of all users and available roles.
+    """Retrieve all users with their roles and available role definitions.
+
+    Returns a list of all users (with userId, email, roles, createdAt,
+    and hasPassword) along with all available roles including user counts
+    and mount counts per role.
 
     Returns:
-        object: Response object with status, message and data.
-    '''
+        Response with users list and availableRoles list.
+    """
     data = []
     role_user_counts = {}
 
@@ -219,15 +235,15 @@ def get_users() -> object:
     return api_response(True, "Users fetched successfully", {"users": data, "availableRoles": available_roles})
 
 def get_user(userId: int) -> object:
-    '''
-    Returns a single user.
+    """Retrieve a single user by ID.
 
-    Parameters:
-        userId: id of the user to fetch.
+    Args:
+        userId: The ID of the user to fetch.
 
     Returns:
-        object: Response object with status, message and data.
-    '''
+        Response with user details (userId, email, roles, createdAt),
+        or an error if the user is not found.
+    """
     data = {}
 
     with Session() as session:
@@ -245,16 +261,21 @@ def get_user(userId: int) -> object:
     return api_response(True, "User fetched successfully", {"user": data})
 
 def save_user(userId: int, data: dict) -> object:
-    '''
-    Saves user data.
+    """Create or update a user account.
 
-    Parameters:
-        userId: id of the user to save (-1 for new user)
-        data: dictionary containing user data to save
+    For new users (userId == -1), creates a new User with hashed password.
+    For existing users, updates email and optionally password or clears it.
+    Also handles role assignment by replacing existing roles with the
+    provided list. Validates email uniqueness across all users.
+
+    Args:
+        userId: The ID of the user to update, or -1 to create a new user.
+        data: Dictionary containing email, password (optional),
+            clearPassword (optional bool), and roles (list of role names).
 
     Returns:
-        object: Response object with status and message
-    '''
+        Response indicating success or failure with an appropriate message.
+    """
     with Session() as session:
         # Check if email already exists
         existing_user = session.execute(select(User).where(User.email == data["email"])).scalar_one_or_none()
@@ -309,12 +330,11 @@ def save_user(userId: int, data: dict) -> object:
         return api_response(True, "User saved successfully")
 
 def get_hardware() -> object:
-  '''
-  Returns a list of all hardware.
+  """Retrieve all hardware specification records.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with a list of all HardwareSpec entries as dicts.
+  """
 
   data = []
 
@@ -328,12 +348,12 @@ def get_hardware() -> object:
   return api_response(True, "Data fetched.", { "hardware": data })
 
 def get_containers() -> object:
-  '''
-  Returns a list of all containers which have not been removed.
+  """Retrieve all active (non-removed) container definitions with their ports.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with a list of container dicts, each including a ports
+      list with containerPortId, port number, and serviceName.
+  """
 
   data = []
 
@@ -355,15 +375,14 @@ def get_containers() -> object:
   return api_response(True, "Data fetched.", { "containers": data })
 
 def get_container(containerId : int) -> object:
-  '''
-  Returns the given container.
+  """Retrieve a single container definition by ID, including its ports.
 
-  Parameters:
-    containerId: id of the container to fetch.
+  Args:
+      containerId: The ID of the container to fetch.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with the container dict including its ports list.
+  """
 
   addable = {}
 
@@ -383,12 +402,12 @@ def get_container(containerId : int) -> object:
   return api_response(True, "Data fetched.", { "data": addable })
 
 def get_computers() -> object:
-  '''
-  Returns a list of all computers.
+  """Retrieve all active (non-removed) computers with their hardware specs.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with a list of computer dicts, each including a
+      hardwareSpecs list of associated hardware specifications.
+  """
 
   data = []
 
@@ -405,15 +424,17 @@ def get_computers() -> object:
   return api_response(True, "Data fetched.", { "computers": data })
 
 def get_computer(computerId : int) -> object:
-  '''
-  Returns a single computer.
+  """Retrieve a single computer by ID with structured hardware details.
 
-  Parameters:
-    computerId: id of the computer to fetch.
+  Returns hardware organized into cpu, ram, gpu (aggregate), and gpus
+  (individual GPU list) sections.
+
+  Args:
+      computerId: The ID of the computer to fetch.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with the computer dict including nested hardware details.
+  """
 
   data = {}
 
@@ -440,17 +461,21 @@ def get_computer(computerId : int) -> object:
   return api_response(True, "Data fetched.", { "data": data })
 
 def save_computer(computerEdit : ComputerEdit) -> object:
-  '''
-  Edits the given computer.
+  """Create or update a computer (server) and its hardware specifications.
 
-  Parameters:
-    computerId: id of the computer to edit.
-    data: New data for the computer.
-  
+  For new computers (computerId == -1), creates a Computer record with
+  CPU, RAM, and GPU hardware specs. For existing computers, updates the
+  fields, modifies hardware spec limits, and handles GPU additions,
+  removals, and edits.
+
+  Args:
+      computerEdit: ComputerEdit model containing computerId and a data
+          dict with name, ip, public flag, hardware (cpu, ram, gpu, gpus),
+          and removedGPUs list.
+
   Returns:
-    object: Response object with status, message and data.
-
-  '''
+      Response indicating success or failure with an appropriate message.
+  """
   
   with Session() as session:
     # If new, create a new computer
@@ -558,15 +583,14 @@ def save_computer(computerEdit : ComputerEdit) -> object:
   return api_response(True, "Computer saved successfully")
 
 def remove_computer(computerId : int) -> object:
-  '''
-  Removes the given computer.
+  """Soft-delete a computer by marking it as removed and non-public.
 
-  Parameters:
-    computerId: id of the computer to remove.
-  
+  Args:
+      computerId: The ID of the computer to remove.
+
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response indicating success or failure with an appropriate message.
+  """
 
   with Session() as session:
     computer = session.execute(select(Computer).where(Computer.computerId == computerId)).scalar_one_or_none()
@@ -580,16 +604,18 @@ def remove_computer(computerId : int) -> object:
   return api_response(True, "Computer removed successfully")
 
 def edit_reservation(reservationId : int, end_date_str : str) -> object:
-  '''
-  Edits the given reservation.
+  """Update a reservation's end date.
 
-  Parameters:
-    reservationId: id of the reservation to edit.
-    end_date_str: New end date for the reservation.
+  Parses the provided date string and sets it as the new end date
+  for the specified reservation.
+
+  Args:
+      reservationId: The ID of the reservation to edit.
+      end_date_str: The new end date as an ISO-format string.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response indicating success or failure with an appropriate message.
+  """
   # Verify that the new end date is valid
   try:
     parsed_end_date = parser.parse(end_date_str)
@@ -607,66 +633,68 @@ def edit_reservation(reservationId : int, end_date_str : str) -> object:
   return api_response(True, "Reservation was edited succesfully.")
 
 def get_all_roles() -> object:
-    '''
-    Returns a list of all roles with mount counts.
+    """Retrieve all roles with their associated mount counts.
+
     Returns:
-        object: Response object with status, message and data.
-    '''
+        Response with a list of role dicts including mount count per role.
+    """
     from helpers.tables.role import get_roles_with_mount_counts
     data = get_roles_with_mount_counts()
     
     return api_response(True, "Roles fetched successfully.", {"roles": data})
 
 def add_role(name: str) -> object:
-    '''
-    Adds a new role.
-    Parameters:
-        name: The name of the role
+    """Create a new role with the given name.
+
+    Args:
+        name: The name for the new role.
+
     Returns:
-        object: Response object with status and message
-    '''
+        Response with the created role data, or an error if creation fails.
+    """
     success, message, role_dict = add_role_helper(name)
     if not success:
         return api_response(False, message)
     return api_response(True, message, role_dict)
 
 def edit_role(roleId: int, name: str) -> object:
-    '''
-    Edits an existing role.
-    Parameters:
-        roleId: The ID of the role to edit
-        name: The new name for the role
+    """Rename an existing role.
+
+    Args:
+        roleId: The ID of the role to edit.
+        name: The new name for the role.
+
     Returns:
-        object: Response object with status and message
-    '''
+        Response with the updated role data, or an error if the edit fails.
+    """
     success, message, role_dict = edit_role_helper(roleId, name)
     if not success:
         return api_response(False, message)
     return api_response(True, message, role_dict)
 
 def remove_role(roleId: int) -> object:
-    '''
-    Removes a role.
-    Parameters:
-        roleId: The ID of the role to remove
+    """Delete a role by ID.
+
+    Args:
+        roleId: The ID of the role to remove.
+
     Returns:
-        object: Response object with status and message
-    '''
+        Response indicating success or failure with an appropriate message.
+    """
     success, message = remove_role_helper(roleId)
     if not success:
         return api_response(False, message)
     return api_response(True, message)
 
 def get_role_mounts(roleId: int) -> object:
-    '''
-    Gets all mounts for a specific role.
-    
-    Parameters:
-        roleId: The ID of the role to get mounts for
-        
+    """Retrieve all volume mount configurations for a specific role.
+
+    Args:
+        roleId: The ID of the role to get mounts for.
+
     Returns:
-        object: Response object with status, message and data containing mounts
-    '''
+        Response with a list of mount dicts for the role.
+    """
     try:
         from helpers.tables.role import get_role_mounts as get_role_mounts_helper
         mounts = get_role_mounts_helper(roleId)
@@ -675,16 +703,19 @@ def get_role_mounts(roleId: int) -> object:
         return api_response(False, f"Error retrieving role mounts: {str(e)}")
 
 def save_role_mounts(roleId: int, mounts: list) -> object:
-    '''
-    Saves role mounts, replacing existing ones.
-    
-    Parameters:
-        roleId: The ID of the role
-        mounts: List of mount dictionaries
-        
+    """Replace all volume mount configurations for a role.
+
+    Deletes existing mounts and saves the provided list as the new
+    mount configuration for the specified role.
+
+    Args:
+        roleId: The ID of the role.
+        mounts: List of mount dicts, each containing host path,
+            container path, and read-only flag.
+
     Returns:
-        object: Response object with status and message
-    '''
+        Response indicating success or failure with an appropriate message.
+    """
     try:
         from helpers.tables.role import save_role_mounts as save_role_mounts_helper
         success, message = save_role_mounts_helper(roleId, mounts)
@@ -693,15 +724,14 @@ def save_role_mounts(roleId: int, mounts: list) -> object:
         return api_response(False, f"Error saving role mounts: {str(e)}")
 
 def get_role_hardware_limits(roleId: int) -> object:
-    '''
-    Retrieves hardware limits for a specific role.
-    
-    Parameters:
-        roleId: The ID of the role
-        
+    """Retrieve hardware resource limits for a specific role.
+
+    Args:
+        roleId: The ID of the role.
+
     Returns:
-        object: Response object with hardware limits data
-    '''
+        Response with a list of hardware limit dicts for the role.
+    """
     try:
         from helpers.tables.role import get_role_hardware_limits as get_role_hardware_limits_helper
         limits = get_role_hardware_limits_helper(roleId)
@@ -710,16 +740,19 @@ def get_role_hardware_limits(roleId: int) -> object:
         return api_response(False, f"Error retrieving role hardware limits: {str(e)}")
 
 def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> object:
-    '''
-    Saves role hardware limits, replacing existing ones.
-    
-    Parameters:
-        roleId: The ID of the role
-        hardwareLimits: List of hardware limit dictionaries
-        
+    """Replace all hardware resource limits for a role.
+
+    Deletes existing limits and saves the provided list as the new
+    hardware limit configuration for the specified role.
+
+    Args:
+        roleId: The ID of the role.
+        hardwareLimits: List of hardware limit dicts, each containing
+            hardwareSpecId and maximumAmountForRole.
+
     Returns:
-        object: Response object with status and message
-    '''
+        Response indicating success or failure with an appropriate message.
+    """
     try:
         from helpers.tables.role import save_role_hardware_limits as save_role_hardware_limits_helper
         success, message = save_role_hardware_limits_helper(roleId, hardwareLimits)
@@ -728,15 +761,15 @@ def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> object:
         return api_response(False, f"Error saving role hardware limits: {str(e)}")
 
 def get_role_reservation_limits(roleId: int) -> object:
-    '''
-    Retrieves reservation limits for a specific role.
-    
-    Parameters:
-        roleId: The ID of the role
-        
+    """Retrieve reservation limits for a specific role.
+
+    Args:
+        roleId: The ID of the role.
+
     Returns:
-        object: Response object with reservation limits data
-    '''
+        Response with reservation limits (minDuration, maxDuration,
+        maxActiveReservations) for the role.
+    """
     try:
         from helpers.tables.role import get_role_reservation_limits as get_role_reservation_limits_helper
         limits = get_role_reservation_limits_helper(roleId)
@@ -745,16 +778,16 @@ def get_role_reservation_limits(roleId: int) -> object:
         return api_response(False, f"Error retrieving role reservation limits: {str(e)}")
 
 def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> object:
-    '''
-    Saves role reservation limits, replacing existing ones.
-    
-    Parameters:
-        roleId: The ID of the role
-        reservationLimits: Dictionary containing minDuration, maxDuration, and maxActiveReservations
-        
+    """Replace reservation limits for a role.
+
+    Args:
+        roleId: The ID of the role.
+        reservationLimits: Dictionary containing minDuration (hours),
+            maxDuration (hours), and maxActiveReservations.
+
     Returns:
-        object: Response object indicating success or failure
-    '''
+        Response indicating success or failure with an appropriate message.
+    """
     try:
         from helpers.tables.role import save_role_reservation_limits as save_role_reservation_limits_helper
         success, message = save_role_reservation_limits_helper(roleId, reservationLimits)
@@ -763,15 +796,19 @@ def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> object
         return api_response(False, f"Error saving role reservation limits: {str(e)}")
 
 def get_server_monitoring(computer_id: int) -> object:
-    '''
-    Returns monitoring data (metrics and logs) for a specific server.
-    
+    """Retrieve monitoring data for a specific server.
+
+    Returns system metrics (CPU, memory, disk, Docker, load averages,
+    uptime) and logs for the specified server. Includes online status
+    and software version information.
+
     Args:
-        computer_id (int): The ID of the computer/server.
-        
+        computer_id: The ID of the computer/server to monitor.
+
     Returns:
-        object: Response object with server monitoring data.
-    '''
+        Response with computer info, online status, metrics dict,
+        version info, and logs dict keyed by log type.
+    """
     with Session() as session:
         # Check if computer exists
         computer = session.execute(select(Computer).where(Computer.computerId == computer_id)).scalar_one_or_none()
@@ -863,12 +900,12 @@ def get_server_monitoring(computer_id: int) -> object:
         return api_response(True, "Server monitoring data retrieved", monitoring_data)
 
 def get_servers_for_monitoring() -> object:
-    '''
-    Returns a list of all servers/computers available for monitoring.
-    
+    """Retrieve all non-removed servers for the monitoring dashboard.
+
     Returns:
-        object: Response object with servers list.
-    '''
+        Response with a list of server dicts containing id, name,
+        address (IP), and public visibility flag.
+    """
     with Session() as session:
         computers = session.execute(select(Computer).where(
             (Computer.removed == False) | (Computer.removed.is_(None))
@@ -886,12 +923,18 @@ def get_servers_for_monitoring() -> object:
         return api_response(True, "Servers retrieved successfully", {"servers": servers_list})
 
 def get_general_settings() -> object:
-    '''
-    Returns all general admin settings with default values if not set.
-    
+    """Retrieve all admin-configurable application settings.
+
+    Fetches settings from the database organized by section: general
+    (app name, timezone, instructions), access control (blacklist/whitelist),
+    email (SMTP configuration), notifications (alert settings), and
+    authentication (login type, session timeout, LDAP configuration).
+    Returns default values for any settings not yet configured.
+
     Returns:
-        object: Response object with all settings organized by section.
-    '''
+        Response with settings organized by section, including
+        blacklisted and whitelisted email lists.
+    """
     try:
         from settings_handler import get_setting, get_multiple_settings
         from helpers.tables.user_access_control import get_blacklisted_emails, get_whitelisted_emails
@@ -996,16 +1039,19 @@ def get_general_settings() -> object:
         return api_response(False, f"Error retrieving settings: {str(e)}")
 
 def save_general_settings(section: str, settings: dict) -> object:
-    '''
-    Saves general admin settings for a specific section.
-    
+    """Save admin settings for a specific configuration section.
+
+    Persists settings to the database for the given section. Supported
+    sections: general, access, email, contact, emailEnable, notifications,
+    and auth (including nested LDAP settings).
+
     Args:
-        section: The section to save (general, access, email, notifications, auth)
-        settings: Dictionary of settings to save
-        
+        section: The settings section name to save.
+        settings: Dictionary of key-value pairs for the section.
+
     Returns:
-        object: Response object indicating success/failure
-    '''
+        Response indicating success or failure with an appropriate message.
+    """
     try:
         from settings_handler import set_setting
         from helpers.tables.user_access_control import set_blacklisted_emails, set_whitelisted_emails
@@ -1105,15 +1151,18 @@ def save_general_settings(section: str, settings: dict) -> object:
         return api_response(False, f"Error saving settings: {str(e)}")
 
 def send_test_email(email: str) -> object:
-    '''
-    Sends a test email to verify SMTP configuration.
-    
+    """Send a test email to verify SMTP configuration.
+
+    Uses the currently saved SMTP settings to send a test message.
+    Supports both SSL/TLS (port 465) and STARTTLS (other ports).
+
     Args:
-        email: Email address to send test to
-        
+        email: The recipient email address.
+
     Returns:
-        object: Response object indicating success/failure
-    '''
+        Response indicating whether the email was sent successfully
+        or describing the error that occurred.
+    """
     try:
         from settings_handler import get_setting
         import smtplib

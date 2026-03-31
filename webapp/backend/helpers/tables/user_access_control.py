@@ -1,27 +1,32 @@
-# User access control (blacklist/whitelist) table management functionality
+"""User access control (blacklist/whitelist) table management functionality.
+
+Provides bulk get and set operations for the UserBlacklist and UserWhitelist
+database tables, used to control which email addresses can access the system.
+"""
 from database import UserBlacklist, UserWhitelist, Session
 from sqlalchemy import select, delete
 
 def get_blacklisted_emails():
-    """
-    Get all blacklisted email addresses.
+    """Get all blacklisted email addresses.
 
     Returns:
-        List of email addresses
+        A list of email address strings from the blacklist.
     """
     with Session() as session:
         blacklist = session.execute(select(UserBlacklist)).scalars().all()
         return [entry.email for entry in blacklist if entry.email]
 
 def set_blacklisted_emails(emails: list):
-    """
-    Set the complete blacklist (replace all existing entries).
+    """Replace the entire blacklist with a new set of email addresses.
+
+    All existing blacklist entries are deleted before the new ones are added.
+    Empty or whitespace-only entries are skipped.
 
     Args:
-        emails: List of email addresses
+        emails: A list of email address strings to set as the new blacklist.
 
     Returns:
-        Boolean indicating success
+        True if the operation succeeded, False if an exception occurred.
     """
     try:
         with Session() as session:
@@ -41,25 +46,26 @@ def set_blacklisted_emails(emails: list):
         return False
 
 def get_whitelisted_emails():
-    """
-    Get all whitelisted email addresses.
+    """Get all whitelisted email addresses.
 
     Returns:
-        List of email addresses
+        A list of email address strings from the whitelist.
     """
     with Session() as session:
         whitelist = session.execute(select(UserWhitelist)).scalars().all()
         return [entry.email for entry in whitelist if entry.email]
 
 def set_whitelisted_emails(emails: list):
-    """
-    Set the complete whitelist (replace all existing entries).
+    """Replace the entire whitelist with a new set of email addresses.
+
+    All existing whitelist entries are deleted before the new ones are added.
+    Empty or whitespace-only entries are skipped.
 
     Args:
-        emails: List of email addresses
+        emails: A list of email address strings to set as the new whitelist.
 
     Returns:
-        Boolean indicating success
+        True if the operation succeeded, False if an exception occurred.
     """
     try:
         with Session() as session:

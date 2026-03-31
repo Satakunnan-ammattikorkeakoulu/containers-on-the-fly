@@ -1,22 +1,44 @@
+"""Email notification and connection text generation for container events.
+
+Generates human-readable connection instructions for started containers
+and sends email notifications for container start, error, and failure
+events. Used by the daemon when container state changes.
+"""
+
 import os
 from helpers.email import send_email
 from settings_handler import get_setting
 
 
 def generate_connection_text(image, ip, ports, password, include_email_details, non_critical_errors, end_date=None):
-    '''
-    Generates the connection details text for a started container.
-    Used both in emails and in the UI.
+    """Generate connection details text for a started container.
 
-    Parameters:
-        image (string): The name of the image used to start the container.
-        ip (string): The ip of the machine where the container is running.
-        ports (list): The ports used by the container. Example format: [ { serviceName: "ssh", localPort: 22, outsidePort: 2283 } ]
-        password (string): The password of the container user.
-        include_email_details (bool): Whether to include email-specific details (contact info, noreply notice).
-        non_critical_errors (string): Non-critical error messages to include.
-        end_date (datetime): The date when the container will be stopped.
-    '''
+    Builds a formatted text block containing SSH connection instructions,
+    other service endpoints, the container password, and optionally
+    email-specific details such as contact information and no-reply
+    notices. Used both in notification emails and in the UI.
+
+    Args:
+        image: Name of the Docker image used to start the container.
+        ip: IP address of the host machine running the container.
+        ports: List of port dictionaries, each containing serviceName,
+            localPort, and outsidePort keys. The SSH port entry is
+            extracted and formatted specially.
+        password: Password for the container's "user" account.
+        include_email_details: Whether to include email-specific text
+            such as contact info and no-reply notice.
+        non_critical_errors: Non-critical error messages to append to
+            the output text.
+        end_date: Optional datetime when the reservation ends. Converted
+            to the configured timezone for display.
+
+    Returns:
+        str: Formatted connection details text.
+
+    Note:
+        This function mutates the ports list by removing the SSH port
+        entry if found.
+    """
 
     linesep = os.linesep
 
@@ -96,7 +118,21 @@ IP address of the machine: {ip}
 
 
 def send_container_started_email(user_email, image_name, computer_ip, ports, password, non_critical_errors, end_date):
-    """Send email notification when a container starts successfully."""
+    """Send an email notification when a container starts successfully.
+
+    Generates connection details text and emails it to the user. Does
+    nothing if email sending is disabled in settings.
+
+    Args:
+        user_email: Recipient email address.
+        image_name: Name of the Docker image that was started.
+        computer_ip: IP address of the host machine.
+        ports: List of port dictionaries with serviceName, localPort,
+            and outsidePort.
+        password: SSH password for the container.
+        non_critical_errors: Any non-critical error messages to include.
+        end_date: Datetime when the reservation ends.
+    """
     if not get_setting('email.sendEmail'):
         return
 
@@ -108,7 +144,15 @@ def send_container_started_email(user_email, image_name, computer_ip, ports, pas
 
 
 def send_container_error_email(user_email, errors):
-    """Send email notification when a container fails to start."""
+    """Send an email notification when a container fails to start.
+
+    Notifies the user that their reservation encountered an error and
+    includes the error details. Does nothing if email sending is disabled.
+
+    Args:
+        user_email: Recipient email address.
+        errors: Error message or exception describing what went wrong.
+    """
     if not get_setting('email.sendEmail'):
         return
 
@@ -120,7 +164,21 @@ def send_container_error_email(user_email, errors):
 
 
 def send_admin_failure_alert(user_email, reservation_id, image_name, server_name, errors):
-    """Send container failure alerts to admin emails using existing helpers/email.py infrastructure."""
+    """Send container failure alerts to configured admin email addresses.
+
+    Sends a detailed failure notification to all admin alert recipients
+    configured in settings, excluding the affected user (who receives
+    their own notification separately). Does nothing if container alerts
+    are disabled or no alert emails are configured.
+
+    Args:
+        user_email: Email of the user whose container failed (excluded
+            from admin recipients to avoid duplicate notifications).
+        reservation_id: Database ID of the failed reservation.
+        image_name: Docker image that failed to start.
+        server_name: Name of the server where the failure occurred.
+        errors: Error message or exception describing the failure.
+    """
     try:
         alerts_enabled = get_setting('notifications.containerAlertsEnabled')
         if not alerts_enabled:

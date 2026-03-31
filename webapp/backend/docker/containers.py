@@ -1,7 +1,6 @@
-"""
-Pure Docker container operations via python_on_whales.
+"""Pure Docker container operations via python_on_whales.
 
-This module handles the actual Docker API calls — start, stop, restart.
+This module handles the actual Docker API calls -- start, stop, restart.
 No database access, no email, no filesystem setup (that's in mounts.py).
 """
 
@@ -14,39 +13,43 @@ from docker.mounts import build_volume_list, run_user_config_script
 
 
 def start_container(pars):
-    """
-    Starts a Docker container with the given parameters.
+    """Start a Docker container with the given parameters.
 
-    If the container cannot be started or there are any problems running this function,
-    will try to stop the created container (if able to).
+    Builds the full Docker run configuration from the provided parameter
+    dictionary, starts the container, sets the user password, optionally
+    deploys an SSH public key, and runs any user config scripts found in
+    mounted volumes. If the container cannot be started, attempts to clean
+    up by stopping any partially-created container.
 
-    Required parameters:
-        name (string): Name of the container. Must be unique in Docker.
-        image (string): Name of the image. Note: The image must be created in Docker before starting the container.
-        username (string): Username of the container user. Note: The user must be created in the Docker image before starting the container.
-        cpus (int): The amount of cpus dedicated for the container. Note: The amount of cpus must be available in the host machine.
-        memory (string): The amount of RAM memory dedicated for the container. For example: "1g" or "8g"
-        ports (list): The ports to be used. In format: [(local_port, container_port), (local_port2, container_port2)]. For example: [(2213, 22)] for SSH.
-        dbUserId (string): User ID from the database who started the container
-        reservation: Reservation dictionary containing computerId and user data (with email)
-        roleMounts (list): List of mount dictionaries with hostPath, containerPath, readOnly, computerId
-                          hostPath and containerPath support template variables:
-                          - {email}: User's email with special characters removed (e.g., "test_foo_com")
-                          - {userid}: User's database ID (e.g., "123")
-    Optional parameters:
-        gpus (string): The amount of gpus dedicated for the container in format "device=0,2,4" where "0", "2" and "4" are device nvidia / cuda IDs. Pass None if no gpus are needed.
-        image_version (string) (default: "latest"): The image version to use.
-        password (string) (default: random password): Password for the user of the container
-        interactive (int) (default: True): Leave stdin open during the duration of the process to allow communication with the parent process. Currently only works with tty=True for interactive use on the terminal.
-        remove (int) (default: True): If this is True, removes the container after it is stopped.
-        shm_size (int): The size of the shared memory. For example: 1g
+    Args:
+        pars: Dictionary of container parameters. Required keys:
+            name (str): Unique container name in Docker.
+            image (str): Docker image name (must exist in the registry).
+            username (str): Username inside the container.
+            cpus (int): Number of CPUs to dedicate.
+            memory (str): RAM allocation, e.g. "1g" or "8g".
+            ports (list): Port mappings as [(host_port, container_port), ...].
+            dbUserId (str): Database user ID of the reservation owner.
+            reservation (dict): Reservation info with computerId and user data.
+            roleMounts (list): Mount configs with hostPath, containerPath,
+                readOnly, and computerId. Paths support {email} and {userid}
+                template variables.
+            Optional keys:
+            gpus (str): GPU device string, e.g. "device=0,2,4", or None.
+            image_version (str): Image tag, defaults to "latest".
+            password (str): Container user password, defaults to random.
+            interactive (bool): Keep stdin open, defaults to True.
+            remove (bool): Remove container on stop, defaults to True.
+            shm_size_percent (int): Shared memory as percentage of RAM (10-90).
+            ram_disk_percent (int): RAM disk as percentage of RAM, 0 to disable.
+            sshPublicKey (str): SSH public key to deploy into the container.
+
     Returns:
-        namedtuple:
-            (boolean) started: True if the container was started successfully,
-            (string) container_name: The name of the container (if any),
-            (string) password: The password of the container user (if any),
-            (string) error_message: Error message(s) (if any),
-            (string) non_critical_error: Non-critical error messages (if any)
+        tuple: A 5-element tuple of (started, container_name, password,
+            error_message, non_critical_errors) where started is a bool
+            indicating success, and the remaining elements are strings
+            (empty on success for error_message, empty string or message
+            for non_critical_errors).
     """
     try:
         # Verify parameters first
@@ -199,11 +202,18 @@ def start_container(pars):
     return True, container_name, pars["password"], "", non_critical_errors
 
 def stop_container(container_name):
-    '''
-    Stops the container with the given name.
+    """Stop and remove a Docker container by name.
+
+    Attempts to stop the container first, then remove it. Either step
+    may fail independently if the container does not exist.
+
+    Args:
+        container_name: Name of the Docker container to stop.
+
     Returns:
-        (boolean) True if the container was stopped successfully, otherwise false (as it did not exist)
-    '''
+        bool: True if both stop and remove succeeded, False if either
+            failed due to the container not existing.
+    """
     no_errors = True
     try:
         docker.stop(container_name)
@@ -222,9 +232,14 @@ def stop_container(container_name):
     return no_errors
 
 def restart_container(container_name):
-    '''
-    Restarts the container with the given name.
-    '''
+    """Restart a Docker container by name.
+
+    Args:
+        container_name: Name of the Docker container to restart.
+
+    Raises:
+        Exception: If the container cannot be restarted (logged via traceback).
+    """
     print("Starting to restart a container...")
     try:
         print(f"Restarting container: {container_name}")

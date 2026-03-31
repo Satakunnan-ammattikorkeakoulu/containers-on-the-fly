@@ -1,3 +1,10 @@
+"""SQLAlchemy ORM models and database engine configuration.
+
+Defines all database tables as SQLAlchemy ORM classes and creates the
+shared engine and session factory used throughout the application.
+Uses MariaDB via PyMySQL with connection pooling.
+"""
+
 from sqlalchemy import create_engine
 from settings_handler import settings_handler
 import pymysql
@@ -18,6 +25,11 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 class User(Base):
+  """Application user account.
+
+  Stores credentials, authentication tokens, and SSH keys.
+  Users can have multiple roles and reservations.
+  """
   __tablename__ = "User"
 
   userId = Column(Integer, primary_key = True, autoincrement = True)
@@ -33,14 +45,23 @@ class User(Base):
   roles = relationship("Role", secondary = "UserRole", back_populates = "users", single_parent=True)
   reservations = relationship("Reservation", back_populates = "user")
 
-# If whitelisting is enabled, then only the email addresses specified here can login
 class UserWhitelist(Base):
+  """Email whitelist entry for access control.
+
+  When whitelisting is enabled, only email addresses present in this table
+  are allowed to log in.
+  """
   __tablename__ = "UserWhitelist"
 
   userWhitelistId = Column(Integer, primary_key = True, autoincrement = True)
   email = Column(Text, nullable = True, unique = True)
 
 class Role(Base):
+  """User role for access control and resource limits.
+
+  Roles group users together and define per-role hardware limits,
+  mount points, and reservation constraints.
+  """
   __tablename__ = "Role"
 
   roleId = Column(Integer, primary_key = True, autoincrement = True)
@@ -54,6 +75,7 @@ class Role(Base):
   reservationLimits = relationship("RoleReservationLimit", back_populates="role", uselist=False)
 
 class UserRole(Base):
+  """Many-to-many association between users and roles."""
   __tablename__ = "UserRole"
 
   userRoleId = Column(Integer, primary_key = True, autoincrement = True)
@@ -63,6 +85,11 @@ class UserRole(Base):
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 
 class Container(Base):
+  """Docker container image definition available for reservation.
+
+  Represents a reservable container type with its Docker image name,
+  display name, and associated service ports.
+  """
   __tablename__ = "Container"
 
   containerId = Column(Integer, primary_key = True, autoincrement = True)
@@ -78,6 +105,12 @@ class Container(Base):
   containerPorts = relationship("ContainerPort", back_populates = "container")
 
 class ContainerPort(Base):
+  """Service port definition for a container image.
+
+  Maps a service name (e.g. SSH, HTTP) to an internal container port.
+  When a container is reserved, each ContainerPort gets an assigned
+  external port via ReservedContainerPort.
+  """
   __tablename__ = "ContainerPort"
 
   containerPortId = Column(Integer, primary_key = True, autoincrement = True)
@@ -91,6 +124,12 @@ class ContainerPort(Base):
   reservedContainerPorts = relationship("ReservedContainerPort", back_populates = "containerPort")
 
 class ReservedContainer(Base):
+  """Instance of a running or scheduled Docker container.
+
+  Created when a user makes a reservation. Tracks the Docker container
+  lifecycle including container ID, status, SSH credentials, and
+  memory configuration (shared memory and RAM disk percentages).
+  """
   __tablename__ = "ReservedContainer"
 
   reservedContainerId = Column(Integer, primary_key = True, autoincrement = True)
@@ -113,8 +152,13 @@ class ReservedContainer(Base):
   reservedContainerPorts = relationship("ReservedContainerPort", back_populates = "reservedContainer")
 
 class ReservedContainerPort(Base):
+  """Port mapping for a reserved container instance.
+
+  Maps a container's internal service port (ContainerPort) to an
+  externally accessible port on the host machine.
+  """
   __tablename__ = "ReservedContainerPort"
-  
+
   reservedContainerPortId = Column(Integer, primary_key = True, autoincrement = True)
   reservedContainerId = Column(ForeignKey("ReservedContainer.reservedContainerId"), nullable = False)
   containerPortForeign = Column(ForeignKey("ContainerPort.containerPortId"), nullable = False)
@@ -127,6 +171,11 @@ class ReservedContainerPort(Base):
   containerPort = relationship("ContainerPort", back_populates = "reservedContainerPorts")
 
 class Reservation(Base):
+  """Container reservation linking a user, container, computer, and time slot.
+
+  Tracks the full lifecycle of a reservation through statuses:
+  reserved, started, stopped, error, restart.
+  """
   __tablename__ = "Reservation"
 
   reservationId = Column(Integer, primary_key = True, autoincrement = True)
@@ -146,6 +195,11 @@ class Reservation(Base):
   computer = relationship("Computer", back_populates = "reservations")
 
 class Computer(Base):
+  """Container server (physical or virtual machine) that hosts Docker containers.
+
+  Each computer has its own hardware specs, IP address, and can be
+  marked public or removed. Supports server status monitoring.
+  """
   __tablename__ = "Computer"
 
   computerId = Column(Integer, primary_key = True, autoincrement = True)
@@ -162,6 +216,11 @@ class Computer(Base):
   status = relationship("ServerStatus", back_populates="computer", uselist=False)
 
 class HardwareSpec(Base):
+  """Hardware resource specification for a computer (e.g. GPU, RAM, CPU cores).
+
+  Defines the resource type, total available amount, and per-user
+  limits. Each spec can have role-based overrides via RoleHardwareLimit.
+  """
   __tablename__ = "HardwareSpec"
 
   hardwareSpecId = Column(Integer, primary_key = True, autoincrement = True)
@@ -181,8 +240,13 @@ class HardwareSpec(Base):
   roleLimits = relationship("RoleHardwareLimit", back_populates="hardwareSpec")
 
 class ReservedHardwareSpec(Base):
+  """Hardware resource allocation for a specific reservation.
+
+  Records the amount of each hardware resource allocated to a
+  reservation (e.g. 2 GPUs, 16 GB RAM).
+  """
   __tablename__ = "ReservedHardwareSpec"
-  
+
   reservedHardwareSpecId = Column(Integer, primary_key = True, autoincrement = True)
   reservationId = Column(ForeignKey("Reservation.reservationId"), nullable = False)
   hardwareSpecId = Column(ForeignKey("HardwareSpec.hardwareSpecId"), nullable = False)
@@ -194,8 +258,13 @@ class ReservedHardwareSpec(Base):
   reservation = relationship("Reservation", back_populates = "reservedHardwareSpecs")
 
 class RoleMount(Base):
+    """Host-to-container volume mount assigned to a role on a specific computer.
+
+    Allows administrators to configure persistent storage mounts that are
+    automatically attached to containers reserved by users with this role.
+    """
     __tablename__ = "RoleMount"
-    
+
     roleMountId = Column(Integer, primary_key=True, autoincrement=True)
     roleId = Column(ForeignKey("Role.roleId"), nullable=False)
     computerId = Column(ForeignKey("Computer.computerId"), nullable=False)
@@ -209,8 +278,13 @@ class RoleMount(Base):
     computer = relationship("Computer", back_populates="roleMounts")
 
 class RoleHardwareLimit(Base):
+    """Per-role override for hardware resource limits.
+
+    Allows setting a maximum hardware allocation for a specific role on
+    a specific hardware spec, overriding the default maximumAmountForUser.
+    """
     __tablename__ = "RoleHardwareLimit"
-    
+
     roleHardwareLimitId = Column(Integer, primary_key=True, autoincrement=True)
     roleId = Column(ForeignKey("Role.roleId", name="fk_RoleHardwareLimit_roleId", ondelete="CASCADE"), nullable=False, index=True)
     hardwareSpecId = Column(ForeignKey("HardwareSpec.hardwareSpecId", name="fk_RoleHardwareLimit_hardwareSpecId", ondelete="CASCADE"), nullable=False, index=True)
@@ -226,8 +300,14 @@ class RoleHardwareLimit(Base):
     hardwareSpec = relationship("HardwareSpec", back_populates="roleLimits")
 
 class RoleReservationLimit(Base):
+    """Per-role reservation duration and concurrency limits.
+
+    Overrides default reservation constraints (min/max duration, max
+    active reservations) for users belonging to this role.
+    NULL values fall back to system defaults.
+    """
     __tablename__ = "RoleReservationLimit"
-    
+
     roleReservationLimitId = Column(Integer, primary_key=True, autoincrement=True)
     roleId = Column(ForeignKey("Role.roleId"), nullable=False)
     minDuration = Column(Integer, nullable=True)  # hours (NULL = use default)
@@ -243,10 +323,15 @@ class RoleReservationLimit(Base):
     role = relationship("Role", back_populates="reservationLimits")
 
 class ServerStatus(Base):
+    """Real-time health and performance metrics for a container server.
+
+    Stores CPU, memory, disk, Docker, and system load metrics collected
+    by the monitoring daemon. One row per computer (1:1 with Computer).
+    """
     __tablename__ = "ServerStatus"
-    
+
     computerId = Column(ForeignKey("Computer.computerId"), primary_key=True)
-    
+
     # Basic Health
     isOnline = Column(Boolean, nullable=False, default=False)
     
@@ -287,8 +372,13 @@ class ServerStatus(Base):
     computer = relationship("Computer", back_populates="status")
 
 class ServerLogs(Base):
+    """Cached log output from a container server's services.
+
+    Stores the last N lines of backend, frontend, or docker_utility logs
+    per computer. Unique per (computerId, logType) pair.
+    """
     __tablename__ = "ServerLogs"
-    
+
     serverLogId = Column(Integer, primary_key=True, autoincrement=True)
     computerId = Column(ForeignKey("Computer.computerId"), nullable=False)
     logType = Column(Text, nullable=False)  # 'backend', 'frontend', 'docker_utility'
@@ -304,14 +394,25 @@ class ServerLogs(Base):
     computer = relationship("Computer")
 
 class UserBlacklist(Base):
+  """Email blacklist entry for access control.
+
+  When blacklisting is enabled, email addresses in this table are
+  denied login access.
+  """
   __tablename__ = "UserBlacklist"
 
   userBlacklistId = Column(Integer, primary_key = True, autoincrement = True)
   email = Column(Text, nullable = True, unique = True)
 
 class SystemSetting(Base):
+  """Runtime-configurable application setting stored in the database.
+
+  Settings are keyed by settingKey (e.g. 'general.applicationName') and
+  store values as strings with a dataType indicator for parsing.
+  Managed via the admin interface and accessed through settings_handler.
+  """
   __tablename__ = "SystemSetting"
-  
+
   systemSettingId = Column(Integer, primary_key = True, autoincrement = True)
   settingKey = Column(Text, nullable = False, unique = True)
   settingValue = Column(Text, nullable = True)  # Store as JSON for complex values

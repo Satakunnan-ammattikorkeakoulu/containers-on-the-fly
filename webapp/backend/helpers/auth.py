@@ -1,3 +1,9 @@
+"""Authentication and authorization utilities.
+
+Provides functions for user authentication (local and LDAP), token management,
+password hashing, role-based access control, and reservation limit calculation.
+"""
+
 from typing import Tuple
 import os
 import hashlib
@@ -18,14 +24,15 @@ from sqlalchemy.orm import joinedload
 from fastapi import HTTPException, status
 
 def is_admin(userIdOrEmail) -> bool:
-  '''
-  Checks that the user with the given email address is in admin role.
+  """Check whether a user has the admin role.
 
-  Parameters:
-    userIdOrEmail: userId or email address of the user. Will use userId if integer is given, otherwise email address.
+  Args:
+      userIdOrEmail: User ID (int) or email address (str). Uses userId
+          for lookup when an integer is provided, otherwise uses email.
+
   Returns:
-    True if is admin, False otherwise.
-  '''
+      True if the user has the admin role, False otherwise.
+  """
   with Session() as session:
     user = None
     if (isinstance(userIdOrEmail, int)):
@@ -40,11 +47,17 @@ def is_admin(userIdOrEmail) -> bool:
     return result
 
 def get_role(email : str) -> string:
-  '''
-  Gets the role (first found role from the database) for the user with the given email.
+  """Get the primary role for a user by email address.
+
+  Looks up the user in the database and returns their first assigned role.
+
+  Args:
+      email: The user's email address.
+
   Returns:
-    'user' if role was not found for the user, otherwise the name of the role.
-  '''
+      The name of the user's first role, or 'user' if no roles are assigned
+      or the user is not found.
+  """
   with Session() as session:
     user = session.execute(
       select(User).options(joinedload(User.roles)).where(User.email == email)
@@ -58,28 +71,33 @@ def get_role(email : str) -> string:
     return user_role
 
 def is_logged_in(token : str):
-  '''
-  Checks if the passed token can be found from the database and has not expired.
-  Parameters:
-    token: token
+  """Check whether an authentication token is valid and not expired.
+
+  Args:
+      token: The authentication token to validate.
+
   Returns:
-    True if user is logged in, false otherwise.
-  '''
+      True if the token is valid and the user is logged in, False otherwise.
+  """
   token_response = check_token(token)
   if (token_response["status"] == True): return True
   else: return False
 
 def get_user_reservation_limits(userId: int) -> dict:
-  '''
-  Gets the user's reservation limits based on their roles.
-  Applies the most permissive limits when user has multiple roles.
+  """Get the effective reservation limits for a user based on all their roles.
 
-  Parameters:
-    userId: The user's ID
+  When a user has multiple roles, the most permissive value is used for each
+  limit (lowest minDuration, highest maxDuration, highest maxActiveReservations).
+  The 'everyone' role is always included. Falls back to defaults if no roles
+  define limits.
+
+  Args:
+      userId: The user's database ID.
 
   Returns:
-    Dict with minDuration, maxDuration, and maxActiveReservations
-  '''
+      A dict with keys 'minDuration' (hours), 'maxDuration' (hours),
+      and 'maxActiveReservations' (int).
+  """
   from database import UserRole, Role
   from helpers.tables.role import get_role_reservation_limits
 
@@ -136,15 +154,20 @@ def get_user_reservation_limits(userId: int) -> dict:
     }
 
 def check_token(token : str) -> object:
-  '''
-  Checks that the given token is valid and has not expired.
-  Parameters:
-    token: token
+  """Validate an authentication token and return user information.
+
+  Checks the token against the database, verifies it has not expired based
+  on the configured session timeout, and returns user details including
+  roles and reservation limits.
+
+  Args:
+      token: The authentication token to validate.
+
   Returns:
-    Returns back a Response.
-  Example return:
-    { success: True, message: "Token OK.", data: { email: "test" } }
-  '''
+      An api_response dict. On success, includes 'data' with userId, email,
+      role (primary), roles (list), and reservationLimits. On failure,
+      status is False with an error message.
+  """
   if token == "" or token is None: return helpers.server.api_response(False, "Token cannot be empty.")
 
   def time_now(): return datetime.datetime.now(datetime.timezone.utc)
@@ -186,19 +209,19 @@ def check_token(token : str) -> object:
     return helpers.server.api_response(False, "Invalid token.")
 
 def get_authenticated_user_id(token: str) -> int:
-  '''
-  Authenticates the provided token and returns the user ID.
-  This combines token validation and user ID extraction in one call.
+  """Authenticate a token and return the associated user ID.
 
-  Parameters:
-    token: The authentication token
+  Combines token validation and user ID extraction in a single call.
+
+  Args:
+      token: The authentication token.
 
   Returns:
-    The authenticated user's ID
+      The authenticated user's database ID.
 
   Raises:
-    HTTPException: If the token is invalid or expired
-  '''
+      HTTPException: 401 Unauthorized if the token is invalid or expired.
+  """
   auth_result = check_token(token)
   if not auth_result["status"]:
     raise HTTPException(
@@ -209,35 +232,44 @@ def get_authenticated_user_id(token: str) -> int:
   return auth_result["data"]["userId"]
 
 def create_login_token() -> str:
-  '''
-  Creates login token of 100 characters (including some special characters)
-  and returns it back.
-    Returns:
-      the generated loginToken
-  '''
+  """Generate a random login token of 100 characters.
+
+  The token consists of lowercase and uppercase ASCII letters, digits,
+  and the special characters '!', '_', and '-'.
+
+  Returns:
+      A 100-character random token string.
+  """
   allowed_chars = string.ascii_lowercase + string.ascii_uppercase + string.digits + "!_-"
   limit = 100
   return ''.join(random.choice(allowed_chars) for _ in range(limit))
 
 def hash_password(password: str) -> Tuple[bytes, bytes]:
-  """
-  Hash the provided password with a randomly-generated salt and return the
-  salt and hash to store in the database.
+  """Hash a password using PBKDF2-HMAC-SHA256 with a random salt.
 
-  Example usage:
-    hash = hash_password('correct horse battery staple')
+  Args:
+      password: The plaintext password to hash.
+
+  Returns:
+      A dict with 'salt' (bytes) and 'hashedPassword' (bytes) suitable
+      for storing in the database.
   """
   salt = os.urandom(16)
   pw_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
   return { "salt": salt, "hashedPassword": pw_hash }
 
 def is_correct_password(salt: bytes, pw_hash: bytes, password: str) -> bool:
-  """
-  Given a previously-stored salt and hash, and a password provided by a user
-  trying to log in, check whether the password is correct.
+  """Verify a password against a stored salt and hash.
 
-  Example usage:
-    if is_correct_password(hash['salt'], hash['hashedPassword'], 'correct horse battery staple') == True
+  Uses constant-time comparison to prevent timing attacks.
+
+  Args:
+      salt: The salt bytes stored alongside the hash.
+      pw_hash: The previously computed password hash.
+      password: The plaintext password to verify.
+
+  Returns:
+      True if the password matches, False otherwise.
   """
   return hmac.compare_digest(
     pw_hash,
@@ -245,16 +277,34 @@ def is_correct_password(salt: bytes, pw_hash: bytes, password: str) -> bool:
   )
 
 def create_password(length = 40):
-  '''
-  Creates a random password of the given length.
+  """Generate a cryptographically secure random password.
+
+  Args:
+      length: The desired password length. Defaults to 40.
+
   Returns:
-    (string) the generated password
-  '''
+      A random string of ASCII letters and digits.
+  """
   possible_chars = string.ascii_letters + string.digits
   random_password = "".join(secrets.choice(possible_chars) for _ in range(length))
   return random_password
 
 def get_ldap_user(username, password):
+  """Authenticate a user against the configured LDAP server.
+
+  Attempts to bind to LDAP with the provided credentials, retrieves the
+  user's email, and either returns an existing local user or creates a
+  new one. Respects the whitelist setting if enabled.
+
+  Args:
+      username: The LDAP username to authenticate.
+      password: The LDAP password.
+
+  Returns:
+      A tuple of (success, result) where:
+          - On success: (True, userId) with the local user's database ID.
+          - On failure: (False, error_message) with a descriptive error string.
+  """
   from settings_handler import get_setting
 
   # Get LDAP settings from database

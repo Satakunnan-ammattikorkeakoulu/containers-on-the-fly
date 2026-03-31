@@ -1,15 +1,25 @@
-# Container table management functionality
+"""Container table management functionality.
+
+Provides CRUD operations for the Container database table, including
+lookup by name or ID, creation, deletion, and editing of container records.
+"""
 from database import Container, Session
 from sqlalchemy import select
 
 def get_containers(filter = None):
-  '''
-  Finds containers with the given optional filter. If no filter is given, finds all containers in the system.
-    Parameters:
-      filter: Additional filters. Example usage: ...
-    Returns:
-      All found containers in a list.
-  '''
+  """Find containers with an optional filter.
+
+  If no filter is given, returns all containers. When a filter is provided,
+  it first attempts to match by container name, then by container ID.
+
+  Args:
+      filter: A container name (str) or container ID (int-like str) to
+          search for. If None, all containers are returned.
+
+  Returns:
+      A list of matching Container objects, or None if a filter was
+      provided but no match was found.
+  """
   with Session() as session:
     if filter != None:
       containers = session.execute(select(Container).where(Container.name == filter)).scalar_one_or_none()
@@ -25,14 +35,18 @@ def get_containers(filter = None):
     return containers
 
 def add_container(name, public, description, imageName):
-  '''
-  Adds the given container in the system.
-    Parameters:
+  """Add a new container to the system.
+
+  Args:
       name: The name of the container to be added.
-      public: Boolean. Whether the container is public or not.
-    Returns:
-      The created container object fetched from database. Or None if provided name already exists.
-  '''
+      public: Whether the container is publicly visible.
+      description: A text description of the container.
+      imageName: The Docker image name associated with this container.
+
+  Returns:
+      The created Container object fetched from the database, or None
+      if a container with the given name already exists.
+  """
   with Session() as session:
     duplicate = session.execute(select(Container).where(Container.name == name)).scalar_one_or_none()
     if duplicate != None:
@@ -43,30 +57,31 @@ def add_container(name, public, description, imageName):
     return session.execute(select(Container).where(Container.name == name)).scalar_one_or_none()
 
 def remove_container(container_id):
-  '''
-  Removes the given container in the system.
-    Parameters:
-      container_id: The container id to be removed.
-    Returns:
-      Nothing
-  '''
+  """Remove a container from the system by its ID.
+
+  Args:
+      container_id: The ID of the container to be removed.
+  """
   with Session() as session:
     container = session.execute(select(Container).where(Container.containerId == container_id)).scalar_one_or_none()
     session.delete(container)
     session.commit()
 
 def edit_container(container_id, new_name = None, new_public = None, new_description = None, new_image_name = None):
-  '''
-  Edits the given container in the system.
-    Parameters:
-      container_id: The container id to be edited.
-      new_name: The new name for the given container.
-      new_public: The new boolean for publicity of the container.
-      new_description: The new description for the given container.
-      new_image_name: The new image name for the given container.
-    Returns:
-      The edited container object fetched from database. Or None if name or publicity isn't provided.
-  '''
+  """Edit an existing container's attributes.
+
+  Only the provided (non-None) fields are updated; others remain unchanged.
+
+  Args:
+      container_id: The ID of the container to be edited.
+      new_name: The new name for the container, or None to keep current.
+      new_public: The new public visibility flag, or None to keep current.
+      new_description: The new description, or None to keep current.
+      new_image_name: The new Docker image name, or None to keep current.
+
+  Returns:
+      The updated Container object.
+  """
   with Session() as session:
     container = session.execute(select(Container).where(Container.containerId == container_id)).scalar_one_or_none()
     if new_name != None: container.name = new_name

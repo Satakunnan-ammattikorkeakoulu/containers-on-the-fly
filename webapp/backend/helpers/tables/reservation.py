@@ -1,16 +1,28 @@
-# Reservation table management functionality
+"""Reservation table management functionality.
+
+Provides CRUD operations for the Reservation database table, including
+lookup by date or status, creation, deletion, and editing of reservation records.
+"""
 from database import Reservation, Session
 from datetime import datetime
 from sqlalchemy import select
 
 def get_reservations(filter = None):
-    '''
-    Find reservations with the given optional filter. If no filter is given, finds all reservations in the system.
-    Parameters:
-        filter: Additional filters. Example usage: ...
+    """Find reservations with an optional filter.
+
+    If no filter is given, returns all reservations. When a filter is provided,
+    it first attempts to parse it as a datetime and match against startDate or
+    endDate. If parsing fails, it treats the filter as a status string.
+
+    Args:
+        filter: A datetime string in '%Y-%m-%d %H:%M:%S' format to match
+            against startDate/endDate, or a status string (e.g. 'reserved',
+            'started', 'stopped'). If None, all reservations are returned.
+
     Returns:
-        All found reservations in a list.
-    '''
+        A list of matching Reservation objects, or None if a filter was
+        provided but no match was found.
+    """
 
     with Session() as session:
         all_reservations_list = []
@@ -38,13 +50,15 @@ def get_reservations(filter = None):
 
 
 def get_reservation(filter = None):
-    '''
-    Find reservation with the given optional filter which in this case is reservationId.
-    Parameters:
-        Additional filters: Example usage: ...
+    """Find a single reservation by its reservation ID.
+
+    Args:
+        filter: The reservation ID to look up. If None, returns None.
+
     Returns:
-        Found reservation in list.
-    '''
+        A single-element list containing the matching Reservation object,
+        or None if no reservation matches or no filter is provided.
+    """
     with Session() as session:
         if filter != None:
             reservations = session.execute(select(Reservation).where(Reservation.reservationId == filter)).scalar_one_or_none()
@@ -55,15 +69,17 @@ def get_reservation(filter = None):
 
 
 def add_reservation(startDate, endDate, userId, computerId, containerId):
-    '''
-    Adds the given reservation in the system.
-        Parameters:
-            startDate: The date the reservation is going to start.
-            endDate: The date the reservation is going to start.
-            status: Reserved, started or stopped.
-        Returns:
-            The created reservation object fetched from database. Or none if for that date reservation already exists.
-     '''
+    """Add a new reservation to the system.
+
+    Creates a reservation with status 'reserved'.
+
+    Args:
+        startDate: The datetime when the reservation starts.
+        endDate: The datetime when the reservation ends.
+        userId: The ID of the user making the reservation.
+        computerId: The ID of the computer to reserve.
+        containerId: The ID of the container to associate with the reservation.
+    """
     with Session() as session:
         session.add(
             Reservation(
@@ -78,29 +94,31 @@ def add_reservation(startDate, endDate, userId, computerId, containerId):
         session.commit()
 
 def remove_reservation(reservation_id):
-    '''
-    Removes the given reservation from the system.
-        Parameters:
-            reservation: The reservation id of the reservation to be removed.
-        Returns:
-            Nothing
-    '''
+    """Remove a reservation from the system by its ID.
+
+    Args:
+        reservation_id: The ID of the reservation to be removed.
+    """
     with Session() as session:
         reservation = session.execute(select(Reservation).where(Reservation.reservationId == reservation_id)).scalar_one_or_none()
         session.delete(reservation)
         session.commit()
 
 def edit_reservation(reservation_id, new_startDate = None, new_endDate = None, new_status = None):
-    '''
-    Edits the given reservation in the system.
-        Parameters:
-            reservation: The reservation id of the reservation to be edited.
-            new_startDate: The new start date for the reservation.
-            new_endDate: The new end date for the reservation.
-            new_status: The new status for the reservation.
-        Returns:
-            The edited reservation object fetched from database. Or none if startDate, endDate or status isn't provided
-    '''
+    """Edit an existing reservation's attributes.
+
+    Only the provided (non-None) fields are updated; others remain unchanged.
+
+    Args:
+        reservation_id: The ID of the reservation to be edited.
+        new_startDate: The new start datetime, or None to keep current.
+        new_endDate: The new end datetime, or None to keep current.
+        new_status: The new status string (e.g. 'reserved', 'started',
+            'stopped'), or None to keep current.
+
+    Returns:
+        The updated Reservation object.
+    """
     with Session() as session:
         reservation = session.execute(select(Reservation).where(Reservation.reservationId == reservation_id)).scalar_one_or_none()
         if new_startDate != None:

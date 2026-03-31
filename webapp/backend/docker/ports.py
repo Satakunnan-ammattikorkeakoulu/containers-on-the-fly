@@ -1,3 +1,10 @@
+"""Port allocation utilities for Docker container reservations.
+
+Manages finding available ports within the configured range for binding
+container services to the host machine. Checks both database records of
+active reservations and actual socket availability.
+"""
+
 import random
 import socket
 from database import Session, Reservation
@@ -6,15 +13,35 @@ from sqlalchemy import select
 
 
 def is_port_in_use(port: int) -> bool:
-  '''
-  Checks if a port is in use.
+  """Check whether a port is currently in use on localhost.
+
+  Attempts a TCP connection to the given port on localhost to determine
+  if anything is listening.
+
+  Args:
+      port: TCP port number to check.
+
   Returns:
-    True if port is in use, False otherwise
-  '''
+      bool: True if the port is in use, False otherwise.
+  """
   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     return s.connect_ex(('localhost', port)) == 0
 
 def get_available_port():
+  """Find an available port within the configured port range.
+
+  Queries the database for all ports currently used by active (started)
+  reservations, builds a list of available ports within the configured
+  range (docker.port_range_start to docker.port_range_end), then
+  randomly selects one that is not bound on the host.
+
+  Returns:
+      int: An available port number.
+
+  Raises:
+      IndexError: If no ports are available in the configured range
+          (all are in use by active reservations).
+  """
   # Loop through all started containers and get the ports in use
   portsInUse = []
   with Session() as session:

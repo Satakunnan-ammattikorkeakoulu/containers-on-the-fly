@@ -1,3 +1,9 @@
+"""Email sending utilities.
+
+Provides SMTP-based email sending with support for both SSL/TLS (port 465)
+and STARTTLS connections. All SMTP configuration is read from system settings.
+"""
+
 import smtplib
 import socket
 from email.mime.multipart import MIMEMultipart
@@ -5,6 +11,18 @@ from email.mime.text import MIMEText
 from settings_handler import get_setting
 
 def send_email(to, mail_subject, mail_body):
+    """Send a plain-text email using the configured SMTP server.
+
+    Does nothing if email sending is disabled in settings or if required
+    SMTP settings are incomplete. Uses SSL/TLS for port 465 and STARTTLS
+    for other ports (typically 587). Errors are printed to stdout rather
+    than raised.
+
+    Args:
+        to: Recipient email address.
+        mail_subject: The email subject line.
+        mail_body: The plain-text body of the email.
+    """
 
     # Check if email sending is enabled
     if not get_setting('email.sendEmail'):

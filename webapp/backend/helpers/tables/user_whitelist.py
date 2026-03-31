@@ -1,14 +1,23 @@
-# User whitelisting table management functionality
+"""User whitelisting table management functionality.
+
+Provides operations for managing the UserWhitelist database table, including
+viewing, adding, and removing whitelisted email addresses.
+"""
 from click import password_option
 from database import UserWhitelist, Session
 from sqlalchemy import select
 
 def view_all(opt_filter = None):
-    '''
-    Get all users from UserWhitelist
-    Make a list and append all those users into the list
-    Return the list
-    '''
+    """Retrieve all whitelisted users, optionally filtered by email.
+
+    Args:
+        opt_filter: An email address to filter by. If None, all
+            whitelisted users are returned.
+
+    Returns:
+        A list of UserWhitelist objects matching the filter, or all
+        whitelisted users if no filter is provided.
+    """
 
     with Session() as session:
         all_whitelisted_users_list = []
@@ -24,10 +33,17 @@ def view_all(opt_filter = None):
 
 
 def add_to_whitelist(emails):
-    '''
-    Checks if the user with the given email already exists in the whitelist,
-    If it doesn't then the email/emails get added.
-    '''
+    """Add an email address to the whitelist.
+
+    Checks for duplicates before adding.
+
+    Args:
+        emails: The email address to add to the whitelist.
+
+    Returns:
+        A dict with key 'msg' set to 'success' if the email was added,
+        or None if the email already exists in the whitelist.
+    """
     with Session() as session:
         whitelisted = session.execute(select(UserWhitelist).where(UserWhitelist.email == emails)).scalar_one_or_none()
         if whitelisted != None:
@@ -43,11 +59,15 @@ def add_to_whitelist(emails):
 
 
 def remove_from_whitelist(email):
-    '''
-    Checks if the email user is inputting is the same as the one in the whitelist,
-    If emails are the same then remove it.
-    And if the email wasn't found in the whitelist, then the user gets notified of that and nothing is removed.
-    '''
+    """Remove an email address from the whitelist.
+
+    Args:
+        email: The email address to remove from the whitelist.
+
+    Returns:
+        A dict with key 'msg' set to 'success' if the email was removed,
+        or None if the email was not found in the whitelist.
+    """
     with Session() as session:
         whitelisted = session.execute(select(UserWhitelist).where(UserWhitelist.email == email)).scalar_one_or_none()
         if whitelisted == None:

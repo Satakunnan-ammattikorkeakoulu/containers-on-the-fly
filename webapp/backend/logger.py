@@ -1,24 +1,44 @@
+"""Custom logging module with colored output and ORM object formatting.
+
+Provides a custom logger class that automatically converts SQLAlchemy ORM
+objects to dictionaries for readable log output, and a colored formatter
+that applies ANSI color codes based on log level.
+
+Usage:
+    from logger import log
+    log.info("Hello world!")
+    log.info(my_database_object)
+"""
+
 import logging
 from database import Base
 from helpers.server import orm_to_dict
 from os import linesep
 
 class CustomLogger(logging.Logger):
-  '''
-  Custom logger that prints database objects as dictionaries.
+  """Custom logger that automatically formats SQLAlchemy ORM objects as dictionaries.
 
-  Example usage:
-    from logger import log
-    log.info("Hello world!")
-    log.info(myDatabaseObject)
-    log.warning("Something went wrong!")    
-  '''
+  Example usage::
+
+      from logger import log
+      log.info("Hello world!")
+      log.info(myDatabaseObject)
+      log.warning("Something went wrong!")
+  """
+
   def __init__(self, name):
     super().__init__(name)
 
   def get_msg(self, msg):
+    """Format a log message, converting ORM objects to readable dicts.
+
+    Args:
+        msg: The log message or SQLAlchemy ORM object to format.
+
+    Returns:
+        Formatted string with a leading newline for readability.
+    """
     try:
-      # Print database objects as dictionaries
       if isinstance(msg, Base):
         return f"{linesep}{msg}{linesep}{linesep}{orm_to_dict(msg)}"
       else:
@@ -27,14 +47,23 @@ class CustomLogger(logging.Logger):
       return f"{linesep}{msg}"
 
   def debug(self, msg, *args, **kwargs):
+    """Log a DEBUG-level message with ORM formatting."""
     super().debug(self.get_msg(msg), *args, **kwargs)
+
   def info(self, msg, *args, **kwargs):
+    """Log an INFO-level message with ORM formatting."""
     super().info(self.get_msg(msg), *args, **kwargs)
+
   def warning(self, msg, *args, **kwargs):
+    """Log a WARNING-level message with ORM formatting."""
     super().warning(self.get_msg(msg), *args, **kwargs)
+
   def error(self, msg, *args, **kwargs):
+    """Log an ERROR-level message with ORM formatting."""
     super().error(self.get_msg(msg), *args, **kwargs)
+
   def critical(self, msg, *args, **kwargs):
+    """Log a CRITICAL-level message with ORM formatting."""
     super().critical(self.get_msg(msg), *args, **kwargs)
 
 class ColoredFormatter(logging.Formatter):
@@ -49,6 +78,14 @@ class ColoredFormatter(logging.Formatter):
   }
 
   def format(self, record):
+    """Format a log record with ANSI color codes based on log level.
+
+    Args:
+        record: The log record to format.
+
+    Returns:
+        Colored, formatted log string.
+    """
     log_color = self.format_dict.get(record.levelno)
     reset_color = "\033[0m"
     gray_color = "\033[37m"

@@ -357,3 +357,42 @@ The frontend has been developed using Vue 2.
 The backend has been developed using Python 3, SQLAlchemy and FastAPI.
 
 The backend also includes a tool called `docker_utility.py` that handles starting and stopping the reserved containers.
+
+### Documentation Standards
+
+**Python Backend** uses Google-style docstrings:
+
+```python
+def reserve_container(user_id, container_id, hours):
+    """Reserve a container for the specified user.
+
+    Args:
+        user_id: The ID of the user making the reservation.
+        container_id: The target container's database ID.
+        hours: Duration of the reservation in hours.
+
+    Returns:
+        Response with the created reservation details.
+
+    Raises:
+        HTTPException: If the container is already reserved.
+    """
+```
+
+- All functions have docstrings describing purpose, parameters, and return values
+- Module-level docstrings describe each file's purpose
+- Pydantic models have field descriptions for complex types
+
+**Vue Frontend:**
+- Component files have a comment block at the top of `<script>` explaining the component's purpose
+- Complex computed properties and methods have brief JSDoc-style comments
+
+**JavaScript Utilities** use JSDoc-style comments:
+
+```js
+/**
+ * Convert a UTC timestamp to the user's local timezone.
+ * @param {string} timestamp - ISO 8601 timestamp
+ * @returns {string} Formatted local time string
+ */
+```

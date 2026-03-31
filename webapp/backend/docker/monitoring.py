@@ -1,3 +1,10 @@
+"""Server monitoring and log collection for container servers.
+
+Periodically collects system metrics (CPU, memory, disk, Docker container
+counts, load averages, uptime, software version) and pm2 service logs,
+then stores them in the database for display in the admin dashboard.
+"""
+
 import psutil
 import subprocess
 import time
@@ -8,7 +15,17 @@ from sqlalchemy import select
 
 
 def read_version_file():
-    """Read version information from .version file"""
+    """Read version information from the project's .version file.
+
+    Parses the key-value format file located three directories above this
+    module (project root).
+
+    Returns:
+        tuple: A 2-element tuple of (version, updated) where version is a
+            string like "1.2.3" and updated is a timestamp string like
+            "2025-07-21 15:12:10 UTC". Both are None if the file is
+            missing or cannot be parsed.
+    """
     try:
         import os
         # Look for .version file in project root (3 levels up from this script)
@@ -34,7 +51,13 @@ def read_version_file():
 
 
 def update_server_monitoring():
-    """Update server monitoring data in database"""
+    """Collect system metrics and update the ServerStatus record in the database.
+
+    Gathers CPU usage, memory usage, disk usage, Docker container counts,
+    system load averages, uptime, and software version, then writes them to
+    the ServerStatus table for the current computer. Also triggers log
+    collection via update_server_logs().
+    """
     try:
         with Session() as session:
             computer = session.execute(
@@ -133,7 +156,16 @@ def update_server_monitoring():
 
 
 def update_server_logs(computer_id: int, session):
-    """Update server logs in database"""
+    """Collect pm2 service logs and store them in the database.
+
+    Captures the last 300 lines of logs from the backend, frontend, and
+    Docker utility pm2 processes, then upserts them into the ServerLogs
+    table.
+
+    Args:
+        computer_id: Database ID of the computer whose logs are being collected.
+        session: Active SQLAlchemy session to use for database operations.
+    """
     try:
         # Backend logs
         try:
@@ -170,7 +202,18 @@ def update_server_logs(computer_id: int, session):
 
 
 def update_log_record(session, computer_id: int, log_type: str, content: str, lines: int):
-    """Helper function to upsert log records"""
+    """Upsert a log record in the ServerLogs table.
+
+    Creates a new log record if one does not exist for the given computer
+    and log type, or updates the existing record's content and line count.
+
+    Args:
+        session: Active SQLAlchemy session to use for database operations.
+        computer_id: Database ID of the computer the logs belong to.
+        log_type: Type of log, e.g. "backend", "frontend", or "docker_utility".
+        content: Full log text content to store.
+        lines: Number of log lines captured.
+    """
     try:
         log_record = session.execute(
             select(ServerLogs).where(

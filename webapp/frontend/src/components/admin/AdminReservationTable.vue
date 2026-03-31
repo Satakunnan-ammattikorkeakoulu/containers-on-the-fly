@@ -50,7 +50,20 @@
       </template>
       <!-- Docker Name -->
       <template v-slot:item.dockerName="{item}">
-        {{ item.reservedContainer.containerDockerName }}
+        <v-tooltip bottom>
+          <template v-slot:activator="{ props }">
+            <span
+              v-bind="props"
+              :class="{ 'docker-name-copyable': item.reservedContainer.containerDockerId }"
+              @click="copyContainerId(item.reservedContainer.containerDockerId)"
+            >{{ item.reservedContainer.containerDockerName }}</span>
+          </template>
+          <div v-if="item.reservedContainer.containerDockerId">
+            <div>Docker ID: {{ item.reservedContainer.containerDockerId }}</div>
+            <div class="text-caption text-center mt-1">(Click to copy)</div>
+          </div>
+          <div v-else>No container ID</div>
+        </v-tooltip>
       </template>
       <!-- Container Status -->
       <template v-slot:item.containerStatus="{item}">
@@ -98,9 +111,14 @@
    * Used in PageAdminReservations.
    */
   import { DisplayTime } from '/src/helpers/time.js'
+  import { useMainStore } from '/src/store/store.js'
 
   export default {
     name: 'AdminReservationTable',
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     props: {
       propReservations: {
         type: Array,
@@ -156,6 +174,12 @@
           if (!this.hasLongItems) this.hasLongItems = true;
           return text.slice(0,10) + "...";
         }
+      },
+      copyContainerId(containerId) {
+        if (!containerId) return
+        navigator.clipboard.writeText(containerId).then(() => {
+          this.store.showMessage({ text: "Container ID copied to clipboard", color: "green" })
+        })
       },
       emitExtendReservation(reservationId) {
         this.$emit('emitExtendReservation', reservationId)
@@ -232,6 +256,15 @@
     cursor: help;
     text-decoration: underline;
     text-decoration-style: dotted;
+  }
+
+  .docker-name-copyable {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    &:hover {
+      text-decoration-style: solid;
+    }
   }
 
   // Deep selector for tooltip styling

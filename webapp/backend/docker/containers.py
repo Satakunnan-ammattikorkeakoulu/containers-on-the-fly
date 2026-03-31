@@ -170,7 +170,7 @@ def start_container(pars):
         print(traceback.format_exc())
         if container_name:  # Only try to stop if we have a name
             stop_container(container_name)
-        return False, "", "", e, None
+        return False, "", "", e, None, None
 
     # Deploy SSH public key if provided (non-critical — don't fail the container)
     if pars.get("sshPublicKey"):
@@ -199,7 +199,7 @@ def start_container(pars):
 
     non_critical_errors = run_user_config_script(pars["roleMounts"], computer_id, user_email, user_id, container_name)
 
-    return True, container_name, pars["password"], "", non_critical_errors
+    return True, container_name, pars["password"], "", non_critical_errors, cont.id
 
 def stop_container(container_name):
     """Stop and remove a Docker container by name.

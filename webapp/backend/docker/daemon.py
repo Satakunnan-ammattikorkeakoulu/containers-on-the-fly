@@ -297,7 +297,7 @@ def start_docker_container(reservation_id: str):
 
     cont_was_started = False
     print("Starting container..")
-    cont_was_started, cont_name, cont_password, errors, non_critical_errors = start_container(details)
+    cont_was_started, cont_name, cont_password, errors, non_critical_errors, container_docker_id = start_container(details)
     print("Container started!")
     print("Result: " + str(cont_was_started))
 
@@ -314,6 +314,8 @@ def start_docker_container(reservation_id: str):
       reservation.status = "started"
       reservation.reservedContainer.sshPassword = cont_password
       reservation.reservedContainer.startedAt = time_now()
+      reservation.reservedContainer.containerDockerId = container_docker_id
+      reservation.reservedContainer.containerStatus = "running"
       send_container_started_email(
         reservation.user.email, image_name, reservation.computer.ip,
         ports, ssh_password, non_critical_errors, reservation.endDate
@@ -331,6 +333,7 @@ def start_docker_container(reservation_id: str):
         print(non_critical_errors)
       reservation.status = "error"
       reservation.reservedContainer.containerDockerErrorMessage = str(errors)
+      reservation.reservedContainer.containerStatus = "error"
       session.commit()
 
       send_container_error_email(reservation.user.email, errors)
@@ -362,6 +365,7 @@ def stop_docker_container(reservation_id: str):
         stop_container(reservation.reservedContainer.containerDockerName)
       reservation.status = "stopped"
       reservation.reservedContainer.stoppedAt = time_now()
+      reservation.reservedContainer.containerStatus = "stopped"
       session.commit()
   except Exception as e:
     print("Error stopping server:")
@@ -396,6 +400,7 @@ def restart_docker_container(reservation_id: str):
 
       restart_container(reservation.reservedContainer.containerDockerName)
       reservation.status = "started"
+      reservation.reservedContainer.containerStatus = "running"
       session.commit()
   except Exception as e:
     print("Error restarting server:")

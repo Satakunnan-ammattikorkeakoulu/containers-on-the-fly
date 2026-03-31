@@ -753,3 +753,54 @@ migrate-database: ## Run database migrations
 create-migration: ## Create a new database migration (use MESSAGE="your message")
 	@echo "Creating new migration..."
 	@cd $(BACKEND_PATH) && alembic revision --autogenerate -m "$(MESSAGE)"
+
+# ===========================================================================
+# Testing
+# ===========================================================================
+
+test-backend-unit: ## Run backend unit tests
+	@cd $(BACKEND_PATH) && $(PYTHON) -m pytest ../../tests/backend/unit -v
+
+test-backend-integration: ## Run backend integration tests
+	@cd $(BACKEND_PATH) && $(PYTHON) -m pytest ../../tests/backend/integration -v
+
+test-backend: ## Run all backend tests
+	@cd $(BACKEND_PATH) && $(PYTHON) -m pytest ../../tests/backend -v
+
+test-backend-coverage: ## Run backend tests with coverage report
+	@cd $(BACKEND_PATH) && $(PYTHON) -m pytest ../../tests/backend -v --cov=. --cov-report=html
+
+test-frontend: ## Run frontend unit and component tests
+	@cd webapp/frontend && npx vitest run
+
+test-frontend-watch: ## Run frontend tests in watch mode
+	@cd webapp/frontend && npx vitest
+
+test-e2e-setup: ## Create temporary test users for E2E/API tests
+	@cd $(BACKEND_PATH) && $(PYTHON) ../../tests/scripts/setup_test_users.py
+
+test-e2e-teardown: ## Remove temporary test users
+	@cd $(BACKEND_PATH) && $(PYTHON) ../../tests/scripts/teardown_test_users.py
+
+test-e2e: ## Run Playwright E2E tests (requires running app stack)
+	@cd $(BACKEND_PATH) && $(PYTHON) ../../tests/scripts/setup_test_users.py
+	@cd tests/e2e && npm test; EXIT=$$?; \
+	  cd ../.. && cd $(BACKEND_PATH) && $(PYTHON) ../../tests/scripts/teardown_test_users.py; \
+	  exit $$EXIT
+
+test-e2e-ui: ## Run Playwright E2E tests with UI (requires running app stack)
+	@cd $(BACKEND_PATH) && $(PYTHON) ../../tests/scripts/setup_test_users.py
+	@cd tests/e2e && npx --no-install playwright test --ui; EXIT=$$?; \
+	  cd ../.. && cd $(BACKEND_PATH) && $(PYTHON) ../../tests/scripts/teardown_test_users.py; \
+	  exit $$EXIT
+
+test-api: ## Run Bruno CLI API tests (requires running app)
+	@cd $(BACKEND_PATH) && $(PYTHON) ../../tests/scripts/setup_test_users.py
+	@cd $(BACKEND_PATH) && $(PYTHON) ../../tests/scripts/generate_bruno_env.py
+	@cd tests/api && npx --no-install bru run --env test -r; EXIT=$$?; \
+	  cd ../.. && cd $(BACKEND_PATH) && $(PYTHON) ../../tests/scripts/teardown_test_users.py; \
+	  exit $$EXIT
+
+test-all: ## Run backend + frontend tests (not E2E — those need a running app)
+	@$(MAKE) test-backend
+	@$(MAKE) test-frontend

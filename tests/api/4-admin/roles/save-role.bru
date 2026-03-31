@@ -1,0 +1,25 @@
+meta {
+  name: Save Role
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{root_url}}/admin/save_role?name=bruno-test-role
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response has status field", function() {
+    expect(res.body).to.have.property('status');
+  });
+}

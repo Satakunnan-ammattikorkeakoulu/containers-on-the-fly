@@ -1,0 +1,46 @@
+# Docker Compose for running the full test stack (E2E and integration tests).
+#
+# Usage:
+#   docker compose -f tests/docker-compose.test.yml up -d
+#   # Run E2E tests against http://localhost:8080
+#   docker compose -f tests/docker-compose.test.yml down
+
+services:
+  mariadb:
+    image: mariadb:11
+    environment:
+      MARIADB_ROOT_PASSWORD: testroot
+      MARIADB_DATABASE: containerfly_test
+      MARIADB_USER: testuser
+      MARIADB_PASSWORD: testpass
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../webapp/backend
+      dockerfile: ../../Dockerfile
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      DATABASE_URI: "mysql+pymysql://testuser:testpass@mariadb/containerfly_test"
+      ADD_TEST_DATA: "true"
+      APP_PORT: "8000"
+      APP_URL: "http://localhost"
+      DOCKER_ENABLED: "false"
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ../webapp/frontend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - backend

@@ -53,6 +53,9 @@ npm run serve          # Development server
 npm run build          # Production build
 npm run lint           # ESLint
 npm run production     # Production mode serve
+npm test               # Run unit + component tests (vitest)
+npm run test:watch     # Tests in watch mode
+npm run test:coverage  # Tests with coverage report
 ```
 
 ### Backend Commands
@@ -249,7 +252,8 @@ make migrate-database
 
 ### Dependencies
 - **Backend**: FastAPI, SQLAlchemy, PyMySQL, ldap3, python-on-whales, alembic
-- **Frontend**: Vue.js 2, Vuetify, Vue Router, Vuex, axios, dayjs
+- **Frontend**: Vue.js 3, Vuetify 4, Vue Router, Pinia, axios, dayjs
+- **Testing**: pytest, httpx, vitest, @vue/test-utils, Playwright, Bruno CLI
 - **Process Management**: pm2, Caddy reverse proxy
 - **Database**: MariaDB with connection pooling
 
@@ -264,7 +268,96 @@ make migrate-database
 
 ## Testing & Quality
 
-This project does not include automated tests. Manual testing workflows:
+### Running Tests
+```bash
+# All automated tests (backend + frontend)
+make test-all
+
+# Backend only
+make test-backend                # All backend tests (unit + integration)
+make test-backend-unit           # Unit tests only (no DB)
+make test-backend-integration    # Integration tests (SQLite in-memory)
+make test-backend-coverage       # With HTML coverage report
+
+# Frontend only
+make test-frontend               # Unit + component tests (vitest)
+make test-frontend-watch         # Watch mode
+
+# E2E (requires running app stack)
+make test-e2e                    # Playwright tests
+make test-e2e-ui                 # Playwright with UI
+
+# API (requires running app)
+make test-api                    # Bruno CLI tests
+```
+
+### Test Structure
+```
+tests/
+├── scripts/
+│   ├── setup_test_users.py      # Create temp admin + user accounts
+│   ├── teardown_test_users.py   # Delete temp accounts + cleanup files
+│   └── generate_bruno_env.py    # Generate Bruno test environment from credentials
+├── backend/
+│   ├── conftest.py              # Shared fixtures, SQLite in-memory DB setup
+│   ├── test_settings.json       # Test-specific settings
+│   ├── unit/                    # Pure function tests (no DB)
+│   │   ├── helpers/             # auth, utils, server, email
+│   │   └── test_settings_schema.py
+│   └── integration/             # API endpoint tests with test DB
+│       ├── test_user_endpoints.py
+│       ├── test_reservation_endpoints.py
+│       ├── test_admin_endpoints.py
+│       └── test_app_endpoints.py
+├── frontend/
+│   ├── setup.js                 # Vitest setup (mocks axios)
+│   ├── unit/                    # Store, helpers, URL builder tests
+│   └── component/               # Vue component tests (shallowMount)
+├── e2e/
+│   ├── playwright.config.js
+│   ├── auth.setup.js            # Login once, save session for parallel tests
+│   ├── fixtures/auth.js         # Login helpers (reads .test_credentials.json)
+│   └── tests/                   # Auth, reservation, admin, navigation specs
+├── api/                         # Bruno API tests (56 .bru files)
+└── docker-compose.test.yml      # Full stack for E2E testing
+```
+
+### Test Architecture Notes
+- **Backend unit tests** use no database — they test pure functions in `helpers/` and `settings_schema.py`
+- **Backend integration tests** use SQLite in-memory via `StaticPool` — the `conftest.py` patches `settings_handler` and `database.engine` at import time to avoid MySQL dependencies
+- **Frontend tests** run via vitest with jsdom. Test files live outside `webapp/frontend/` so `test.alias` in `vite.config.js` maps package imports to the frontend's `node_modules`
+- **Component tests** use `shallowMount` with Vuetify stubs (Vuetify 4 auto-import sub-paths are not compatible with alias-based resolution in the test environment)
+- **E2E tests** require the full app stack running (use `docker-compose.test.yml` or manual startup with `ADD_TEST_DATA=true`)
+
+### E2E & API Test User Management
+E2E (Playwright) and API (Bruno) tests use **temporary test accounts** created automatically before tests and deleted afterward — they never use real user accounts. The flow is:
+
+1. `tests/scripts/setup_test_users.py` creates a temp admin + normal user with random passwords via direct DB access
+2. Credentials are written to `tests/.test_credentials.json`
+3. For Bruno, `tests/scripts/generate_bruno_env.py` generates `tests/api/environments/test.bru` from the credentials
+4. Tests run (Playwright reads credentials from JSON; Bruno uses the `test` environment)
+5. `tests/scripts/teardown_test_users.py` deletes the users and removes credential files
+
+The `make test-e2e` and `make test-api` targets handle this full lifecycle automatically — teardown always runs even if tests fail. For manual use: `make test-e2e-setup` and `make test-e2e-teardown`.
+
+Playwright uses an **auth setup project** to avoid login race conditions: `auth.setup.js` logs in once per role, saves browser state, and all parallel test workers reuse the saved session without hitting the login endpoint again.
+
+### Installing Test Dependencies
+```bash
+# Backend
+pip install -r tests/backend/requirements-test.txt
+
+# Frontend (already in devDependencies after npm install)
+cd webapp/frontend && npm install
+
+# E2E
+cd tests/e2e && npm install && npx playwright install
+
+# Bruno CLI
+cd tests/api && npm install
+```
+
+### Manual Testing
 1. Test main server setup: `make start-main-server`
 2. Test Docker utility: `make start-docker-utility`
 3. Test database operations: `make init-database`

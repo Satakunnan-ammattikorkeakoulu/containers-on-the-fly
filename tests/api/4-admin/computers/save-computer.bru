@@ -1,0 +1,54 @@
+meta {
+  name: Save Computer
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{root_url}}/admin/save_computer
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "computerId": -1,
+    "data": {
+      "name": "bruno-test-server",
+      "ip": "192.168.1.200",
+      "public": true,
+      "hardware": {
+        "cpu": {
+          "minimumAmount": 1,
+          "maximumAmount": 4,
+          "maximumAmountForUser": 4,
+          "defaultAmountForUser": 1
+        },
+        "ram": {
+          "minimumAmount": 1,
+          "maximumAmount": 8,
+          "maximumAmountForUser": 8,
+          "defaultAmountForUser": 2
+        },
+        "gpu": {
+          "maximumAmountForUser": 0
+        },
+        "gpus": []
+      }
+    }
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response has status field", function() {
+    expect(res.body).to.have.property('status');
+  });
+}

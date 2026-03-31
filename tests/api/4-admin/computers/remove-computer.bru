@@ -1,0 +1,29 @@
+meta {
+  name: Remove Computer
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{root_url}}/admin/remove_computer?computerId=2
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response has status field", function() {
+    expect(res.body).to.have.property('status');
+  });
+
+  test("Response has message", function() {
+    expect(res.body).to.have.property('message');
+  });
+}

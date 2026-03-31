@@ -1,0 +1,32 @@
+meta {
+  name: Save Role Hardware Limits
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{root_url}}/admin/save_role_hardware_limits
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "roleId": 1,
+    "hardwareLimits": []
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response has status field", function() {
+    expect(res.body).to.have.property('status');
+  });
+}

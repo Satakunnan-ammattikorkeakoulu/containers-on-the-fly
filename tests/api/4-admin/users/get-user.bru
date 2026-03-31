@@ -1,0 +1,40 @@
+meta {
+  name: Get Single User
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{root_url}}/admin/user?userId=1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal(true);
+  });
+
+  test("Response has user data", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('user');
+    const user = res.body.data.user;
+    expect(user).to.have.property('userId');
+    expect(user).to.have.property('email');
+    expect(user).to.have.property('roles');
+    expect(user).to.have.property('createdAt');
+  });
+
+  test("User ID matches request", function() {
+    expect(res.body.data.user.userId).to.equal(1);
+  });
+}

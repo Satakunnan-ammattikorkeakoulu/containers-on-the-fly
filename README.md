@@ -55,6 +55,7 @@ This project has been featured in the following academic publications:
    * [Additional Tasks](#additional-tasks)
       * [Creating Reservable Containers](#creating-reservable-containers)
       * [LDAP Authentication Setup](#ldap-authentication-setup)
+   * [Testing](#testing)
    * [Technical Details](#technical-details)
       * [Frontend](#frontend)
       * [Backend](#backend)
@@ -286,6 +287,55 @@ chore(nav): Update the header to include a new link for the games
 Backend
 feat(teachers): Add a new route for teacher to fetch game statistics
 fix: Fix group removal logic to not break on empty usernames
+```
+
+## Testing
+
+The project includes automated tests across four layers:
+
+```bash
+make test-all              # Run backend + frontend tests (131 tests)
+make test-backend          # 100 pytest tests (unit + integration)
+make test-frontend         # 31 vitest tests (unit + component)
+make test-e2e              # Playwright E2E tests (requires running app)
+make test-api              # Bruno CLI API tests (requires running app)
+```
+
+| Layer | Framework | Count | What it covers |
+|-------|-----------|-------|----------------|
+| Backend unit | pytest | 55 | Password hashing, tokens, settings validation, email, helpers |
+| Backend integration | pytest + FastAPI TestClient | 45 | API endpoints (login, reservations, admin CRUD, roles) |
+| Frontend unit | vitest | 26 | Pinia store, time helpers, URL builder |
+| Frontend component | vitest + vue-test-utils | 5 | Loading, Snackbar components |
+| E2E | Playwright | 17 specs | Login flows, reservations, admin pages, navigation guards |
+| API | Bruno CLI | 56 .bru files | Manual API tests, now CLI-runnable |
+
+### Installing Test Dependencies
+
+```bash
+# Backend test deps
+pip install -r tests/backend/requirements-test.txt
+
+# Frontend (included in devDependencies)
+cd webapp/frontend && npm install
+
+# E2E
+cd tests/e2e && npm install && npx playwright install
+
+# Bruno CLI
+cd tests/api && npm install
+```
+
+### E2E & API Test Accounts
+
+E2E and API tests automatically create temporary test accounts (admin + user) with random passwords before running, and delete them afterward — even if tests fail. No real user accounts are used. This is handled by `make test-e2e` and `make test-api` automatically.
+
+### E2E with Docker Compose
+
+```bash
+docker compose -f tests/docker-compose.test.yml up -d
+make test-e2e
+docker compose -f tests/docker-compose.test.yml down
 ```
 
 ## Technical Details

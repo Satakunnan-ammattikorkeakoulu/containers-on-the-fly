@@ -1,0 +1,31 @@
+meta {
+  name: Get Own Reservation Details
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{root_url}}/reservation/get_own_reservation_details?reservationId=1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response has status field", function() {
+    expect(res.body).to.have.property('status');
+  });
+
+  test("If successful, response has connection details", function() {
+    if (res.body.status === true) {
+      expect(res.body).to.have.property('data');
+    }
+  });
+}

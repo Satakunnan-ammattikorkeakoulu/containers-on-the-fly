@@ -1,0 +1,29 @@
+meta {
+  name: Remove Role
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{root_url}}/admin/remove_role?roleId=3
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response has status field", function() {
+    expect(res.body).to.have.property('status');
+  });
+
+  test("Response has message", function() {
+    expect(res.body).to.have.property('message');
+  });
+}

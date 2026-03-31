@@ -1,5 +1,6 @@
 .DS_STORE
 __pycache__
+node_modules/
 venv/
 webapp/backend/aiserver.db
 webapp/frontend/src/AppSettings.js
@@ -16,3 +17,18 @@ webapp/backend/docker/local_overrides.py
 .vscode
 .settings_just_created
 .server_type
+
+# Test artifacts — generated credentials and environments
+tests/.test_credentials.json
+tests/api/environments/test.bru
+
+tests/api/node_modules/
+tests/api/package-lock.json
+tests/e2e/node_modules/
+tests/e2e/package-lock.json
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+tests/e2e/.auth/
+tests/backend/.pytest_cache/
+tests/backend/htmlcov/
+tests/backend/**/__pycache__/

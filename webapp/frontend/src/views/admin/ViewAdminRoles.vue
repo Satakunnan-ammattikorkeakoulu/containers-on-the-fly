@@ -9,6 +9,9 @@
 </template>
 
 <script>
+  /**
+   * View wrapper for the admin roles management page. Renders PageAdminRoles inside LayoutApp.
+   */
   import LayoutApp from '/src/layouts/LayoutApp'
   import PageAdminRoles from '/src/pages/admin/PageAdminRoles'
 

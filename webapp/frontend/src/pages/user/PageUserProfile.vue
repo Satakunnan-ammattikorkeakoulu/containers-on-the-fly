@@ -114,6 +114,12 @@
 </template>
 
 <script>
+/**
+ * User profile page for managing account settings.
+ * Displays user info (email, roles, member since) and provides forms for
+ * changing the login password and managing an SSH public key that gets
+ * auto-deployed to containers on launch.
+ */
 import axios from 'axios'
 import dayjs from 'dayjs'
 import { useMainStore } from '@/store/store'
@@ -185,13 +191,14 @@ export default {
         console.error('Error loading user profile:', error)
       }
     },
+    /** Checks whether the user has a local password set (vs. LDAP-only auth). */
     async checkPasswordStatus() {
       const currentUser = this.store.user
       if (!currentUser || !currentUser.loginToken) {
         console.error('No login token available')
         return
       }
-      
+
       try {
         const response = await axios.get('/api/user/has_password', {
           headers: {

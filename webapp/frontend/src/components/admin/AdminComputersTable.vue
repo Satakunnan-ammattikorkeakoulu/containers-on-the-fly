@@ -388,6 +388,14 @@
 </template>
 
 <script>
+  /**
+   * Displays a sortable data table of all container servers (computers) with online/offline
+   * status indicators based on monitoring heartbeat data. Each row is expandable to show
+   * detailed server monitoring: CPU, memory, disk usage, Docker container counts, system
+   * load, uptime, software version, and PM2 application logs.
+   * Actions menu allows editing the computer, viewing monitoring, or removing the computer.
+   * Used in PageAdminComputers.
+   */
   import { DisplayTime } from '/src/helpers/time.js'
   import { useMainStore } from '@/store/store'
 
@@ -461,6 +469,7 @@
       parseTime(timestamp) {
         return DisplayTime(timestamp)
       },
+      /** Toggles the expanded monitoring panel for a computer row (single-expand mode). */
       toggleExpand(item) {
         const index = this.expanded.indexOf(item.computerId);
         if (index >= 0) {
@@ -476,6 +485,7 @@
       fetchMonitoringData(computerId) {
         this.$emit('emitFetchMonitoring', computerId);
       },
+      /** Returns 'green' if the server reported a heartbeat within the threshold, 'grey' otherwise. */
       getStatusColor(item) {
         return this.propActiveServers[item.computerId] ? 'green' : 'grey';
       },
@@ -510,6 +520,7 @@
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
       },
+      /** Reverses log line order so the most recent entries appear at the top. */
       reverseLogOrder(logContent) {
         if (!logContent || logContent.trim() === '') return logContent;
         
@@ -532,6 +543,7 @@
         const isoString = date.toISOString().replace('Z', '');
         return DisplayTime(isoString);
       },
+      /** Converts a UTC millisecond timestamp into a human-readable relative time string (e.g. "5m ago"). */
       formatLastUpdate(timestamp) {
         if (!timestamp) return 'No data';
         const now = Date.now();

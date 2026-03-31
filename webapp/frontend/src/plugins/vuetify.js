@@ -1,3 +1,9 @@
+/**
+ * Vuetify plugin configuration.
+ * Initialises Vuetify 3 with the dark theme and Material Design Icons.
+ * @module plugins/vuetify
+ */
+
 import 'vuetify/styles'
 import { createVuetify } from 'vuetify'
 import '@mdi/font/css/materialdesignicons.css'

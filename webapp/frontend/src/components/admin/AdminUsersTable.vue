@@ -44,6 +44,12 @@
 </template>
 
 <script>
+/**
+ * Displays a sortable data table of all users in the system.
+ * Shows user ID, email, assigned roles, password status, and creation date.
+ * Provides an "Edit User" action that emits to the parent to open AdminManageUserModal.
+ * Used in PageAdminUsers.
+ */
 import { DisplayTime } from '/src/helpers/time.js'
 
 export default {

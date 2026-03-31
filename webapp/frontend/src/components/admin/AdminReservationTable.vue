@@ -90,6 +90,13 @@
 </template>
 
 <script>
+  /**
+   * Displays a sortable data table of all reservations with status, user, dates,
+   * resource summary, Docker container name, and container issues.
+   * Provides an actions menu per row for showing details, changing end date,
+   * restarting the container, or cancelling the reservation.
+   * Used in PageAdminReservations.
+   */
   import { DisplayTime } from '/src/helpers/time.js'
 
   export default {
@@ -128,7 +135,7 @@
       this.reservations = this.propReservations
     },
     methods: {
-      // Returns a string of all ports for a reservation
+      /** Returns an HTML string listing all port mappings (local -> outside) for a reservation tooltip. */
       getPorts(ports) {
         if (ports) {
           let portsString = ""
@@ -173,6 +180,7 @@
       parseTime(timestamp) {
         return DisplayTime(timestamp)
       },
+      /** Formats reserved hardware specs into a comma-separated summary string (e.g. "4 vCPUs, 16 GB RAM"). */
       getResources(specs) {
         if (specs) {
           let resources = ""

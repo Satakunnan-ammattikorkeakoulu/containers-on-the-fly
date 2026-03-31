@@ -25,6 +25,11 @@
 </template>
 
 <script>
+  /**
+   * Admin page for viewing hardware specifications across all container servers.
+   * Displays a read-only table of hardware resources (CPUs, GPUs, memory, storage)
+   * that auto-refreshes every 30 seconds.
+   */
   import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import AdminHardwareTable from '/src/components/admin/AdminHardwareTable.vue';

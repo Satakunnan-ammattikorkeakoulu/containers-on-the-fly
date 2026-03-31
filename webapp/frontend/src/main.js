@@ -1,3 +1,11 @@
+/**
+ * Application entry point.
+ * Creates the Vue 3 app instance, registers plugins (Pinia, Vue Router, Vuetify),
+ * sets up Axios response interceptors for automatic session expiry handling,
+ * initialises the main store, and mounts the app to the DOM.
+ * @module main
+ */
+
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router/router'

@@ -8,6 +8,9 @@
 </template>
 
 <script>
+  /**
+   * Centered circular progress indicator with configurable size.
+   */
   export default {
     name: "Loading",
     props: {

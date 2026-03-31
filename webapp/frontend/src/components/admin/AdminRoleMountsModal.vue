@@ -137,6 +137,19 @@
 </template>
 
 <script>
+/**
+ * Modal dialog for managing host-to-container volume mounts for a specific role.
+ * Displays an expansion panel per computer where admins can add or remove mounts
+ * with host path, container path, and read-only settings. Supports template
+ * variables ({email}, {userid}) for per-user mount paths.
+ *
+ * Props:
+ *   roleId   - The ID of the role being configured.
+ *   roleName - The display name of the role (shown in the header).
+ *
+ * Emits:
+ *   emitModalClose - When the modal is closed.
+ */
 import axios from 'axios';
 import Loading from '/src/components/global/Loading.vue';
 import { useMainStore } from '@/store/store'
@@ -238,10 +251,12 @@ export default {
       }
     },
 
+    /** Filters the full mounts list to only those belonging to the given computer. */
     getMountsForComputer(computerId) {
       return this.mounts.filter(mount => mount.computerId === computerId);
     },
 
+    /** Validates the form, appends the new mount, and saves all mounts to the backend. */
     async addMount(computerId) {
       if (!this.$refs[`mountForm-${computerId}`][0].validate()) return;
       
@@ -302,6 +317,7 @@ export default {
       }
     },
 
+    /** Confirms removal, removes the mount locally, and persists the updated list to the backend. */
     async removeMount(computerId, mountToRemove) {
       const confirm = window.confirm("Are you sure you want to remove this mount?");
       if (!confirm) return;
@@ -356,6 +372,7 @@ export default {
       this.$emit('emitModalClose');
     },
 
+    /** Returns the computer name with mount count appended, e.g. "Server1 (3 mounts)". */
     getComputerTitle(computer) {
       const mountCount = this.getMountsForComputer(computer.computerId).length;
       if (mountCount > 0) {

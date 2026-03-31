@@ -9,6 +9,9 @@
 </template>
 
 <script>
+  /**
+   * View wrapper for the admin reservations management page. Renders PageAdminReservations inside LayoutApp.
+   */
   import LayoutApp from '/src/layouts/LayoutApp'
   import PageAdminReservations from '/src/pages/admin/PageAdminReservations'
 

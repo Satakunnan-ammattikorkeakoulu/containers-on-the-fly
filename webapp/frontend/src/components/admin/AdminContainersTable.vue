@@ -54,6 +54,12 @@
 </template>
 
 <script>
+  /**
+   * Displays a sortable data table of all container images (Docker image definitions).
+   * Shows container ID, public/private visibility, name, image name, description,
+   * and timestamps. Actions menu allows editing or removing a container image.
+   * Used in PageAdminContainers.
+   */
   import { DisplayTime } from '/src/helpers/time.js'
 
   export default {

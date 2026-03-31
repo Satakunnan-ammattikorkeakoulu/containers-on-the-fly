@@ -61,6 +61,10 @@
 </template>
 
 <script>
+/**
+ * Full-page error screen for critical failures (e.g., config loading errors).
+ * Offers a page refresh button and a link back to the login page.
+ */
 export default {
   name: 'ErrorTemplate',
   props: {

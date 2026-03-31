@@ -5,6 +5,9 @@
 </template>
 
 <script>
+  /**
+   * View wrapper for the user profile page. Renders PageUserProfile inside LayoutApp.
+   */
   import LayoutApp from '@/layouts/LayoutApp.vue'
   import PageUserProfile from '@/pages/user/PageUserProfile.vue'
 

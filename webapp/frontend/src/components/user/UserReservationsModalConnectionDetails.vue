@@ -208,6 +208,12 @@
 </template>
 
 <script>
+  /**
+   * Modal dialog showing connection details for a running reservation.
+   * Fetches SSH credentials, port mappings, container info, and server IP on mount,
+   * then presents them in copyable text fields with collapsible sections for
+   * container details, server information, and instructions.
+   */
   import Loading from '/src/components/global/Loading.vue';
   import axios from 'axios';
   import { useMainStore } from '@/store/store'

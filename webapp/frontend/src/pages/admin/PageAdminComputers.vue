@@ -40,6 +40,12 @@
 </template>
 
 <script>
+  /**
+   * Admin page for managing container servers (computers).
+   * Lists all registered servers with their status, provides CRUD operations
+   * via a modal dialog, and polls server monitoring data (metrics, logs, version)
+   * to display health status and last-update timestamps.
+   */
   import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import AdminComputersTable from '/src/components/admin/AdminComputersTable.vue';
@@ -182,6 +188,10 @@
         this.isFetching = false
       },
       
+      /**
+       * Polls each server's monitoring endpoint to determine active/inactive status.
+       * A server is considered active if its last data update was within 7 minutes.
+       */
       async checkServerStatus() {
         // Get monitoring data for all servers to check their status
         if (!this.data || this.data.length === 0) return;
@@ -257,6 +267,11 @@
         }
       },
       
+      /**
+       * Fetches detailed monitoring data (metrics, logs, version) for a single server.
+       * Called on-demand when an admin expands a server's monitoring panel.
+       * @param {number} computerId - The server to fetch monitoring data for
+       */
       async fetchMonitoringData(computerId) {
         let _this = this;
         let currentUser = this.store.user;

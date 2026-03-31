@@ -1,6 +1,18 @@
+/**
+ * Vue Router configuration and navigation guards.
+ * Defines all application routes with lazy-loaded view components and
+ * enforces authentication/authorisation via `beforeEach` guard.
+ *
+ * Route meta flags:
+ *  - `requiresAuth` {boolean} - Redirect unauthenticated users to login.
+ *  - `requiresAdmin` {boolean} - Restrict access to admin-role users.
+ * @module router
+ */
+
 import { createRouter, createWebHistory } from 'vue-router'
 import { useMainStore } from '../store/store'
 
+/** @type {import('vue-router').RouteRecordRaw[]} */
 const routes = [
   {
     path: '/',
@@ -87,7 +99,13 @@ const router = createRouter({
   routes
 })
 
-// Helper function to wait for store initialization
+/**
+ * Wait until the Pinia store finishes its async initialisation.
+ * Called at the start of the navigation guard so that auth state is
+ * available before any route-level checks run.
+ * @param {Object} store - The main Pinia store instance.
+ * @returns {Promise<void>} Resolves once `store.initializing` is false.
+ */
 function waitForStoreInit(store) {
   return new Promise((resolve) => {
     if (!store.initializing) {
@@ -103,7 +121,13 @@ function waitForStoreInit(store) {
   })
 }
 
-// Navigation guards for authentication
+/**
+ * Global navigation guard.
+ * - Waits for store initialisation before evaluating auth state.
+ * - Redirects unauthenticated users away from protected routes.
+ * - Redirects non-admin users away from admin routes.
+ * - Redirects already-authenticated users from the login page to the user area.
+ */
 router.beforeEach(async (to, from) => {
   const store = useMainStore()
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)

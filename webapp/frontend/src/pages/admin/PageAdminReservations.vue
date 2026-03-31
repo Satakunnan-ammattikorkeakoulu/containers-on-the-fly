@@ -137,6 +137,13 @@
 </template>
 
 <script>
+  /**
+   * Admin page for viewing and managing all reservations system-wide.
+   * Displays reservation statistics (by status and time period), supports
+   * filtering by status and reservation ID, and provides actions to cancel,
+   * change end dates, restart containers, and view connection details.
+   * Data auto-refreshes every 15 seconds.
+   */
   import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import AdminReservationTable from '/src/components/admin/AdminReservationTable.vue';
@@ -454,6 +461,7 @@
         this.modalConnectionDetailsVisible = true
         this.modalConnectionDetailsReservationId = reservationId
       },
+      /** Recalculates status and time-based statistics from the full (unfiltered) reservations list. */
       updateStats() {
         const now = new Date()
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())

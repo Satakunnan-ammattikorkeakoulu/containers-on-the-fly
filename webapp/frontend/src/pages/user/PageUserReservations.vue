@@ -86,6 +86,14 @@
 </template>
 
 <script>
+  /**
+   * User-facing reservations dashboard.
+   * Displays the user's own reservations (past 3 months) with status filtering,
+   * and provides actions to cancel, extend, restart, edit description, and view
+   * connection details. Includes an optional calendar view of all current reservations.
+   * Enforces per-user active reservation limits before allowing new reservations.
+   * Data auto-refreshes every 15 seconds.
+   */
   import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import UserReservationTable from '/src/components/user/UserReservationTable.vue';
@@ -416,6 +424,7 @@
           });
         }
       },
+      /** Fetches all current/upcoming reservations for the calendar overlay view. */
       fetchAllReservations() {
         let _this = this;
         _this.fetchingAllReservations = true;
@@ -471,6 +480,7 @@
        handleReservationsRefreshed(reservations) {
          this.allReservations = reservations;
        },
+       /** Fallback status counter used when the backend does not return statusCounts. */
        calculateStatusCounts() {
          // Initialize counts
          this.statusCounts = {

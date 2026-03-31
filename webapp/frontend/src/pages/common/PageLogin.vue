@@ -28,6 +28,11 @@
 </template>
 
 <script>
+  /**
+   * Login page for user authentication.
+   * Handles credential submission via OAuth2 form data and redirects
+   * authenticated users to the reservations page.
+   */
   import axios from 'axios';
   import { useMainStore } from '@/store/store'
   import frontBgImg from '/src/assets/images/front_bg.png'

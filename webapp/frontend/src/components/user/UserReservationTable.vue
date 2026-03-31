@@ -101,6 +101,11 @@
 </template>
 
 <script>
+  /**
+   * Data table listing the current user's reservations with status chips, resource
+   * tooltips, and an actions menu for show-details, extend, restart, edit description,
+   * and cancel operations. Emits events to the parent for each action.
+   */
   import { DisplayTime } from '/src/helpers/time.js'
 
   export default {

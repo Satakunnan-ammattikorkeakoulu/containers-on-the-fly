@@ -9,6 +9,9 @@
 </template>
 
 <script>
+  /**
+   * View wrapper for the login page. Renders PageLogin inside LayoutLogin.
+   */
   import LayoutLogin from '/src/layouts/LayoutLogin'
   import PageLogin from '/src/pages/common/PageLogin'
 

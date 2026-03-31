@@ -11,6 +11,11 @@
 </template>
 
 <script>
+  /**
+   * Displays a read-only data table of hardware specifications across all computers.
+   * Shows CPU, RAM, and GPU details including min/max amounts and user-facing defaults.
+   * Used in the admin computers page to inspect hardware configuration per computer.
+   */
   import { DisplayTime } from '/src/helpers/time.js'
 
   export default {

@@ -742,6 +742,14 @@
 </template>
 
 <script>
+/**
+ * Admin page for managing system-wide settings.
+ * Organized into collapsible sections: general info/instructions, authentication
+ * (password/LDAP), user access control (blacklist/whitelist), email configuration
+ * (SMTP, contact, test delivery), and system notifications (container failure alerts).
+ * Toggle-type settings (checkboxes, radio buttons) auto-save via watchers;
+ * text fields require explicit save button clicks per section.
+ */
 import axios from 'axios';
 import { useMainStore } from '@/store/store'
 
@@ -1007,6 +1015,11 @@ export default {
       this.saveAlertEmails(); // Auto-save to backend
     },
     
+    /**
+     * Loads all settings sections from the backend and populates local state.
+     * Uses settingsInitialized flags and isLoading to prevent watchers from
+     * triggering auto-save during the initial hydration.
+     */
     async loadSettings() {
       try {
         //console.log('Loading settings from backend...');
@@ -1129,6 +1142,11 @@ export default {
       }
     },
     
+    /**
+     * Validates and saves a single settings section to the backend.
+     * Reloads app config after saving sections that affect public settings (general, contact).
+     * @param {string} sectionName - One of: general, access, email, emailEnable, contact, notifications, auth
+     */
     async saveSection(sectionName) {
       try {
         // Validate the form first

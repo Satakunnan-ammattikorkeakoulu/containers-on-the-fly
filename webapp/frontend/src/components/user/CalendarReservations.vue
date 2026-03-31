@@ -117,6 +117,12 @@
 </template>
 
 <script>
+  /**
+   * Interactive calendar displaying reservations and server resource availability.
+   * Supports month/week/day/4-day views and toggles between a reservation timeline
+   * and a per-server availability heatmap with color-coded resource indicators.
+   * Emits "slotSelected" when a user clicks a future time slot to start a new reservation.
+   */
   import { TimestampToLocalTimeZone } from '/src/helpers/time.js'
   import dayjs from "dayjs";
   import axios from 'axios';
@@ -176,6 +182,10 @@
       intervalFormat(interval) {
         return interval.time
       },
+      /**
+       * Handles calendar time-slot clicks. Rounds the selected time down to the
+       * nearest 30-minute boundary and emits "slotSelected" if the time is in the future.
+       */
       selectSlot( nativeEvent, data ) {
         // If calendar is in read-only mode, don't allow slot selection
         if (this.readOnly) {
@@ -225,6 +235,10 @@
         })
         return returnData
       },
+      /**
+       * Builds HTML for per-resource availability indicators (green/yellow/red dots)
+       * based on the ratio of available vs. maximum for each hardware spec.
+       */
       formatResourcesWithIndicators(availabilityEvent) {
         if (!availabilityEvent.availableSpecs) {
           return availabilityEvent.resourceText
@@ -281,6 +295,7 @@
       rnd (a, b) {
         return Math.floor((b - a + 1) * Math.random()) + a
       },
+      /** Fetches server availability data for the currently visible calendar date range. */
       async fetchAvailabilityData() {
         if (this.viewMode !== 'availability') {
           return
@@ -349,6 +364,7 @@
           this.store.showMessage({ text: "Error loading availability data.", color: "red" })
         }
       },
+      /** Fetches all reservations for the visible date range and emits them to the parent. */
       async fetchAllReservationsForCalendar() {
         // Calculate date range for current calendar view based on type
         let calendarStart, calendarEnd;
@@ -402,6 +418,7 @@
           this.store.showMessage({ text: "Error refreshing reservations.", color: "red" })
         }
       },
+      /** Switches the calendar events array between reservation and availability data based on viewMode. */
       updateDisplayedEvents() {
         
         if (this.viewMode === 'availability') {

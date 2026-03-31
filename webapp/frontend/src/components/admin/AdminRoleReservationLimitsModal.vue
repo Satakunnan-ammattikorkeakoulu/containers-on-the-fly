@@ -145,6 +145,18 @@
 </template>
 
 <script>
+/**
+ * Modal dialog for configuring per-role reservation limits.
+ * Allows admins to set minimum/maximum reservation duration (in hours)
+ * and the maximum number of concurrent active reservations for users in this role.
+ *
+ * Props:
+ *   roleId   - The ID of the role being configured.
+ *   roleName - The display name of the role (shown in the header).
+ *
+ * Emits:
+ *   emitModalClose - When the modal is closed; passes true on successful save.
+ */
 import axios from 'axios';
 import Loading from '../global/Loading.vue';
 import { useMainStore } from '@/store/store'
@@ -181,8 +193,8 @@ export default {
     }
   },
   computed: {
+    /** Returns false if minDuration exceeds maxDuration, preventing invalid saves. */
     isValid() {
-      // Check if min/max duration relationship is valid
       if (this.reservationLimits.minDuration !== null && this.reservationLimits.maxDuration !== null) {
         if (this.reservationLimits.minDuration > this.reservationLimits.maxDuration) {
           return false;
@@ -190,6 +202,7 @@ export default {
       }
       return true;
     },
+    /** Validation rules for minimum duration: required, 1-720 hours, must not exceed max. */
     minDurationRules() {
       return [
         v => !!v || v === 0 || 'This field is required',
@@ -202,6 +215,7 @@ export default {
         }
       ];
     },
+    /** Validation rules for maximum duration: required, 1-1440 hours, must not be below min. */
     maxDurationRules() {
       return [
         v => !!v || v === 0 || 'This field is required',

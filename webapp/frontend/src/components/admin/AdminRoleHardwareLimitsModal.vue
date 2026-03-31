@@ -110,6 +110,18 @@
 </template>
 
 <script>
+/**
+ * Modal dialog for configuring per-role hardware allocation limits on each computer.
+ * Displays an expansion panel per computer, allowing admins to override the default
+ * maximum CPU, RAM, and GPU amounts for users assigned to this role.
+ *
+ * Props:
+ *   roleId   - The ID of the role being configured.
+ *   roleName - The display name of the role (shown in the header).
+ *
+ * Emits:
+ *   emitModalClose - When the modal is closed; passes true on successful save.
+ */
 import axios from 'axios';
 import Loading from '../global/Loading.vue';
 import { useMainStore } from '@/store/store'
@@ -259,14 +271,16 @@ export default {
       };
       return icons[type] || 'mdi-chip';
     },
+    /** Returns true if the given computer has any non-null override limits set. */
     hasCustomLimits(computerId) {
       const limits = this.hardwareLimits[computerId];
       if (!limits) return false;
       return Object.values(limits).some(limit => limit.maximum !== null);
     },
+    /** Converts the nested hardwareLimits object into a flat array for the backend API. */
     formatHardwareLimitsForBackend() {
       const formattedLimits = [];
-      
+
       Object.entries(this.hardwareLimits).forEach(([computerId, specs]) => {
         Object.entries(specs).forEach(([hardwareSpecId, limits]) => {
           if (limits.maximum !== null && limits.maximum !== '') {
@@ -278,11 +292,14 @@ export default {
           }
         });
       });
-      
+
       return formattedLimits;
     },
+    /**
+     * Returns hardware specs for the computer, excluding individual GPU entries
+     * (those with internalId) since the aggregate GPU spec already represents them.
+     */
     getFilteredHardwareSpecs(computer) {
-      // Filter out GPU specs that have an internalId
       return computer.hardwareSpecs.filter(spec => {
         if (spec.type === 'gpu' && spec.internalId) {
           return false;
@@ -290,12 +307,15 @@ export default {
         return true;
       });
     },
+    /**
+     * Returns the system-wide maximum for a hardware spec.
+     * For GPUs, this is the total count of individual GPU entries on the computer.
+     * For CPU/RAM, this is the configured maximumAmount.
+     */
     getSystemMaximum(computer, spec) {
-      // For GPUs without internalId, count all GPU specs (including those with internalId)
       if (spec.type === 'gpu' && !spec.internalId) {
         return computer.hardwareSpecs.filter(s => s.type === 'gpu').length;
       }
-      // For other hardware types, use the regular maximumAmount
       return spec.maximumAmount;
     },
   }

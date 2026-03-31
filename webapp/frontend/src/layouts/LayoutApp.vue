@@ -74,6 +74,12 @@
 </template>
 
 <script>
+  /**
+   * Main authenticated layout. Provides a sticky top navigation bar with links to
+   * user reservations and admin pages (inline on wide screens, dropdown on narrow),
+   * a user account menu, and a global Snackbar. Redirects to logout if the user
+   * session is missing.
+   */
   import Snackbar from '/src/components/global/Snackbar.vue';
   import { useMainStore } from '@/store/store'
   import frontBgImg from '/src/assets/images/front_bg.png'
@@ -125,6 +131,7 @@
       isLoggedIn() {
         return this.store.isLoggedIn || false
       },
+      /** Checks both legacy single-role and multi-role arrays for admin access. */
       isAdmin() {
         let currentUser = this.store.user
         if (!currentUser) return false

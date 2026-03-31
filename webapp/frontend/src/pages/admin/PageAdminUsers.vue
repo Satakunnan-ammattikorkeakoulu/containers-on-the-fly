@@ -68,6 +68,11 @@
 </template>
 
 <script>
+/**
+ * Admin page for managing user accounts.
+ * Lists all users with client-side filtering by role, email, and user ID.
+ * Supports creating new users and editing existing ones via a modal dialog.
+ */
 import axios from 'axios';
 import Loading from '/src/components/global/Loading.vue';
 import AdminUsersTable from '/src/components/admin/AdminUsersTable.vue';
@@ -104,6 +109,7 @@ export default {
     }
   }),
   computed: {
+    /** Builds role filter dropdown items with user counts per role. */
     roleItems() {
       const items = [{text: `All (${this.users.length})`, value: 'All'}];
       if (this.availableRoles) {

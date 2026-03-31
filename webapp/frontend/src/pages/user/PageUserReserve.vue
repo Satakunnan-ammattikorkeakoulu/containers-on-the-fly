@@ -433,6 +433,13 @@
   dayjs.extend(timezone)
   dayjs.extend(customParseFormat)
 
+  /**
+   * Pre-flight check that verifies hardware resources are available for the given date and duration.
+   * @param {string} date - ISO date string for the reservation start
+   * @param {number} duration - Duration in hours
+   * @param {string} loginToken - Auth token
+   * @returns {Promise<string|null>} Error message string, or null if resources are available
+   */
   async function checkHardwareAvailability(date, duration, loginToken) {
     let returnData = null;
     let dateParsed = dayjs(date).utc().toISOString()
@@ -461,6 +468,15 @@
     return returnData
   }
 
+  /**
+   * Multi-step reservation wizard for creating new container reservations.
+   * Step 1: Select start time via calendar or "Reserve Now" button.
+   * Step 2: Choose reservation duration (days/hours) within role-based limits.
+   * Step 3: Select container image, target server, hardware resources (GPUs, CPUs,
+   *         memory, storage), and advanced settings (SHM size, RAM disk, description,
+   *         admin-only reserve-for-another-user).
+   * Validates hardware availability at each step before proceeding.
+   */
   export default {
     name: 'PageUserReserve',
 

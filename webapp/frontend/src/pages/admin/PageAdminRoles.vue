@@ -67,6 +67,12 @@
 </template>
 
 <script>
+/**
+ * Admin page for managing user roles and their associated permissions.
+ * Supports CRUD operations on roles, plus dedicated modals for configuring
+ * each role's volume mounts, hardware limits, and reservation limits.
+ * Built-in roles (admin, everyone) cannot be removed.
+ */
 import axios from 'axios';
 import Loading from '/src/components/global/Loading.vue';
 import AdminRolesTable from '/src/components/admin/AdminRolesTable.vue';

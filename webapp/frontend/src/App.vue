@@ -15,6 +15,11 @@
 </template>
 
 <script>
+/**
+ * Root application component. Renders the router view or a full-page error screen
+ * when the application configuration fails to load. Keeps the document title in
+ * sync with the app name from the store.
+ */
 import ErrorTemplate from '@/components/global/ErrorTemplate.vue'
 import { useMainStore } from '@/store/store'
 

@@ -93,6 +93,17 @@
 </template>
 
 <script>
+  /**
+   * Modal dialog for creating or editing a container server (computer).
+   * Allows admins to configure the server's name, IP address, public visibility,
+   * and hardware specs (vCPUs, RAM, GPU count, and individual GPU entries with CUDA IDs).
+   *
+   * Props:
+   *   propData - The computer ID to edit, or "new" to create a new computer.
+   *
+   * Emits:
+   *   emitModalClose - When the modal is closed (after save or cancel).
+   */
   import axios from 'axios';
   import { useMainStore } from '@/store/store'
   //import Loading from '/src/components/global/Loading.vue';
@@ -152,8 +163,8 @@
       addGPU() {
         this.data.hardware.gpus.push({ format: "", internalId: "" });
       },
+      /** Removes a GPU entry and tracks its ID for backend deletion if it was already persisted. */
       removeGPU(index) {
-        // Mark the gpu for removal if it also contained hardwareSpecId, thus it was already in the database
         if (this.data.hardware.gpus[index].hardwareSpecId) {
           this.removedGPUs.push(this.data.hardware.gpus[index].hardwareSpecId);
         }

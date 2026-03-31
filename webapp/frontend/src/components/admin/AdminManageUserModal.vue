@@ -80,6 +80,18 @@
 </template>
 
 <script>
+/**
+ * Modal dialog for creating or editing a user account.
+ * Provides fields for email, password, and role assignment. When editing,
+ * admins can also clear the user's password (useful when LDAP auth is enabled).
+ * Fetches available roles from the backend and filters out the built-in "everyone" role.
+ *
+ * Props:
+ *   propData - The user ID to edit, or "new" to create a new user.
+ *
+ * Emits:
+ *   emitModalClose - When the modal is closed (after save or cancel).
+ */
 import axios from 'axios';
 import { useMainStore } from '@/store/store'
 
@@ -219,6 +231,7 @@ export default {
       return name;
     },
 
+    /** Fetches all roles from the backend and filters out the "everyone" built-in role. */
     fetchRoles() {
       let currentUser = this.store.user;
 

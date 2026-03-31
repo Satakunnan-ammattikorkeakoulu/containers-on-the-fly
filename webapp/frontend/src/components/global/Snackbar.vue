@@ -15,6 +15,9 @@
 </template>
 
 <script>
+  /**
+   * Global snackbar notification driven by the Pinia store's snackbar state.
+   */
   import { useMainStore } from '@/store/store'
   export default {
     setup() {

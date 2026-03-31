@@ -5,6 +5,9 @@
 </template>
 
 <script>
+  /**
+   * Application footer displaying the app name.
+   */
   import { useMainStore } from '@/store/store'
   export default {
     name: 'Footer',

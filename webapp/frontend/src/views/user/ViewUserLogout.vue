@@ -4,6 +4,9 @@
 </template>
 
 <script>
+  /**
+   * Logout view. Clears the user session on mount and redirects to the login page.
+   */
   import { useMainStore } from '@/store/store'
 
   export default {

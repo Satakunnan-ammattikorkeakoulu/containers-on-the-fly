@@ -63,6 +63,14 @@
 </template>
 
 <script>
+/**
+ * Displays a sortable data table of all roles in the system.
+ * Shows role ID, name, mount count, and creation date. Built-in roles ("everyone", "admin")
+ * display a description and have restricted actions (no edit name or delete).
+ * Actions menu allows editing the name, managing mounts, reservation limits,
+ * hardware limits, and deleting custom roles.
+ * Used in PageAdminRoles.
+ */
 import { DisplayTime } from '/src/helpers/time.js'
 
 export default {
@@ -97,6 +105,7 @@ export default {
     },
   },
   methods: {
+    /** Returns true for the "everyone" and "admin" roles which cannot be renamed or deleted. */
     isBuiltInRole(name) {
       return name === "everyone" || name === "admin";
     },

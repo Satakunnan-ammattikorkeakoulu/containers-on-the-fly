@@ -9,6 +9,9 @@
 </template>
 
 <script>
+  /**
+   * View wrapper for the admin users management page. Renders PageAdminUsers inside LayoutApp.
+   */
   import LayoutApp from '/src/layouts/LayoutApp'
   import PageAdminUsers from '/src/pages/admin/PageAdminUsers'
 

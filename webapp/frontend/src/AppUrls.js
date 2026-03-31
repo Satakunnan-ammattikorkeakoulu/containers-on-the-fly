@@ -1,4 +1,16 @@
-/* All URL addresses of the API endpoints. Used by the AppSettings.js script. */
+/**
+ * API endpoint URL builder.
+ * Constructs the full URL map for every backend endpoint, grouped by domain
+ * (user, reservation, admin, app). Consumed by AppSettings.js.
+ * @module AppUrls
+ */
+
+/**
+ * Build the complete API URL map from a base address.
+ * @param {string} baseAddress - The root API URL (e.g. "http://localhost/api/").
+ * @returns {Object} Nested object with keys `user`, `reservation`, `admin`, and `app`,
+ *   each containing named endpoint URLs as string properties.
+ */
 function createUrls(baseAddress) {
     let URLS = {}
     URLS.user = {}

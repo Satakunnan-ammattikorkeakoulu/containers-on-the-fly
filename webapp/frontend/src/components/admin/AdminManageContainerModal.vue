@@ -67,6 +67,17 @@
 </template>
 
 <script>
+  /**
+   * Modal dialog for creating or editing a container image definition.
+   * Allows admins to configure the container's name, Docker image name, public visibility,
+   * description, and service port mappings (local ports bound to random outside ports).
+   *
+   * Props:
+   *   propData - The container ID to edit, or "new" to create a new container.
+   *
+   * Emits:
+   *   emitModalClose - When the modal is closed (after save or cancel).
+   */
   import axios from 'axios';
   import { useMainStore } from '@/store/store'
   //import Loading from '/src/components/global/Loading.vue';
@@ -125,8 +136,8 @@
       addPort() {
         this.data.ports.push({ serviceName: "", port: "" });
       },
+      /** Removes a port entry and tracks its ID for backend deletion if it was already persisted. */
       removePort(index) {
-        // Mark the port for removal if it also contained containerPortId, thus it was already in the database
         if (this.data.ports[index].containerPortId) {
           this.removedPorts.push(this.data.ports[index].containerPortId);
         }

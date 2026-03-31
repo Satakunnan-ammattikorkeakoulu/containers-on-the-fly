@@ -46,6 +46,17 @@
 </template>
 
 <script>
+/**
+ * Modal dialog for creating or editing a role.
+ * Provides a name input and informational guidance about what can be configured
+ * on the role after creation (hardware limits, reservation limits, mounts).
+ *
+ * Props:
+ *   propData - Role object ({ roleId, name }) for editing, or null when creating a new role.
+ *
+ * Emits:
+ *   emitModalClose - When the modal is closed; passes true on successful save.
+ */
 import axios from 'axios';
 import { useMainStore } from '@/store/store'
 

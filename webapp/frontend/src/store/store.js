@@ -1,7 +1,18 @@
+/**
+ * Main Pinia store for application state management.
+ * Holds authentication state, app configuration fetched from the backend,
+ * and global UI state (snackbar messages). All components share this single store.
+ * @module store
+ */
+
 import { defineStore } from 'pinia'
 import axios from 'axios'
 import AppSettings from '/src/AppSettings.js'
 
+/**
+ * Main application store.
+ * @returns {Object} Pinia store instance with state, getters, and actions.
+ */
 export const useMainStore = defineStore('main', {
   state: () => ({
     // For global snackbar (message) component
@@ -52,29 +63,51 @@ export const useMainStore = defineStore('main', {
   }),
 
   getters: {
+    /** @returns {boolean} Whether a user is currently authenticated. */
     isLoggedIn: (state) => {
       if (state.user && state.user.loginToken) return true
       else return false
     },
+    /** @returns {boolean} Whether the store is still performing async initialisation. */
     isInitializing: (state) => state.initializing,
+    /** @returns {boolean} Whether backend app configuration has been loaded successfully. */
     isConfigLoaded: (state) => state.configLoaded,
+    /** @returns {boolean} Whether loading the backend app configuration failed. */
     hasConfigError: (state) => state.configError,
+    /** @returns {string} Display name of the application. */
     appName: (state) => state.appConfig.app.name || 'Containers on the Fly',
+    /** @returns {string} IANA timezone string used for all date formatting. */
     appTimezone: (state) => state.appConfig.app.timezone,
+    /** @returns {string} Contact email shown to users. */
     contactEmail: (state) => state.appConfig.app.contactEmail,
+    /** @returns {string} Instructional text shown on the login page. */
     loginPageInfo: (state) => state.appConfig.instructions.login,
+    /** @returns {string} Instructional text shown on the reservation page. */
     reservationPageInstructions: (state) => state.appConfig.instructions.reservation,
+    /** @returns {string} Instructional text included in reservation emails. */
     emailInstructions: (state) => state.appConfig.instructions.email,
+    /** @returns {string} Login page information text (alias for loginPageInfo). */
     loginText: (state) => state.appConfig.instructions.login,
+    /** @returns {string} Custom label for the username input field. */
     usernameField: (state) => state.appConfig.instructions.usernameFieldLabel,
+    /** @returns {string} Custom label for the password input field. */
     passwordField: (state) => state.appConfig.instructions.passwordFieldLabel,
+    /** @returns {Object} The current user's reservation limit settings. */
     userReservationLimits: (state) => state.user.reservationLimits,
+    /** @returns {number} Minimum reservation duration (hours) for the current user. */
     userMinDuration: (state) => state.user.reservationLimits.minDuration,
+    /** @returns {number} Maximum reservation duration (hours) for the current user. */
     userMaxDuration: (state) => state.user.reservationLimits.maxDuration,
+    /** @returns {number} Maximum concurrent active reservations for the current user. */
     userMaxActiveReservations: (state) => state.user.reservationLimits.maxActiveReservations,
   },
 
   actions: {
+    /**
+     * Bootstrap the store on application startup.
+     * Loads backend configuration, then restores the user session from
+     * localStorage and validates the token against the backend.
+     */
     initialiseStore() {
       this.loadAppConfig().then(() => {
         if (!this.configError) {
@@ -109,6 +142,10 @@ export const useMainStore = defineStore('main', {
       });
     },
 
+    /**
+     * Merge fetched backend configuration into the store.
+     * @param {Object} config - Configuration object from the `/app/config` endpoint.
+     */
     setAppConfig(config) {
       this.appConfig = { ...this.appConfig, ...config };
       this.configLoaded = true;
@@ -116,17 +153,29 @@ export const useMainStore = defineStore('main', {
       this.configErrorMessage = "";
     },
 
+    /**
+     * Record that loading the app configuration failed.
+     * @param {string} errorMessage - Human-readable error description.
+     */
     setConfigError(errorMessage) {
       this.configError = true;
       this.configErrorMessage = errorMessage;
       this.configLoaded = false;
     },
 
+    /** Clear any previously recorded configuration error. */
     clearConfigError() {
       this.configError = false;
       this.configErrorMessage = "";
     },
 
+    /**
+     * Validate a login token with the backend and persist user state.
+     * On success the user's profile (email, role, reservation limits) is
+     * saved to both the store and localStorage. On failure the user is logged out.
+     * @param {Object} payload - Must contain `loginToken` {string}. May contain
+     *   an optional `callback` {Function} invoked with `{success, message}`.
+     */
     setUser(payload) {
       if (!payload.callback) payload.callback = () => { };
 
@@ -176,6 +225,7 @@ export const useMainStore = defineStore('main', {
       });
     },
 
+    /** Clear all user state from the store and remove the session from localStorage. */
     logoutUser() {
       localStorage.removeItem("user")
       this.user.loginToken = ""
@@ -185,6 +235,15 @@ export const useMainStore = defineStore('main', {
       this.user.loggedinAt = null
     },
 
+    /**
+     * Display a global snackbar notification.
+     * @param {Object} payload
+     * @param {string} payload.text - Message text to display.
+     * @param {string} [payload.color="primary"] - Vuetify color string.
+     * @param {boolean} [payload.close=false] - Whether to show a close button.
+     * @param {boolean} [payload.multiline] - Force multiline layout (auto-detected if text > 50 chars).
+     * @param {number} [payload.timeout] - Auto-dismiss timeout in milliseconds.
+     */
     showMessage(payload) {
       this.snackbar.text = payload.text;
       this.snackbar.color = payload.color || "primary";
@@ -202,10 +261,17 @@ export const useMainStore = defineStore('main', {
       this.snackbar.visible = true;
     },
 
+    /** Hide the global snackbar notification. */
     closeMessage() {
       this.snackbar.visible = false;
     },
 
+    /**
+     * Fetch application configuration from the backend `/app/config` endpoint.
+     * On success, merges the config into the store via `setAppConfig`.
+     * On failure, records the error via `setConfigError`.
+     * @returns {Promise<void>}
+     */
     async loadAppConfig() {
       try {
         const response = await axios.get(AppSettings.APIServer.app.get_config);

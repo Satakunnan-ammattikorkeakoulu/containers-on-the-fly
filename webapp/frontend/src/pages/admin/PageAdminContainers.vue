@@ -32,6 +32,11 @@
 </template>
 
 <script>
+  /**
+   * Admin page for managing container images.
+   * Lists all registered Docker container images with CRUD operations
+   * via a modal dialog. Data auto-refreshes every 30 seconds.
+   */
   import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import AdminContainersTable from '/src/components/admin/AdminContainersTable.vue';

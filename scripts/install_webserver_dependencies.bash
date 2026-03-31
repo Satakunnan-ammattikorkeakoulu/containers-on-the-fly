@@ -73,6 +73,9 @@ fi
 sudo chown root:root /etc/caddy/Caddyfile
 sudo chmod 644 /etc/caddy/Caddyfile
 
+# Auto-format Caddyfile to avoid formatting warnings during validation
+sudo caddy fmt --overwrite /etc/caddy/Caddyfile
+
 # Test Caddy configuration
 sudo caddy validate --config /etc/caddy/Caddyfile
 if [ $? -eq 0 ]; then

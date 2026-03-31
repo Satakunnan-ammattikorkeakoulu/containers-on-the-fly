@@ -156,11 +156,12 @@ class SettingsApplier:
         is_main_server_context = os.environ.get('CONTAINERFLY_CONTEXT') == 'main-server'
         
         if enable_https:
+            self.settings['CADDY_GLOBAL_OPTIONS'] = ""
             if custom_ssl:
                 # HTTPS mode with custom certificates
                 cert_path = self.settings.get('CUSTOM_SSL_CERT_PATH', '')
                 key_path = self.settings.get('CUSTOM_SSL_KEY_PATH', '')
-                
+
                 if cert_path and key_path:
                     self.settings['CADDY_SITE_BLOCK'] = f"{domain}"
                     self.settings['CADDY_TLS_CONFIG'] = f"\n\ttls {cert_path} {key_path}"
@@ -186,7 +187,8 @@ class SettingsApplier:
                 if is_main_server_context:
                     print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
         else:
-            # HTTP mode - no SSL certificates
+            # HTTP mode - no SSL certificates, disable auto_https to suppress warning
+            self.settings['CADDY_GLOBAL_OPTIONS'] = "{\n\tauto_https off\n}\n\n"
             self.settings['CADDY_SITE_BLOCK'] = f"http://{domain}"
             self.settings['CADDY_TLS_CONFIG'] = ""
             self.settings['CADDY_SECURITY_HEADERS'] = " (HTTP mode)"

@@ -249,13 +249,15 @@ pm2 restart all    # Restart all services to apply changes
 
 ### Automated Code Review (Post-Implementation)
 
-After completing a feature or task (not after every individual edit), automatically run both review skills **in the background** against unstaged changes:
+After completing a feature or task (not after every individual edit), automatically run review skills and tests **in the background** against unstaged changes:
 
-1. Run `/code-review` and `/security-review` **in parallel as background agents**
-2. Each agent should review the **unstaged git diff** (`git diff`) to see what changed
-3. Wait for both to finish, then present a combined summary:
+1. Run `/code-review`, `/security-review`, and `/test` **in parallel as background agents**
+2. Code review and security review should review the **unstaged git diff** (`git diff`) to see what changed
+3. `/test` runs the offline test suites (backend + frontend) to catch regressions
+4. Wait for all to finish, then present a combined summary:
    - Code convention issues (if any)
    - Security issues (if any)
+   - Test results (pass/fail count)
    - "No issues found" if clean
 
 **When to trigger:** After finishing implementation work, before the user commits. Do NOT trigger on trivial changes (typo fixes, single-line config edits, documentation-only changes).
@@ -263,6 +265,7 @@ After completing a feature or task (not after every individual edit), automatica
 **Skills available:**
 - `/code-review` — Checks naming conventions, auth patterns, Response() usage, session management, Vuetify patterns, and ESLint compliance
 - `/security-review` — Checks authentication on endpoints, role authorization, input validation, ORM usage, and Docker security
+- `/test` — Runs backend (pytest) and frontend (vitest) test suites, reports pass/fail summary
 
 ### Database Migrations
 ```bash

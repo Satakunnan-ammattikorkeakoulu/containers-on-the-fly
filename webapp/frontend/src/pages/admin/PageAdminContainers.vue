@@ -170,7 +170,7 @@
         this.isFetching = false
       },
     },
-    beforeDestroy() {
+    beforeUnmount() {
       clearInterval(this.intervalFetch)
     },
   }

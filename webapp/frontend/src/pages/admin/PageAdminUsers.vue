@@ -206,7 +206,7 @@ export default {
       this.filteredUsers = filtered;
     }
   },
-  beforeDestroy() {
+  beforeUnmount() {
     clearInterval(this.intervalFetch);
   }
 }

@@ -231,7 +231,7 @@ export default {
       }
     }
   },
-  beforeDestroy() {
+  beforeUnmount() {
     if (this.intervalFetch) {
       clearInterval(this.intervalFetch);
     }

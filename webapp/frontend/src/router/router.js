@@ -128,7 +128,7 @@ function waitForStoreInit(store) {
  * - Redirects non-admin users away from admin routes.
  * - Redirects already-authenticated users from the login page to the user area.
  */
-router.beforeEach(async (to, from) => {
+router.beforeEach(async (to) => {
   const store = useMainStore()
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth)
   const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin)

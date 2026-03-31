@@ -10,7 +10,7 @@
    */
   import { useMainStore } from '@/store/store'
   export default {
-    name: 'Footer',
+    name: 'AppFooter',
     setup() {
       const store = useMainStore()
       return { store }

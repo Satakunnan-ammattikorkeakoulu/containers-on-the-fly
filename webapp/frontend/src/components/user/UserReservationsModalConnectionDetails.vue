@@ -191,7 +191,8 @@
         </v-card-text>
 
         <!-- Fallback for legacy response without structured data -->
-        <v-card-text v-else-if="!isLoading && !details" v-html="connectionText">
+        <v-card-text v-else-if="!isLoading && !details">
+          <div v-html="connectionText"></div>
         </v-card-text>
 
         <Loading style="margin: 60px 0px;" v-if="isLoading"></Loading>

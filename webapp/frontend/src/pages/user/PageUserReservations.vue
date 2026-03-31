@@ -523,7 +523,7 @@
         return this.store.userMaxActiveReservations;
       }
     },
-    beforeDestroy() {
+    beforeUnmount() {
       clearInterval(this.intervalFetchReservations)
     },
   }

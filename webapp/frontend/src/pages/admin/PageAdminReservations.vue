@@ -496,7 +496,7 @@
         }).length
       }
     },
-    beforeDestroy() {
+    beforeUnmount() {
       clearInterval(this.intervalFetchReservations)
     },
   }

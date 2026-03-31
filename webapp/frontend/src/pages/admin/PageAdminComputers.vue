@@ -369,7 +369,7 @@
         }
       }
     },
-    beforeDestroy() {
+    beforeUnmount() {
       clearInterval(this.intervalFetch)
       clearInterval(this.intervalMonitoring)
     },

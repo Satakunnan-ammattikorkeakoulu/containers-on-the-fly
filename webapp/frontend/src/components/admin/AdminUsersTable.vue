@@ -1,12 +1,16 @@
 <template>
   <div>
-    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
-    <v-data-table
+    <v-data-table-server
       :headers="table.headers"
-      :items="data"
-      :sort-by="[{key: 'userId', order: 'desc'}]"
+      :items="propItems"
+      :items-length="totalItems"
+      :loading="loading"
+      :sort-by="sortBy"
+      :items-per-page="itemsPerPage"
+      :page="page"
+      @update:options="onOptionsUpdate"
       class="elevation-1">
-      
+
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
         <v-menu>
@@ -33,21 +37,21 @@
       <template v-slot:item.roles="{item}">
         {{ Array.isArray(item.roles) ? item.roles.join(', ') : item.roles }}
       </template>
-      
+
       <!-- Password Set -->
       <template v-slot:item.hasPassword="{item}">
         <v-icon v-if="item.hasPassword" color="green">mdi-check</v-icon>
         <v-icon v-else color="red">mdi-close</v-icon>
       </template>
-    </v-data-table>
+    </v-data-table-server>
   </div>
 </template>
 
 <script>
 /**
- * Displays a sortable data table of all users in the system.
+ * Server-side paginated data table of all users in the system.
  * Shows user ID, email, assigned roles, password status, and creation date.
- * Provides an "Edit User" action that emits to the parent to open AdminManageUserModal.
+ * Emits pagination/sort changes to the parent via @update:options.
  * Used in PageAdminUsers.
  */
 import { DisplayTime } from '/src/helpers/time.js'
@@ -58,53 +62,52 @@ export default {
     propItems: {
       type: Array,
       required: true,
-    }
+    },
+    totalItems: {
+      type: Number,
+      default: 0,
+    },
+    loading: {
+      type: Boolean,
+      default: false,
+    },
+    page: {
+      type: Number,
+      default: 1,
+    },
+    itemsPerPage: {
+      type: Number,
+      default: 10,
+    },
+    sortBy: {
+      type: Array,
+      default: () => [{key: 'userId', order: 'desc'}],
+    },
   },
   data: () => ({
-    data: [],
-    readAll: false,
-    hasLongItems: false,
     table: {
       headers: [
         { title: 'User ID', key: 'userId' },
         { title: 'Email', key: 'email' },
-        { title: 'Roles', key: 'roles' },
+        { title: 'Roles', key: 'roles', sortable: false },
         { title: 'Password Set', key: 'hasPassword' },
         { title: 'Created At', key: 'createdAt' },
         { title: '', key: 'actions', sortable: false },
       ],
     }
   }),
-  mounted () {
-    this.data = this.propItems
-  },
   methods: {
     emitEditUser(userId) {
       this.$emit('emitEditUser', userId)
-    },
-    toggleReadAll() {
-      this.readAll = !this.readAll;
-    },
-    getText(text) {
-      if (this.readAll) return text;
-      else {
-        if (!this.hasLongItems) this.hasLongItems = true;
-        return text.slice(0,10) + "...";
-      }
     },
     parseTime(timestamp) {
       if (!timestamp) return '-';
       return DisplayTime(timestamp);
     },
-  },
-  watch: {
-    propItems: {
-      handler(newVal) {
-        this.data = newVal
-      },
-      immediate: true,
+    onOptionsUpdate(options) {
+      this.$emit('update:options', options)
     },
-  }
+  },
 }
 </script>
 

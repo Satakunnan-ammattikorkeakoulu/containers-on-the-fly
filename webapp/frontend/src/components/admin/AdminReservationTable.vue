@@ -1,10 +1,15 @@
 <template>
   <div>
     <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Expand Issues" : "Collapse Issues" }}</a>
-    <v-data-table
+    <v-data-table-server
       :headers="table.headers"
-      :items="reservations"
-      :sort-by="[{key: 'reservationId', order: 'desc'}]"
+      :items="propReservations"
+      :items-length="totalItems"
+      :loading="loading"
+      :sort-by="sortBy"
+      :items-per-page="itemsPerPage"
+      :page="page"
+      @update:options="onOptionsUpdate"
       class="elevation-1">
       <!-- Status -->
       <template v-slot:item.status="{item}">
@@ -98,16 +103,15 @@
           </v-list>
         </v-menu>
       </template>
-    </v-data-table>
+    </v-data-table-server>
   </div>
 </template>
 
 <script>
   /**
-   * Displays a sortable data table of all reservations with status, user, dates,
+   * Server-side paginated data table of all reservations with status, user, dates,
    * resource summary, Docker container name, and container issues.
-   * Provides an actions menu per row for showing details, changing end date,
-   * restarting the container, or cancelling the reservation.
+   * Emits pagination/sort changes and row actions to the parent.
    * Used in PageAdminReservations.
    */
   import { DisplayTime } from '/src/helpers/time.js'
@@ -123,10 +127,29 @@
       propReservations: {
         type: Array,
         required: true,
-      }
+      },
+      totalItems: {
+        type: Number,
+        default: 0,
+      },
+      loading: {
+        type: Boolean,
+        default: false,
+      },
+      page: {
+        type: Number,
+        default: 1,
+      },
+      itemsPerPage: {
+        type: Number,
+        default: 10,
+      },
+      sortBy: {
+        type: Array,
+        default: () => [{key: 'reservationId', order: 'desc'}],
+      },
     },
     data: () => ({
-      reservations: [],
       cancellingReservation: false,
       readAll: false,
       hasLongItems: false,
@@ -142,16 +165,13 @@
           { title: 'User', key: 'userEmail' },
           { title: 'Starts', key: 'startDate' },
           { title: 'Ends', key: 'endDate' },
-          { title: 'Resources', key: 'resourcesInfo' },
-          { title: 'Docker Name', key: 'dockerName' },
-          { title: 'Issues', key: 'containerStatus' },
+          { title: 'Resources', key: 'resourcesInfo', sortable: false },
+          { title: 'Docker Name', key: 'dockerName', sortable: false },
+          { title: 'Issues', key: 'containerStatus', sortable: false },
           { title: '', key: 'actions', sortable: false },
         ],
       }
     }),
-    mounted () {
-      this.reservations = this.propReservations
-    },
     methods: {
       /** Returns an HTML string listing all port mappings (local -> outside) for a reservation tooltip. */
       getPorts(ports) {
@@ -180,9 +200,6 @@
         navigator.clipboard.writeText(containerId).then(() => {
           this.store.showMessage({ text: "Container ID copied to clipboard", color: "green" })
         })
-      },
-      emitExtendReservation(reservationId) {
-        this.$emit('emitExtendReservation', reservationId)
       },
       emitCancelReservation(reservationId) {
         this.$emit('emitCancelReservation', reservationId)
@@ -215,14 +232,9 @@
           return resources
         }
         return ""
-      }
-    },
-    watch: {
-      propReservations: {
-        handler(newVal) {
-          this.reservations = newVal
-        },
-        immediate: true,
+      },
+      onOptionsUpdate(options) {
+        this.$emit('update:options', options)
       },
     },
   }
@@ -251,7 +263,7 @@
     padding-left: 15px;
     width: auto;
   }
-  
+
   .resource-link {
     cursor: help;
     text-decoration: underline;

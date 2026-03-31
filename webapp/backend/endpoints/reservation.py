@@ -10,7 +10,7 @@ from helpers.server import api_response, force_authentication
 from helpers.auth import check_token, is_admin, get_authenticated_user_id
 from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import reservation as functionality
-from endpoints.models.reservation import ReservationFilters
+from endpoints.models.reservation import ReservationFilters, UserReservationRequest
 import json
 import re
 
@@ -68,18 +68,18 @@ async def get_all_reservations_for_calendar(startDate: str, endDate: str, token:
   return functionality.get_all_reservations_for_calendar(startDate, endDate)
 
 @router.post("/get_own_reservations")
-async def get_own_reservations(filters : ReservationFilters, token: str = Depends(oauth2_scheme)):
-  """Retrieve the authenticated user's own reservations with filters.
+async def get_own_reservations(request: UserReservationRequest, token: str = Depends(oauth2_scheme)):
+  """Retrieve the authenticated user's own reservations with pagination.
 
   Args:
-      filters: Pydantic model with filtering criteria (dates, status, etc.).
+      request: Pagination, sorting, and filter parameters.
       token: OAuth2 bearer token (injected by Depends).
 
   Returns:
-      Filtered list of the user's reservations wrapped in an API response.
+      Paginated list of the user's reservations with status counts.
   """
   userId = get_authenticated_user_id(token)
-  return functionality.get_own_reservations(userId, filters)
+  return functionality.get_own_reservations(userId, request)
 
 @router.get("/get_own_reservation_details")
 async def get_own_reservation_details(reservationId: int, token: str = Depends(oauth2_scheme)):

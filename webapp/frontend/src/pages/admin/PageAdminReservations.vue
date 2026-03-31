@@ -10,7 +10,7 @@
     </v-row>
 
     <!-- Statistics Cards -->
-    <div v-if="!isFetchingReservations" id="stats-row">
+    <div v-if="!initialLoading" id="stats-row">
       <!-- Status Statistics -->
       <v-row class="mb-4 justify-center">
         <v-col cols="12" sm="6" md="2">
@@ -93,7 +93,7 @@
     </div>
 
     <!-- Filters -->
-    <v-row class="text-center row-filters justify-center" v-if="!isFetchingReservations">
+    <v-row class="text-center row-filters justify-center" v-if="!initialLoading">
       <v-col cols="12" md="3">
         <v-select
           :items="statusItems"
@@ -101,7 +101,7 @@
           v-model="filters.status"
           item-title="text"
           item-value="value"
-          @update:model-value="applyFilters"
+          @update:model-value="onFilterChange"
         ></v-select>
       </v-col>
       <v-col cols="12" md="2">
@@ -109,20 +109,26 @@
           v-model="filters.reservationId"
           label="Reservation ID"
           clearable
-          @input="applyFilters"
+          @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
     </v-row>
 
-    <v-row v-if="!isFetchingReservations" style="margin-top: 0px">
+    <v-row v-if="!initialLoading" style="margin-top: 0px">
         <v-col cols="12" style="padding-top: 0px">
-          <v-slide-x-transition mode="out-in">
-            <div v-if="filteredReservations && filteredReservations.length > 0">
-              <AdminReservationTable @emitCancelReservation="cancelReservation" @emitChangeEndDate="changeEndDate" @emitRestartContainer="restartContainer" @emitShowReservationDetails="showReservationDetails" v-bind:propReservations="filteredReservations" />
-            </div>
-          
-            <p v-else class="dim text-center">{{ reservations.length > 0 ? 'No reservations match the filters.' : 'No reservations found.' }}</p>
-          </v-slide-x-transition>
+          <AdminReservationTable
+            @emitCancelReservation="cancelReservation"
+            @emitChangeEndDate="changeEndDate"
+            @emitRestartContainer="restartContainer"
+            @emitShowReservationDetails="showReservationDetails"
+            @update:options="onTableOptionsUpdate"
+            :propReservations="reservations"
+            :totalItems="totalItems"
+            :loading="loading"
+            :page="tableOptions.page"
+            :itemsPerPage="tableOptions.itemsPerPage"
+            :sortBy="tableOptions.sortBy"
+          />
         </v-col>
       </v-row>
       <v-row v-else>
@@ -132,7 +138,7 @@
     </v-row>
 
     <UserReservationsModalConnectionDetails :reservationId="modalConnectionDetailsReservationId" v-on:emitModalClose="closeModalConnectionDetails" v-if="modalConnectionDetailsVisible && modalConnectionDetailsReservationId != null"></UserReservationsModalConnectionDetails>
-    
+
   </v-container>
 </template>
 
@@ -140,8 +146,8 @@
   /**
    * Admin page for viewing and managing all reservations system-wide.
    * Displays reservation statistics (by status and time period), supports
-   * filtering by status and reservation ID, and provides actions to cancel,
-   * change end dates, restart containers, and view connection details.
+   * server-side filtering by status and reservation ID, and provides actions
+   * to cancel, change end dates, restart containers, and view connection details.
    * Data auto-refreshes every 15 seconds.
    */
   import axios from 'axios';
@@ -165,17 +171,18 @@
     },
     data: () => ({
       intervalFetchReservations: null,
-      isFetchingReservations: true,
+      initialLoading: true,
+      loading: false,
       reservations: [],
+      totalItems: 0,
       justReserved: false,
       informByEmail: false,
       modalConnectionDetailsVisible: false,
       modalConnectionDetailsReservationId: null,
-      filters: { 
+      filters: {
         status: "All",
         reservationId: ''
       },
-      filteredReservations: [],
       statusCounts: {},
       stats: {
         total: 0,
@@ -186,12 +193,18 @@
         lastWeek: 0,
         lastMonth: 0,
         lastThreeMonths: 0
-      }
+      },
+      tableOptions: {
+        page: 1,
+        itemsPerPage: 10,
+        sortBy: [{key: 'reservationId', order: 'desc'}],
+      },
+      debounceTimer: null,
     }),
     computed: {
       statusItems() {
         const items = [
-          { text: `All (${this.reservations.length})`, value: 'All' },
+          { text: `All (${this.statusCounts.reserved + this.statusCounts.started + this.statusCounts.stopped + this.statusCounts.error || 0})`, value: 'All' },
           { text: `reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
           { text: `started (${this.statusCounts.started || 0})`, value: 'started' },
           { text: `stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
@@ -210,34 +223,32 @@
         localStorage.removeItem("justReservedInformEmail");
       }
 
-      this.isFetchingReservations = true
       this.fetchReservations()
       // Keep updating reservations every 15 seconds
       this.intervalFetchReservations = setInterval(() => { this.fetchReservations()}, 15000)
     },
     methods: {
-      applyFilters() {
-        let filtered = this.reservations;
-        
-        // Filter by Status
-        if (this.filters.status && this.filters.status !== 'All') {
-          filtered = filtered.filter(reservation =>
-            reservation.status === this.filters.status
-          );
+      /** Handles pagination/sort changes from the data table. */
+      onTableOptionsUpdate(options) {
+        this.tableOptions.page = options.page;
+        this.tableOptions.itemsPerPage = options.itemsPerPage;
+        if (options.sortBy && options.sortBy.length > 0) {
+          this.tableOptions.sortBy = options.sortBy;
         }
-        
-        // Filter by Reservation ID
-        if (this.filters.reservationId && this.filters.reservationId.trim() !== '') {
-          filtered = filtered.filter(reservation => 
-            reservation.reservationId.toString().toLowerCase().includes(this.filters.reservationId.toLowerCase().trim())
-          );
-        }
-        
-        this.filteredReservations = filtered;
-        this.updateStats();
+        this.fetchReservations();
       },
-      setFilters() {
-        this.fetchReservations()
+      /** Handles dropdown filter changes (immediate). */
+      onFilterChange() {
+        this.tableOptions.page = 1;
+        this.fetchReservations();
+      },
+      /** Handles text filter changes with 300ms debounce. */
+      onTextFilterChange() {
+        clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => {
+          this.tableOptions.page = 1;
+          this.fetchReservations();
+        }, 300);
       },
       closeModalConnectionDetails() {
         this.modalConnectionDetailsVisible = false
@@ -245,7 +256,7 @@
       createReservation() {
         // For admins, their limits are typically very high (99 active reservations)
         // But we still check to be consistent
-        
+
         // Count active reservations for the admin user
         let activeReservationCount = 0
         this.reservations.forEach((res) => {
@@ -260,9 +271,9 @@
 
         // Check against the user's actual limit
         if (activeReservationCount >= maxActiveReservations) {
-          this.store.showMessage({ 
-            text: `You have reached your maximum of ${maxActiveReservations} active reservations.`, 
-            color: "red" 
+          this.store.showMessage({
+            text: `You have reached your maximum of ${maxActiveReservations} active reservations.`,
+            color: "red"
           })
           return
         }
@@ -273,36 +284,37 @@
       fetchReservations() {
         let _this = this
         let currentUser = this.store.user
-        
-        let filters = {}
-        Object.keys(_this.filters).forEach(function(key) {
-          if (_this.filters[key] == "All" || typeof _this.filters[key] !== 'string') filters[key] = ""
-          else filters[key] = _this.filters[key]
-        });
+        _this.loading = true;
 
         axios({
           method: "post",
           url: this.$appSettings.APIServer.admin.get_reservations,
-          data: { filters: filters },
+          data: {
+            page: _this.tableOptions.page,
+            itemsPerPage: _this.tableOptions.itemsPerPage,
+            sortBy: _this.tableOptions.sortBy,
+            filters: {
+              status: _this.filters.status === 'All' ? '' : (_this.filters.status || ''),
+              reservationId: _this.filters.reservationId || '',
+            }
+          },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
-          //console.log(response)
-            // Success
             if (response.data.status == true) {
               _this.reservations = response.data.data.reservations
+              _this.totalItems = response.data.data.totalItems
               _this.statusCounts = response.data.data.statusCounts || {}
-              _this.applyFilters()
+              _this.stats = response.data.data.stats || _this.stats
             }
-            // Fail
             else {
-              console.log("Failed getting own reservations...")
-              _this.store.showMessage({ text: "There was an error getting own reservations.", color: "red" })
+              console.log("Failed getting reservations...")
+              _this.store.showMessage({ text: "There was an error getting reservations.", color: "red" })
             }
-            _this.isFetchingReservations = false
+            _this.loading = false
+            _this.initialLoading = false
         })
         .catch(function (error) {
-            // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
@@ -310,7 +322,8 @@
               console.log(error)
               _this.store.showMessage({ text: "Unknown error while trying to get reservations.", color: "red" })
             }
-            _this.isFetchingReservations = false
+            _this.loading = false
+            _this.initialLoading = false
         });
       },
       changeEndDate(reservationId, currentEndDate) {
@@ -338,13 +351,10 @@
           }
         })
         .then(function (response) {
-          //console.log(response)
-            // Success
             if (response.data.status == true) {
               _this.store.showMessage({ text: "Reservation edited.", color: "green" })
               _this.fetchReservations()
             }
-            // Fail
             else {
               console.log("Failed editing reservation...")
               console.log(response)
@@ -353,7 +363,6 @@
             }
         })
         .catch(function (error) {
-            // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
@@ -383,13 +392,10 @@
           }
         })
         .then(function (response) {
-          //console.log(response)
-            // Success
             if (response.data.status == true) {
               _this.store.showMessage({ text: "Reservation cancelled.", color: "green" })
               _this.fetchReservations()
             }
-            // Fail
             else {
               console.log("Failed removing reservation...")
               console.log(response)
@@ -399,7 +405,6 @@
             _this.cancellingReservation = false
         })
         .catch(function (error) {
-            // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
@@ -430,13 +435,10 @@
           }
         })
         .then(function (response) {
-          //console.log(response)
-            // Success
             if (response.data.status == true) {
               _this.store.showMessage({ text: "Container restarted succesfully.", color: "green" })
               _this.fetchReservations()
             }
-            // Fail
             else {
               console.log("Failed restarting container...")
               console.log(response)
@@ -446,7 +448,6 @@
             _this.restartingContainer = false
         })
         .catch(function (error) {
-            // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
@@ -461,43 +462,10 @@
         this.modalConnectionDetailsVisible = true
         this.modalConnectionDetailsReservationId = reservationId
       },
-      /** Recalculates status and time-based statistics from the full (unfiltered) reservations list. */
-      updateStats() {
-        const now = new Date()
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-        const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-        
-        // Always use all reservations for statistics
-        this.stats.total = this.reservations.length
-        this.stats.started = this.reservations.filter(r => r.status === 'started').length
-        this.stats.stopped = this.reservations.filter(r => r.status === 'stopped').length
-        this.stats.error = this.reservations.filter(r => r.status === 'error').length
-        
-        this.stats.today = this.reservations.filter(r => {
-          const startDate = new Date(r.startDate)
-          return startDate >= today
-        }).length
-
-        this.stats.lastWeek = this.reservations.filter(r => {
-          const startDate = new Date(r.startDate)
-          return startDate >= weekAgo
-        }).length
-
-        this.stats.lastMonth = this.reservations.filter(r => {
-          const startDate = new Date(r.startDate)
-          return startDate >= monthAgo
-        }).length
-
-        this.stats.lastThreeMonths = this.reservations.filter(r => {
-          const startDate = new Date(r.startDate)
-          return startDate >= threeMonthsAgo
-        }).length
-      }
     },
     beforeUnmount() {
       clearInterval(this.intervalFetchReservations)
+      clearTimeout(this.debounceTimer)
     },
   }
 </script>
@@ -506,7 +474,7 @@
   .loading {
     margin: 60px auto;
   }
-  
+
   .row-filters {
     margin-top: 30px;
     margin-bottom: 0px;

@@ -56,13 +56,15 @@ class TestGetOwnReservations:
     def test_returns_own_reservations(self, test_client, user_token):
         resp = test_client.post(
             "/api/reservation/get_own_reservations",
-            json={"filters": {"status": "all"}},
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {"status": ""}},
             headers={"Authorization": f"Bearer {user_token}"},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] is True
         assert "reservations" in data["data"]
+        assert "totalItems" in data["data"]
+        assert "activeReservationCount" in data["data"]
 
 
 class TestCreateReservation:

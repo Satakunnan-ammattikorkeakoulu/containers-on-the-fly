@@ -12,96 +12,169 @@ from datetime import timezone, timedelta
 from helpers.server import api_response, orm_to_dict
 import datetime
 from endpoints.models.admin import ContainerEdit, ComputerEdit
-from endpoints.models.reservation import ReservationFilters
+from endpoints.models.reservation import ReservationFilters, AdminReservationRequest, UserReservationRequest
+from endpoints.models.admin import AdminUsersRequest
 from sqlalchemy.orm import joinedload
+from sqlalchemy import cast, String
+from helpers.pagination import apply_pagination, get_total_count
 from logger import log
 from helpers.auth import hash_password, is_correct_password
 import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
 from helpers.tables.role import get_roles, get_role_by_id, add_role as add_role_helper, edit_role as edit_role_helper, remove_role as remove_role_helper
-from sqlalchemy import select, delete, func
+from sqlalchemy import select, delete, func, case
 
-def get_reservations(filters : ReservationFilters) -> object:
-  """Retrieve all reservations with optional status filtering.
+def get_reservations(request: AdminReservationRequest) -> object:
+  """Retrieve paginated reservations with server-side filtering and sorting.
 
   Fetches reservations from the last 90 days (or with future end dates),
-  including eager-loaded hardware specs, container details, and computer
-  info. Also returns counts of reservations by status.
+  with pagination and filtering support. Also returns unfiltered status
+  counts and time-based statistics for the dashboard cards.
 
   Args:
-      filters: ReservationFilters containing status filter criteria.
+      request: Pagination, sorting, and filter parameters. Supported
+          filter keys: status, reservationId.
 
   Returns:
-      Response with a list of reservation dicts and status count summary.
+      Response with paginated reservations, totalItems, statusCounts,
+      and stats.
   """
-  reservations = []
-  status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
+  filters = request.filters
+  status_filter = filters.get("status", "")
+  reservation_id_filter = str(filters.get("reservationId", "")).strip()
 
-  # Limit listing to 90 days
+  allowed_sort_keys = {
+      "reservationId": Reservation.reservationId,
+      "status": Reservation.status,
+      "userEmail": User.email,
+      "startDate": Reservation.startDate,
+      "endDate": Reservation.endDate,
+  }
+
   def time_now(): return datetime.datetime.now(datetime.timezone.utc)
   min_start_date = time_now() - timedelta(days=90)
+  time_scope = (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now())
 
   with Session() as session:
-    # First get all reservations for counting
-    count_query = session.execute(select(Reservation)\
-      .where((Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()) )).scalars().all()
+    # Status counts (unfiltered, 90-day scoped)
+    status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
+    count_rows = session.execute(
+        select(Reservation.status, func.count())
+        .where(time_scope)
+        .group_by(Reservation.status)
+    ).all()
+    for s, c in count_rows:
+        if s in status_counts:
+            status_counts[s] = c
 
-    # Count statuses
-    for reservation in count_query:
-      if reservation.status in status_counts:
-        status_counts[reservation.status] += 1
+    # Time-based stats (unfiltered, 90-day scoped)
+    now = time_now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
 
-    # Now get filtered reservations with all the joins
-    stmt = select(Reservation)\
-      .options(
-        joinedload(Reservation.reservedHardwareSpecs),
-        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
-        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
-        joinedload(Reservation.computer)
-      )\
-      .where((Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()) )
-    if filters.filters["status"] != "":
-      stmt = stmt.where( Reservation.status == filters.filters["status"] )
-    query = session.execute(stmt).unique().scalars().all()
+    stats_row = session.execute(
+        select(
+            func.count().label("total"),
+            func.sum(case((Reservation.startDate >= today_start, 1), else_=0)).label("today"),
+            func.sum(case((Reservation.startDate >= week_ago, 1), else_=0)).label("lastWeek"),
+            func.sum(case((Reservation.startDate >= month_ago, 1), else_=0)).label("lastMonth"),
+        )
+        .where(time_scope)
+    ).one()
+    stats = {
+        "total": stats_row.total or 0,
+        "started": status_counts.get("started", 0),
+        "stopped": status_counts.get("stopped", 0),
+        "error": status_counts.get("error", 0),
+        "today": int(stats_row.today or 0),
+        "lastWeek": int(stats_row.lastWeek or 0),
+        "lastMonth": int(stats_row.lastMonth or 0),
+        "lastThreeMonths": stats_row.total or 0,
+    }
 
-    for reservation in query:
-      res = orm_to_dict(reservation)
-      res["userEmail"] = reservation.user.email
-      res["computerName"] = reservation.computer.name
-      res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
-      res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
+    # Build filtered base query (for counting and pagination)
+    base_filtered = select(Reservation).where(time_scope)
+    # Need join to User for userEmail sorting — always join since it's lightweight
+    base_filtered = base_filtered.join(User, Reservation.userId == User.userId)
+    if status_filter:
+        base_filtered = base_filtered.where(Reservation.status == status_filter)
+    if reservation_id_filter:
+        base_filtered = base_filtered.where(
+            cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")
+        )
 
-      # Add all reserved ports
-      res["reservedContainer"]["reservedPorts"] = []
-      # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
-      if reservation.status == "started":
-        for reserved_port in reservation.reservedContainer.reservedContainerPorts:
-          port_obj = orm_to_dict(reserved_port)
-          port_obj["localPort"] = reserved_port.containerPort.port
-          port_obj["serviceName"] = reserved_port.containerPort.serviceName
-          res["reservedContainer"]["reservedPorts"].append(port_obj)
+    # Total count of filtered results
+    total_items = get_total_count(session, base_filtered)
 
-      # Add all reserved hardware specs
-      res["reservedHardwareSpecs"] = []
-      for spec in reservation.reservedHardwareSpecs:
-        # Add only specs over 0
-        if spec.amount > 0:
-            # Add also internalId for GPUs
-            if spec.hardwareSpec.type == "gpu":
-              format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
-            else:
-              format = spec.hardwareSpec.format
+    # Paginate IDs first (subquery pattern to avoid joinedload + LIMIT issues)
+    # Rebuild ID query with same filters and joins to avoid cartesian product
+    id_stmt = select(Reservation.reservationId).where(time_scope)\
+        .join(User, Reservation.userId == User.userId)
+    if status_filter:
+        id_stmt = id_stmt.where(Reservation.status == status_filter)
+    if reservation_id_filter:
+        id_stmt = id_stmt.where(
+            cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")
+        )
+    id_stmt = apply_pagination(
+        id_stmt, request.sortBy, request.page,
+        request.itemsPerPage, allowed_sort_keys
+    )
+    paginated_ids = [row[0] for row in session.execute(id_stmt).all()]
 
-            res["reservedHardwareSpecs"].append({
-              "type": spec.hardwareSpec.type,
-              "format": format,
-              "internalId": spec.hardwareSpec.format,
-              "amount": spec.amount
-            })
-      reservations.append(res)
-    
-  return api_response(True, "Reservations fetched.", { "reservations": reservations, "statusCounts": status_counts })
+    # Load full reservation objects for the paginated IDs
+    reservations = []
+    if paginated_ids:
+        # Re-apply sort order to the full query
+        full_stmt = select(Reservation)\
+            .options(
+                joinedload(Reservation.reservedHardwareSpecs),
+                joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
+                joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
+                joinedload(Reservation.computer),
+            )\
+            .where(Reservation.reservationId.in_(paginated_ids))
+        full_stmt = apply_pagination(full_stmt, request.sortBy, 1, -1, allowed_sort_keys)
+        query = session.execute(full_stmt).unique().scalars().all()
+
+        for reservation in query:
+            res = orm_to_dict(reservation)
+            res["userEmail"] = reservation.user.email
+            res["computerName"] = reservation.computer.name
+            res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
+            res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
+
+            res["reservedContainer"]["reservedPorts"] = []
+            if reservation.status == "started":
+                for reserved_port in reservation.reservedContainer.reservedContainerPorts:
+                    port_obj = orm_to_dict(reserved_port)
+                    port_obj["localPort"] = reserved_port.containerPort.port
+                    port_obj["serviceName"] = reserved_port.containerPort.serviceName
+                    res["reservedContainer"]["reservedPorts"].append(port_obj)
+
+            res["reservedHardwareSpecs"] = []
+            for spec in reservation.reservedHardwareSpecs:
+                if spec.amount > 0:
+                    if spec.hardwareSpec.type == "gpu":
+                        format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
+                    else:
+                        format = spec.hardwareSpec.format
+                    res["reservedHardwareSpecs"].append({
+                        "type": spec.hardwareSpec.type,
+                        "format": format,
+                        "internalId": spec.hardwareSpec.format,
+                        "amount": spec.amount,
+                    })
+            reservations.append(res)
+
+  return api_response(True, "Reservations fetched.", {
+      "reservations": reservations,
+      "totalItems": total_items,
+      "statusCounts": status_counts,
+      "stats": stats,
+  })
 
 def save_container(containerEdit : ContainerEdit) -> object:
   """Create or update a container definition.
@@ -194,45 +267,89 @@ def remove_container(containerId : int) -> object:
 
   return api_response(True, "Container removed successfully")
 
-def get_users() -> object:
-    """Retrieve all users with their roles and available role definitions.
+def get_users(request: AdminUsersRequest) -> object:
+    """Retrieve paginated users with server-side filtering and sorting.
 
-    Returns a list of all users (with userId, email, roles, createdAt,
-    and hasPassword) along with all available roles including user counts
-    and mount counts per role.
+    Returns a page of users matching the given filters, along with the
+    total count of matching users and available roles with user counts
+    (always unfiltered so the role dropdown shows accurate totals).
+
+    Args:
+        request: Pagination, sorting, and filter parameters. Supported
+            filter keys: role, email, userId.
 
     Returns:
-        Response with users list and availableRoles list.
+        Response with paginated users list, totalItems count, and
+        availableRoles list.
     """
-    data = []
-    role_user_counts = {}
+    filters = request.filters
+    role_filter = filters.get("role", "")
+    email_filter = filters.get("email", "")
+    user_id_filter = filters.get("userId", "")
+
+    allowed_sort_keys = {
+        "userId": User.userId,
+        "email": User.email,
+        "createdAt": User.userCreatedAt,
+        "hasPassword": User.password,
+    }
 
     with Session() as session:
-        query = session.execute(select(User)).scalars().all()
-        for user in query:
-            addable = {}
-            addable["userId"] = user.userId
-            addable["email"] = user.email
-            addable["roles"] = [role.name for role in user.roles]
-            addable["createdAt"] = user.userCreatedAt  # Added createdAt field
-            addable["hasPassword"] = user.password is not None and user.password != ""
-            data.append(addable)
-            
-            # Count users per role
-            for role in user.roles:
-                if role.name not in role_user_counts:
-                    role_user_counts[role.name] = 0
-                role_user_counts[role.name] += 1
+        # Build base filtered query
+        base_stmt = select(User)
+        if role_filter:
+            base_stmt = base_stmt.join(UserRole, User.userId == UserRole.userId)\
+                .join(Role, UserRole.roleId == Role.roleId)\
+                .where(Role.name == role_filter)
+        if email_filter:
+            base_stmt = base_stmt.where(User.email.ilike(f"%{email_filter}%"))
+        if user_id_filter:
+            base_stmt = base_stmt.where(cast(User.userId, String).like(f"%{user_id_filter}%"))
 
-    # Get available roles
+        # Get total count of filtered results
+        total_items = get_total_count(session, base_stmt)
+
+        # Apply sorting and pagination
+        paginated_stmt = apply_pagination(
+            base_stmt, request.sortBy, request.page,
+            request.itemsPerPage, allowed_sort_keys
+        )
+
+        # Fetch paginated users with their roles eager-loaded
+        paginated_stmt = paginated_stmt.options(joinedload(User.roles))
+        users = session.execute(paginated_stmt).unique().scalars().all()
+
+        data = []
+        for user in users:
+            data.append({
+                "userId": user.userId,
+                "email": user.email,
+                "roles": [role.name for role in user.roles],
+                "createdAt": user.userCreatedAt,
+                "hasPassword": user.password is not None and user.password != "",
+            })
+
+    # Get available roles with user counts (always unfiltered)
+    role_user_counts = {}
+    with Session() as session:
+        role_counts = session.execute(
+            select(Role.name, func.count(UserRole.userId))
+            .outerjoin(UserRole, Role.roleId == UserRole.roleId)
+            .group_by(Role.name)
+        ).all()
+        for role_name, count in role_counts:
+            role_user_counts[role_name] = count
+
     from helpers.tables.role import get_roles_with_mount_counts
     available_roles = get_roles_with_mount_counts()
-
-    # Add user counts to each role
     for role in available_roles:
         role["userCount"] = role_user_counts.get(role["name"], 0)
 
-    return api_response(True, "Users fetched successfully", {"users": data, "availableRoles": available_roles})
+    return api_response(True, "Users fetched successfully", {
+        "users": data,
+        "totalItems": total_items,
+        "availableRoles": available_roles,
+    })
 
 def get_user(userId: int) -> object:
     """Retrieve a single user by ID.

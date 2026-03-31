@@ -15,9 +15,10 @@ from dateutil.relativedelta import *
 import datetime
 from datetime import timezone, timedelta
 from docker import stop_container
-from endpoints.models.reservation import ReservationFilters
-from sqlalchemy import select, delete, func
+from endpoints.models.reservation import ReservationFilters, UserReservationRequest
+from sqlalchemy import select, delete, func, cast, String
 from sqlalchemy.orm import joinedload
+from helpers.pagination import apply_pagination, get_total_count
 from settings_handler import get_setting
 
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
@@ -166,93 +167,126 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
 
   return api_response(True, "Hardware resources fetched.", { "computers": computers, "containers": containers })
 
-def get_own_reservations(userId : int, filters : ReservationFilters) -> object:
-  """Retrieve all reservations belonging to a specific user.
+def get_own_reservations(userId: int, request: UserReservationRequest) -> object:
+  """Retrieve paginated reservations belonging to a specific user.
 
   Fetches reservations from the last 90 days (or with future end dates),
-  including eager-loaded hardware specs, container details, reserved
-  ports, and computer info. Returns status counts and supports filtering
-  by reservation status.
+  with server-side pagination, sorting, and filtering. Returns unfiltered
+  status counts and the user's active reservation count for limit
+  enforcement.
 
   Args:
       userId: The ID of the user whose reservations to fetch.
-      filters: ReservationFilters containing status filter criteria.
+      request: Pagination, sorting, and filter parameters. Supported
+          filter keys: status.
 
   Returns:
-      Response with a list of reservation dicts and status count summary.
+      Response with paginated reservations, totalItems, statusCounts,
+      and activeReservationCount.
   """
-  reservations = []
-  status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
+  filters = request.filters
+  status_filter = filters.get("status", "")
 
-  # Limit listing to 90 days
+  allowed_sort_keys = {
+      "reservationId": Reservation.reservationId,
+      "status": Reservation.status,
+      "startDate": Reservation.startDate,
+      "endDate": Reservation.endDate,
+  }
+
   def time_now(): return datetime.datetime.now(datetime.timezone.utc)
   min_start_date = time_now() - timedelta(days=90)
+  time_scope = (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now())
 
   with Session() as session:
-    # First get all user's reservations for counting
-    count_results = session.execute(
-      select(Reservation)
-      .where(
-        Reservation.userId == userId,
-        (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()))
-    ).scalars().all()
+    # Status counts (unfiltered by status, scoped to userId + 90 days)
+    status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
+    count_rows = session.execute(
+        select(Reservation.status, func.count())
+        .where(Reservation.userId == userId, time_scope)
+        .group_by(Reservation.status)
+    ).all()
+    for s, c in count_rows:
+        if s in status_counts:
+            status_counts[s] = c
 
-    # Count statuses
-    for reservation in count_results:
-      if reservation.status in status_counts:
-        status_counts[reservation.status] += 1
+    # Active reservation count (no 90-day scope — for limit enforcement)
+    active_count = session.execute(
+        select(func.count())
+        .select_from(Reservation)
+        .where(
+            Reservation.userId == userId,
+            Reservation.status.in_(["reserved", "started"]),
+        )
+    ).scalar()
 
-    # Now get filtered reservations with all the joins
-    stmt = select(Reservation)\
-      .options(
-        joinedload(Reservation.reservedHardwareSpecs),
-        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
-        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
-        joinedload(Reservation.computer)
-      )\
-      .where(
-        Reservation.userId == userId,
-        (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now()))
-    if filters.filters["status"] != "":
-      stmt = stmt.where( Reservation.status == filters.filters["status"] )
-    query = session.execute(stmt).unique().scalars().all()
+    # Build filtered base query
+    base_filtered = select(Reservation).where(Reservation.userId == userId, time_scope)
+    if status_filter:
+        base_filtered = base_filtered.where(Reservation.status == status_filter)
 
-    for reservation in query:
-      res = orm_to_dict(reservation)
-      res["computerName"] = reservation.computer.name
-      res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
-      res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
-      res["reservedContainer"]["reservedPorts"] = []
-      # Include SHM and RAM disk percentages
-      res["shmSizePercent"] = reservation.reservedContainer.shmSizePercent if reservation.reservedContainer.shmSizePercent is not None else 50
-      res["ramDiskSizePercent"] = reservation.reservedContainer.ramDiskSizePercent if reservation.reservedContainer.ramDiskSizePercent is not None else 0
-      # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
-      if reservation.status == "started":
-        for reserved_port in reservation.reservedContainer.reservedContainerPorts:
-          port_obj = orm_to_dict(reserved_port)
-          port_obj["localPort"] = reserved_port.containerPort.port
-          port_obj["serviceName"] = reserved_port.containerPort.serviceName
-          res["reservedContainer"]["reservedPorts"].append(port_obj)
-      # Add all reserved hardware specs
-      res["reservedHardwareSpecs"] = []
-      for spec in reservation.reservedHardwareSpecs:
-        # Add only specs over 0
-        if spec.amount > 0:
-            # Add also internalId for GPUs
-            if spec.hardwareSpec.type == "gpu":
-              format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
-            else:
-              format = spec.hardwareSpec.format
+    # Total count of filtered results
+    total_items = get_total_count(session, base_filtered)
 
-            res["reservedHardwareSpecs"].append({
-              "type": spec.hardwareSpec.type,
-              "format": format,
-              "internalId": spec.hardwareSpec.format,
-              "amount": spec.amount
-            })
-      reservations.append(res)
-  
-  return api_response(True, "Hardware resources fetched.", { "reservations": reservations, "statusCounts": status_counts })
+    # Paginate IDs first (subquery pattern to avoid joinedload + LIMIT issues)
+    id_stmt = select(Reservation.reservationId).where(Reservation.userId == userId, time_scope)
+    if status_filter:
+        id_stmt = id_stmt.where(Reservation.status == status_filter)
+    id_stmt = apply_pagination(
+        id_stmt, request.sortBy, request.page,
+        request.itemsPerPage, allowed_sort_keys
+    )
+    paginated_ids = [row[0] for row in session.execute(id_stmt).all()]
+
+    # Load full reservation objects for the paginated IDs
+    reservations = []
+    if paginated_ids:
+        full_stmt = select(Reservation)\
+            .options(
+                joinedload(Reservation.reservedHardwareSpecs),
+                joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
+                joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
+                joinedload(Reservation.computer),
+            )\
+            .where(Reservation.reservationId.in_(paginated_ids))
+        full_stmt = apply_pagination(full_stmt, request.sortBy, 1, -1, allowed_sort_keys)
+        query = session.execute(full_stmt).unique().scalars().all()
+
+        for reservation in query:
+            res = orm_to_dict(reservation)
+            res["computerName"] = reservation.computer.name
+            res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
+            res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
+            res["reservedContainer"]["reservedPorts"] = []
+            res["shmSizePercent"] = reservation.reservedContainer.shmSizePercent if reservation.reservedContainer.shmSizePercent is not None else 50
+            res["ramDiskSizePercent"] = reservation.reservedContainer.ramDiskSizePercent if reservation.reservedContainer.ramDiskSizePercent is not None else 0
+            if reservation.status == "started":
+                for reserved_port in reservation.reservedContainer.reservedContainerPorts:
+                    port_obj = orm_to_dict(reserved_port)
+                    port_obj["localPort"] = reserved_port.containerPort.port
+                    port_obj["serviceName"] = reserved_port.containerPort.serviceName
+                    res["reservedContainer"]["reservedPorts"].append(port_obj)
+            res["reservedHardwareSpecs"] = []
+            for spec in reservation.reservedHardwareSpecs:
+                if spec.amount > 0:
+                    if spec.hardwareSpec.type == "gpu":
+                        format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
+                    else:
+                        format = spec.hardwareSpec.format
+                    res["reservedHardwareSpecs"].append({
+                        "type": spec.hardwareSpec.type,
+                        "format": format,
+                        "internalId": spec.hardwareSpec.format,
+                        "amount": spec.amount,
+                    })
+            reservations.append(res)
+
+  return api_response(True, "Reservations fetched.", {
+      "reservations": reservations,
+      "totalItems": total_items,
+      "statusCounts": status_counts,
+      "activeReservationCount": active_count,
+  })
 
 def get_own_reservation_details(reservationId : int, userId : int) -> object:
   """Retrieve connection details for a specific reservation.

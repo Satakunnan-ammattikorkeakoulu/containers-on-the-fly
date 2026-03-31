@@ -16,8 +16,11 @@ auth:bearer {
 
 body:json {
   {
+    "page": 1,
+    "itemsPerPage": 10,
+    "sortBy": [],
     "filters": {
-      "status": "all"
+      "status": ""
     }
   }
 }
@@ -32,10 +35,13 @@ tests {
     expect(res.body.status).to.equal(true);
   });
 
-  test("Response has reservations and status counts", function() {
+  test("Response has reservations, totalItems, status counts, and active count", function() {
     expect(res.body).to.have.property('data');
     expect(res.body.data).to.have.property('reservations');
     expect(res.body.data.reservations).to.be.an('array');
+    expect(res.body.data).to.have.property('totalItems');
+    expect(res.body.data.totalItems).to.be.a('number');
     expect(res.body.data).to.have.property('statusCounts');
+    expect(res.body.data).to.have.property('activeReservationCount');
   });
 }

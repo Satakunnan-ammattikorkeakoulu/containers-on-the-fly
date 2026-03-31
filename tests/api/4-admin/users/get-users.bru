@@ -4,14 +4,23 @@ meta {
   seq: 1
 }
 
-get {
+post {
   url: {{root_url}}/admin/users
-  body: none
+  body: json
   auth: bearer
 }
 
 auth:bearer {
   token: {{admin_token}}
+}
+
+body:json {
+  {
+    "page": 1,
+    "itemsPerPage": 10,
+    "sortBy": [],
+    "filters": {}
+  }
 }
 
 tests {
@@ -24,11 +33,13 @@ tests {
     expect(res.body.status).to.equal(true);
   });
 
-  test("Response has users array and available roles", function() {
+  test("Response has users array, totalItems, and available roles", function() {
     expect(res.body).to.have.property('data');
     expect(res.body.data).to.have.property('users');
     expect(res.body.data.users).to.be.an('array');
     expect(res.body.data.users.length).to.be.greaterThan(0);
+    expect(res.body.data).to.have.property('totalItems');
+    expect(res.body.data.totalItems).to.be.a('number');
     expect(res.body.data).to.have.property('availableRoles');
     expect(res.body.data.availableRoles).to.be.an('array');
   });

@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, Request
 from helpers.server import force_authentication, api_response
 from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import admin as functionality
-from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit, RoleMountsEdit, RoleHardwareLimitsEdit, RoleReservationLimitsEdit
-from endpoints.models.reservation import ReservationFilters
+from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit, RoleMountsEdit, RoleHardwareLimitsEdit, RoleReservationLimitsEdit, AdminUsersRequest
+from endpoints.models.reservation import ReservationFilters, AdminReservationRequest, UserReservationRequest
 from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole, ServerStatus, ServerLogs
 from sqlalchemy import desc, Column, Integer, Text, Float, ForeignKey, DateTime, UniqueConstraint, Boolean, BigInteger, func
 import datetime
@@ -27,31 +27,32 @@ router = APIRouter(
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/login")  # Make sure the tokenUrl is correct
 
 @router.post("/reservations")
-async def get_reservations(filters : ReservationFilters, token: str = Depends(oauth2_scheme)):
-  """Retrieve reservations matching the given filters.
+async def get_reservations(request: AdminReservationRequest, token: str = Depends(oauth2_scheme)):
+  """Retrieve paginated reservations matching the given filters.
 
   Args:
-      filters: Pydantic model with filtering criteria (dates, status, etc.).
+      request: Pagination, sorting, and filter parameters.
       token: OAuth2 bearer token (injected by Depends).
 
   Returns:
-      Filtered list of reservations wrapped in an API response.
+      Paginated list of reservations with status counts and stats.
   """
   force_authentication(token, "admin")
-  return functionality.get_reservations(filters)
+  return functionality.get_reservations(request)
 
-@router.get("/users")
-async def get_users(token: str = Depends(oauth2_scheme)):
-  """Retrieve all registered users.
+@router.post("/users")
+async def get_users(request: AdminUsersRequest, token: str = Depends(oauth2_scheme)):
+  """Retrieve paginated users matching the given filters.
 
   Args:
+      request: Pagination, sorting, and filter parameters.
       token: OAuth2 bearer token (injected by Depends).
 
   Returns:
-      List of all users wrapped in an API response.
+      Paginated list of users with total count and available roles.
   """
   force_authentication(token, "admin")
-  return functionality.get_users()
+  return functionality.get_users(request)
 
 @router.get("/hardware")
 async def get_hardware(token: str = Depends(oauth2_scheme)):

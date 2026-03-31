@@ -6,6 +6,17 @@ editing containers, computers, users, and role configurations.
 
 from pydantic import BaseModel
 from typing import Dict, Any, List
+from endpoints.models.pagination import PaginationParams
+
+
+class AdminUsersRequest(PaginationParams):
+    """Request model for paginated, filtered admin user listing.
+
+    Inherits page, itemsPerPage, sortBy, and filters from PaginationParams.
+    Supported filter keys: role, email, userId.
+    """
+
+    pass
 
 
 class ContainerEdit(BaseModel):

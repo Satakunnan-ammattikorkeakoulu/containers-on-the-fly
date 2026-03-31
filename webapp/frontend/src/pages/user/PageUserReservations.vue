@@ -16,9 +16,9 @@
       <v-col cols="12">
         <h3 style="margin-bottom: 10px;">Reservation Calendar</h3>
         <p style="margin-bottom: 20px; color: #666; font-size: 14px;">All times are in timezone <strong>{{globalTimezone}}</strong></p>
-        <CalendarReservations 
-          v-if="showCalendar" 
-          :propReservations="allReservations || []" 
+        <CalendarReservations
+          v-if="showCalendar"
+          :propReservations="allReservations || []"
           :readOnly="true"
           @slotSelected="handleSlotSelected"
           @reservationsRefreshed="handleReservationsRefreshed"
@@ -59,21 +59,31 @@
             v-model="filters.status"
             item-title="text"
             item-value="value"
-            @update:model-value="setFilters"
+            @update:model-value="onFilterChange"
           ></v-select>
         </v-col>
       </v-row>
     </v-row>
 
     <!-- Data table -->
-    <v-row v-if="!isFetchingReservations">
+    <v-row v-if="!initialLoading">
       <v-col cols="12">
-        <v-slide-x-transition mode="out-in">
-          <div v-if="reservations && reservations.length > 0" style="margin-top: 50px">
-            <UserReservationTable @emitCancelReservation="cancelReservation" @emitExtendReservation="extendReservation" @emitRestartContainer="restartContainer" @emitShowReservationDetails="showReservationDetails" @emitEditDescription="editDescription" v-bind:propReservations="reservations" />
-          </div>
-          <p v-else class="dim text-center">No reservations found.</p>
-        </v-slide-x-transition>
+        <div style="margin-top: 50px">
+          <UserReservationTable
+            @emitCancelReservation="cancelReservation"
+            @emitExtendReservation="extendReservation"
+            @emitRestartContainer="restartContainer"
+            @emitShowReservationDetails="showReservationDetails"
+            @emitEditDescription="editDescription"
+            @update:options="onTableOptionsUpdate"
+            :propReservations="reservations"
+            :totalItems="totalItems"
+            :loading="loading"
+            :page="tableOptions.page"
+            :itemsPerPage="tableOptions.itemsPerPage"
+            :sortBy="tableOptions.sortBy"
+          />
+        </div>
       </v-col>
     </v-row>
     <v-row v-else>
@@ -88,10 +98,11 @@
 <script>
   /**
    * User-facing reservations dashboard.
-   * Displays the user's own reservations (past 3 months) with status filtering,
-   * and provides actions to cancel, extend, restart, edit description, and view
-   * connection details. Includes an optional calendar view of all current reservations.
-   * Enforces per-user active reservation limits before allowing new reservations.
+   * Displays the user's own reservations (past 3 months) with server-side
+   * pagination, sorting, and status filtering. Provides actions to cancel,
+   * extend, restart, edit description, and view connection details. Includes
+   * an optional calendar view of all current reservations.
+   * Enforces per-user active reservation limits using server-provided counts.
    * Data auto-refreshes every 15 seconds.
    */
   import axios from 'axios';
@@ -118,10 +129,13 @@
     data: () => ({
       filters: { status: "All" },
       intervalFetchReservations: null,
-      isFetchingReservations: true,
+      initialLoading: true,
+      loading: false,
       reservations: [],
+      totalItems: 0,
       totalReservationCount: 0,
       statusCounts: {},
+      activeReservationCount: 0,
       justReserved: false,
       informByEmail: false,
       modalConnectionDetailsVisible: false,
@@ -129,6 +143,11 @@
       showCalendar: false,
       allReservations: null,
       fetchingAllReservations: false,
+      tableOptions: {
+        page: 1,
+        itemsPerPage: 10,
+        sortBy: [{key: 'reservationId', order: 'desc'}],
+      },
     }),
     mounted () {
       if (localStorage.getItem("justReserved") === "true") {
@@ -140,14 +159,24 @@
         localStorage.removeItem("justReservedInformEmail");
       }
 
-      this.isFetchingReservations = true
       this.fetchReservations()
       // Keep updating reservations every 15 seconds
       this.intervalFetchReservations = setInterval(() => { this.fetchReservations()}, 15000)
     },
     methods: {
-      setFilters() {
-        this.fetchReservations()
+      /** Handles pagination/sort changes from the data table. */
+      onTableOptionsUpdate(options) {
+        this.tableOptions.page = options.page;
+        this.tableOptions.itemsPerPage = options.itemsPerPage;
+        if (options.sortBy && options.sortBy.length > 0) {
+          this.tableOptions.sortBy = options.sortBy;
+        }
+        this.fetchReservations();
+      },
+      /** Handles dropdown filter changes (immediate). */
+      onFilterChange() {
+        this.tableOptions.page = 1;
+        this.fetchReservations();
       },
       closeModalConnectionDetails() {
         this.modalConnectionDetailsVisible = false
@@ -155,9 +184,9 @@
       createReservation() {
         // Check against the user's actual limit
         if (this.activeReservationCount >= this.maxActiveReservations) {
-          this.store.showMessage({ 
-            text: `You have reached your maximum of ${this.maxActiveReservations} active reservation${this.maxActiveReservations === 1 ? '' : 's'}. Please wait for an existing reservation to complete before creating a new one.`, 
-            color: "red" 
+          this.store.showMessage({
+            text: `You have reached your maximum of ${this.maxActiveReservations} active reservation${this.maxActiveReservations === 1 ? '' : 's'}. Please wait for an existing reservation to complete before creating a new one.`,
+            color: "red"
           })
           return
         }
@@ -168,42 +197,38 @@
       fetchReservations() {
         let _this = this
         let currentUser = this.store.user
-        
-        let filters = {}
-        Object.keys(_this.filters).forEach(function(key) {
-          if (_this.filters[key] == "All" || typeof _this.filters[key] !== 'string') filters[key] = ""
-          else filters[key] = _this.filters[key]
-        });
-        
+        _this.loading = true;
+
         axios({
           method: "post",
           url: this.$appSettings.APIServer.reservation.get_own_reservations,
-          data: { filters: filters },
+          data: {
+            page: _this.tableOptions.page,
+            itemsPerPage: _this.tableOptions.itemsPerPage,
+            sortBy: _this.tableOptions.sortBy,
+            filters: {
+              status: _this.filters.status === 'All' ? '' : (_this.filters.status || ''),
+            }
+          },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
-          //console.log(response)
-            // Success
             if (response.data.status == true) {
               _this.reservations = response.data.data.reservations
-              // Only update status counts when fetching unfiltered data
-              if (_this.filters.status === "All") {
-                _this.totalReservationCount = _this.reservations.length
-                _this.statusCounts = response.data.data.statusCounts || {}
-                if (Object.keys(_this.statusCounts).length === 0) {
-                  _this.calculateStatusCounts();
-                }
-              }
+              _this.totalItems = response.data.data.totalItems
+              _this.activeReservationCount = response.data.data.activeReservationCount || 0
+              // Always update status counts and total from server
+              _this.statusCounts = response.data.data.statusCounts || {}
+              _this.totalReservationCount = (_this.statusCounts.reserved || 0) + (_this.statusCounts.started || 0) + (_this.statusCounts.stopped || 0) + (_this.statusCounts.error || 0)
             }
-            // Fail
             else {
               console.log("Failed getting own reservations...")
               _this.store.showMessage({ text: "There was an error getting own reservations.", color: "red" })
             }
-            _this.isFetchingReservations = false
+            _this.loading = false
+            _this.initialLoading = false
         })
         .catch(function (error) {
-            // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
@@ -211,7 +236,8 @@
               console.log(error)
               _this.store.showMessage({ text: "Unknown error while trying to get reservations.", color: "red" })
             }
-            _this.isFetchingReservations = false
+            _this.loading = false
+            _this.initialLoading = false
         });
       },
       cancelReservation(reservationId) {
@@ -234,13 +260,10 @@
           }
         })
         .then(function (response) {
-          //console.log(response)
-            // Success
             if (response.data.status == true) {
               _this.store.showMessage({ text: "Reservation cancelled.", color: "green" })
               _this.fetchReservations()
             }
-            // Fail
             else {
               console.log("Failed removing reservation...")
               console.log(response)
@@ -250,7 +273,6 @@
             _this.cancellingReservation = false
         })
         .catch(function (error) {
-            // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
@@ -293,20 +315,16 @@
           }
         })
         .then(function (response) {
-          //console.log(response)
-            // Success
             if (response.data.status == true) {
               _this.store.showMessage({ text: "Reservation was extended succesfully.", color: "green" })
               _this.fetchReservations()
             }
-            // Fail
             else {
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error extending."
               _this.store.showMessage({ text: msg, color: "red" })
             }
         })
         .catch(function (error) {
-            // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
@@ -336,13 +354,10 @@
           }
         })
         .then(function (response) {
-          //console.log(response)
-            // Success
             if (response.data.status == true) {
               _this.store.showMessage({ text: "Container restarted succesfully.", color: "green" })
               _this.fetchReservations()
             }
-            // Fail
             else {
               console.log("Failed restarting container...")
               console.log(response)
@@ -352,7 +367,6 @@
             _this.restartingContainer = false
         })
         .catch(function (error) {
-            // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
@@ -389,19 +403,16 @@
           }
         })
         .then(function (response) {
-            // Success
             if (response.data.status == true) {
               _this.store.showMessage({ text: "Description updated.", color: "green" })
               _this.fetchReservations()
             }
-            // Fail
             else {
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error updating the description."
               _this.store.showMessage({ text: msg, color: "red" })
             }
         })
         .catch(function (error) {
-            // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
@@ -436,11 +447,9 @@
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
-            // Success
             if (response.data.status == true) {
               _this.allReservations = response.data.data.reservations || [];
             }
-            // Fail
             else {
               console.log("Failed getting current reservations...")
               _this.store.showMessage({ text: "There was an error getting current reservations.", color: "red" })
@@ -448,7 +457,6 @@
             _this.fetchingAllReservations = false;
         })
         .catch(function (error) {
-            // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
@@ -462,9 +470,9 @@
        handleSlotSelected() {
          // Check against the user's actual limit
          if (this.activeReservationCount >= this.maxActiveReservations) {
-           this.store.showMessage({ 
-             text: `You have reached your maximum of ${this.maxActiveReservations} active reservation${this.maxActiveReservations === 1 ? '' : 's'}. Please wait for an existing reservation to complete before creating a new one.`, 
-             color: "red" 
+           this.store.showMessage({
+             text: `You have reached your maximum of ${this.maxActiveReservations} active reservation${this.maxActiveReservations === 1 ? '' : 's'}. Please wait for an existing reservation to complete before creating a new one.`,
+             color: "red"
            })
            return
          }
@@ -480,23 +488,6 @@
        handleReservationsRefreshed(reservations) {
          this.allReservations = reservations;
        },
-       /** Fallback status counter used when the backend does not return statusCounts. */
-       calculateStatusCounts() {
-         // Initialize counts
-         this.statusCounts = {
-           reserved: 0,
-           started: 0,
-           stopped: 0,
-           error: 0
-         };
-         
-         // Count reservations by status
-         this.reservations.forEach(reservation => {
-           if (reservation.status in this.statusCounts) {
-             this.statusCounts[reservation.status]++;
-           }
-         });
-       }
     },
     computed: {
       statusItems() {
@@ -511,13 +502,6 @@
       },
       globalTimezone() {
         return this.store.appTimezone;
-      },
-      activeReservationCount() {
-        let count = 0;
-        this.reservations.forEach((res) => {
-          if (res.status == "started" || res.status == "reserved") count++;
-        });
-        return count;
       },
       maxActiveReservations() {
         return this.store.userMaxActiveReservations;

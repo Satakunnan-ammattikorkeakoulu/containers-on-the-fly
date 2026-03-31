@@ -1,10 +1,15 @@
 <template>
   <div>
     <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Expand Issues" : "Collapse Issues" }}</a>
-    <v-data-table
+    <v-data-table-server
       :headers="table.headers"
-      :items="reservations"
-      :sort-by="[{key: 'reservationId', order: 'desc'}]"
+      :items="propReservations"
+      :items-length="totalItems"
+      :loading="loading"
+      :sort-by="sortBy"
+      :items-per-page="itemsPerPage"
+      :page="page"
+      @update:options="onOptionsUpdate"
       class="elevation-1">
       <!-- Status -->
       <template v-slot:item.status="{item}">
@@ -96,15 +101,16 @@
           </v-list>
         </v-menu>
       </template>
-    </v-data-table>
+    </v-data-table-server>
   </div>
 </template>
 
 <script>
   /**
-   * Data table listing the current user's reservations with status chips, resource
-   * tooltips, and an actions menu for show-details, extend, restart, edit description,
-   * and cancel operations. Emits events to the parent for each action.
+   * Server-side paginated data table listing the current user's reservations
+   * with status chips, resource tooltips, and an actions menu for show-details,
+   * extend, restart, edit description, and cancel operations.
+   * Emits pagination/sort changes and row actions to the parent.
    */
   import { DisplayTime } from '/src/helpers/time.js'
 
@@ -114,10 +120,29 @@
       propReservations: {
         type: Array,
         required: true,
-      }
+      },
+      totalItems: {
+        type: Number,
+        default: 0,
+      },
+      loading: {
+        type: Boolean,
+        default: false,
+      },
+      page: {
+        type: Number,
+        default: 1,
+      },
+      itemsPerPage: {
+        type: Number,
+        default: 10,
+      },
+      sortBy: {
+        type: Array,
+        default: () => [{key: 'reservationId', order: 'desc'}],
+      },
     },
     data: () => ({
-      reservations: [],
       cancellingReservation: false,
       readAll: false,
       hasLongItems: false,
@@ -132,23 +157,18 @@
           { title: 'ID', key: 'reservationId' },
           { title: 'Starts', key: 'startDate' },
           { title: 'Ends', key: 'endDate' },
-          { title: 'Resources', key: 'resourcesInfo' },
-          { title: 'Description', key: 'description' },
-          { title: 'Issues', key: 'containerStatus' },
+          { title: 'Resources', key: 'resourcesInfo', sortable: false },
+          { title: 'Description', key: 'description', sortable: false },
+          { title: 'Issues', key: 'containerStatus', sortable: false },
           { title: '', key: 'actions', sortable: false },
         ],
       }
     }),
-    mounted () {
-      this.reservations = this.propReservations
-    },
     methods: {
-      // Truncates description to 20 characters with ellipsis
       truncateDescription(description) {
         if (!description) return "-";
         return description.length > 20 ? description.substring(0, 20) + "..." : description;
       },
-      // Returns a string of all ports for a reservation
       getPorts(ports) {
         if (ports) {
           let portsString = ""
@@ -160,11 +180,10 @@
         }
         return "No ports"
       },
-      // Checks if the given time is between the given time + hours
       lessHoursThan(time, hours) {
         let curDate = new Date()
         let afterUtc = new Date(time.getTime() - (time.getTimezoneOffset() * 60000))
-        
+
         let diff = afterUtc.getTime() - curDate.getTime()
         let diffHours = Math.ceil(diff / (1000 * 60 * 60))
         if (diffHours < 0) return false
@@ -214,20 +233,15 @@
         }
         return ""
       },
-    },
-    watch: {
-      propReservations: {
-        handler(newVal) {
-          this.reservations = newVal
-        },
-        immediate: true,
+      onOptionsUpdate(options) {
+        this.$emit('update:options', options)
       },
     },
   }
 </script>
 
 <style scoped lang="scss">
-  
+
   .link-toggle-read-all {
     margin-bottom: 20px;
     font-size: 14px;
@@ -235,17 +249,17 @@
     padding-left: 15px;
     width: auto;
   }
-  
+
   .resource-link {
     cursor: help;
     text-decoration: underline;
     text-decoration-style: dotted;
   }
-  
+
   .description-text {
     font-size: 13px;
   }
-  
+
   .description-empty {
     color: #999;
   }

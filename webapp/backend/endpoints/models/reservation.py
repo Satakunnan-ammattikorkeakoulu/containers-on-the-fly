@@ -5,6 +5,7 @@ Defines the JSON body schemas used by reservation-related POST endpoints.
 
 from pydantic import BaseModel
 from typing import Dict, Any
+from endpoints.models.pagination import PaginationParams
 
 
 class ReservationFilters(BaseModel):
@@ -16,3 +17,23 @@ class ReservationFilters(BaseModel):
     """
 
     filters: Dict[str, Any]
+
+
+class AdminReservationRequest(PaginationParams):
+    """Request model for paginated, filtered admin reservation listing.
+
+    Inherits page, itemsPerPage, sortBy, and filters from PaginationParams.
+    Supported filter keys: status, reservationId.
+    """
+
+    pass
+
+
+class UserReservationRequest(PaginationParams):
+    """Request model for paginated, filtered user reservation listing.
+
+    Inherits page, itemsPerPage, sortBy, and filters from PaginationParams.
+    Supported filter keys: status.
+    """
+
+    pass

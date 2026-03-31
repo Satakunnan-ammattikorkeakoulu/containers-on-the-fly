@@ -22,7 +22,7 @@
           v-model="filters.role"
           item-title="text"
           item-value="value"
-          @update:model-value="applyFilters"
+          @update:model-value="onFilterChange"
         ></v-select>
       </v-col>
       <v-col cols="12" md="3">
@@ -30,7 +30,7 @@
           v-model="filters.email"
           label="Email"
           clearable
-          @input="applyFilters"
+          @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
       <v-col cols="12" md="3">
@@ -38,17 +38,23 @@
           v-model="filters.userId"
           label="User ID"
           clearable
-          @input="applyFilters"
+          @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
     </v-row>
 
-    <v-row v-if="!isFetching" style="margin-top: 0px">
+    <v-row v-if="!initialLoading" style="margin-top: 0px">
       <v-col cols="12">
-        <div v-if="filteredUsers && filteredUsers.length > 0">
-          <AdminUsersTable v-on:emitEditUser="editUser" v-bind:propItems="filteredUsers" />
-        </div>
-        <p v-else class="dim text-center">{{ users.length > 0 ? 'No users match the filters.' : 'No users.' }}</p>
+        <AdminUsersTable
+          v-on:emitEditUser="editUser"
+          @update:options="onTableOptionsUpdate"
+          :propItems="users"
+          :totalItems="totalItems"
+          :loading="loading"
+          :page="tableOptions.page"
+          :itemsPerPage="tableOptions.itemsPerPage"
+          :sortBy="tableOptions.sortBy"
+        />
       </v-col>
     </v-row>
     <v-row v-else>
@@ -57,11 +63,11 @@
       </v-col>
     </v-row>
 
-    <AdminManageUserModal 
-      @click.stop="dialog = true" 
-      v-if="selectedItem" 
-      v-on:emitModalClose="closeDialog" 
-      :propData="selectedItem" 
+    <AdminManageUserModal
+      @click.stop="dialog = true"
+      v-if="selectedItem"
+      v-on:emitModalClose="closeDialog"
+      :propData="selectedItem"
       :key="dialogKey">
     </AdminManageUserModal>
   </v-container>
@@ -70,8 +76,8 @@
 <script>
 /**
  * Admin page for managing user accounts.
- * Lists all users with client-side filtering by role, email, and user ID.
- * Supports creating new users and editing existing ones via a modal dialog.
+ * Lists all users with server-side pagination, sorting, and filtering
+ * by role, email, and user ID. Supports creating and editing users via modal.
  */
 import axios from 'axios';
 import Loading from '/src/components/global/Loading.vue';
@@ -94,24 +100,30 @@ export default {
   },
   data: () => ({
     intervalFetch: null,
-    isFetching: false,
-    users: [],  // Changed from data to users
-    filteredUsers: [],
+    initialLoading: true,
+    loading: false,
+    users: [],
+    totalItems: 0,
     availableRoles: [],
     selectedItem: undefined,
     dialog: false,
     dialogKey: new Date().getTime(),
-    tableName: "users",
     filters: {
       userId: '',
       email: '',
       role: 'All'
-    }
+    },
+    tableOptions: {
+      page: 1,
+      itemsPerPage: 10,
+      sortBy: [{key: 'userId', order: 'desc'}],
+    },
+    debounceTimer: null,
   }),
   computed: {
     /** Builds role filter dropdown items with user counts per role. */
     roleItems() {
-      const items = [{text: `All (${this.users.length})`, value: 'All'}];
+      const items = [{text: `All`, value: 'All'}];
       if (this.availableRoles) {
         items.push(...this.availableRoles.map(role => ({
           text: `${role.name} (${role.userCount || 0})`,
@@ -122,7 +134,6 @@ export default {
     }
   },
   mounted () {
-    this.isFetching = true;
     this.fetch();
 
     // Keep updating data every 30 seconds
@@ -144,70 +155,76 @@ export default {
       this.selectedItem = undefined;
       this.fetch();
     },
+    /** Handles pagination/sort changes from the data table. */
+    onTableOptionsUpdate(options) {
+      this.tableOptions.page = options.page;
+      this.tableOptions.itemsPerPage = options.itemsPerPage;
+      if (options.sortBy && options.sortBy.length > 0) {
+        this.tableOptions.sortBy = options.sortBy;
+      }
+      this.fetch();
+    },
+    /** Handles dropdown filter changes (immediate). */
+    onFilterChange() {
+      this.tableOptions.page = 1;
+      this.fetch();
+    },
+    /** Handles text filter changes with 300ms debounce. */
+    onTextFilterChange() {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = setTimeout(() => {
+        this.tableOptions.page = 1;
+        this.fetch();
+      }, 300);
+    },
     fetch() {
       let _this = this;
       let currentUser = this.store.user;
+      _this.loading = true;
 
       axios({
-        method: "get",
+        method: "post",
         url: this.$appSettings.APIServer.admin.get_users,
+        data: {
+          page: _this.tableOptions.page,
+          itemsPerPage: _this.tableOptions.itemsPerPage,
+          sortBy: _this.tableOptions.sortBy,
+          filters: {
+            role: _this.filters.role === 'All' ? '' : (_this.filters.role || ''),
+            email: _this.filters.email || '',
+            userId: _this.filters.userId || '',
+          }
+        },
         headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
       })
       .then(function (response) {
         if (response.data.status == true) {
-          _this.users = response.data.data[_this.tableName];  // Changed from data to users
+          _this.users = response.data.data.users;
+          _this.totalItems = response.data.data.totalItems;
           _this.availableRoles = response.data.data.availableRoles || [];
-          _this.applyFilters();
         } else {
-          console.log("Failed getting "+_this.tableName+"...");
-          _this.store.showMessage({ text: "There was an error getting "+_this.tableName+".", color: "red" });
+          console.log("Failed getting users...");
+          _this.store.showMessage({ text: "There was an error getting users.", color: "red" });
         }
-        _this.isFetching = false;
+        _this.loading = false;
+        _this.initialLoading = false;
       })
       .catch(function (error) {
-        // Error
         if (error.response && (error.response.status == 400 || error.response.status == 401)) {
           _this.store.showMessage({ text: error.response.data.detail, color: "red" });
         }
         else {
           console.log(error);
-          _this.store.showMessage({ text: "Unknown error while trying to get "+_this.tableName+".", color: "red" });
+          _this.store.showMessage({ text: "Unknown error while trying to get users.", color: "red" });
         }
-        _this.isFetching = false;
+        _this.loading = false;
+        _this.initialLoading = false;
       });
     },
-    applyFilters() {
-      let filtered = this.users;
-      
-      // Filter by User ID
-      if (this.filters.userId && this.filters.userId.trim() !== '') {
-        filtered = filtered.filter(user => 
-          user.userId.toString().toLowerCase().includes(this.filters.userId.toLowerCase().trim())
-        );
-      }
-      
-      // Filter by Email
-      if (this.filters.email && this.filters.email.trim() !== '') {
-        filtered = filtered.filter(user => 
-          user.email.toLowerCase().includes(this.filters.email.toLowerCase().trim())
-        );
-      }
-      
-      // Filter by Role
-      if (this.filters.role && this.filters.role !== 'All') {
-        filtered = filtered.filter(user => {
-          if (Array.isArray(user.roles)) {
-            return user.roles.includes(this.filters.role);
-          }
-          return user.roles === this.filters.role;
-        });
-      }
-      
-      this.filteredUsers = filtered;
-    }
   },
   beforeUnmount() {
     clearInterval(this.intervalFetch);
+    clearTimeout(this.debounceTimer);
   }
 }
 </script>

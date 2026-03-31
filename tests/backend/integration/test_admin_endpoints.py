@@ -5,8 +5,9 @@ class TestAdminAuthGuard:
     """All admin endpoints must reject non-admin users."""
 
     def test_get_users_requires_admin(self, test_client, user_token):
-        resp = test_client.get(
+        resp = test_client.post(
             "/api/admin/users",
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {}},
             headers={"Authorization": f"Bearer {user_token}"},
         )
         assert resp.status_code == 401
@@ -36,20 +37,23 @@ class TestAdminAuthGuard:
 class TestAdminUsers:
 
     def test_get_users(self, test_client, admin_token):
-        resp = test_client.get(
+        resp = test_client.post(
             "/api/admin/users",
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {}},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] is True
         assert "users" in data["data"]
+        assert "totalItems" in data["data"]
         assert len(data["data"]["users"]) >= 2  # admin + user
 
     def test_get_user(self, test_client, admin_token):
         # First get all users to find an ID
-        resp = test_client.get(
+        resp = test_client.post(
             "/api/admin/users",
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {}},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         user_id = resp.json()["data"]["users"][0]["userId"]

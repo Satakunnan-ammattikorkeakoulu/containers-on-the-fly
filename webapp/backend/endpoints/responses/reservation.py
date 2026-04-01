@@ -676,7 +676,10 @@ def cancel_reservation(userId : int, reservationId: str):
       reservation = session.execute(select(Reservation).where( Reservation.reservationId == reservationId )).scalar_one_or_none()
     if reservation is None: return api_response(False, "No reservation found.")
 
-    reservation.endDate = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    reservation.endDate = now
+    if reservation.startDate > now:
+      reservation.startDate = now
     session.commit()
 
   return api_response(True, "Reservation cancelled.")

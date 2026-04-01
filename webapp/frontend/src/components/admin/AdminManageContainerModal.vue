@@ -86,6 +86,23 @@
               <v-col cols="12">
                 <h2 style="margin-top: 20px; margin-bottom: 3px;">Ports</h2>
                 <p class="text-muted" style="margin-bottom: 20px; margin-top: 0px;">Local ports of the container that will be bound to random outside ports.</p>
+                <!-- Built-in SSH port (always present, read-only) -->
+                <v-row>
+                  <v-col cols="12">
+                    <v-row>
+                      <v-col cols="12" md="4">
+                        <v-text-field model-value="SSH" label="Service name" readonly variant="outlined" bg-color="grey-darken-3"></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="4">
+                        <v-text-field model-value="22" label="Port" readonly variant="outlined" bg-color="grey-darken-3"></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="4" class="d-flex align-center">
+                        <v-chip color="info" size="small">Always included</v-chip>
+                      </v-col>
+                    </v-row>
+                    <p class="text-caption text-medium-emphasis" style="margin-top: -8px;">SSH is the primary way users connect to their reserved container. It is always included automatically.</p>
+                  </v-col>
+                </v-row>
                 <v-row>
                   <!-- Loop through all ports and add them here one by one -->
                   <v-col cols="12" v-for="(port, index) in data.ports" :key="index">
@@ -274,22 +291,21 @@
                 </v-expansion-panels>
               </v-col>
 
-              <!-- SAVE INFO -->
-              <v-col cols="12" v-if="hasRequiredFields">
-                <v-alert
-                  :type="saveInfoType"
-                  variant="tonal"
-                  density="compact"
-                >
-                  {{ saveInfoMessage }}
-                </v-alert>
-              </v-col>
             </v-row>
           </v-container>
         </v-card-text>
 
-        <v-card-actions>
-          <v-spacer></v-spacer>
+        <v-card-actions class="mx-6 mb-6 mt-2" style="align-items: center; flex-wrap: wrap; gap: 8px;">
+          <!-- SAVE INFO -->
+          <v-alert
+            v-if="hasRequiredFields"
+            :type="saveInfoType"
+            variant="tonal"
+            density="compact"
+            style="flex: 1 1 0; min-width: 0;"
+          >
+            {{ saveInfoMessage }}
+          </v-alert>
           <v-btn color="red" variant="text" @click="closeDialog">Cancel</v-btn>
           <v-btn color="blue" variant="text" @click="submit" :loading="isSubmitting">
             <span v-if="isCreatingNew">Add container</span><span v-else>Save Container</span>
@@ -557,16 +573,13 @@
             // Success
             if (response.data.status == true) {
               let savedId = response.data.data ? response.data.data.containerId : null;
-              if (!_this.data.managedExternally && _this.data.dockerfileCommands && _this.data.dockerfileCommands.trim()) {
+              if (_this.willRebuild && savedId) {
                 _this.store.showMessage({ text: "Container saved. Image build queued.", color: "green" })
-                // Auto-open build log dialog
-                if (savedId) {
-                  _this.data.containerId = savedId;
-                  _this.showBuildLogDialog = true;
-                  _this.isOpen = false;
-                  _this.isSubmitting = false;
-                  return;
-                }
+                _this.data.containerId = savedId;
+                _this.showBuildLogDialog = true;
+                _this.isOpen = false;
+                _this.isSubmitting = false;
+                return;
               } else {
                 _this.store.showMessage({ text: "Container saved.", color: "green" })
               }

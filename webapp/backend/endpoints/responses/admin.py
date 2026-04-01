@@ -33,6 +33,29 @@ _RESERVED_USERNAMES = {"root", "daemon", "bin", "sys", "nobody", "www-data", "ma
 # Valid Docker image name pattern (lowercase, digits, dots, hyphens, underscores, slashes)
 _VALID_IMAGE_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9._/\-]{0,127}$')
 
+# Built-in SSH port — always present on every container
+_SSH_SERVICE_NAME = "SSH"
+_SSH_PORT = 22
+
+def _ensure_ssh_port(session, container):
+  """Ensure container has an SSH port 22 ContainerPort. Idempotent.
+
+  If no ContainerPort with serviceName="SSH" and port=22 exists for this
+  container, one is created. Safe to call on both new and existing containers.
+
+  Args:
+      session: Active SQLAlchemy session.
+      container: Container ORM object to check/fix.
+  """
+  has_ssh = any(
+    p.serviceName == _SSH_SERVICE_NAME and p.port == _SSH_PORT
+    for p in container.containerPorts
+  )
+  if not has_ssh:
+    container.containerPorts.append(
+      ContainerPort(serviceName=_SSH_SERVICE_NAME, port=_SSH_PORT)
+    )
+
 def get_reservations(request: AdminReservationRequest) -> object:
   """Retrieve paginated reservations with server-side filtering and sorting.
 
@@ -282,6 +305,7 @@ def save_container(containerEdit : ContainerEdit) -> object:
       for port in containerEdit.data.get("ports", []):
         container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
       session.add(container)
+      _ensure_ssh_port(session, container)
       session.commit()
       saved_container_id = container.containerId
     # Otherwise, edit container
@@ -316,9 +340,13 @@ def save_container(containerEdit : ContainerEdit) -> object:
         if new_managed_externally:
           container.buildStatus = None
           container.buildLog = None
-        # Remove all removable ports
-        for port in containerEdit.data.get("removedPorts", []):
-          session.execute(delete(ContainerPort).where(ContainerPort.containerPortId == port))
+        # Remove all removable ports (protect built-in SSH port from deletion)
+        for port_id in containerEdit.data.get("removedPorts", []):
+          port_to_remove = session.execute(
+            select(ContainerPort).where(ContainerPort.containerPortId == port_id)
+          ).scalar_one_or_none()
+          if port_to_remove and not (port_to_remove.serviceName == _SSH_SERVICE_NAME and port_to_remove.port == _SSH_PORT):
+            session.execute(delete(ContainerPort).where(ContainerPort.containerPortId == port_id))
         # Add all new ports
         for port in containerEdit.data.get("ports", []):
           if "containerPortId" not in port:
@@ -334,6 +362,7 @@ def save_container(containerEdit : ContainerEdit) -> object:
 
         #for port in containerEdit.data.get("ports", []):
         #  container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
+        _ensure_ssh_port(session, container)
         session.commit()
         saved_container_id = container.containerId
   return api_response(True, "Container saved successfully", {"containerId": saved_container_id})
@@ -652,6 +681,8 @@ def get_containers() -> object:
       addable.pop("buildLog", None)
       addable["ports"] = []
       for port in container.containerPorts:
+        if port.serviceName == _SSH_SERVICE_NAME and port.port == _SSH_PORT:
+          continue
         addable["ports"].append({
           "containerPortId": port.containerPortId,
           "port": port.port,
@@ -680,6 +711,8 @@ def get_container(containerId : int) -> object:
       addable = orm_to_dict(container)
       addable["ports"] = []
       for port in container.containerPorts:
+        if port.serviceName == _SSH_SERVICE_NAME and port.port == _SSH_PORT:
+          continue
         addable["ports"].append({
           "containerPortId": port.containerPortId,
           "port": port.port,

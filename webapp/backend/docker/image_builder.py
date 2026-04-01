@@ -156,6 +156,8 @@ def build_and_push_image(container_id):
             container.buildLog = ""
             session.commit()
 
+        build_start_time = datetime.now(timezone.utc)
+
         registry_address = settings_handler.get_setting("docker.registryAddress")
         full_tag = f"{registry_address}/{image_name}:latest"
 
@@ -212,6 +214,9 @@ def build_and_push_image(container_id):
             build_log_lines.append(f"=== Image size: {_format_size(image_size)}")
         except Exception:
             pass
+
+        build_duration = datetime.now(timezone.utc) - build_start_time
+        build_log_lines.append(f"=== Build completed in {_format_duration(build_duration)}")
 
         # Mark success
         with Session() as session:
@@ -293,6 +298,25 @@ def _format_size(size_bytes):
             return f"{size_bytes:.1f} {unit}"
         size_bytes /= 1024
     return f"{size_bytes:.1f} TB"
+
+
+def _format_duration(delta):
+    """Format a timedelta to a human-readable string.
+
+    Args:
+        delta: A timedelta object.
+
+    Returns:
+        str: Formatted duration (e.g. "2m 34s", "45s", "1h 5m 12s").
+    """
+    total_seconds = int(delta.total_seconds())
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours}h {minutes}m {seconds}s"
+    if minutes > 0:
+        return f"{minutes}m {seconds}s"
+    return f"{seconds}s"
 
 
 def update_all_image_sizes():

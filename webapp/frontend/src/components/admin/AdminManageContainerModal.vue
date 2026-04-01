@@ -38,12 +38,11 @@
                 <v-text-field type="text" :rules="[rules.required, rules.imageName]" v-model="data.imageName" label="Image name*" hint="Only lowercase letters, digits, dots, hyphens, underscores, and forward slashes. Used as the image tag in the registry." class="mb-10"></v-text-field>
 
                 <!-- DESCRIPTION -->
-                <v-textarea v-model="data.description" label="Description" hint="Visible in the reservation page after selecting the container." class="mb-10"></v-textarea>
+                <v-textarea v-model="data.description" label="Description" hint="Visible in the reservation page after selecting the container." class="mb-5"></v-textarea>
               </v-col>
 
               <!-- CONTAINER CARD PREVIEW -->
               <v-col cols="12" v-if="data.name">
-                <p class="text-body-2 mb-3 text-muted">Preview — how this container appears on the reservation page:</p>
                 <v-card
                   style="min-height: 200px; max-width: 320px;"
                   variant="outlined"
@@ -80,12 +79,13 @@
                     </div>
                   </v-card-text>
                 </v-card>
+                <p class="text-body-2 mt-2 mb-3 text-muted" style="font-size: 13px;">Preview — how this container appears on the reservation page.</p>
               </v-col>
 
               <!-- PORTS -->
               <v-col cols="12">
                 <h2 style="margin-top: 20px; margin-bottom: 3px;">Ports</h2>
-                <p class="text-muted" style="margin-bottom: 20px; margin-top: 0px;">Local ports of the container that will be bound to random outside ports.</p>
+                <p class="text-muted" style="margin-bottom: 20px; margin-top: 0px;">Define which container ports are exposed to users. Each local port gets a random external port assigned when a reservation starts. Add any ports your container services will listen on — they don't need to be running at container creation time.</p>
                 <!-- Built-in SSH port (always present, read-only) -->
                 <v-row>
                   <v-col cols="12">
@@ -94,13 +94,13 @@
                         <v-text-field model-value="SSH" label="Service name" readonly variant="outlined" bg-color="grey-darken-3"></v-text-field>
                       </v-col>
                       <v-col cols="12" md="4">
-                        <v-text-field model-value="22" label="Port" readonly variant="outlined" bg-color="grey-darken-3"></v-text-field>
+                        <v-text-field model-value="22" label="Local port" readonly variant="outlined" bg-color="grey-darken-3"></v-text-field>
                       </v-col>
                       <v-col cols="12" md="4" class="d-flex align-center">
                         <v-chip color="info" size="small">Always included</v-chip>
                       </v-col>
                     </v-row>
-                    <p class="text-caption text-medium-emphasis" style="margin-top: -8px;">SSH is the primary way users connect to their reserved container. It is always included automatically.</p>
+                    <p class="text-medium-emphasis" style="margin-top: -8px; font-size: 11px;">SSH is the primary way users connect to their reserved container. It is always included automatically.</p>
                   </v-col>
                 </v-row>
                 <v-row>
@@ -111,7 +111,7 @@
                         <v-text-field type="text" v-model="port.serviceName" :rules="[rules.required]" label="Service name"></v-text-field>
                       </v-col>
                       <v-col cols="12" md="4">
-                        <v-text-field type="text" v-model="port.port" :rules="[rules.required]" label="Port"></v-text-field>
+                        <v-text-field type="number" v-model="port.port" :rules="[rules.required, rules.port, v => duplicatePortRule(v, index)]" label="Local port"></v-text-field>
                       </v-col>
                       <v-col cols="12" md="4">
                         <v-btn color="red" variant="text" @click="removePort(index)">Remove</v-btn>
@@ -394,6 +394,12 @@
             if (['root', 'daemon', 'bin', 'sys', 'nobody', 'www-data', 'mail', 'sshd'].includes(value)) return 'This username is reserved.';
             return true;
           },
+          port: value => {
+            if (!value) return true;
+            let num = Number(value);
+            if (!Number.isInteger(num) || num < 1 || num > 65535) return 'Must be an integer between 1 and 65535.';
+            return true;
+          },
           number: value => !isNaN(parseFloat(value)),
         }
       }
@@ -466,6 +472,15 @@
     mounted() {
     },
     methods: {
+      /** Validates that a port number is not used by another entry or the built-in SSH port. */
+      duplicatePortRule(value, currentIndex) {
+        if (!value) return true;
+        let port = String(value).trim();
+        if (port === '22') return 'Port 22 is reserved for SSH (always included).';
+        let duplicates = this.data.ports.filter((p, i) => i !== currentIndex && String(p.port).trim() === port);
+        if (duplicates.length > 0) return 'This port is already in use.';
+        return true;
+      },
       addPort() {
         this.data.ports.push({ serviceName: "", port: "" });
       },

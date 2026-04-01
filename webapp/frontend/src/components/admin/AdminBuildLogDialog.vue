@@ -1,6 +1,6 @@
 <template>
   <v-dialog v-model="dialogOpen" persistent max-width="900px">
-    <v-card>
+    <v-card class="pa-4">
       <v-card-title class="d-flex align-center">
         <span>Image Build Log</span>
         <v-spacer></v-spacer>
@@ -181,10 +181,10 @@
   }
 
   .build-log {
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
+    font-family: monospace;
+    font-size: 14px;
     line-height: 1.5;
-    color: #d4d4d4;
+    color: #fff;
     white-space: pre-wrap;
     word-break: break-all;
     margin: 0;

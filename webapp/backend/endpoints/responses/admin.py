@@ -284,6 +284,22 @@ def save_container(containerEdit : ContainerEdit) -> object:
     else:
       new_username = None  # Will default to "user" at runtime
 
+    # Validate ports (integers 1-65535, no duplicates, port 22 reserved for SSH)
+    new_ports = containerEdit.data.get("ports", [])
+    port_numbers = [_SSH_PORT]  # SSH is always reserved
+    for port in new_ports:
+      try:
+        port_num = int(port.get("port", 0))
+      except (ValueError, TypeError):
+        return api_response(False, "Port must be an integer.")
+      if port_num < 1 or port_num > 65535:
+        return api_response(False, f"Port {port_num} is out of range. Must be between 1 and 65535.")
+      if port_num == _SSH_PORT:
+        return api_response(False, "Port 22 is reserved for SSH and is always included automatically.")
+      if port_num in port_numbers:
+        return api_response(False, f"Duplicate port {port_num}. Each port can only be used once.")
+      port_numbers.append(port_num)
+
     # If new, create a new container
     if containerEdit.containerId == -1:
       container = Container()
@@ -301,6 +317,7 @@ def save_container(containerEdit : ContainerEdit) -> object:
       # Queue build if using Image Builder
       if not new_managed_externally and new_dockerfile_commands:
         container.buildStatus = "pending"
+        container.buildLog = ""
       # Add ports
       for port in containerEdit.data.get("ports", []):
         container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
@@ -336,6 +353,7 @@ def save_container(containerEdit : ContainerEdit) -> object:
         # Queue rebuild if using Image Builder and Dockerfile-related fields changed
         if not new_managed_externally and new_dockerfile_commands and (dockerfile_changed or base_image_changed or username_changed or cmd_changed):
           container.buildStatus = "pending"
+          container.buildLog = ""
         # If switching to externally managed, clear build status
         if new_managed_externally:
           container.buildStatus = None
@@ -412,6 +430,7 @@ def rebuild_container_image(container_id: int) -> object:
     if container.buildStatus == "building":
       return api_response(False, "A build is already in progress for this container.")
     container.buildStatus = "pending"
+    container.buildLog = ""
     session.commit()
   return api_response(True, "Image build queued. The Docker utility will build it shortly.")
 

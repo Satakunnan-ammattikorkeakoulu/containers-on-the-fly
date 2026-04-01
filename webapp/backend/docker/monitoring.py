@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from database import ServerStatus, ServerLogs, Computer, Session
 from settings_handler import settings_handler
 from sqlalchemy import select
+from logger import log
 
 
 def read_version_file():
@@ -46,7 +47,7 @@ def read_version_file():
         else:
             return None, None
     except Exception as e:
-        print(f"Error reading version file: {e}")
+        log.warning(f"Error reading version file: {e}")
         return None, None
 
 
@@ -67,7 +68,7 @@ def update_server_monitoring():
             ).scalar_one_or_none()
 
             if not computer:
-                print(f"Warning: Computer '{settings_handler.get_setting('docker.serverName')}' not found in database")
+                log.warning(f"Computer '{settings_handler.get_setting('docker.serverName')}' not found in database")
                 return
 
             # Get or create status record
@@ -144,7 +145,7 @@ def update_server_monitoring():
                         except:
                             pass
             except Exception as e:
-                print(f"Error updating version info: {e}")
+                log.warning(f"Error updating version info: {e}")
 
             session.commit()
 
@@ -152,7 +153,7 @@ def update_server_monitoring():
             update_server_logs(computer.computerId, session)
 
     except Exception as e:
-        print(f"Error updating server monitoring: {e}")
+        log.error(f"Error updating server monitoring: {e}")
 
 
 def update_server_logs(computer_id: int, session):
@@ -198,7 +199,7 @@ def update_server_logs(computer_id: int, session):
             pass
 
     except Exception as e:
-        print(f"Error updating server logs: {e}")
+        log.error(f"Error updating server logs: {e}")
 
 
 def update_log_record(session, computer_id: int, log_type: str, content: str, lines: int):
@@ -234,4 +235,4 @@ def update_log_record(session, computer_id: int, log_type: str, content: str, li
         session.commit()
 
     except Exception as e:
-        print(f"Error updating {log_type} logs: {e}")
+        log.error(f"Error updating {log_type} logs: {e}")

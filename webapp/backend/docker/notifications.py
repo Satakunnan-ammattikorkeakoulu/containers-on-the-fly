@@ -8,6 +8,7 @@ events. Used by the daemon when container state changes.
 import os
 from helpers.email import send_email
 from settings_handler import get_setting
+from logger import log
 
 
 def generate_connection_text(image, ip, ports, password, include_email_details, non_critical_errors, end_date=None, username="user"):
@@ -187,7 +188,7 @@ def send_admin_failure_alert(user_email, reservation_id, image_name, server_name
 
         alert_emails = get_setting('notifications.alertEmails')
         if not alert_emails or len(alert_emails) == 0:
-            print("Container failure alerts enabled but no alert emails configured")
+            log.warning("Container failure alerts enabled but no alert emails configured")
             return
 
         # Create list of recipients, removing user's email to avoid duplicate notification
@@ -196,7 +197,7 @@ def send_admin_failure_alert(user_email, reservation_id, image_name, server_name
             recipients.remove(user_email)
 
         if not recipients:
-            print("Container failure alerts enabled but no additional recipients (user already notified)")
+            log.info("Container failure alerts: no additional recipients (user already notified)")
             return
 
         linesep = os.linesep
@@ -214,12 +215,12 @@ def send_admin_failure_alert(user_email, reservation_id, image_name, server_name
                 send_email(admin_email, "Container Failure Alert", admin_body)
                 successful_sends += 1
             except Exception as email_error:
-                print(f"Failed to send alert to {admin_email}: {email_error}")
+                log.error(f"Failed to send alert to {admin_email}: {email_error}")
 
         if successful_sends > 0:
-            print(f"Container failure alerts sent to {successful_sends}/{len(recipients)} admin(s)")
+            log.info(f"Container failure alerts sent to {successful_sends}/{len(recipients)} admin(s)")
         else:
-            print(f"Failed to send container failure alerts to any of {len(recipients)} admin(s)")
+            log.error(f"Failed to send container failure alerts to any of {len(recipients)} admin(s)")
 
     except Exception as e:
-        print(f"Warning: Failed to send container failure alerts: {e}")
+        log.error(f"Failed to send container failure alerts: {e}")

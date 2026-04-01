@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 import datetime
 from datetime import timezone
+from logger import log
 
 
 def time_now():
@@ -145,8 +146,7 @@ def get_container_information(reservation_id: str):
       container_state = docker.container.inspect(reservation.reservedContainer.containerDockerName)
       return reservation.reservedContainer.containerDockerName, container_state
   except Exception as e:
-    print(f"Something went wrong getting container information for reservation {reservation_id}. Error:")
-    print(e)
+    log.error(f"Error getting container information for reservation {reservation_id}: {e}")
     return None, {}
 
 
@@ -169,8 +169,7 @@ def get_computer_id(computer_name: str):
         return None
       return computer.computerId
   except Exception as e:
-    print(f"Something went wrong getting computer ID for name: {computer_name}. Error:")
-    print(e)
+    log.error(f"Error getting computer ID for name '{computer_name}': {e}")
     return None
 
 
@@ -248,5 +247,5 @@ def reset_stale_building_status():
       container.buildStatus = "pending"
     if count > 0:
       session.commit()
-      print(f"[ImageBuilder] Reset {count} stale 'building' status(es) to 'pending'")
+      log.info(f"Reset {count} stale 'building' status(es) to 'pending'")
     return count

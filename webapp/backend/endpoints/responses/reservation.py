@@ -9,6 +9,7 @@ retrieval for active reservations.
 from database import Session, Computer, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec
 from docker import get_email_container_started, restart_container
 from helpers.server import api_response, orm_to_dict
+from logger import log
 from helpers.auth import is_admin
 from dateutil import parser
 from dateutil.relativedelta import *
@@ -159,7 +160,7 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
         if spec["maximumAmountForUser"] > spec["maximumAmount"]:
           spec["maximumAmountForUser"] = spec["maximumAmount"]
         if spec["maximumAmount"] < spec["minimumAmount"]:
-          print("Spec: ", spec["type"], " ", spec["maximumAmount"], " is below minimum amount: ", spec["minimumAmount"])
+          log.warning(f"Spec {spec['type']} maximumAmount {spec['maximumAmount']} is below minimumAmount {spec['minimumAmount']}")
           spec_message = ""
           spec_max = spec['maximumAmount']
           if spec_max < 0: spec_max = 0
@@ -798,7 +799,7 @@ def extend_reservation(userId : int, reservationId: str, duration: int):
       session.commit()
       return api_response(True, "Reservation was extended by " + str(duration) + " hours.")
     else:
-      print(available_hardware_response["message"])
+      log.debug(available_hardware_response["message"])
       return api_response(False, "Cannot extend reservation due to lack of resources. Try with less hours.")
 
   return api_response(False, "Error.")

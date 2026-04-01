@@ -10,6 +10,7 @@ import socket
 from database import Session, Reservation
 from settings_handler import settings_handler
 from sqlalchemy import select
+from logger import log
 
 
 def is_port_in_use(port: int) -> bool:
@@ -67,5 +68,5 @@ def get_available_port():
        return randPort
     i += 1
 
-  print("ERROR: Did not find a random port to bind to after 50 attempts. Randomly giving one out.")
+  log.warning("Did not find an available port after 50 attempts. Randomly assigning one.")
   return random.choice(availablePorts)

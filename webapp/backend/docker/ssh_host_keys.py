@@ -11,6 +11,7 @@ import subprocess
 import traceback
 
 from python_on_whales import docker
+from logger import log
 
 
 # Key types to generate, matching standard openssh-server defaults
@@ -43,9 +44,9 @@ def ensure_host_keys(keys_path):
                 check=True,
             )
             os.chmod(key_file, 0o600)
-            print(f"Generated SSH host key: {key_file}")
+            log.info(f"Generated SSH host key: {key_file}")
         except Exception as e:
-            print(f"Error generating SSH host key {key_file}: {e}")
+            log.error(f"Error generating SSH host key {key_file}: {e}")
 
 
 def get_host_keys(keys_path):
@@ -87,7 +88,7 @@ def inject_host_keys(container_name, keys_path):
     try:
         keys = get_host_keys(keys_path)
         if not keys:
-            print(f"No SSH host keys found at {keys_path}, skipping injection for {container_name}")
+            log.warning(f"No SSH host keys found at {keys_path}, skipping injection for {container_name}")
             return
 
         for filename, content in keys.items():
@@ -115,5 +116,4 @@ def inject_host_keys(container_name, keys_path):
             user="root",
         )
     except Exception as e:
-        print(f"Non-critical error injecting SSH host keys into {container_name}: {e}")
-        traceback.print_exc()
+        log.warning(f"Non-critical error injecting SSH host keys into {container_name}: {e}\n{traceback.format_exc()}")

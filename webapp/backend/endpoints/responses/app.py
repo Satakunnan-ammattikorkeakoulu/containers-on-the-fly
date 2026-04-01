@@ -5,6 +5,7 @@ such as application name, timezone, login instructions, and contact info.
 """
 
 from helpers.server import api_response
+from logger import log
 
 def get_public_config() -> object:
     """Return public app configuration that does not require authentication.
@@ -59,5 +60,5 @@ def get_public_config() -> object:
         return api_response(True, "Public configuration retrieved successfully", config_data)
         
     except Exception as e:
-        print(f"Error retrieving application settings: {str(e)}")
+        log.error(f"Error retrieving application settings: {str(e)}")
         return api_response(False, f"Error retrieving public configurations")

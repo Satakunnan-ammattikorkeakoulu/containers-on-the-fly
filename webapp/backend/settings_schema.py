@@ -93,7 +93,12 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.FILE, SettingType.BOOLEAN, default=False,
         description="Add test data when running in development mode"
     ),
-    
+    "app.logLevel": SettingSetting(
+        SettingSource.FILE, SettingType.TEXT, default="DEBUG",
+        allowed_values=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        description="Logging level for the application (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
+    ),
+
     # Database Configuration
     "database.engineUri": SettingSetting(
         SettingSource.FILE, SettingType.TEXT, required=True,

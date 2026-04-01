@@ -9,6 +9,7 @@ from helpers.auth import create_password
 from settings_handler import settings_handler
 from python_on_whales.exceptions import NoSuchContainer
 import traceback
+from logger import log
 from docker.mounts import build_volume_list, run_user_config_script
 from docker.image_builder import DEFAULT_PASSWORD_COMMAND, DEFAULT_SSH_KEY_DEPLOY_COMMANDS
 from docker.ssh_host_keys import inject_host_keys
@@ -175,11 +176,9 @@ def start_container(pars):
         inject_host_keys(container_name, host_keys_path)
 
     except Exception as e:
-        print(f"Something went wrong starting container {container_name or 'unknown'}. Trying to stop the container. Error:")
-        print(e)
-        print("Stack trace:")
-        print(traceback.format_exc())
+        log.error(f"Failed to start container {container_name or 'unknown'}: {e}\n{traceback.format_exc()}")
         if container_name:  # Only try to stop if we have a name
+            log.info(f"Cleaning up partially-created container {container_name}")
             stop_container(container_name)
         return False, "", "", e, None, None
 
@@ -195,7 +194,7 @@ def start_container(pars):
                 user="root"
             )
         except Exception as e:
-            print(f"Non-critical error deploying SSH public key to container {container_name}: {e}")
+            log.warning(f"Non-critical error deploying SSH public key to container {container_name}: {e}")
 
     non_critical_errors = run_user_config_script(pars["roleMounts"], computer_id, user_email, user_id, container_name)
 
@@ -217,16 +216,14 @@ def stop_container(container_name):
     no_errors = True
     try:
         docker.stop(container_name, time=60)
-        print(f"Stopped container {container_name}")
     except NoSuchContainer as e:
-        print(f"Error stopping container: {container_name}")
+        log.error(f"Could not stop container (not found): {container_name}")
         no_errors = False
 
     try:
         docker.remove(container_name)
-        print(f"Removed container {container_name}")
     except NoSuchContainer as e:
-        print(f"Error removing container: {container_name}")
+        log.error(f"Could not remove container (not found): {container_name}")
         no_errors = False
 
     return no_errors
@@ -240,11 +237,8 @@ def restart_container(container_name):
     Raises:
         Exception: If the container cannot be restarted (logged via traceback).
     """
-    print("Starting to restart a container...")
     try:
-        print(f"Restarting container: {container_name}")
         docker.restart(container_name, time=60)
     except Exception as e:
-        print(f"Could not restart container: {container_name}")
-        traceback.print_exc()
+        log.error(f"Could not restart container {container_name}: {e}\n{traceback.format_exc()}")
         raise

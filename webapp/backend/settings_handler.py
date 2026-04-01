@@ -123,7 +123,12 @@ class UnifiedSettings:
             
         except Exception as e:
             # Log error but don't fail - allow fallback to individual queries
-            print(f"Warning: Could not load database settings cache: {e}")
+            # Lazy import to avoid circular dependency with logger module
+            try:
+                from logger import log as _log
+                _log.warning(f"Could not load database settings cache: {e}")
+            except ImportError:
+                pass
     
     def _get_from_database(self, key: str, default: Any) -> Any:
         """Get a setting value from the database with caching"""
@@ -161,7 +166,11 @@ class UnifiedSettings:
                 
             return value
         except Exception as e:
-            print(f"Warning: Error getting database setting {key}: {e}")
+            try:
+                from logger import log as _log
+                _log.warning(f"Error getting database setting {key}: {e}")
+            except ImportError:
+                pass
             return default
     
     def get_setting(self, key: str) -> Any:
@@ -276,7 +285,11 @@ class UnifiedSettings:
             return success
             
         except Exception as e:
-            print(f"Error setting {key}: {e}")
+            try:
+                from logger import log as _log
+                _log.error(f"Error setting {key}: {e}")
+            except ImportError:
+                pass
             return False
     
     def get_multiple_settings(self, keys: List[str]) -> Dict[str, Any]:

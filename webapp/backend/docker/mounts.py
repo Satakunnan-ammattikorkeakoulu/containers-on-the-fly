@@ -10,6 +10,7 @@ import shutil
 import getpass
 import subprocess
 from helpers.utils import remove_special_characters
+from logger import log
 
 
 def substitute_mount_variables(path, user_email, user_id):
@@ -75,15 +76,13 @@ def prepare_mount_directory(host_path):
     try:
         subprocess.run(['setfacl', '-b', host_path], check=True, capture_output=True)
     except Exception as e:
-        print("Resetting ACL permissions for a mount folder failed:")
-        print(e)
+        log.warning(f"Resetting ACL permissions for mount folder {host_path} failed: {e}")
 
     # Give containerfly group write access to the directory
     try:
         subprocess.run(['setfacl', '-m', 'g:containerfly:rwx', host_path], check=True)
     except Exception as e:
-        print(f"Failed to set containerfly group permissions on {host_path}:")
-        print(e)
+        log.warning(f"Failed to set containerfly group permissions on {host_path}: {e}")
 
 
 def build_volume_list(role_mounts, computer_id, user_email, user_id):
@@ -161,8 +160,7 @@ def run_user_config_script(role_mounts, computer_id, user_email, user_id, contai
                     docker.execute(container=container_name, command=["/bin/bash", "-c", f"timeout 60 {container_path}/config/config.bash"], user="root")
                     break  # Only run the first config.bash found
     except Exception as e:
-        print(f"Something went wrong when running users config.bash in  {container_name}. This is not critical, most likely user error")
-        print(e)
+        log.warning(f"Error running user config.bash in container {container_name} (non-critical): {e}")
         return "Something went wrong when running users config.bash, from a persistent mount path /config, check your script."
 
     return ""

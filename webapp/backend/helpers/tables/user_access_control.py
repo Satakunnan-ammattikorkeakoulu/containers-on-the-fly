@@ -5,6 +5,7 @@ database tables, used to control which email addresses can access the system.
 """
 from database import UserBlacklist, UserWhitelist, Session
 from sqlalchemy import select, delete
+from logger import log
 
 def get_blacklisted_emails():
     """Get all blacklisted email addresses.
@@ -42,7 +43,7 @@ def set_blacklisted_emails(emails: list):
             session.commit()
             return True
     except Exception as e:
-        print(f"Error setting blacklisted emails: {e}")
+        log.error(f"Error setting blacklisted emails: {e}")
         return False
 
 def get_whitelisted_emails():
@@ -81,5 +82,5 @@ def set_whitelisted_emails(emails: list):
             session.commit()
             return True
     except Exception as e:
-        print(f"Error setting whitelisted emails: {e}")
+        log.error(f"Error setting whitelisted emails: {e}")
         return False

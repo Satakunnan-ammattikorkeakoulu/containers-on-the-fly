@@ -11,6 +11,7 @@ from datetime import timezone, datetime, timedelta
 import sys
 from os import linesep
 
+from logger import log
 from settings_handler import settings_handler
 from database import Session, Reservation, ReservedContainerPort, Role
 from helpers.auth import create_password
@@ -88,7 +89,6 @@ def stop_finished_servers():
   reservations = get_reservations_requiring_stop(computer_id)
   for reservation in reservations:
     if settings_handler.get_setting("docker.enabled") == True:
-      print(time_now(), ": Stopping Docker server for reservation with reservationId: ",  reservation.reservationId)
       stop_docker_container(reservation.reservationId)
 
 def start_new_servers():
@@ -101,7 +101,6 @@ def start_new_servers():
   reservations = get_reservations_requiring_start(computer_id)
   for reservation in reservations:
     if settings_handler.get_setting("docker.enabled") == True:
-      print(time_now(), ": Starting Docker server for reservation with reservationId: ",  reservation.reservationId)
       start_docker_container(reservation.reservationId)
 
 def restart_crashed_servers():
@@ -117,10 +116,10 @@ def restart_crashed_servers():
       try:
         container_name, container_state = get_container_information(reservation.reservationId)
         if container_state.state.status == "exited":
+          log.warning(f"Container exited unexpectedly for reservation {reservation.reservationId}, restarting")
           restart_docker_container(reservation.reservationId)
       except Exception as e:
-        print(f"Error restarting a crashed container:")
-        print(e)
+        log.error(f"Error restarting crashed container for reservation {reservation.reservationId}: {e}")
 
 def restart_servers_requiring_restart():
   """Restart containers that have been flagged for restart by a user or admin.
@@ -137,8 +136,7 @@ def restart_servers_requiring_restart():
       try:
         restart_docker_container(reservation.reservationId)
       except Exception as e:
-        print(f"Error restarting a container:")
-        print(e)
+        log.error(f"Error restarting container for reservation {reservation.reservationId}: {e}")
 
 def process_image_builds():
   """Build Docker images for containers with pending build requests.
@@ -150,12 +148,11 @@ def process_image_builds():
   """
   containers = get_containers_requiring_build()
   for container in containers:
-    print(time_now(), f": Building image for container {container.containerId} ({container.imageName})")
+    log.info(f"Building image for container {container.containerId} ({container.imageName})")
     try:
       build_and_push_image(container.containerId)
     except Exception as e:
-      print(f"Error building image for container {container.containerId}:")
-      print(e)
+      log.error(f"Error building image for container {container.containerId} ({container.imageName}): {e}")
 
 def process_image_removals():
   """Remove Docker images for containers that have been deleted by admins.
@@ -165,12 +162,11 @@ def process_image_removals():
   """
   containers = get_containers_requiring_image_removal()
   for container in containers:
-    print(time_now(), f": Removing image for deleted container {container.containerId} ({container.imageName})")
+    log.info(f"Removing image for deleted container {container.containerId} ({container.imageName})")
     try:
       remove_image(container.containerId)
     except Exception as e:
-      print(f"Error removing image for container {container.containerId}:")
-      print(e)
+      log.error(f"Error removing image for container {container.containerId} ({container.imageName}): {e}")
 
 def stop_orphan_container_reservations():
   """Clean up Docker containers that have no matching active reservation.
@@ -201,11 +197,10 @@ def stop_orphan_container_reservations():
         if is_running:
           pass
         else:
-          print("Container Docker reservation not synchronized with database! Reservation ID: " + str(reservation.reservationId) + " and container name: " + container.name)
+          log.warning(f"Orphan container detected (not in database): container name {container.name}, stopping it")
           stop_orphan_docker_container(container.name)
   except Exception as e:
-    print("Error stopping (cleaning up) orphan containers:")
-    print(e)
+    log.error(f"Error stopping (cleaning up) orphan containers: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +229,7 @@ def start_docker_container(reservation_id: str):
     # Guard: if the container has Dockerfile commands but hasn't been built successfully, block start
     container_obj = reservation.reservedContainer.container
     if container_obj.dockerfileCommands and container_obj.buildStatus != "success":
-      print(f"Container image for {container_obj.imageName} has not been built successfully (status: {container_obj.buildStatus}). Marking reservation as error.")
+      log.warning(f"Container image for {container_obj.imageName} not built successfully (status: {container_obj.buildStatus}), marking reservation {reservation_id} as error")
       reservation.status = "error"
       reservation.reservedContainer.containerDockerErrorMessage = "Container image has not been built successfully. Please ask an admin to build the image first."
       reservation.reservedContainer.containerStatus = "error"
@@ -344,13 +339,10 @@ def start_docker_container(reservation_id: str):
                     })
 
     cont_was_started = False
-    print("Starting container..")
     cont_was_started, cont_name, cont_password, errors, non_critical_errors, container_docker_id = start_container(details)
-    print("Container started!")
-    print("Result: " + str(cont_was_started))
 
     if cont_was_started == True:
-      print(f"Container with Docker name {cont_name} was started succesfully.")
+      log.info(f"Container started for reservation {reservation_id}, user={reservation.userId}, image={image_name}, docker_name={cont_name}, docker_id={container_docker_id}")
       # Set bound ports
       for port in ports:
         reservation.reservedContainer.reservedContainerPorts.append(ReservedContainerPort(
@@ -373,13 +365,7 @@ def start_docker_container(reservation_id: str):
       session.commit()
     else:
       # Set error message to database
-      print("Error starting container!")
-      print("Critical errors:")
-      if errors:
-        print(errors)
-      print("Non-critical errors:")
-      if non_critical_errors:
-        print(non_critical_errors)
+      log.error(f"Failed to start container for reservation {reservation_id}, user={reservation.userId}, image={image_name}: {errors}")
       reservation.status = "error"
       reservation.reservedContainer.containerDockerErrorMessage = str(errors)
       reservation.reservedContainer.containerStatus = "error"
@@ -390,8 +376,6 @@ def start_docker_container(reservation_id: str):
         reservation.user.email, reservation.reservationId,
         image_name, reservation.computer.name, errors
       )
-
-      print("Container was not started. Logged the error to ReservedContainer.")
 
 def stop_docker_container(reservation_id: str):
   """Stop a Docker container and update the reservation to "stopped".
@@ -410,15 +394,17 @@ def stop_docker_container(reservation_id: str):
       ).scalar_one_or_none()
       if reservation == None: return False
 
+      container_docker_name = reservation.reservedContainer.containerDockerName
       if reservation.status in ("started", "restart_error"):
-        stop_container(reservation.reservedContainer.containerDockerName)
+        stop_container(container_docker_name)
       reservation.status = "stopped"
       reservation.reservedContainer.stoppedAt = time_now()
       reservation.reservedContainer.containerStatus = "stopped"
       session.commit()
+      container_docker_id = reservation.reservedContainer.containerDockerId
+      log.info(f"Container stopped for reservation {reservation_id}, user={reservation.userId}, docker_name={container_docker_name}, docker_id={container_docker_id}")
   except Exception as e:
-    print("Error stopping server:")
-    print(e)
+    log.error(f"Error stopping container for reservation {reservation_id}: {e}")
 
 def stop_orphan_docker_container(container_name):
   """Stop an orphan Docker container that has no active reservation.
@@ -429,9 +415,9 @@ def stop_orphan_docker_container(container_name):
   if not container_name: return
   try:
     stop_container(container_name)
+    log.info(f"Orphan container stopped: {container_name}")
   except Exception as e:
-    print("Error stopping orphan container:")
-    print(e)
+    log.error(f"Error stopping orphan container {container_name}: {e}")
 
 def restart_docker_container(reservation_id: str):
   """Restart a Docker container and reset the reservation status to "started".
@@ -449,14 +435,16 @@ def restart_docker_container(reservation_id: str):
     ).scalar_one_or_none()
     if reservation == None: return False
 
+    container_docker_name = reservation.reservedContainer.containerDockerName
     try:
-      restart_container(reservation.reservedContainer.containerDockerName)
+      restart_container(container_docker_name)
       reservation.status = "started"
       reservation.reservedContainer.containerStatus = "running"
       reservation.reservedContainer.containerDockerErrorMessage = ""
+      container_docker_id = reservation.reservedContainer.containerDockerId
+      log.info(f"Container restarted for reservation {reservation_id}, user={reservation.userId}, docker_name={container_docker_name}, docker_id={container_docker_id}")
     except Exception as e:
-      print("Error restarting server:")
-      print(e)
+      log.error(f"Error restarting container for reservation {reservation_id}, user={reservation.userId}, docker_name={container_docker_name}: {e}")
       reservation.status = "restart_error"
       reservation.reservedContainer.containerStatus = "restart_error"
       reservation.reservedContainer.containerDockerErrorMessage = f"Container failed to restart: {e}"
@@ -478,22 +466,22 @@ def run():
   """
   global computer_id
 
-  print("AI Server Docker utility started.")
-  print("This software will run infinitely and start / stop servers for reservations." + linesep)
+  log.info("AI Server Docker utility started.")
+  log.info("This software will run infinitely and start / stop servers for reservations.")
 
   # Check that docker support has been enabled
   if (settings_handler.get_setting("docker.enabled") != True):
-    print("!!! Docker support has not been enabled, so this script does nothing. Enable it with settings.json setting docker.enabled: true !!!" + linesep)
+    log.warning("Docker support has not been enabled. Enable it with settings.json setting docker.enabled: true")
 
   # Get ID of the computer from the database based on the settings.json key docker.serverName.
   # Exit on any errors
   server_name = settings_handler.get_setting("docker.serverName")
   if not server_name:
-    print("!!! You need to specify the name of the server in settings.json file, in key docker.serverName. The name should be exactly the same as in database !!! Exiting." + linesep)
+    log.critical("docker.serverName not specified in settings.json. The name should be exactly the same as in database. Exiting.")
     sys.exit()
   computer_id = get_computer_id(server_name)
   if not computer_id:
-    print("!!! Could not find computer with this name from the database. settings.json should contain docker.serverName and the name should be exactly the same as the computer in the database. !!! Exiting." + linesep)
+    log.critical(f"Could not find computer with name '{server_name}' from the database. Exiting.")
     sys.exit()
 
   # Reset any image builds that were interrupted by a previous shutdown

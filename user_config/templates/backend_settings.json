@@ -6,7 +6,8 @@
       "logoUrl": "/static/logos/logo.png",
       "port": {{BACKEND_PORT}},
       "production": true,
-      "addTestDataInDevelopment": {{ADD_TEST_DATA}}
+      "addTestDataInDevelopment": {{ADD_TEST_DATA}},
+      "logLevel": "{{LOG_LEVEL}}"
     },
     "database": {
       "engineUri": "{{DATABASE_URI}}",

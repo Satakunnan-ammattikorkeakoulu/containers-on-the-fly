@@ -18,6 +18,7 @@ from python_on_whales import docker
 from database import Session, Container
 from sqlalchemy import select
 from settings_handler import settings_handler
+from logger import log
 
 # Pattern for valid Docker image names (alphanumeric, dots, slashes, colons, hyphens, underscores)
 _VALID_IMAGE_NAME_RE = re.compile(r'^[a-zA-Z0-9._/:\-]+$')
@@ -137,7 +138,7 @@ def build_and_push_image(container_id):
                 select(Container).where(Container.containerId == container_id)
             ).scalar_one_or_none()
             if container is None:
-                print(f"[ImageBuilder] Container {container_id} not found")
+                log.warning(f"Container {container_id} not found")
                 return False
 
             image_name = container.imageName
@@ -148,7 +149,7 @@ def build_and_push_image(container_id):
 
             # Use default body if none provided
             if not dockerfile_body or not dockerfile_body.strip():
-                print(f"[ImageBuilder] Container {container_id} has no dockerfileCommands, skipping")
+                log.info(f"Container {container_id} has no dockerfileCommands, skipping")
                 return False
 
             # Mark as building
@@ -230,7 +231,7 @@ def build_and_push_image(container_id):
                 container.lastBuiltAt = datetime.now(timezone.utc)
                 session.commit()
 
-        print(f"[ImageBuilder] Successfully built and pushed {full_tag}")
+        log.info(f"Successfully built and pushed {full_tag}")
         return True
 
     except Exception as e:
@@ -249,9 +250,9 @@ def build_and_push_image(container_id):
                     container.buildLog = "\n".join(build_log_lines)
                     session.commit()
         except Exception as db_error:
-            print(f"[ImageBuilder] Failed to update build status: {db_error}")
+            log.error(f"Failed to update build status for container {container_id}: {db_error}")
 
-        print(f"[ImageBuilder] Failed to build container {container_id}: {error_msg}")
+        log.error(f"Failed to build container {container_id}: {error_msg}")
         return False
 
     finally:
@@ -345,9 +346,9 @@ def remove_image(container_id):
 
             try:
                 docker.image.remove(full_tag, force=True)
-                print(f"[ImageBuilder] Removed Docker image {full_tag}")
+                log.info(f"Removed Docker image {full_tag}")
             except Exception as e:
-                print(f"[ImageBuilder] Image {full_tag} not found locally, skipping removal: {e}")
+                log.warning(f"Image {full_tag} not found locally, skipping removal: {e}")
 
             container.buildStatus = "removed"
             container.imageSize = None
@@ -355,7 +356,7 @@ def remove_image(container_id):
             return True
 
     except Exception as e:
-        print(f"[ImageBuilder] Failed to remove image for container {container_id}: {e}")
+        log.error(f"Failed to remove image for container {container_id}: {e}")
         return False
 
 
@@ -394,7 +395,7 @@ def update_all_image_sizes():
 
             if updated > 0:
                 session.commit()
-                print(f"[ImageBuilder] Updated image sizes for {updated} container(s)")
+                log.info(f"Updated image sizes for {updated} container(s)")
 
     except Exception as e:
-        print(f"[ImageBuilder] Failed to update image sizes: {e}")
+        log.error(f"Failed to update image sizes: {e}")

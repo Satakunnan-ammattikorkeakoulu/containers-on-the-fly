@@ -9,6 +9,7 @@ import socket
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from settings_handler import get_setting
+from logger import log
 
 def send_email(to, mail_subject, mail_body):
     """Send a plain-text email using the configured SMTP server.
@@ -37,7 +38,7 @@ def send_email(to, mail_subject, mail_body):
 
     # Check if all required settings are configured
     if not all([smtp_server, smtp_port, smtp_username, smtp_password, from_email]):
-        print("Email settings are incomplete in the database. Email not sent.")
+        log.warning("Email settings are incomplete in the database. Email not sent.")
         return
 
     username = smtp_username
@@ -62,5 +63,5 @@ def send_email(to, mail_subject, mail_body):
         connection.send_message(mimemsg)
         connection.quit()
     except (smtplib.SMTPConnectError, smtplib.SMTPAuthenticationError, socket.gaierror, socket.error, Exception) as e:
-        print(f"Something went wrong sending email: {e}")
+        log.error(f"Error sending email to {to}: {e}")
         return

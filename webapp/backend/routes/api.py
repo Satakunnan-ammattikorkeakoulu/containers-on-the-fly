@@ -9,6 +9,7 @@ optionally seeds test data in development mode.
 from fastapi import APIRouter
 from endpoints import user, reservation, admin, app
 from settings_handler import settings_handler
+from logger import log
 from helpers.auth import hash_password
 from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, Container
 from sqlalchemy import select
@@ -25,15 +26,15 @@ router.include_router(app.router)
 # Run code here when server starts
 
 if settings_handler.get_setting("app.production") == True:
-  print("Running server in production mode")
+  log.info("Running server in production mode")
 else:
-  print("Running server in development mode")
+  log.info("Running server in development mode")
 
 # Add everyone role if it does not exist
 with Session() as session:
   everyoneRole = session.execute(select(Role).where(Role.name == "everyone")).scalar_one_or_none()
   if everyoneRole is None:
-    print("Creating role everyone")
+    log.info("Creating role 'everyone'")
     session.add(Role(
       name = "everyone"
     ))
@@ -43,7 +44,7 @@ with Session() as session:
 with Session() as session:
   adminRole = session.execute(select(Role).where(Role.name == "admin")).scalar_one_or_none()
   if adminRole is None:
-    print("Creating role admin")
+    log.info("Creating role 'admin'")
     session.add(Role(
       name = "admin"
     ))
@@ -54,7 +55,7 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
     # Admin user
     adminUser = session.execute(select(User).where(User.email == "admin@foo.com")).scalar_one_or_none()
     if adminUser is None:
-      print("Creating test data: admin user with email admin@foo.com")
+      log.info("Creating test data: admin user with email admin@foo.com")
       hash = hash_password("test")
       adminUser = User(
         email = "admin@foo.com",
@@ -69,7 +70,7 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
     # Normal User
     normalUser = session.execute(select(User).where(User.email == "user@foo.com")).scalar_one_or_none()
     if normalUser is None:
-      print("Creating test data: normal user with email user@foo.com")
+      log.info("Creating test data: normal user with email user@foo.com")
       hash = hash_password("test")
       normalUser = User(
         email = "user@foo.com",
@@ -82,7 +83,7 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
     # Computer
     computer = session.execute(select(Computer).where(Computer.name == "server1")).scalar_one_or_none()
     if computer is None:
-      print("Creating test data: computer named server1")
+      log.info("Creating test data: computer named server1")
       computer = Computer( name = "server1", ip = settings_handler.get_setting("app.serverIp"), public = True )
       session.add(computer)
       session.commit()
@@ -90,7 +91,7 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
     # Hardware Specs for computer
     computer = session.execute(select(Computer).where(Computer.name == "server1")).scalar_one_or_none()
     if len(computer.hardwareSpecs) == 0:
-      print("Creating test data: hardware specs for a computer")
+      log.info("Creating test data: hardware specs for a computer")
       computer.hardwareSpecs.append(HardwareSpec(
         type = "gpus",
         maximumAmount = 0,
@@ -139,7 +140,7 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
     # Container
     container = session.execute(select(Container).where(Container.imageName == "ubuntu-base")).scalar_one_or_none()
     if container is None:
-      print("Creating test data: container with imageName ubuntu-base")
+      log.info("Creating test data: container with imageName ubuntu-base")
       container = Container(
         public = True,
         imageName = "ubuntu-base",

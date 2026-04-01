@@ -123,6 +123,10 @@ class SettingsApplier:
                 except ValueError:
                     print(f"Warning: {setting} should be numeric, got: {self.settings[setting]}")
         
+        # Default log level if not specified
+        if 'LOG_LEVEL' not in self.settings or not self.settings['LOG_LEVEL']:
+            self.settings['LOG_LEVEL'] = 'DEBUG'
+
         # Handle DOCKER_REGISTRY_ADDRESS - use SERVER_IP_ADDRESS if empty
         docker_registry_addr = self.settings.get('DOCKER_REGISTRY_ADDRESS', '').strip()
         if not docker_registry_addr:

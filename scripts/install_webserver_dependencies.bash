@@ -283,3 +283,23 @@ if ! command -v pm2 > /dev/null; then
     sudo npm install pm2 -g
     pm2 startup
 fi
+
+# Install and configure pm2-logrotate for log retention management
+if ! pm2 describe pm2-logrotate > /dev/null 2>&1; then
+    echo "Installing pm2-logrotate..."
+    pm2 install pm2-logrotate
+fi
+
+# Configure pm2-logrotate settings
+# Maximum size of a single log file before rotation
+pm2 set pm2-logrotate:max_size 500M
+# Number of rotated log files to retain (90 days at ~1 rotation/day)
+pm2 set pm2-logrotate:retain 90
+# Enable compression of rotated log files
+pm2 set pm2-logrotate:compress true
+# Check for rotation every 60 seconds
+pm2 set pm2-logrotate:workerInterval 60
+# Rotate daily at midnight
+pm2 set pm2-logrotate:rotateInterval '0 0 * * *'
+# Rotate the pm2 module logs too
+pm2 set pm2-logrotate:rotateModule true

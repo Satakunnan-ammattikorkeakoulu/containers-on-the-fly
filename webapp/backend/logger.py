@@ -40,11 +40,11 @@ class CustomLogger(logging.Logger):
     """
     try:
       if isinstance(msg, Base):
-        return f"{linesep}{msg}{linesep}{linesep}{orm_to_dict(msg)}"
+        return f"{msg} {orm_to_dict(msg)}"
       else:
-        return f"{linesep}{msg}"
-    except:
-      return f"{linesep}{msg}"
+        return str(msg)
+    except Exception:
+      return str(msg)
 
   def debug(self, msg, *args, **kwargs):
     """Log a DEBUG-level message with ORM formatting."""
@@ -88,8 +88,7 @@ class ColoredFormatter(logging.Formatter):
     """
     log_color = self.format_dict.get(record.levelno)
     reset_color = "\033[0m"
-    gray_color = "\033[37m"
-    formatter = f"{log_color}%(levelname)s - %(asctime)s - %(filename)s:%(lineno)d:{reset_color} %(message)s{linesep}"
+    formatter = f"{log_color}%(levelname)s:{reset_color} %(message)s"
     self._style._fmt = formatter
     return super().format(record)
 
@@ -99,24 +98,31 @@ logging.setLoggerClass(CustomLogger)
 # Create a custom logger
 log = logging.getLogger('global_logger')
 
-# Set the level of logger. It can be DEBUG, INFO, WARNING, ERROR or CRITICAL
-# TODO: From settings
-log.setLevel(logging.DEBUG)
+# Read log level from settings (file-based, so no DB access needed)
+_LOG_LEVEL_MAP = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
 
-# Create handlers
-# TODO: from settings
-console_handler = logging.StreamHandler()  # logs to console
-#file_handler = logging.FileHandler('logfile.log') # logs to a file
+_configured_level = "DEBUG"
+try:
+    from settings_handler import settings_handler
+    _configured_level = settings_handler.get_setting("app.logLevel") or "DEBUG"
+except Exception:
+    pass  # Fall back to DEBUG if settings not yet available
 
-# Set the level of handler
-console_handler.setLevel(logging.DEBUG)
-#file_handler.setLevel(logging.DEBUG)
+log.setLevel(_LOG_LEVEL_MAP.get(_configured_level.upper(), logging.INFO))
+
+# Create handlers (console only — pm2 handles log persistence to disk)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(_LOG_LEVEL_MAP.get(_configured_level.upper(), logging.INFO))
 
 # Create formatter and add it to handlers
 formatter = ColoredFormatter()
 console_handler.setFormatter(formatter)
-#file_handler.setFormatter(formatter)
 
 # Add handlers to the logger
 log.addHandler(console_handler)
-#log.addHandler(file_handler)

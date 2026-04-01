@@ -15,6 +15,7 @@ from settings_handler import settings_handler
 import subprocess
 import os
 from database import Base, engine, Session  # Import Session as well
+from logger import log
 
 def database_exists():
     """Check if any tables exist in the database.
@@ -59,12 +60,15 @@ def run_alembic_command(command):
             text=True,
             check=True
         )
-        print(result.stdout)
+        if result.stdout.strip():
+            log.info(result.stdout.strip())
         return True
     except subprocess.CalledProcessError as e:
-        print(f"Error running alembic {command}: {e}")
-        print(f"Stdout: {e.stdout}")
-        print(f"Stderr: {e.stderr}")
+        log.error(f"Error running alembic {command}: {e}")
+        if e.stdout:
+            log.error(f"Stdout: {e.stdout}")
+        if e.stderr:
+            log.error(f"Stderr: {e.stderr}")
         return False
 
 def init_alembic():
@@ -78,7 +82,7 @@ def init_alembic():
     """
     try:
         with Session() as session:
-            print("Initializing Alembic version tracking...")
+            log.info("Initializing Alembic version tracking...")
             # Create alembic_version table if it doesn't exist
             session.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)"))
             session.execute(text("DELETE FROM alembic_version"))
@@ -87,13 +91,13 @@ def init_alembic():
             # Stamp with current head
             success = run_alembic_command("stamp head")
             if success:
-                print("✓ Alembic version tracking initialized")
+                log.info("Alembic version tracking initialized")
                 return True
             else:
-                print("✗ Failed to initialize Alembic version tracking")
+                log.error("Failed to initialize Alembic version tracking")
                 return False
     except Exception as e:
-        print(f"Error initializing Alembic: {e}")
+        log.error(f"Error initializing Alembic: {e}")
         return False
 
 def init_database():
@@ -107,24 +111,24 @@ def init_database():
     """
     
     if database_exists():
-        print("Existing database detected...")
-        
+        log.info("Existing database detected...")
+
         if not alembic_table_exists():
-            print("Alembic version tracking not found.")
+            log.info("Alembic version tracking not found.")
             if not init_alembic():
                 return False
         
-        print("Running any pending migrations...")
-        print("Note: if migration gets stuck here and does not proceed further, it may be due to container server(s) holding database connections. If that happens, then on each container server, run: pm2 stop all. Wait for migration to complete, then run: pm2 restart all on each container server.")
+        log.info("Running any pending migrations...")
+        log.info("Note: if migration gets stuck, container server(s) may be holding database connections. On each container server, run: pm2 stop all. Wait for migration to complete, then run: pm2 restart all.")
         success = run_alembic_command("upgrade head")
         if success:
-            print("✓ Database schema is up-to-date")
+            log.info("Database schema is up-to-date")
         else:
-            print("✗ Failed to apply migrations")
+            log.error("Failed to apply migrations")
             return False
             
     else:
-        print("New database detected. Creating initial schema...")
+        log.info("New database detected. Creating initial schema...")
         
         # For new databases, create all tables directly from models
         Base.metadata.create_all(engine)
@@ -133,14 +137,14 @@ def init_database():
         if not init_alembic():
             return False
         
-        print("✓ Database initialized successfully")
+        log.info("Database initialized successfully")
     
     return True
 
 if __name__ == "__main__":
     if init_database():
-        print("Database initialization completed successfully")
+        log.info("Database initialization completed successfully")
         sys.exit(0)
     else:
-        print("Database initialization failed")
+        log.error("Database initialization failed")
         sys.exit(1) 

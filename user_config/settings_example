@@ -120,6 +120,12 @@ DEBUG_SKIP_GPU_DEDICATION=false
 # Docker container shared memory size (e.g., "1g")
 DOCKER_SHM_SIZE="1g"
 
+# Application log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+# DEBUG: Show everything including verbose data
+# INFO: Show lifecycle events, startup info (recommended for production)
+# WARNING: Show only warnings and errors
+LOG_LEVEL="DEBUG"
+
 # Additional custom ports to keep open (comma-separated)
 # These ports will be allowed through the firewall in addition to the standard ports
 # Example: "8080,9000,3306" or leave empty for no additional ports

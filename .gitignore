@@ -14,6 +14,7 @@ mounts/
 user_config/Caddyfile
 user_config/settings
 webapp/backend/docker/local_overrides.py
+webapp/backend/data/ssh_host_keys/
 .vscode
 .settings_just_created
 .server_type

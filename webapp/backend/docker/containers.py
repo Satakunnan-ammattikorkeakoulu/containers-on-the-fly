@@ -11,6 +11,7 @@ from python_on_whales.exceptions import NoSuchContainer
 import traceback
 from docker.mounts import build_volume_list, run_user_config_script
 from docker.image_builder import DEFAULT_PASSWORD_COMMAND, DEFAULT_SSH_KEY_DEPLOY_COMMANDS
+from docker.ssh_host_keys import inject_host_keys
 
 
 def start_container(pars):
@@ -168,6 +169,10 @@ def start_container(pars):
         password_cmd_template = pars.get("passwordCommand") or DEFAULT_PASSWORD_COMMAND
         password_cmd = password_cmd_template.replace("{username}", pars.get("username", "user")).replace("{password}", pars["password"])
         docker.execute(container=container_name, command=["/bin/bash", "-c", password_cmd], user="root")
+
+        # Inject persistent SSH host keys to prevent known_hosts conflicts on port reuse
+        host_keys_path = settings_handler.get_setting("docker.sshHostKeysPath")
+        inject_host_keys(container_name, host_keys_path)
 
     except Exception as e:
         print(f"Something went wrong starting container {container_name or 'unknown'}. Trying to stop the container. Error:")

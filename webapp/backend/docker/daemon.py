@@ -502,6 +502,11 @@ def run():
   # Update image sizes for all containers on startup
   update_all_image_sizes()
 
+  # Ensure persistent SSH host keys exist for this server
+  from docker.ssh_host_keys import ensure_host_keys
+  host_keys_path = settings_handler.get_setting("docker.sshHostKeysPath")
+  ensure_host_keys(host_keys_path)
+
   main()
 
 

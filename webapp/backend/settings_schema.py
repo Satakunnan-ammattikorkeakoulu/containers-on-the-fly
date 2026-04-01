@@ -133,6 +133,10 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.FILE, SettingType.BOOLEAN, default=False,
         description="Skip actual GPU device dedication for testing (GPU reservation logic still runs)"
     ),
+    "docker.sshHostKeysPath": SettingSetting(
+        SettingSource.FILE, SettingType.TEXT, default="data/ssh_host_keys",
+        description="Directory for persistent SSH host keys injected into containers to prevent known_hosts conflicts"
+    ),
     
     # ===== DATABASE-BASED SETTINGS (User-Configurable) =====
     # These can be modified through the admin interface

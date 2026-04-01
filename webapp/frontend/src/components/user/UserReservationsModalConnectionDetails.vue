@@ -1,7 +1,7 @@
 <template>
   <div class="text-center">
     <v-dialog v-model="isOpen" width="600">
-      <v-card>
+      <v-card class="pa-4">
         <v-card-title class="text-h5 lighten-2 pt-6">
           Connection Details
         </v-card-title>
@@ -56,34 +56,51 @@
                 <v-icon size="small" class="copy-icon" @click="copyToClipboard(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
               </template>
             </v-text-field>
-          </div>
 
-          <!-- Other Services -->
-          <div v-if="hasOtherPorts">
-            <div class="d-flex align-center mb-5">
-              <v-icon class="mr-2" size="small">mdi-lan</v-icon>
-              <span class="text-subtitle-1 font-weight-medium">Other Services</span>
-            </div>
-
-            <v-text-field
-              v-for="port in details.otherPorts"
-              :key="port.serviceName"
-              :model-value="`${details.ip}:${port.outsidePort}`"
-              :label="`${port.serviceName} (local port ${port.localPort})`"
-              prepend-inner-icon="mdi-open-in-new"
-              readonly
-              variant="outlined"
-              density="compact"
-              class="mb-2"
-            >
-              <template v-slot:append-inner>
-                <v-icon size="small" class="copy-icon" @click="copyToClipboard(`${details.ip}:${port.outsidePort}`, port.serviceName)">mdi-content-copy</v-icon>
-              </template>
-            </v-text-field>
+            <v-alert v-if="details.hasSshPublicKey" type="info" variant="tonal" density="compact" class="mt-1" style="margin-bottom: 30px;">
+              Your SSH public key has been deployed to this container. You can also connect without a password.
+            </v-alert>
+            <p v-else class="text-caption text-medium-emphasis mb-2" style="margin-top: -4px;">
+              <v-icon size="x-small" class="mr-1">mdi-information-outline</v-icon>
+              <v-tooltip location="bottom" max-width="300">
+                <template v-slot:activator="{ props }">
+                  <a v-bind="props" class="text-caption" style="cursor: pointer; color: inherit;">Enable passwordless SSH login</a>
+                </template>
+                <span>You can add your SSH public key in your profile settings to connect to containers without entering a password. The key will be automatically deployed to all future reservations.</span>
+              </v-tooltip>
+            </p>
           </div>
 
           <!-- Collapsible sections -->
           <v-expansion-panels variant="accordion" class="mt-4">
+
+            <!-- Other Services -->
+            <v-expansion-panel v-if="hasOtherPorts">
+              <v-expansion-panel-title>
+                <div class="d-flex align-center">
+                  <v-icon class="mr-2" size="small">mdi-lan</v-icon>
+                  <span class="text-subtitle-1 font-weight-medium">Other Services</span>
+                  <v-chip size="x-small" color="primary" class="ml-2">{{ details.otherPorts.length }}</v-chip>
+                </div>
+              </v-expansion-panel-title>
+              <v-expansion-panel-text>
+                <v-text-field
+                  v-for="port in details.otherPorts"
+                  :key="port.serviceName"
+                  :model-value="`${details.ip}:${port.outsidePort}`"
+                  :label="`${port.serviceName} (local port ${port.localPort})`"
+                  prepend-inner-icon="mdi-open-in-new"
+                  readonly
+                  variant="outlined"
+                  density="compact"
+                  class="mb-2"
+                >
+                  <template v-slot:append-inner>
+                    <v-icon size="small" class="copy-icon" @click="copyToClipboard(`${details.ip}:${port.outsidePort}`, port.serviceName)">mdi-content-copy</v-icon>
+                  </template>
+                </v-text-field>
+              </v-expansion-panel-text>
+            </v-expansion-panel>
 
             <!-- Container Details -->
             <v-expansion-panel v-if="details.containerName">

@@ -374,6 +374,7 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
       "containerDescription": container.description,
       "containerImage": container.imageName,
       "username": container_username,
+      "hasSshPublicKey": bool(reservation.user.sshPublicKey),
     }
 
   return api_response(True, "Details fetched.", { "connectionText": connection_text, "connectionDetails": connection_details } )

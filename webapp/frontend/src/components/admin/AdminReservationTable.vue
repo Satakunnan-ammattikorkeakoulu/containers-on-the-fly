@@ -14,6 +14,17 @@
       <!-- Status -->
       <template v-slot:item.status="{item}">
         <v-chip :color="getStatusColor(item.status)">{{ getStatusLabel(item.status) }}</v-chip>
+        <v-tooltip bottom v-if="item.isLowPriority">
+          <template v-slot:activator="{ props }">
+            <v-chip v-bind="props" size="x-small" color="warning" style="margin-left: 4px;">Low Priority</v-chip>
+          </template>
+          <div style="max-width: 250px;">
+            <strong>Low Priority</strong><br>
+            This container may be paused if resources are needed by other reservations.
+            It will automatically resume when resources become available.
+            Save your work to mounted volumes to prevent data loss.
+          </div>
+        </v-tooltip>
       </template>
       <!-- ID -->
       <template v-slot:item.reservationId="{item}">
@@ -76,7 +87,7 @@
       </template>
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
-        <v-menu v-if="item.status === 'reserved' || item.status === 'started' || item.status === 'restart_error'">
+        <v-menu v-if="item.status === 'reserved' || item.status === 'started' || item.status === 'restart_error' || item.status === 'paused'">
           <template v-slot:activator="{ props }">
             <a class="actions-link" v-bind="props">
               Actions <v-icon size="small">mdi-chevron-down</v-icon>
@@ -221,6 +232,7 @@
           "error": "Startup Error",
           "restart_error": "Error Restarting",
           "restart": "Restarting",
+          "paused": "Paused",
         }
         return labels[status] || status
       },
@@ -229,6 +241,7 @@
         else if (status == "started") return "green"
         else if (status == "stopped") return "red"
         else if (status == "restart_error") return "orange"
+        else if (status == "paused") return "warning"
       },
       parseTime(timestamp) {
         return DisplayTime(timestamp)

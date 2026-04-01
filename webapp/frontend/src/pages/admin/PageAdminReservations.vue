@@ -204,9 +204,10 @@
     computed: {
       statusItems() {
         const items = [
-          { text: `All (${this.statusCounts.reserved + this.statusCounts.started + this.statusCounts.stopped + this.statusCounts.error || 0})`, value: 'All' },
+          { text: `All (${(this.statusCounts.reserved || 0) + (this.statusCounts.started || 0) + (this.statusCounts.stopped || 0) + (this.statusCounts.error || 0) + (this.statusCounts.paused || 0)})`, value: 'All' },
           { text: `Reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
           { text: `Running (${this.statusCounts.started || 0})`, value: 'started' },
+          { text: `Paused (${this.statusCounts.paused || 0})`, value: 'paused' },
           { text: `Stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
           { text: `Error (${this.statusCounts.error || 0})`, value: 'error' }
         ];

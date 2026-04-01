@@ -439,11 +439,11 @@
             
             const eventData = {
               id: `reservation-${res.reservationId}`,
-              name: "Reservation #" + res.reservationId,
+              name: res.isLowPriority ? "Reservation #" + res.reservationId + " (LP)" : "Reservation #" + res.reservationId,
               reservationId: res.reservationId,
               start: startDate.toDate(),
               end: endDate.toDate(),
-              color: color,
+              color: res.isLowPriority ? 'amber darken-2' : color,
               timed: true,
             }
             events.push(eventData)

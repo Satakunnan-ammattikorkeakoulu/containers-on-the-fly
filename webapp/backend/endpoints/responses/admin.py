@@ -89,7 +89,7 @@ def get_reservations(request: AdminReservationRequest) -> object:
 
   with Session() as session:
     # Status counts (unfiltered, 90-day scoped)
-    status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
+    status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0, "paused": 0}
     count_rows = session.execute(
         select(Reservation.status, func.count())
         .where(time_scope)

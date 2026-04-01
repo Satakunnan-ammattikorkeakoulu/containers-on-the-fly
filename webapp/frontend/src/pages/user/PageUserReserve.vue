@@ -349,6 +349,24 @@
                 </v-col>
               </v-row>
 
+              <!-- Low-Priority Reservation -->
+              <v-row style="margin-bottom: 20px;">
+                <v-col cols="12" md="6" style="margin: 0 auto; padding: 0 40px;">
+                  <h3 class="text-center">Low-Priority Reservation</h3>
+                  <p class="text-center" style="color: gray; font-size: 15px;">
+                    Low-priority reservations may be paused when resources are needed by other users,
+                    and automatically resumed when resources become available. Save your work to mounted volumes.
+                  </p>
+                  <div class="d-flex justify-center">
+                    <v-switch
+                      v-model="isLowPriority"
+                      color="warning"
+                      label="Make reservation low-priority"
+                    ></v-switch>
+                  </div>
+                </v-col>
+              </v-row>
+
               <!-- SHM + RAM Disk side by side -->
               <v-row>
                 <v-col cols="12" md="6" style="padding: 0 60px;">
@@ -514,6 +532,7 @@
       reserveDurationDays: null,
       reserveDurationHours: null,
       initializingDefaults: false, // Flag to prevent watchers from interfering during initialization
+      isLowPriority: false, // Low-priority reservations can be paused when resources are needed
       shmSizePercent: 50, // Default SHM size to 50% of memory
       ramDiskSizePercent: 0, // Default RAM disk size to 0% of memory
       fetchingReservations: false, // True if we are fetching all current and upcoming reservations
@@ -934,7 +953,8 @@
           "adminReserveUserEmail": this.adminReserveUserEmail ? this.adminReserveUserEmail : "",
           "description": this.reservationDescription && this.reservationDescription.trim() ? this.reservationDescription.trim() : "",
           "shmSizePercent": this.shmSizePercent,
-          "ramDiskSizePercent": this.ramDiskSizePercent
+          "ramDiskSizePercent": this.ramDiskSizePercent,
+          "isLowPriority": this.isLowPriority
         }
 
         axios({

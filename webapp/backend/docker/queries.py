@@ -6,7 +6,7 @@ computer information. Used exclusively by the daemon module.
 """
 
 from python_on_whales import docker
-from database import Session, Reservation, Computer, Container
+from database import Session, Reservation, Computer, Container, ReservedHardwareSpec, HardwareSpec
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 import datetime
@@ -89,7 +89,7 @@ def get_reservations_requiring_stop(computer_id: int):
     reservations = session.execute(
       select(Reservation).where(
         Reservation.computerId == computer_id,
-        Reservation.status.in_(["started", "reserved", "restart_error"]),
+        Reservation.status.in_(["started", "reserved", "restart_error", "paused"]),
         Reservation.endDate < time_now()
       )
     ).scalars().all()
@@ -227,6 +227,122 @@ def get_containers_requiring_image_removal():
       select(Container).where(Container.buildStatus == "removing")
     ).scalars().all()
     return containers
+
+
+def get_low_priority_running_reservations(computer_id: int):
+  """Get all running low-priority reservations on the given computer.
+
+  Args:
+      computer_id: Database ID of the computer to query.
+
+  Returns:
+      list: Reservation ORM objects for running low-priority containers.
+  """
+  with Session() as session:
+    reservations = session.execute(
+      select(Reservation)
+      .options(
+        joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec),
+        joinedload(Reservation.reservedContainer),
+        joinedload(Reservation.user),
+        joinedload(Reservation.computer),
+      )
+      .where(
+        Reservation.status == "started",
+        Reservation.isLowPriority == True,
+        Reservation.computerId == computer_id,
+        Reservation.endDate > time_now()
+      )
+    ).unique().scalars().all()
+    return reservations
+
+
+def get_paused_reservations(computer_id: int):
+  """Get all paused reservations waiting to resume on the given computer.
+
+  Ordered by createdAt ascending (FIFO) so the oldest paused reservation
+  gets priority when resources free up.
+
+  Args:
+      computer_id: Database ID of the computer to query.
+
+  Returns:
+      list: Reservation ORM objects for paused low-priority containers.
+  """
+  with Session() as session:
+    reservations = session.execute(
+      select(Reservation)
+      .options(
+        joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec),
+        joinedload(Reservation.reservedContainer),
+        joinedload(Reservation.user),
+        joinedload(Reservation.computer),
+      )
+      .where(
+        Reservation.status == "paused",
+        Reservation.computerId == computer_id,
+        Reservation.endDate > time_now()
+      )
+      .order_by(Reservation.createdAt.asc())
+    ).unique().scalars().all()
+    return reservations
+
+
+def get_future_normal_reservations(computer_id: int, start_time, end_time):
+  """Get non-low-priority reservations overlapping a future time window.
+
+  Used for look-ahead conflict checking to prevent thrashing when
+  deciding whether to resume a paused low-priority container.
+
+  Args:
+      computer_id: Database ID of the computer to query.
+      start_time: Start of the time window to check.
+      end_time: End of the time window to check.
+
+  Returns:
+      list: Reservation ORM objects for normal reservations in the window.
+  """
+  with Session() as session:
+    reservations = session.execute(
+      select(Reservation)
+      .options(
+        joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec)
+      )
+      .where(
+        Reservation.computerId == computer_id,
+        Reservation.isLowPriority == False,
+        Reservation.status.in_(["reserved", "started"]),
+        Reservation.startDate < end_time,
+        Reservation.endDate > start_time
+      )
+    ).unique().scalars().all()
+    return reservations
+
+
+def get_all_active_reservations(computer_id: int):
+  """Get all active reservations (started or reserved) on the given computer.
+
+  Used to calculate current resource usage for preemption decisions.
+
+  Args:
+      computer_id: Database ID of the computer to query.
+
+  Returns:
+      list: Reservation ORM objects for all active reservations.
+  """
+  with Session() as session:
+    reservations = session.execute(
+      select(Reservation)
+      .options(
+        joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec)
+      )
+      .where(
+        Reservation.computerId == computer_id,
+        Reservation.status.in_(["started", "reserved"]),
+        Reservation.endDate > time_now()
+      )
+    ).unique().scalars().all()
+    return reservations
 
 
 def reset_stale_building_status():

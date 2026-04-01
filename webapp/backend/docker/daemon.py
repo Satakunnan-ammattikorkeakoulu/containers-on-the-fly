@@ -13,19 +13,21 @@ from os import linesep
 
 from logger import log
 from settings_handler import settings_handler
-from database import Session, Reservation, ReservedContainerPort, Role
+from database import Session, Reservation, ReservedContainerPort, Role, Computer, HardwareSpec, ReservedHardwareSpec
 from helpers.auth import create_password
 from sqlalchemy import select
 
 from docker.containers import start_container, stop_container, restart_container
 from docker.monitoring import update_server_monitoring
-from docker.notifications import send_container_started_email, send_container_error_email, send_admin_failure_alert
+from docker.notifications import send_container_started_email, send_container_error_email, send_admin_failure_alert, send_container_paused_email, send_container_resumed_email
 from docker.ports import get_available_port
 from docker.queries import (
     get_reservations_requiring_start, get_running_reservations,
     get_reservations_requiring_stop, get_reservations_requiring_restart,
     get_container_information, get_computer_id, get_running_reserved_docker_containers,
-    get_containers_requiring_build, get_containers_requiring_image_removal, reset_stale_building_status
+    get_containers_requiring_build, get_containers_requiring_image_removal, reset_stale_building_status,
+    get_low_priority_running_reservations, get_paused_reservations,
+    get_future_normal_reservations, get_all_active_reservations
 )
 from docker.image_builder import build_and_push_image, remove_image, update_all_image_sizes
 
@@ -52,14 +54,18 @@ def main():
   """Run the daemon's main polling loop.
 
   Continuously cycles through lifecycle checks every 10 seconds:
-  stop finished containers, start new ones, restart crashed or
-  restart-requested containers. Server monitoring is updated every
-  30 seconds, and orphan container cleanup runs every 60 seconds.
+  pause low-priority containers for incoming normal reservations,
+  stop finished containers, start new ones, resume paused low-priority
+  containers, restart crashed or restart-requested containers. Server
+  monitoring is updated every 30 seconds, and orphan container cleanup
+  runs every 60 seconds.
   """
   while (run):
     for i in range(6):
+      pause_low_priority_for_normal_reservations()
       stop_finished_servers()
       start_new_servers()
+      resume_paused_containers()
       restart_crashed_servers()
       restart_servers_requiring_restart()
       process_image_builds()
@@ -168,6 +174,334 @@ def process_image_removals():
     except Exception as e:
       log.error(f"Error removing image for container {container.containerId} ({container.imageName}): {e}")
 
+def pause_low_priority_for_normal_reservations():
+  """Pause running low-priority containers to free resources for normal reservations.
+
+  Checks if any normal reservation is ready to start but lacks resources
+  because low-priority containers are using them. If so, stops the
+  low-priority containers and sets their status to "paused".
+  """
+  global computer_id
+  if settings_handler.get_setting("docker.enabled") != True:
+    return
+
+  try:
+    # Find normal reservations ready to start
+    with Session() as session:
+      from sqlalchemy.orm import joinedload
+      normal_pending = session.execute(
+        select(Reservation)
+        .options(
+          joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec)
+        )
+        .where(
+          Reservation.status == "reserved",
+          Reservation.isLowPriority == False,
+          Reservation.computerId == computer_id,
+          Reservation.startDate < time_now()
+        )
+      ).unique().scalars().all()
+
+      if not normal_pending:
+        return
+
+      # Get computer's total hardware capacity
+      computer = session.execute(
+        select(Computer).options(joinedload(Computer.hardwareSpecs))
+        .where(Computer.computerId == computer_id)
+      ).unique().scalar_one_or_none()
+      if not computer:
+        return
+
+      total_capacity = {}
+      for spec in computer.hardwareSpecs:
+        total_capacity[spec.hardwareSpecId] = spec.maximumAmount
+
+      # Get all currently active non-low-priority reservations (started + reserved)
+      non_lp_active = session.execute(
+        select(Reservation)
+        .options(joinedload(Reservation.reservedHardwareSpecs))
+        .where(
+          Reservation.computerId == computer_id,
+          Reservation.isLowPriority == False,
+          Reservation.status.in_(["started", "reserved"]),
+          Reservation.endDate > time_now()
+        )
+      ).unique().scalars().all()
+
+      # Calculate resources used by non-low-priority reservations
+      non_lp_used = {}
+      for res in non_lp_active:
+        for spec in res.reservedHardwareSpecs:
+          spec_id = spec.hardwareSpecId
+          non_lp_used[spec_id] = non_lp_used.get(spec_id, 0) + spec.amount
+
+      # Get running low-priority containers
+      lp_running = session.execute(
+        select(Reservation)
+        .options(
+          joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec),
+          joinedload(Reservation.reservedContainer),
+          joinedload(Reservation.user),
+          joinedload(Reservation.computer),
+        )
+        .where(
+          Reservation.status == "started",
+          Reservation.isLowPriority == True,
+          Reservation.computerId == computer_id,
+          Reservation.endDate > time_now()
+        )
+      ).unique().scalars().all()
+
+      if not lp_running:
+        return
+
+      for normal_res in normal_pending:
+        # What does this normal reservation need?
+        needed = {}
+        for spec in normal_res.reservedHardwareSpecs:
+          needed[spec.hardwareSpecId] = spec.amount
+
+        # Check if resources are already available (without touching low-priority)
+        resources_ok = True
+        for spec_id, amount in needed.items():
+          available = total_capacity.get(spec_id, 0) - non_lp_used.get(spec_id, 0)
+          if amount > available:
+            resources_ok = False
+            break
+
+        if resources_ok:
+          continue  # No preemption needed for this reservation
+
+        # Need to pause low-priority containers to free resources
+        # Build a deficit map: how much more resource is needed
+        deficit = {}
+        for spec_id, amount in needed.items():
+          available = total_capacity.get(spec_id, 0) - non_lp_used.get(spec_id, 0)
+          if amount > available:
+            deficit[spec_id] = amount - available
+
+        # Try to resolve deficit by pausing low-priority containers (newest first = LIFO)
+        lp_sorted = sorted(lp_running, key=lambda r: r.createdAt, reverse=True)
+        to_pause = []
+
+        for lp_res in lp_sorted:
+          if not deficit:
+            break
+          # Check if this low-priority container has overlapping resources
+          lp_specs = {}
+          for spec in lp_res.reservedHardwareSpecs:
+            lp_specs[spec.hardwareSpecId] = spec.amount
+
+          has_overlap = any(spec_id in lp_specs for spec_id in deficit)
+          if not has_overlap:
+            continue
+
+          to_pause.append(lp_res)
+          # Reduce deficit by resources freed from this container
+          for spec_id in list(deficit.keys()):
+            if spec_id in lp_specs:
+              deficit[spec_id] -= lp_specs[spec_id]
+              if deficit[spec_id] <= 0:
+                del deficit[spec_id]
+
+        # Pause the identified containers
+        for lp_res in to_pause:
+          try:
+            container_docker_name = lp_res.reservedContainer.containerDockerName
+            if container_docker_name:
+              stop_container(container_docker_name)
+            lp_res.status = "paused"
+            lp_res.reservedContainer.stoppedAt = time_now()
+            lp_res.reservedContainer.containerStatus = "paused"
+            session.commit()
+
+            image_name = lp_res.reservedContainer.container.imageName if lp_res.reservedContainer.container else "unknown"
+            computer_name = lp_res.computer.name if lp_res.computer else "unknown"
+            log.info(f"Low-priority reservation {lp_res.reservationId} paused for normal reservation {normal_res.reservationId}")
+            send_container_paused_email(lp_res.user.email, image_name, computer_name, lp_res.reservationId)
+
+            # Remove from the running list so subsequent normal reservations don't try to pause it again
+            if lp_res in lp_running:
+              lp_running.remove(lp_res)
+
+            # Update non_lp_used would not change (we paused an LP), but total available changes
+            # Actually we need to recalculate for the next normal_res iteration
+
+          except Exception as e:
+            log.error(f"Error pausing low-priority reservation {lp_res.reservationId}: {e}")
+
+  except Exception as e:
+    log.error(f"Error in pause_low_priority_for_normal_reservations: {e}")
+
+
+def resume_paused_containers():
+  """Resume paused low-priority containers when resources become available.
+
+  Checks if any paused low-priority reservations can be restarted based
+  on current resource availability. Includes a 30-minute look-ahead to
+  avoid start-stop thrashing. FIFO priority (oldest paused first).
+  """
+  global computer_id
+  if settings_handler.get_setting("docker.enabled") != True:
+    return
+
+  try:
+    paused = get_paused_reservations(computer_id)
+    if not paused:
+      return
+
+    with Session() as session:
+      from sqlalchemy.orm import joinedload
+
+      # Get computer's total hardware capacity
+      computer = session.execute(
+        select(Computer).options(joinedload(Computer.hardwareSpecs))
+        .where(Computer.computerId == computer_id)
+      ).unique().scalar_one_or_none()
+      if not computer:
+        return
+
+      total_capacity = {}
+      for spec in computer.hardwareSpecs:
+        total_capacity[spec.hardwareSpecId] = spec.maximumAmount
+
+      # Get all currently active reservations (non-LP started/reserved + LP started)
+      all_active = session.execute(
+        select(Reservation)
+        .options(joinedload(Reservation.reservedHardwareSpecs))
+        .where(
+          Reservation.computerId == computer_id,
+          Reservation.status.in_(["started", "reserved"]),
+          Reservation.endDate > time_now()
+        )
+      ).unique().scalars().all()
+
+      # Calculate currently used resources
+      used = {}
+      for res in all_active:
+        for spec in res.reservedHardwareSpecs:
+          spec_id = spec.hardwareSpecId
+          used[spec_id] = used.get(spec_id, 0) + spec.amount
+
+      for paused_res in paused:
+        # Re-fetch within this session to ensure we can modify
+        res = session.execute(
+          select(Reservation)
+          .options(joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec))
+          .where(Reservation.reservationId == paused_res.reservationId)
+        ).unique().scalar_one_or_none()
+        if not res or res.status != "paused":
+          continue
+
+        # Check if resources are available
+        needed = {}
+        for spec in res.reservedHardwareSpecs:
+          needed[spec.hardwareSpecId] = spec.amount
+
+        resources_ok = True
+        for spec_id, amount in needed.items():
+          available = total_capacity.get(spec_id, 0) - used.get(spec_id, 0)
+          if amount > available:
+            resources_ok = False
+            break
+
+        if not resources_ok:
+          continue
+
+        # Look-ahead: check if a normal reservation would start within 30 minutes
+        # that would immediately conflict and preempt this container again
+        look_ahead_end = time_now() + timedelta(minutes=30)
+        future_normals = get_future_normal_reservations(computer_id, time_now(), look_ahead_end)
+        would_conflict = False
+        for future_res in future_normals:
+          # Check if the future normal reservation's resources overlap with this paused one
+          for f_spec in future_res.reservedHardwareSpecs:
+            if f_spec.hardwareSpecId in needed:
+              # Would this future reservation cause a resource deficit?
+              future_needed = f_spec.amount
+              spec_available = total_capacity.get(f_spec.hardwareSpecId, 0) - used.get(f_spec.hardwareSpecId, 0)
+              # If after resuming this LP container, the future normal wouldn't fit
+              if future_needed > (spec_available - needed.get(f_spec.hardwareSpecId, 0)):
+                would_conflict = True
+                break
+          if would_conflict:
+            break
+
+        if would_conflict:
+          log.debug(f"Skipping resume of paused reservation {res.reservationId}: would conflict with upcoming normal reservation")
+          continue
+
+        # Resume: set back to "reserved" so start_new_servers() picks it up
+        res.status = "reserved"
+        session.commit()
+        log.info(f"Resuming paused low-priority reservation {res.reservationId}")
+
+        # Update used resources for subsequent iterations
+        for spec_id, amount in needed.items():
+          used[spec_id] = used.get(spec_id, 0) + amount
+
+  except Exception as e:
+    log.error(f"Error in resume_paused_containers: {e}")
+
+
+def _are_resources_available_for_reservation(reservation):
+  """Check if hardware resources are currently available for a reservation.
+
+  Computes available resources on the computer by subtracting all active
+  (started/reserved) reservations, then checks if the given reservation's
+  needs fit within the remaining capacity.
+
+  Args:
+      reservation: Reservation ORM object to check resources for.
+
+  Returns:
+      bool: True if resources are available, False otherwise.
+  """
+  try:
+    with Session() as session:
+      from sqlalchemy.orm import joinedload
+
+      computer = session.execute(
+        select(Computer).options(joinedload(Computer.hardwareSpecs))
+        .where(Computer.computerId == reservation.computerId)
+      ).unique().scalar_one_or_none()
+      if not computer:
+        return False
+
+      total_capacity = {}
+      for spec in computer.hardwareSpecs:
+        total_capacity[spec.hardwareSpecId] = spec.maximumAmount
+
+      # Get all active reservations except this one
+      all_active = session.execute(
+        select(Reservation)
+        .options(joinedload(Reservation.reservedHardwareSpecs))
+        .where(
+          Reservation.computerId == reservation.computerId,
+          Reservation.status.in_(["started", "reserved"]),
+          Reservation.reservationId != reservation.reservationId,
+          Reservation.endDate > time_now()
+        )
+      ).unique().scalars().all()
+
+      used = {}
+      for res in all_active:
+        for spec in res.reservedHardwareSpecs:
+          spec_id = spec.hardwareSpecId
+          used[spec_id] = used.get(spec_id, 0) + spec.amount
+
+      for spec in reservation.reservedHardwareSpecs:
+        available = total_capacity.get(spec.hardwareSpecId, 0) - used.get(spec.hardwareSpecId, 0)
+        if spec.amount > available:
+          return False
+
+      return True
+  except Exception as e:
+    log.error(f"Error checking resource availability for reservation {reservation.reservationId}: {e}")
+    return False
+
+
 def stop_orphan_container_reservations():
   """Clean up Docker containers that have no matching active reservation.
 
@@ -224,6 +558,14 @@ def start_docker_container(reservation_id: str):
       select(Reservation).where(Reservation.reservationId == reservation_id)
     ).scalar_one_or_none()
     if reservation == None: return False
+
+    # Guard: if low-priority reservation, verify resources are actually available right now
+    if reservation.isLowPriority:
+      if not _are_resources_available_for_reservation(reservation):
+        reservation.status = "paused"
+        session.commit()
+        log.info(f"Low-priority reservation {reservation_id} paused: insufficient resources")
+        return
     ssh_password = create_password()
 
     # Guard: if the container has Dockerfile commands but hasn't been built successfully, block start
@@ -397,6 +739,7 @@ def stop_docker_container(reservation_id: str):
       container_docker_name = reservation.reservedContainer.containerDockerName
       if reservation.status in ("started", "restart_error"):
         stop_container(container_docker_name)
+      # Paused containers are already stopped in Docker, just finalize the status
       reservation.status = "stopped"
       reservation.reservedContainer.stoppedAt = time_now()
       reservation.reservedContainer.containerStatus = "stopped"

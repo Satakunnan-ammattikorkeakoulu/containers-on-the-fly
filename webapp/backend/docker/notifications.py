@@ -165,6 +165,59 @@ def send_container_error_email(user_email, errors):
     send_email(user_email, "AI Server did not start", body)
 
 
+def send_container_paused_email(user_email, image_name, computer_name, reservation_id):
+    """Send an email notification when a low-priority container is paused.
+
+    Notifies the user that their container was paused to free resources
+    for a higher-priority reservation, and that it will restart
+    automatically when resources become available.
+
+    Args:
+        user_email: Recipient email address.
+        image_name: Name of the Docker image that was paused.
+        computer_name: Name of the server where the container ran.
+        reservation_id: Database ID of the paused reservation.
+    """
+    if not get_setting('email.sendEmail'):
+        return
+
+    linesep = os.linesep
+    body = f"Your low-priority container (reservation #{reservation_id}) has been paused.{linesep}{linesep}"
+    body += f"Container image: {image_name}{linesep}"
+    body += f"Server: {computer_name}{linesep}{linesep}"
+    body += f"The container was paused because resources are needed by a higher-priority reservation.{linesep}"
+    body += f"It will restart automatically when resources become available.{linesep}{linesep}"
+    body += f"Data on mounted volumes is preserved. No action is needed from you.{linesep}{linesep}"
+    body += "Please do not reply to this email, this email is sent from a noreply email address."
+    send_email(user_email, "Low-priority container paused", body)
+
+
+def send_container_resumed_email(user_email, image_name, computer_ip, ports, password, end_date, username="user"):
+    """Send an email notification when a paused low-priority container resumes.
+
+    Notifies the user that their container has been restarted with new
+    connection details (ports and password may have changed).
+
+    Args:
+        user_email: Recipient email address.
+        image_name: Name of the Docker image that was resumed.
+        computer_ip: IP address of the host machine.
+        ports: List of port dictionaries with serviceName, localPort,
+            and outsidePort.
+        password: New SSH password for the container.
+        end_date: Datetime when the reservation ends.
+        username: Container username for SSH connection strings.
+    """
+    if not get_setting('email.sendEmail'):
+        return
+
+    body = generate_connection_text(
+        image_name, computer_ip, ports, password,
+        True, "Your low-priority container has been resumed.", end_date, username
+    )
+    send_email(user_email, "Low-priority container resumed", body)
+
+
 def send_admin_failure_alert(user_email, reservation_id, image_name, server_name, errors):
     """Send container failure alerts to configured admin email addresses.
 

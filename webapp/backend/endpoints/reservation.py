@@ -97,7 +97,7 @@ async def get_own_reservation_details(reservationId: int, token: str = Depends(o
   return functionality.get_own_reservation_details(reservationId, userId)
 
 @router.post("/create_reservation")
-async def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, token: str = Depends(oauth2_scheme)):
+async def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, token: str = Depends(oauth2_scheme)):
   """Create a new container reservation after validating all inputs.
 
   Validates date, duration, IDs, email format, description length,
@@ -115,6 +115,7 @@ async def create_reservation(date: str, duration: int, computerId: int, containe
       description: Optional short description (max 50 chars).
       shmSizePercent: Shared memory size as a percentage of RAM (0 -- 90).
       ramDiskSizePercent: RAM disk size as a percentage of RAM (0 -- 60).
+      isLowPriority: Whether this is a low-priority reservation (default False).
       token: OAuth2 bearer token (injected by Depends).
 
   Returns:
@@ -178,7 +179,7 @@ async def create_reservation(date: str, duration: int, computerId: int, containe
     return api_response(False, "Invalid hardware specs JSON format.")
 
   userId = get_authenticated_user_id(token)
-  return functionality.create_reservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description, shmSizePercent, ramDiskSizePercent)
+  return functionality.create_reservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description, shmSizePercent, ramDiskSizePercent, isLowPriority)
 
 @router.get("/get_current_reservations")
 async def get_current_reservations(token: str = Depends(oauth2_scheme)):

@@ -62,6 +62,7 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
       .where(
         Reservation.startDate < end_date,
         Reservation.endDate > date,
+        Reservation.isLowPriority == False,
         (Reservation.status == "reserved") | (Reservation.status == "started")
       )
     ).unique().scalars().all()
@@ -205,7 +206,7 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
 
   with Session() as session:
     # Status counts (unfiltered by status, scoped to userId + 90 days)
-    status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
+    status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0, "paused": 0}
     count_rows = session.execute(
         select(Reservation.status, func.count())
         .where(Reservation.userId == userId, time_scope)
@@ -223,7 +224,7 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
         .select_from(Reservation)
         .where(
             Reservation.userId == userId,
-            Reservation.status.in_(["reserved", "started"]),
+            Reservation.status.in_(["reserved", "started", "paused"]),
         )
     ).scalar()
 
@@ -409,7 +410,7 @@ def get_current_reservations() -> object:
       select(Reservation)
       .options(joinedload(Reservation.reservedHardwareSpecs))
       .where(
-        ((Reservation.status == "reserved") | (Reservation.status == "started")),
+        Reservation.status.in_(["reserved", "started", "paused"]),
         (Reservation.endDate > min_end_date),
       )
     ).unique().scalars().all()
@@ -428,12 +429,13 @@ def get_current_reservations() -> object:
         "computerId": reservation.computerId,
         "computerName": reservation.computer.name,
         "hardwareSpecs": specs,
+        "isLowPriority": reservation.isLowPriority,
       }
       reservations.append(res)
-  
+
   return api_response(True, "Current reservations fetched.", { "reservations": reservations })
 
-def create_reservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0):
+def create_reservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False):
   """Create a new container reservation with hardware resource allocation.
 
   Validates all inputs including duration limits, resource availability,
@@ -455,6 +457,8 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
           RAM (10-90, default 50).
       ramDiskSizePercent: RAM disk size as percentage of allocated
           RAM (0-60, default 0).
+      isLowPriority: Whether this is a low-priority reservation that
+          can be paused when normal reservations need resources.
 
   Returns:
       Response indicating success with informByEmail flag, or an error
@@ -535,7 +539,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     user_active_reservations = session.execute(
       select(func.count()).select_from(Reservation).where(
         (Reservation.userId == userId),
-        ( (Reservation.status == "reserved") | (Reservation.status == "started") )
+        Reservation.status.in_(["reserved", "started", "paused"])
       )
     ).scalar_one()
     if user_active_reservations >= max_active_reservations:
@@ -555,9 +559,11 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       user = another_user
 
     # Make sure that there are enough resources for the reservation
-    available_hardware_response = get_available_hardware(date.isoformat(), duration, hardwareSpecs, is_user_admin, None, user.userId)
-    if (available_hardware_response["status"] == False):
-      return api_response(False, available_hardware_response["message"])
+    # Low-priority reservations skip the time-slot availability check (they start when resources are free)
+    if not isLowPriority:
+      available_hardware_response = get_available_hardware(date.isoformat(), duration, hardwareSpecs, is_user_admin, None, user.userId)
+      if (available_hardware_response["status"] == False):
+        return api_response(False, available_hardware_response["message"])
 
     # Create the base reservation
     reservation_data = {
@@ -567,6 +573,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       "userId": user.userId,
       "computerId": computerId,
       "status": "reserved",
+      "isLowPriority": isLowPriority,
     }
     
     # Only add description if it's provided and not empty
@@ -715,7 +722,7 @@ def update_reservation_description(userId: int, reservationId: str, description:
       reservation = session.execute(select(Reservation).where( Reservation.reservationId == reservationId )).scalar_one_or_none()
     if reservation is None: return api_response(False, "No reservation found.")
 
-    if reservation.status not in ("reserved", "started"):
+    if reservation.status not in ("reserved", "started", "paused"):
       return api_response(False, "Cannot edit description: reservation is not active.")
 
     reservation.description = description if description else None
@@ -756,8 +763,8 @@ def extend_reservation(userId : int, reservationId: str, duration: int):
     ).unique().scalar_one_or_none()
     if reservation is None: return api_response(False, "No reservation found.")
 
-    if reservation.status != "started":
-      return api_response(False, "Reservation is not started, so cannot extend it.")
+    if reservation.status not in ("started", "paused"):
+      return api_response(False, "Reservation is not active, so cannot extend it.")
 
     # Check that the duration is between minimum and maximum lengths
     if duration < 0 or duration > 24:
@@ -834,12 +841,16 @@ def restart_container(userId : int, reservationId: str):
     if reservation is None:
       return api_response(False, "No reservation found.")
 
-    if reservation.status in ("started", "restart_error"):
+    if reservation.status == "paused":
+      reservation.status = "reserved"
+      session.commit()
+      return api_response(True, "Container will be restarted when resources are available.")
+    elif reservation.status in ("started", "restart_error"):
       reservation.status = "restart"
       session.commit()
       return api_response(True, "Container will be restarted.")
     else:
-      return api_response(False, "Reservation is not currently started, so cannot restart the container.")
+      return api_response(False, "Reservation is not currently active, so cannot restart the container.")
 
 def get_availability_timeline(startDate: str, endDate: str, is_admin = False) -> object:
   """Generate resource availability timeline for all public servers.
@@ -883,6 +894,7 @@ def get_availability_timeline(startDate: str, endDate: str, is_admin = False) ->
       .where(
         Reservation.startDate < end_date,
         Reservation.endDate > start_date,
+        Reservation.isLowPriority == False,
         (Reservation.status == "reserved") | (Reservation.status == "started")
       )
     ).unique().scalars().all()
@@ -1087,7 +1099,8 @@ def get_all_reservations_for_calendar(startDate: str, endDate: str) -> object:
         "endDate": reservation.endDate.isoformat(),
         "computerName": reservation.computer.name,
         "hardwareSpecs": specs,
-        "status": reservation.status
+        "status": reservation.status,
+        "isLowPriority": reservation.isLowPriority,
       })
     
   return api_response(True, "All reservations fetched.", {"reservations": reservations})

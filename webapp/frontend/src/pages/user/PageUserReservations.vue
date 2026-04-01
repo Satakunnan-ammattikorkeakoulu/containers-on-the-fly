@@ -219,7 +219,7 @@
               _this.activeReservationCount = response.data.data.activeReservationCount || 0
               // Always update status counts and total from server
               _this.statusCounts = response.data.data.statusCounts || {}
-              _this.totalReservationCount = (_this.statusCounts.reserved || 0) + (_this.statusCounts.started || 0) + (_this.statusCounts.stopped || 0) + (_this.statusCounts.error || 0)
+              _this.totalReservationCount = (_this.statusCounts.reserved || 0) + (_this.statusCounts.started || 0) + (_this.statusCounts.stopped || 0) + (_this.statusCounts.error || 0) + (_this.statusCounts.paused || 0)
             }
             else {
               console.log("Failed getting own reservations...")
@@ -497,6 +497,7 @@
           { text: `All (${this.totalReservationCount})`, value: 'All' },
           { text: `Reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
           { text: `Running (${this.statusCounts.started || 0})`, value: 'started' },
+          { text: `Paused (${this.statusCounts.paused || 0})`, value: 'paused' },
           { text: `Stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
           { text: `Error (${this.statusCounts.error || 0})`, value: 'error' }
         ];

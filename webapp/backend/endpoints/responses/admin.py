@@ -5,7 +5,7 @@ management, container and computer (server) CRUD, user management, role and
 permission management, server monitoring, and general application settings.
 """
 
-from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs
+from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedContainerPort, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs
 from dateutil import parser
 from dateutil.relativedelta import *
 from datetime import timezone, timedelta
@@ -372,6 +372,28 @@ def save_container(containerEdit : ContainerEdit) -> object:
             select(ContainerPort).where(ContainerPort.containerPortId == port_id)
           ).scalar_one_or_none()
           if port_to_remove and not (port_to_remove.serviceName == _SSH_SERVICE_NAME and port_to_remove.port == _SSH_PORT):
+            # Block removal if any active reservation references this port
+            active_ref_count = session.execute(
+              select(func.count()).select_from(ReservedContainerPort).join(
+                ReservedContainer, ReservedContainerPort.reservedContainerId == ReservedContainer.reservedContainerId
+              ).join(
+                Reservation, Reservation.reservedContainerId == ReservedContainer.reservedContainerId
+              ).where(
+                ReservedContainerPort.containerPortForeign == port_id,
+                Reservation.status.in_(["reserved", "started", "restart", "restart_error"])
+              )
+            ).scalar() or 0
+            if active_ref_count > 0:
+              return api_response(
+                False,
+                f"Cannot remove port {port_to_remove.port} ({port_to_remove.serviceName}): "
+                f"it is used by {active_ref_count} active reservation(s). "
+                f"Cancel or wait for those reservations to end first."
+              )
+            # Clean up historical ReservedContainerPort records before deleting the port
+            session.execute(
+              delete(ReservedContainerPort).where(ReservedContainerPort.containerPortForeign == port_id)
+            )
             session.execute(delete(ContainerPort).where(ContainerPort.containerPortId == port_id))
         # Add all new ports
         for port in containerEdit.data.get("ports", []):

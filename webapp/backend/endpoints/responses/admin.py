@@ -24,6 +24,14 @@ from endpoints.models.admin import UserEdit
 from database import UserRole, Role
 from helpers.tables.role import get_roles, get_role_by_id, add_role as add_role_helper, edit_role as edit_role_helper, remove_role as remove_role_helper
 from sqlalchemy import select, delete, func, case
+import re
+
+# Valid Linux username pattern
+_VALID_USERNAME_RE = re.compile(r'^[a-z_][a-z0-9_-]{0,31}$')
+_RESERVED_USERNAMES = {"root", "daemon", "bin", "sys", "nobody", "www-data", "mail", "sshd"}
+
+# Valid Docker image name pattern (lowercase, digits, dots, hyphens, underscores, slashes)
+_VALID_IMAGE_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9._/\-]{0,127}$')
 
 def get_reservations(request: AdminReservationRequest) -> object:
   """Retrieve paginated reservations with server-side filtering and sorting.
@@ -144,7 +152,10 @@ def get_reservations(request: AdminReservationRequest) -> object:
             res["userEmail"] = reservation.user.email
             res["computerName"] = reservation.computer.name
             res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
-            res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
+            container_dict = orm_to_dict(reservation.reservedContainer.container)
+            # Strip buildLog from reservation listings to avoid large payloads
+            container_dict.pop("buildLog", None)
+            res["reservedContainer"]["container"] = container_dict
 
             res["reservedContainer"]["reservedPorts"] = []
             if reservation.status == "started":
@@ -201,6 +212,54 @@ def save_container(containerEdit : ContainerEdit) -> object:
     ).scalar_one_or_none()
     if existing and existing.containerId != containerEdit.containerId:
       return api_response(False, "A container with this image name already exists.")
+    if new_image_name and not _VALID_IMAGE_NAME_RE.match(new_image_name):
+      return api_response(False, "Invalid image name. Use only lowercase letters, digits, dots, hyphens, underscores, and forward slashes.")
+
+    new_managed_externally = containerEdit.data.get("managedExternally", True)
+    new_dockerfile_commands = containerEdit.data.get("dockerfileCommands", None)
+    new_base_image = containerEdit.data.get("baseImage", None)
+    new_username = containerEdit.data.get("containerUsername", None)
+    new_password_command = containerEdit.data.get("passwordCommand", None)
+    new_ssh_key_commands = containerEdit.data.get("sshKeyDeployCommands", None)
+    new_cmd = containerEdit.data.get("containerCmd", None)
+
+    # For externally managed containers, clear image builder fields
+    if new_managed_externally:
+      new_dockerfile_commands = None
+      new_base_image = None
+      new_username = None
+      new_password_command = None
+      new_ssh_key_commands = None
+      new_cmd = None
+
+    # Type-check string fields
+    for field_name, field_val in [("dockerfileCommands", new_dockerfile_commands), ("baseImage", new_base_image),
+                                   ("containerUsername", new_username), ("passwordCommand", new_password_command),
+                                   ("sshKeyDeployCommands", new_ssh_key_commands), ("containerCmd", new_cmd)]:
+      if field_val is not None and not isinstance(field_val, str):
+        return api_response(False, f"{field_name} must be a string.")
+
+    # Normalize empty strings to None
+    if new_dockerfile_commands is not None and not new_dockerfile_commands.strip():
+      new_dockerfile_commands = None
+    if new_base_image is not None and not new_base_image.strip():
+      new_base_image = None
+    if new_password_command is not None and not new_password_command.strip():
+      new_password_command = None
+    if new_ssh_key_commands is not None and not new_ssh_key_commands.strip():
+      new_ssh_key_commands = None
+    if new_cmd is not None and not new_cmd.strip():
+      new_cmd = None
+
+    # Validate username
+    if new_username is not None and new_username.strip():
+      new_username = new_username.strip()
+      if not _VALID_USERNAME_RE.match(new_username):
+        return api_response(False, "Invalid username. Must be 1-32 lowercase letters, digits, hyphens, or underscores, starting with a letter or underscore.")
+      if new_username in _RESERVED_USERNAMES:
+        return api_response(False, f"Username '{new_username}' is reserved and cannot be used.")
+    else:
+      new_username = None  # Will default to "user" at runtime
 
     # If new, create a new container
     if containerEdit.containerId == -1:
@@ -209,22 +268,54 @@ def save_container(containerEdit : ContainerEdit) -> object:
       container.name = containerEdit.data.get("name")
       container.imageName = new_image_name
       container.description = containerEdit.data.get("description", "")
+      container.managedExternally = new_managed_externally
+      container.dockerfileCommands = new_dockerfile_commands
+      container.baseImage = new_base_image
+      container.containerUsername = new_username
+      container.passwordCommand = new_password_command
+      container.sshKeyDeployCommands = new_ssh_key_commands
+      container.containerCmd = new_cmd
+      # Queue build if using Image Builder
+      if not new_managed_externally and new_dockerfile_commands:
+        container.buildStatus = "pending"
       # Add ports
       for port in containerEdit.data.get("ports", []):
         container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
       session.add(container)
       session.commit()
+      saved_container_id = container.containerId
     # Otherwise, edit container
     else:
       container = session.execute(select(Container).where(Container.containerId == containerEdit.containerId)).scalar_one_or_none()
       if container is None:
         return api_response(False, "Container not found.")
       else:
+        # Check if Dockerfile-related fields changed — if so, queue a rebuild
+        dockerfile_changed = (new_dockerfile_commands != container.dockerfileCommands)
+        base_image_changed = (new_base_image != container.baseImage)
+        username_changed = (new_username != container.containerUsername)
+        cmd_changed = (new_cmd != container.containerCmd)
+
         container.public = containerEdit.data.get("public", False)
         container.name = containerEdit.data.get("name")
         container.imageName = new_image_name
         container.description = containerEdit.data.get("description", "")
+        container.managedExternally = new_managed_externally
+        container.dockerfileCommands = new_dockerfile_commands
+        container.baseImage = new_base_image
+        container.containerUsername = new_username
+        container.passwordCommand = new_password_command
+        container.sshKeyDeployCommands = new_ssh_key_commands
+        container.containerCmd = new_cmd
         container.updatedAt = datetime.datetime.now(datetime.timezone.utc)
+
+        # Queue rebuild if using Image Builder and Dockerfile-related fields changed
+        if not new_managed_externally and new_dockerfile_commands and (dockerfile_changed or base_image_changed or username_changed or cmd_changed):
+          container.buildStatus = "pending"
+        # If switching to externally managed, clear build status
+        if new_managed_externally:
+          container.buildStatus = None
+          container.buildLog = None
         # Remove all removable ports
         for port in containerEdit.data.get("removedPorts", []):
           session.execute(delete(ContainerPort).where(ContainerPort.containerPortId == port))
@@ -244,7 +335,8 @@ def save_container(containerEdit : ContainerEdit) -> object:
         #for port in containerEdit.data.get("ports", []):
         #  container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
         session.commit()
-  return api_response(True, "Container saved successfully")
+        saved_container_id = container.containerId
+  return api_response(True, "Container saved successfully", {"containerId": saved_container_id})
 
 def remove_container(containerId : int) -> object:
   """Soft-delete a container by marking it as removed and non-public.
@@ -266,6 +358,82 @@ def remove_container(containerId : int) -> object:
       session.commit()
 
   return api_response(True, "Container removed successfully")
+
+def rebuild_container_image(container_id: int) -> object:
+  """Queue a container image for rebuild by setting buildStatus to "pending".
+
+  The Docker utility daemon will pick this up on its next polling cycle
+  and perform the actual build. Refuses if the container has no Dockerfile
+  commands or if a build is already in progress.
+
+  Args:
+      container_id: Database ID of the container to rebuild.
+
+  Returns:
+      Response indicating success or failure with an appropriate message.
+  """
+  with Session() as session:
+    container = session.execute(
+      select(Container).where(Container.containerId == container_id)
+    ).scalar_one_or_none()
+    if container is None:
+      return api_response(False, "Container not found.")
+    if not container.dockerfileCommands:
+      return api_response(False, "This container has no Dockerfile commands. Cannot build.")
+    if container.buildStatus == "building":
+      return api_response(False, "A build is already in progress for this container.")
+    container.buildStatus = "pending"
+    session.commit()
+  return api_response(True, "Image build queued. The Docker utility will build it shortly.")
+
+def get_container_defaults(username: str = "user") -> object:
+  """Get default values for container creation fields.
+
+  Returns the default Dockerfile body, CMD, password command, and SSH key
+  deploy commands. Used by the frontend to pre-fill the container creation
+  form and for the "Reset to Defaults" button.
+
+  Args:
+      username: Linux username to interpolate into the defaults.
+
+  Returns:
+      Response with default field values.
+  """
+  # Validate username before interpolating into Dockerfile template
+  if not _VALID_USERNAME_RE.match(username):
+    return api_response(False, "Invalid username.")
+  if username in _RESERVED_USERNAMES:
+    return api_response(False, f"Username '{username}' is reserved.")
+
+  from docker.image_builder import get_default_dockerfile_body, DEFAULT_CMD, DEFAULT_PASSWORD_COMMAND, DEFAULT_SSH_KEY_DEPLOY_COMMANDS
+
+  return api_response(True, "Defaults fetched.", {
+    "dockerfileBody": get_default_dockerfile_body(username),
+    "containerCmd": DEFAULT_CMD,
+    "passwordCommand": DEFAULT_PASSWORD_COMMAND,
+    "sshKeyDeployCommands": DEFAULT_SSH_KEY_DEPLOY_COMMANDS,
+    "containerUsername": username,
+  })
+
+def get_container_build_status(container_id: int) -> object:
+  """Get the current build status and log for a container image.
+
+  Args:
+      container_id: Database ID of the container to check.
+
+  Returns:
+      Response with buildStatus and buildLog fields.
+  """
+  with Session() as session:
+    container = session.execute(
+      select(Container).where(Container.containerId == container_id)
+    ).scalar_one_or_none()
+    if container is None:
+      return api_response(False, "Container not found.")
+    return api_response(True, "Build status fetched.", {
+      "buildStatus": container.buildStatus,
+      "buildLog": container.buildLog or ""
+    })
 
 def get_users(request: AdminUsersRequest) -> object:
     """Retrieve paginated users with server-side filtering and sorting.
@@ -480,6 +648,8 @@ def get_containers() -> object:
     for container in query:
       addable = {}
       addable = orm_to_dict(container)
+      # Strip buildLog from listing to avoid large payloads
+      addable.pop("buildLog", None)
       addable["ports"] = []
       for port in container.containerPorts:
         addable["ports"].append({

@@ -23,8 +23,10 @@ from docker.ports import get_available_port
 from docker.queries import (
     get_reservations_requiring_start, get_running_reservations,
     get_reservations_requiring_stop, get_reservations_requiring_restart,
-    get_container_information, get_computer_id, get_running_reserved_docker_containers
+    get_container_information, get_computer_id, get_running_reserved_docker_containers,
+    get_containers_requiring_build, reset_stale_building_status
 )
+from docker.image_builder import build_and_push_image
 
 # Runs the script forever
 run: bool = True
@@ -59,6 +61,7 @@ def main():
       start_new_servers()
       restart_crashed_servers()
       restart_servers_requiring_restart()
+      process_image_builds()
 
       # Update monitoring data every 3rd iteration (every 30 seconds)
       if i % 3 == 0:
@@ -136,6 +139,23 @@ def restart_servers_requiring_restart():
         print(f"Error restarting a container:")
         print(e)
 
+def process_image_builds():
+  """Build Docker images for containers with pending build requests.
+
+  Queries for containers with buildStatus "pending" and builds them
+  one at a time to avoid resource contention. Each build generates
+  a Dockerfile from the base template plus custom commands, builds
+  the image, and pushes it to the local registry.
+  """
+  containers = get_containers_requiring_build()
+  for container in containers:
+    print(time_now(), f": Building image for container {container.containerId} ({container.imageName})")
+    try:
+      build_and_push_image(container.containerId)
+    except Exception as e:
+      print(f"Error building image for container {container.containerId}:")
+      print(e)
+
 def stop_orphan_container_reservations():
   """Clean up Docker containers that have no matching active reservation.
 
@@ -195,7 +215,17 @@ def start_docker_container(reservation_id: str):
     if reservation == None: return False
     ssh_password = create_password()
 
-    image_name = reservation.reservedContainer.container.imageName
+    # Guard: if the container has Dockerfile commands but hasn't been built successfully, block start
+    container_obj = reservation.reservedContainer.container
+    if container_obj.dockerfileCommands and container_obj.buildStatus != "success":
+      print(f"Container image for {container_obj.imageName} has not been built successfully (status: {container_obj.buildStatus}). Marking reservation as error.")
+      reservation.status = "error"
+      reservation.reservedContainer.containerDockerErrorMessage = "Container image has not been built successfully. Please ask an admin to build the image first."
+      reservation.reservedContainer.containerStatus = "error"
+      session.commit()
+      return
+
+    image_name = container_obj.imageName
     hw_specs = {}
     gpu_specs = {}
     for spec in reservation.reservedHardwareSpecs:
@@ -240,7 +270,7 @@ def start_docker_container(reservation_id: str):
     details = {
       "name": container_name,
       "image": image_name,
-      "username": "user",
+      "username": container_obj.containerUsername or "user",
       "cpus": int(hw_specs['cpus']["amount"]),
       "gpus": gpus_string if gpus_string else None,  # Convert empty string to None
       "memory": f"{hw_specs['ram']['amount']}g",
@@ -255,7 +285,9 @@ def start_docker_container(reservation_id: str):
           "email": reservation.user.email
         }
       },
-      "sshPublicKey": reservation.user.sshPublicKey
+      "sshPublicKey": reservation.user.sshPublicKey,
+      "passwordCommand": container_obj.passwordCommand,
+      "sshKeyDeployCommands": container_obj.sshKeyDeployCommands,
     }
 
     # Add role-based mounts (now the unified mounting system)
@@ -318,7 +350,8 @@ def start_docker_container(reservation_id: str):
       reservation.reservedContainer.containerStatus = "running"
       send_container_started_email(
         reservation.user.email, image_name, reservation.computer.ip,
-        ports, ssh_password, non_critical_errors, reservation.endDate
+        ports, ssh_password, non_critical_errors, reservation.endDate,
+        container_obj.containerUsername or "user"
       )
 
       session.commit()
@@ -438,6 +471,9 @@ def run():
   if not computer_id:
     print("!!! Could not find computer with this name from the database. settings.json should contain docker.serverName and the name should be exactly the same as the computer in the database. !!! Exiting." + linesep)
     sys.exit()
+
+  # Reset any image builds that were interrupted by a previous shutdown
+  reset_stale_building_status()
 
   main()
 

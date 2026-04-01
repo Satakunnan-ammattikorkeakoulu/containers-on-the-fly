@@ -20,6 +20,10 @@ body {
   opacity: .7;
 }
 
+.text-muted {
+  color: rgba(255, 255, 255, 0.5);
+}
+
 /* Vuetify 4 snackbar content */
 .v-snackbar__content {
   font-size: 16px !important;

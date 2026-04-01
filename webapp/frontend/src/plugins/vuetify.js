@@ -12,4 +12,17 @@ export default createVuetify({
   theme: {
     defaultTheme: 'dark',
   },
+  defaults: {
+    VTextField: {
+      variant: 'outlined',
+      persistentHint: true,
+    },
+    VTextarea: {
+      variant: 'outlined',
+      persistentHint: true,
+    },
+    VSwitch: {
+      persistentHint: true,
+    },
+  },
 })

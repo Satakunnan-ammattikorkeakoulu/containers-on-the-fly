@@ -18,6 +18,63 @@
         </v-chip>
       </template>
 
+      <!-- Username -->
+      <template v-slot:item.containerUsername="{item}">
+        {{ item.containerUsername || 'user' }}
+      </template>
+
+      <!-- Build Status -->
+      <template v-slot:item.buildStatus="{item}">
+        <v-chip
+          v-if="!item.dockerfileCommands"
+          color="grey"
+          text-color="white"
+          size="small"
+        >
+          Externally Managed
+        </v-chip>
+        <v-chip
+          v-else-if="item.buildStatus === 'success'"
+          color="green"
+          text-color="white"
+          size="small"
+        >
+          Built
+        </v-chip>
+        <v-chip
+          v-else-if="item.buildStatus === 'building'"
+          color="orange"
+          text-color="white"
+          size="small"
+        >
+          <v-progress-circular indeterminate size="12" width="2" class="mr-1"></v-progress-circular>
+          Building...
+        </v-chip>
+        <v-chip
+          v-else-if="item.buildStatus === 'pending'"
+          color="yellow"
+          size="small"
+        >
+          Queued
+        </v-chip>
+        <v-chip
+          v-else-if="item.buildStatus === 'failed'"
+          color="red"
+          text-color="white"
+          size="small"
+        >
+          Failed
+        </v-chip>
+        <v-chip
+          v-else
+          color="grey"
+          text-color="white"
+          size="small"
+        >
+          Not Built
+        </v-chip>
+      </template>
+
       <!-- Created At -->
       <template v-slot:item.createdAt="{item}">
         {{ item.createdAt ? parseTime(item.createdAt) : '' }}
@@ -41,6 +98,14 @@
               <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
               <v-list-item-title>Edit Container</v-list-item-title>
             </v-list-item>
+            <v-list-item v-if="item.dockerfileCommands" @click="emitRebuildContainer(item.containerId)">
+              <template v-slot:prepend><v-icon size="small">mdi-hammer-wrench</v-icon></template>
+              <v-list-item-title>Rebuild Image</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="item.dockerfileCommands" @click="emitViewBuildLog(item.containerId)">
+              <template v-slot:prepend><v-icon size="small">mdi-text-box-outline</v-icon></template>
+              <v-list-item-title>View Build Log</v-list-item-title>
+            </v-list-item>
             <v-divider class="my-1" />
             <v-list-item @click="emitRemoveContainer(item.containerId)" class="destructive-action">
               <template v-slot:prepend><v-icon size="small">mdi-delete-outline</v-icon></template>
@@ -56,9 +121,9 @@
 <script>
   /**
    * Displays a sortable data table of all container images (Docker image definitions).
-   * Shows container ID, public/private visibility, name, image name, description,
-   * and timestamps. Actions menu allows editing or removing a container image.
-   * Used in PageAdminContainers.
+   * Shows container ID, public/private visibility, name, image name, build status,
+   * description, and timestamps. Actions menu allows editing, rebuilding, or removing
+   * a container image. Used in PageAdminContainers.
    */
   import { DisplayTime } from '/src/helpers/time.js'
 
@@ -78,8 +143,10 @@
         headers: [
           { title: 'Container ID', key: 'containerId' },
           { title: 'Public', key: 'public' },
-          { title: 'name', key: 'name' },
+          { title: 'Name', key: 'name' },
           { title: 'Image name', key: 'imageName' },
+          { title: 'Username', key: 'containerUsername' },
+          { title: 'Build Status', key: 'buildStatus', sortable: false },
           { title: 'Description', key: 'description' },
           { title: 'Created At', key: 'createdAt' },
           { title: 'Updated At', key: 'updatedAt' },
@@ -96,6 +163,12 @@
       },
       emitRemoveContainer(containerId) {
         this.$emit('emitRemoveContainer', containerId)
+      },
+      emitRebuildContainer(containerId) {
+        this.$emit('emitRebuildContainer', containerId)
+      },
+      emitViewBuildLog(containerId) {
+        this.$emit('emitViewBuildLog', containerId)
       },
       toggleReadAll() {
         this.readAll = !this.readAll;

@@ -10,6 +10,7 @@ from settings_handler import settings_handler
 from python_on_whales.exceptions import NoSuchContainer
 import traceback
 from docker.mounts import build_volume_list, run_user_config_script
+from docker.image_builder import DEFAULT_PASSWORD_COMMAND, DEFAULT_SSH_KEY_DEPLOY_COMMANDS
 
 
 def start_container(pars):
@@ -124,7 +125,8 @@ def start_container(pars):
         ram_disk_percent = pars.get("ram_disk_percent", 0)
 
         if ram_disk_percent > 0:
-            mount_path = "/home/user/ram_disk"
+            username = pars.get("username", "user")
+            mount_path = f"/home/{username}/ram_disk"
             # Calculate RAM disk size in bytes based on percentage
             # Use the same memory value we calculated for SHM
             ram_disk_mb = int(mem_mb * ram_disk_percent / 100)
@@ -161,7 +163,11 @@ def start_container(pars):
             run_params['mounts'] = [[mount] for mount in ram_mounts]
 
         cont = docker.run(full_image_name, **run_params)
-        docker.execute(container=container_name, command=["/bin/bash","-c", f"/bin/echo 'user:{pars['password']}' | /usr/sbin/chpasswd"], user="root")
+
+        # Set password using customizable command template
+        password_cmd_template = pars.get("passwordCommand") or DEFAULT_PASSWORD_COMMAND
+        password_cmd = password_cmd_template.replace("{username}", pars.get("username", "user")).replace("{password}", pars["password"])
+        docker.execute(container=container_name, command=["/bin/bash", "-c", password_cmd], user="root")
 
     except Exception as e:
         print(f"Something went wrong starting container {container_name or 'unknown'}. Trying to stop the container. Error:")
@@ -176,22 +182,11 @@ def start_container(pars):
     if pars.get("sshPublicKey"):
         try:
             ssh_key = pars["sshPublicKey"]
+            ssh_cmd_template = pars.get("sshKeyDeployCommands") or DEFAULT_SSH_KEY_DEPLOY_COMMANDS
+            ssh_cmd = ssh_cmd_template.replace("{username}", pars.get("username", "user")).replace("{ssh_key}", ssh_key)
             docker.execute(
                 container=container_name,
-                command=["/bin/bash", "-c",
-                         "mkdir -p /home/user/.ssh && chmod 700 /home/user/.ssh"],
-                user="root"
-            )
-            docker.execute(
-                container=container_name,
-                command=["/bin/bash", "-c",
-                         f"cat <<'SSHEOF' > /home/user/.ssh/authorized_keys\n{ssh_key}\nSSHEOF"],
-                user="root"
-            )
-            docker.execute(
-                container=container_name,
-                command=["/bin/bash", "-c",
-                         "chmod 600 /home/user/.ssh/authorized_keys && chown -R user:$(id -gn user) /home/user/.ssh"],
+                command=["/bin/bash", "-c", ssh_cmd],
                 user="root"
             )
         except Exception as e:

@@ -10,7 +10,7 @@ from helpers.email import send_email
 from settings_handler import get_setting
 
 
-def generate_connection_text(image, ip, ports, password, include_email_details, non_critical_errors, end_date=None):
+def generate_connection_text(image, ip, ports, password, include_email_details, non_critical_errors, end_date=None, username="user"):
     """Generate connection details text for a started container.
 
     Builds a formatted text block containing SSH connection instructions,
@@ -54,10 +54,10 @@ def generate_connection_text(image, ip, ports, password, include_email_details, 
         if (port["serviceName"] == "SSH"):
             found_item = port
             help_text_ssh += f"Connecting with Visual Studio Code (SSH):{linesep}"
-            help_text_ssh += f"user@{ip}:{port['outsidePort']}"
+            help_text_ssh += f"{username}@{ip}:{port['outsidePort']}"
             help_text_ssh += linesep + linesep
             help_text_ssh += f"Connecting from the terminal (SSH):{linesep}"
-            help_text_ssh += f"ssh user@{ip} -p {port['outsidePort']}"
+            help_text_ssh += f"ssh {username}@{ip} -p {port['outsidePort']}"
             help_text_ssh += linesep + linesep
             help_text_ssh += f"Password for the SSH connection:" + linesep
             help_text_ssh += f"{password}"
@@ -117,7 +117,7 @@ IP address of the machine: {ip}
     return body
 
 
-def send_container_started_email(user_email, image_name, computer_ip, ports, password, non_critical_errors, end_date):
+def send_container_started_email(user_email, image_name, computer_ip, ports, password, non_critical_errors, end_date, username="user"):
     """Send an email notification when a container starts successfully.
 
     Generates connection details text and emails it to the user. Does
@@ -132,13 +132,14 @@ def send_container_started_email(user_email, image_name, computer_ip, ports, pas
         password: SSH password for the container.
         non_critical_errors: Any non-critical error messages to include.
         end_date: Datetime when the reservation ends.
+        username: Container username for SSH connection strings.
     """
     if not get_setting('email.sendEmail'):
         return
 
     body = generate_connection_text(
         image_name, computer_ip, ports, password,
-        True, non_critical_errors, end_date
+        True, non_critical_errors, end_date, username
     )
     send_email(user_email, "AI Server is ready to use!", body)
 

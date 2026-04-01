@@ -242,13 +242,16 @@
       isLoading: true,
     }),
     computed: {
+      containerUsername() {
+        return (this.details && this.details.username) || 'user'
+      },
       vscodeConnectionString() {
         if (!this.details || !this.details.sshPort) return null
-        return `user@${this.details.ip}:${this.details.sshPort}`
+        return `${this.containerUsername}@${this.details.ip}:${this.details.sshPort}`
       },
       sshCommand() {
         if (!this.details || !this.details.sshPort) return null
-        return `ssh user@${this.details.ip} -p ${this.details.sshPort}`
+        return `ssh ${this.containerUsername}@${this.details.ip} -p ${this.details.sshPort}`
       },
       formattedEndDate() {
         if (!this.details || !this.details.endDate) return null

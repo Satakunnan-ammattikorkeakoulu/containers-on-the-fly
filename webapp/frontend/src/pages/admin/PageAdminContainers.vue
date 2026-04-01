@@ -17,7 +17,13 @@
     <v-row v-if="!isFetching">
       <v-col cols="12">
         <div v-if="data && data.length > 0" style="margin-top: 50px">
-          <AdminContainersTable v-on:emitEditContainer="editContainer" v-on:emitRemoveContainer="removeContainer" v-bind:propItems="data" />
+          <AdminContainersTable
+            v-on:emitEditContainer="editContainer"
+            v-on:emitRemoveContainer="removeContainer"
+            v-on:emitRebuildContainer="rebuildContainer"
+            v-on:emitViewBuildLog="viewBuildLog"
+            v-bind:propItems="data"
+          />
         </div>
         <p v-else class="dim text-center">No containers.</p>
       </v-col>
@@ -28,6 +34,15 @@
       </v-col>
     </v-row>
     <AdminManageContainerModal @click.stop="dialog = true" v-if="selectedItem" v-on:emitModalClose="closeDialog" :propData="selectedItem" :key="dialogKey"></AdminManageContainerModal>
+
+    <!-- Build Log Dialog for rebuild from table -->
+    <AdminBuildLogDialog
+      v-if="rebuildContainerId !== null"
+      :containerId="rebuildContainerId"
+      :isOpen="rebuildContainerId !== null"
+      @emitClose="onRebuildLogClose"
+      @emitEditContainer="onBuildLogEditContainer"
+    />
   </v-container>
 </template>
 
@@ -41,6 +56,7 @@
   import Loading from '/src/components/global/Loading.vue';
   import AdminContainersTable from '/src/components/admin/AdminContainersTable.vue';
   import AdminManageContainerModal from '/src/components/admin/AdminManageContainerModal.vue';
+  import AdminBuildLogDialog from '/src/components/admin/AdminBuildLogDialog.vue';
   import { useMainStore } from '@/store/store'
 
   export default {
@@ -54,7 +70,8 @@
     components: {
     Loading,
     AdminContainersTable,
-    AdminManageContainerModal
+    AdminManageContainerModal,
+    AdminBuildLogDialog
 },
     data: () => ({
       intervalFetch: null,
@@ -65,6 +82,7 @@
       dialog: false,
       dialogKey: new Date().getTime(),
       tableName: "containers",
+      rebuildContainerId: null,
     }),
     mounted () {
       this.isFetching = true
@@ -103,7 +121,6 @@
           }
         })
         .then(function (response) {
-          //console.log(response)
             // Success
             if (response.data.status == true) {
               _this.store.showMessage({ text: "Container removed.", color: "green" })
@@ -128,6 +145,51 @@
             }
         });
       },
+      /** Trigger a rebuild of a container's Docker image. */
+      rebuildContainer(containerId) {
+        let result = window.confirm("Rebuild the Docker image for this container? This will replace the existing image in the registry.")
+        if (!result) return
+
+        let _this = this
+        let currentUser = this.store.user
+
+        axios({
+          method: "post",
+          url: this.$appSettings.APIServer.admin.rebuild_container_image,
+          params: { containerId: containerId },
+          headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            _this.store.showMessage({ text: response.data.message, color: "green" })
+            _this.rebuildContainerId = containerId;
+            _this.fetch()
+          } else {
+            _this.store.showMessage({ text: response.data.message || "Failed to queue rebuild.", color: "red" })
+          }
+        })
+        .catch(function (error) {
+          if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+            _this.store.showMessage({ text: error.response.data.detail, color: "red" })
+          } else {
+            console.log(error)
+            _this.store.showMessage({ text: "Unknown error while trying to rebuild image.", color: "red" })
+          }
+        });
+      },
+      /** Open the build log dialog for a container (without triggering a rebuild). */
+      viewBuildLog(containerId) {
+        this.rebuildContainerId = containerId;
+      },
+      onRebuildLogClose() {
+        this.rebuildContainerId = null;
+        this.fetch();
+      },
+      /** Handle edit container request from build log dialog. */
+      onBuildLogEditContainer(containerId) {
+        this.rebuildContainerId = null;
+        this.editContainer(containerId);
+      },
       closeDialog() {
         this.dialog = false;
         this.fetch();
@@ -139,11 +201,9 @@
         axios({
           method: "get",
           url: this.$appSettings.APIServer.admin.get_containers,
-          //params: { }
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
-          //console.log(response)
             // Success
             if (response.data.status == true) {
               _this.data = response.data.data[_this.tableName]

@@ -98,6 +98,15 @@ class Container(Base):
   name = Column(Text, nullable = False)
   removed = Column(Boolean, nullable = True)
   description = Column(Text, nullable = True)
+  dockerfileCommands = Column(Text, nullable = True)
+  baseImage = Column(Text, nullable = True)
+  buildStatus = Column(Text, nullable = True)  # null | pending | building | success | failed
+  buildLog = Column(LONGTEXT, nullable = True)
+  containerUsername = Column(Text, nullable = True)  # default "user"
+  passwordCommand = Column(Text, nullable = True)  # template with {username}, {password}
+  sshKeyDeployCommands = Column(Text, nullable = True)  # template with {username}, {ssh_key}
+  containerCmd = Column(Text, nullable = True)  # CMD instruction, default: ["/bin/bash","-c", "/usr/sbin/sshd -D ;"]
+  managedExternally = Column(Boolean, nullable = True)  # True = pre-built image, False = Image Builder, null = legacy (treated as True)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 

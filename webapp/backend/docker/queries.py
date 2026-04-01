@@ -6,7 +6,7 @@ computer information. Used exclusively by the daemon module.
 """
 
 from python_on_whales import docker
-from database import Session, Reservation, Computer
+from database import Session, Reservation, Computer, Container
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 import datetime
@@ -194,3 +194,42 @@ def get_running_reserved_docker_containers():
   ]
 
   return reservation_containers
+
+
+def get_containers_requiring_build():
+  """Get all container definitions that have a pending image build.
+
+  Queries for Container records where buildStatus is "pending",
+  indicating the admin has saved Dockerfile commands and the image
+  needs to be built.
+
+  Returns:
+      list: Container ORM objects that need their images built.
+  """
+  with Session() as session:
+    containers = session.execute(
+      select(Container).where(Container.buildStatus == "pending")
+    ).scalars().all()
+    return containers
+
+
+def reset_stale_building_status():
+  """Reset any containers stuck in "building" status back to "pending".
+
+  This handles the case where the daemon was restarted while a build
+  was in progress. Called once at daemon startup.
+
+  Returns:
+      int: Number of containers that were reset.
+  """
+  with Session() as session:
+    containers = session.execute(
+      select(Container).where(Container.buildStatus == "building")
+    ).scalars().all()
+    count = len(containers)
+    for container in containers:
+      container.buildStatus = "pending"
+    if count > 0:
+      session.commit()
+      print(f"[ImageBuilder] Reset {count} stale 'building' status(es) to 'pending'")
+    return count

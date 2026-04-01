@@ -104,7 +104,11 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
 
     containers = []
     for container in all_containers:
-      containers.append(orm_to_dict(container))
+      container_dict = orm_to_dict(container)
+      # Strip build-related fields not needed by regular users
+      container_dict.pop("dockerfileCommands", None)
+      container_dict.pop("buildLog", None)
+      containers.append(container_dict)
 
   # Get user's roles and their hardware limits
   user_role_limits = {}
@@ -256,7 +260,11 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
             res = orm_to_dict(reservation)
             res["computerName"] = reservation.computer.name
             res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
-            res["reservedContainer"]["container"] = orm_to_dict(reservation.reservedContainer.container)
+            container_dict = orm_to_dict(reservation.reservedContainer.container)
+            # Strip build-related fields not needed by regular users
+            container_dict.pop("dockerfileCommands", None)
+            container_dict.pop("buildLog", None)
+            res["reservedContainer"]["container"] = container_dict
             res["reservedContainer"]["reservedPorts"] = []
             res["shmSizePercent"] = reservation.reservedContainer.shmSizePercent if reservation.reservedContainer.shmSizePercent is not None else 50
             res["ramDiskSizePercent"] = reservation.reservedContainer.ramDiskSizePercent if reservation.reservedContainer.ramDiskSizePercent is not None else 0
@@ -323,6 +331,8 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
       local_port = port.containerPort.port
       ports_for_email.append({ "serviceName": service_name, "localPort": local_port, "outsidePort": outside_port })
 
+    container_username = reservation.reservedContainer.container.containerUsername or "user"
+
     # Pass a copy of ports list — generate_connection_text mutates it by removing the SSH entry
     connection_text = get_email_container_started(
       reservation.reservedContainer.container.imageName,
@@ -331,7 +341,8 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
       reservation.reservedContainer.sshPassword,
       False,
       "",
-      reservation.endDate
+      reservation.endDate,
+      container_username
       )
 
     connection_text = connection_text.replace("\n", "<br>")
@@ -362,6 +373,7 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
       "containerName": container.name,
       "containerDescription": container.description,
       "containerImage": container.imageName,
+      "username": container_username,
     }
 
   return api_response(True, "Details fetched.", { "connectionText": connection_text, "connectionDetails": connection_details } )

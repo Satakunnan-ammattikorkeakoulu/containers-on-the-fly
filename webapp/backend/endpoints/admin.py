@@ -177,6 +177,60 @@ async def remove_container(containerId : int, token: str = Depends(oauth2_scheme
   force_authentication(token, "admin")
   return functionality.remove_container(containerId)
 
+@router.get("/container_defaults")
+async def get_container_defaults(username: str = "user", token: str = Depends(oauth2_scheme)):
+  """Get default values for a new container (Dockerfile body, CMD, runtime commands).
+
+  Used by the frontend to pre-fill the container creation form and for
+  the "Reset to Defaults" button. The username parameter controls which
+  username is interpolated into the default Dockerfile body template.
+
+  Args:
+      username: Linux username to interpolate into defaults.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      API response with default Dockerfile body, CMD, password command,
+      and SSH key deploy commands.
+  """
+  force_authentication(token, "admin")
+  return functionality.get_container_defaults(username)
+
+@router.post("/rebuild_container_image")
+async def rebuild_container_image(containerId: int, token: str = Depends(oauth2_scheme)):
+  """Queue a container image rebuild.
+
+  Sets the container's buildStatus to "pending" so the Docker utility
+  daemon picks it up on its next polling cycle. Does not perform the
+  build itself — the web server has no Docker access.
+
+  Args:
+      containerId: ID of the container whose image should be rebuilt.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Success or failure API response.
+  """
+  force_authentication(token, "admin")
+  return functionality.rebuild_container_image(containerId)
+
+@router.get("/container_build_status")
+async def get_container_build_status(containerId: int, token: str = Depends(oauth2_scheme)):
+  """Get the current build status and log for a container image.
+
+  Used by the frontend to poll build progress while an image is being
+  built by the Docker utility daemon.
+
+  Args:
+      containerId: ID of the container to check.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      API response with buildStatus and buildLog.
+  """
+  force_authentication(token, "admin")
+  return functionality.get_container_build_status(containerId)
+
 @router.post("/edit_reservation")
 async def edit_reservation(reservationId : int, endDate : str, token: str = Depends(oauth2_scheme)):
   """Edit a reservation's end date.

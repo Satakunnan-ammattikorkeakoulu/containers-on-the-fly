@@ -76,7 +76,12 @@
         <v-card>
           <v-card-text>
             <div class="ssh-key-section">
-              <h3 class="subtitle-1 mb-3">SSH Public Key</h3>
+              <h3 class="subtitle-1 mb-1">SSH Public Key</h3>
+              <a class="text-caption" style="cursor: pointer; color: #2196f3;" @click="sshConfigDialog = true">
+                <v-icon size="x-small" class="mr-1">mdi-information-outline</v-icon>
+                How to configure SSH
+              </a>
+              <div class="mb-3"></div>
               <p class="text-caption mb-2">
                 Paste your SSH public key here. It will be automatically deployed to your containers on launch.
               </p>
@@ -109,6 +114,43 @@
           </v-card-text>
         </v-card>
       </v-col>
+
+      <!-- SSH Config Help Dialog -->
+      <v-dialog v-model="sshConfigDialog" max-width="600px">
+        <v-card class="pa-4">
+          <v-card-title class="text-h6">SSH Configuration Guide</v-card-title>
+          <v-card-text>
+            <p class="mb-4">Add the following to your <code>~/.ssh/config</code> file to enable key-based authentication with reservations:</p>
+
+            <div class="ssh-config-block mb-2">
+              <pre class="ssh-config-pre">Host aiserver
+    HostName SERVER_ADDRESS
+    IdentityFile ~/.ssh/id_rsa</pre>
+              <v-btn
+                icon
+                size="x-small"
+                variant="text"
+                class="copy-btn"
+                @click="copySshConfig"
+              >
+                <v-icon size="small">mdi-content-copy</v-icon>
+              </v-btn>
+            </div>
+
+            <v-alert type="info" variant="tonal" density="compact" class="mb-4">
+              <div class="mb-1"><strong>Host</strong> — a nickname you choose for this connection (e.g. "aiserver")</div>
+              <div class="mb-1"><strong>HostName</strong> — the server address, shown in your reservation connection details</div>
+              <div class="mb-1"><strong>IdentityFile</strong> — path to your private key (matches the public key you added above)</div>
+            </v-alert>
+
+
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="primary" variant="text" @click="sshConfigDialog = false">Close</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </v-row>
   </div>
 </template>
@@ -145,6 +187,7 @@ export default {
       loading: false,
       sshPublicKey: '',
       sshKeyLoading: false,
+      sshConfigDialog: false,
       userProfile: null,
       rules: {
         required: v => !!v || 'This field is required',
@@ -315,6 +358,11 @@ export default {
     async removeSshKey() {
       this.sshPublicKey = ''
       await this.updateSshKey()
+    },
+    copySshConfig() {
+      const config = `Host aiserver\n    HostName SERVER_ADDRESS\n    IdentityFile ~/.ssh/id_rsa`;
+      navigator.clipboard.writeText(config);
+      this.store.showMessage({ text: 'SSH config copied to clipboard', color: 'green' });
     }
   }
 }
@@ -323,5 +371,26 @@ export default {
 <style scoped>
 .user-info p {
   margin-bottom: 8px;
+}
+
+.ssh-config-block {
+  position: relative;
+  background: #1e1e1e;
+  border-radius: 4px;
+  padding: 16px;
+}
+
+.ssh-config-pre {
+  font-family: monospace;
+  font-size: 14px;
+  color: #fff;
+  margin: 0;
+  white-space: pre;
+}
+
+.ssh-config-block .copy-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
 }
 </style>

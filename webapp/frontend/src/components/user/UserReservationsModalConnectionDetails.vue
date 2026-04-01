@@ -60,13 +60,13 @@
             <v-alert v-if="details.hasSshPublicKey" type="info" variant="tonal" density="compact" class="mt-1" style="margin-bottom: 30px;">
               Your SSH public key has been deployed to this container. You can also connect without a password.
             </v-alert>
-            <p v-else class="text-caption text-medium-emphasis mb-2" style="margin-top: -4px;">
+            <p v-else class="text-medium-emphasis" style="margin-top: -4px; margin-bottom: 30px; font-size: 13px;">
               <v-icon size="x-small" class="mr-1">mdi-information-outline</v-icon>
               <v-tooltip location="bottom" max-width="300">
                 <template v-slot:activator="{ props }">
-                  <a v-bind="props" class="text-caption" style="cursor: pointer; color: inherit;">Enable passwordless SSH login</a>
+                  <a v-bind="props" class="text-caption" style="cursor: pointer; color: inherit;">Enable passwordless SSH login?</a>
                 </template>
-                <span>You can add your SSH public key in your profile settings to connect to containers without entering a password. The key will be automatically deployed to all future reservations.</span>
+                <span>You can add public SSH key in your user profile to connect to containers without entering a password. The key will be automatically deployed to all future reservations.</span>
               </v-tooltip>
             </p>
           </div>
@@ -157,8 +157,8 @@
               <v-expansion-panel-text>
                 <v-text-field
                   :model-value="details.ip"
-                  label="IP Address"
-                  prepend-inner-icon="mdi-ip-network"
+                  label="Server Address"
+                  prepend-inner-icon="mdi-server"
                   readonly
                   variant="outlined"
                   density="compact"

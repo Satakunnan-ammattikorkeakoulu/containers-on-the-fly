@@ -211,7 +211,9 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
         .group_by(Reservation.status)
     ).all()
     for s, c in count_rows:
-        if s in status_counts:
+        if s == "restart_error":
+            status_counts["error"] += c
+        elif s in status_counts:
             status_counts[s] = c
 
     # Active reservation count (no 90-day scope — for limit enforcement)
@@ -227,7 +229,10 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
     # Build filtered base query
     base_filtered = select(Reservation).where(Reservation.userId == userId, time_scope)
     if status_filter:
-        base_filtered = base_filtered.where(Reservation.status == status_filter)
+        if status_filter == "error":
+            base_filtered = base_filtered.where(Reservation.status.in_(["error", "restart_error"]))
+        else:
+            base_filtered = base_filtered.where(Reservation.status == status_filter)
 
     # Total count of filtered results
     total_items = get_total_count(session, base_filtered)
@@ -235,7 +240,10 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
     # Paginate IDs first (subquery pattern to avoid joinedload + LIMIT issues)
     id_stmt = select(Reservation.reservationId).where(Reservation.userId == userId, time_scope)
     if status_filter:
-        id_stmt = id_stmt.where(Reservation.status == status_filter)
+        if status_filter == "error":
+            id_stmt = id_stmt.where(Reservation.status.in_(["error", "restart_error"]))
+        else:
+            id_stmt = id_stmt.where(Reservation.status == status_filter)
     id_stmt = apply_pagination(
         id_stmt, request.sortBy, request.page,
         request.itemsPerPage, allowed_sort_keys
@@ -678,7 +686,8 @@ def cancel_reservation(userId : int, reservationId: str):
 
     now = datetime.datetime.now(datetime.timezone.utc)
     reservation.endDate = now
-    if reservation.startDate > now:
+    start_date = reservation.startDate.replace(tzinfo=datetime.timezone.utc) if reservation.startDate.tzinfo is None else reservation.startDate
+    if start_date > now:
       reservation.startDate = now
     session.commit()
 
@@ -824,7 +833,7 @@ def restart_container(userId : int, reservationId: str):
     if reservation is None:
       return api_response(False, "No reservation found.")
 
-    if (reservation.status == "started"):
+    if reservation.status in ("started", "restart_error"):
       reservation.status = "restart"
       session.commit()
       return api_response(True, "Container will be restarted.")

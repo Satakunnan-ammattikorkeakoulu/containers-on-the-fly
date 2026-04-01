@@ -88,7 +88,7 @@ def get_reservations_requiring_stop(computer_id: int):
     reservations = session.execute(
       select(Reservation).where(
         Reservation.computerId == computer_id,
-        Reservation.status.in_(["started", "reserved"]),
+        Reservation.status.in_(["started", "reserved", "restart_error"]),
         Reservation.endDate < time_now()
       )
     ).scalars().all()

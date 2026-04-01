@@ -410,7 +410,7 @@ def stop_docker_container(reservation_id: str):
       ).scalar_one_or_none()
       if reservation == None: return False
 
-      if (reservation.status == "started"):
+      if reservation.status in ("started", "restart_error"):
         stop_container(reservation.reservedContainer.containerDockerName)
       reservation.status = "stopped"
       reservation.reservedContainer.stoppedAt = time_now()
@@ -436,24 +436,32 @@ def stop_orphan_docker_container(container_name):
 def restart_docker_container(reservation_id: str):
   """Restart a Docker container and reset the reservation status to "started".
 
+  If the restart fails, sets the reservation status to "restart_error"
+  so the user can see the failure and manually retry.
+
   Args:
       reservation_id: Database ID of the reservation whose container
           should be restarted.
   """
-  try:
-    with Session() as session:
-      reservation = session.execute(
-        select(Reservation).where(Reservation.reservationId == reservation_id)
-      ).scalar_one_or_none()
-      if reservation == None: return False
+  with Session() as session:
+    reservation = session.execute(
+      select(Reservation).where(Reservation.reservationId == reservation_id)
+    ).scalar_one_or_none()
+    if reservation == None: return False
 
+    try:
       restart_container(reservation.reservedContainer.containerDockerName)
       reservation.status = "started"
       reservation.reservedContainer.containerStatus = "running"
-      session.commit()
-  except Exception as e:
-    print("Error restarting server:")
-    print(e)
+      reservation.reservedContainer.containerDockerErrorMessage = ""
+    except Exception as e:
+      print("Error restarting server:")
+      print(e)
+      reservation.status = "restart_error"
+      reservation.reservedContainer.containerStatus = "restart_error"
+      reservation.reservedContainer.containerDockerErrorMessage = f"Container failed to restart: {e}"
+
+    session.commit()
 
 
 # ---------------------------------------------------------------------------

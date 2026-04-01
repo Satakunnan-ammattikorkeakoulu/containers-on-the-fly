@@ -205,10 +205,10 @@
       statusItems() {
         const items = [
           { text: `All (${this.statusCounts.reserved + this.statusCounts.started + this.statusCounts.stopped + this.statusCounts.error || 0})`, value: 'All' },
-          { text: `reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
-          { text: `started (${this.statusCounts.started || 0})`, value: 'started' },
-          { text: `stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
-          { text: `error (${this.statusCounts.error || 0})`, value: 'error' }
+          { text: `Reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
+          { text: `Running (${this.statusCounts.started || 0})`, value: 'started' },
+          { text: `Stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
+          { text: `Error (${this.statusCounts.error || 0})`, value: 'error' }
         ];
         return items;
       }
@@ -395,6 +395,7 @@
             if (response.data.status == true) {
               _this.store.showMessage({ text: "Reservation cancelled.", color: "green" })
               _this.fetchReservations()
+              setTimeout(() => _this.fetchReservations(), 5000)
             }
             else {
               console.log("Failed removing reservation...")
@@ -438,6 +439,7 @@
             if (response.data.status == true) {
               _this.store.showMessage({ text: "Container restarted succesfully.", color: "green" })
               _this.fetchReservations()
+              setTimeout(() => _this.fetchReservations(), 5000)
             }
             else {
               console.log("Failed restarting container...")

@@ -185,7 +185,7 @@ class Reservation(Base):
   """Container reservation linking a user, container, computer, and time slot.
 
   Tracks the full lifecycle of a reservation through statuses:
-  reserved, started, stopped, error, restart.
+  reserved, started, stopped, error, restart, restart_error.
   """
   __tablename__ = "Reservation"
 
@@ -198,7 +198,7 @@ class Reservation(Base):
   description = Column(Text, nullable = True)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
-  status = Column(Text, nullable = False) # reserved, started, stopped, error, restart
+  status = Column(Text, nullable = False) # reserved, started, stopped, error, restart, restart_error
 
   user = relationship("User", back_populates = "reservations")
   reservedContainer = relationship("ReservedContainer", back_populates = "reservation")

@@ -211,7 +211,7 @@ def stop_container(container_name):
     """
     no_errors = True
     try:
-        docker.stop(container_name)
+        docker.stop(container_name, time=60)
         print(f"Stopped container {container_name}")
     except NoSuchContainer as e:
         print(f"Error stopping container: {container_name}")
@@ -238,7 +238,8 @@ def restart_container(container_name):
     print("Starting to restart a container...")
     try:
         print(f"Restarting container: {container_name}")
-        docker.restart(container_name)
+        docker.restart(container_name, time=60)
     except Exception as e:
         print(f"Could not restart container: {container_name}")
         traceback.print_exc()
+        raise

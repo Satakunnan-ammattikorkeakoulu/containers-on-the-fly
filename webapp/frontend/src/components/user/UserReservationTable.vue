@@ -13,7 +13,7 @@
       class="elevation-1">
       <!-- Status -->
       <template v-slot:item.status="{item}">
-        <v-chip :color="getStatusColor(item.status)">{{item.status}}</v-chip>
+        <v-chip :color="getStatusColor(item.status)">{{ getStatusLabel(item.status) }}</v-chip>
       </template>
       <!-- ID -->
       <template v-slot:item.reservationId="{item}">
@@ -66,11 +66,11 @@
       </template>
       <!-- Container Status -->
       <template v-slot:item.containerStatus="{item}">
-        {{ item.status == "error" && item.reservedContainer.containerDockerErrorMessage ? getText(item.reservedContainer.containerDockerErrorMessage) : item.reservedContainer.containerStatus }}
+        {{ (item.status == "error" || item.status == "restart_error") && item.reservedContainer.containerDockerErrorMessage ? getText(item.reservedContainer.containerDockerErrorMessage) : '' }}
       </template>
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
-        <v-menu v-if="item.status === 'reserved' || item.status === 'started'">
+        <v-menu v-if="item.status === 'reserved' || item.status === 'started' || item.status === 'restart_error'">
           <template v-slot:activator="{ props }">
             <a class="actions-link" v-bind="props">
               Actions <v-icon size="small">mdi-chevron-down</v-icon>
@@ -89,7 +89,7 @@
               <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
               <v-list-item-title>Edit Description</v-list-item-title>
             </v-list-item>
-            <v-list-item v-if="item.status === 'started'" @click="emitRestartContainer(item.reservationId)">
+            <v-list-item v-if="item.status === 'started' || item.status === 'restart_error'" @click="emitRestartContainer(item.reservationId)">
               <template v-slot:prepend><v-icon size="small">mdi-restart</v-icon></template>
               <v-list-item-title>Restart Container</v-list-item-title>
             </v-list-item>
@@ -214,10 +214,22 @@
       emitEditDescription(reservationId, currentDescription) {
         this.$emit('emitEditDescription', reservationId, currentDescription)
       },
+      getStatusLabel(status) {
+        const labels = {
+          "reserved": "Reserved",
+          "started": "Running",
+          "stopped": "Stopped",
+          "error": "Startup Error",
+          "restart_error": "Error Restarting",
+          "restart": "Restarting",
+        }
+        return labels[status] || status
+      },
       getStatusColor(status) {
         if (status == "reserved") return "primary"
         else if (status == "started") return "green"
         else if (status == "stopped") return "red"
+        else if (status == "restart_error") return "orange"
       },
       parseTime(timestamp) {
         return DisplayTime(timestamp)

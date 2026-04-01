@@ -96,7 +96,9 @@ def get_reservations(request: AdminReservationRequest) -> object:
         .group_by(Reservation.status)
     ).all()
     for s, c in count_rows:
-        if s in status_counts:
+        if s == "restart_error":
+            status_counts["error"] += c
+        elif s in status_counts:
             status_counts[s] = c
 
     # Time-based stats (unfiltered, 90-day scoped)
@@ -130,7 +132,10 @@ def get_reservations(request: AdminReservationRequest) -> object:
     # Need join to User for userEmail sorting — always join since it's lightweight
     base_filtered = base_filtered.join(User, Reservation.userId == User.userId)
     if status_filter:
-        base_filtered = base_filtered.where(Reservation.status == status_filter)
+        if status_filter == "error":
+            base_filtered = base_filtered.where(Reservation.status.in_(["error", "restart_error"]))
+        else:
+            base_filtered = base_filtered.where(Reservation.status == status_filter)
     if reservation_id_filter:
         base_filtered = base_filtered.where(
             cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")
@@ -144,7 +149,10 @@ def get_reservations(request: AdminReservationRequest) -> object:
     id_stmt = select(Reservation.reservationId).where(time_scope)\
         .join(User, Reservation.userId == User.userId)
     if status_filter:
-        id_stmt = id_stmt.where(Reservation.status == status_filter)
+        if status_filter == "error":
+            id_stmt = id_stmt.where(Reservation.status.in_(["error", "restart_error"]))
+        else:
+            id_stmt = id_stmt.where(Reservation.status == status_filter)
     if reservation_id_filter:
         id_stmt = id_stmt.where(
             cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")

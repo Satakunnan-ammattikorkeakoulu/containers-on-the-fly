@@ -26,7 +26,7 @@ from docker.queries import (
     get_container_information, get_computer_id, get_running_reserved_docker_containers,
     get_containers_requiring_build, reset_stale_building_status
 )
-from docker.image_builder import build_and_push_image
+from docker.image_builder import build_and_push_image, update_all_image_sizes
 
 # Runs the script forever
 run: bool = True
@@ -474,6 +474,9 @@ def run():
 
   # Reset any image builds that were interrupted by a previous shutdown
   reset_stale_building_status()
+
+  # Update image sizes for all containers on startup
+  update_all_image_sizes()
 
   main()
 

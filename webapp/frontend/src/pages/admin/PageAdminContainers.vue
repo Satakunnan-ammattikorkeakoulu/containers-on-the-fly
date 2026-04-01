@@ -17,12 +17,24 @@
     <v-row v-if="!isFetching">
       <v-col cols="12">
         <div v-if="data && data.length > 0" style="margin-top: 50px">
+          <v-row justify="center" class="mb-4">
+            <v-col cols="12" sm="4" md="3">
+              <v-select
+                v-model="visibilityFilter"
+                :items="visibilityOptions"
+                item-title="text"
+                item-value="value"
+                label="Visibility"
+                hide-details
+              ></v-select>
+            </v-col>
+          </v-row>
           <AdminContainersTable
             v-on:emitEditContainer="editContainer"
             v-on:emitRemoveContainer="removeContainer"
             v-on:emitRebuildContainer="rebuildContainer"
             v-on:emitViewBuildLog="viewBuildLog"
-            v-bind:propItems="data"
+            v-bind:propItems="filteredData"
           />
         </div>
         <p v-else class="dim text-center">No containers.</p>
@@ -77,6 +89,7 @@
       intervalFetch: null,
       isFetching: false,
       data: [],
+      visibilityFilter: 'all',
       isCreatingNew: false,
       selectedItem: undefined,
       dialog: false,
@@ -84,6 +97,26 @@
       tableName: "containers",
       rebuildContainerId: null,
     }),
+    computed: {
+      visibilityOptions() {
+        return [
+          { text: `All (${this.data.length})`, value: 'all' },
+          { text: `Public (${this.publicCount})`, value: 'public' },
+          { text: `Private (${this.privateCount})`, value: 'private' },
+        ];
+      },
+      filteredData() {
+        if (this.visibilityFilter === 'public') return this.data.filter(c => c.public);
+        if (this.visibilityFilter === 'private') return this.data.filter(c => !c.public);
+        return this.data;
+      },
+      publicCount() {
+        return this.data.filter(c => c.public).length;
+      },
+      privateCount() {
+        return this.data.filter(c => !c.public).length;
+      },
+    },
     mounted () {
       this.isFetching = true
       this.fetch()

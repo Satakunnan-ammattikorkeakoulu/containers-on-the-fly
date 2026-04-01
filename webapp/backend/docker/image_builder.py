@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import traceback
+from datetime import datetime, timezone
 from python_on_whales import docker
 from database import Session, Container
 from sqlalchemy import select
@@ -203,6 +204,15 @@ def build_and_push_image(container_id):
 
         build_log_lines.append("=== Push complete. Image built and pushed successfully.")
 
+        # Get image size
+        image_size = None
+        try:
+            inspected = docker.image.inspect(full_tag)
+            image_size = inspected.size
+            build_log_lines.append(f"=== Image size: {_format_size(image_size)}")
+        except Exception:
+            pass
+
         # Mark success
         with Session() as session:
             container = session.execute(
@@ -211,6 +221,8 @@ def build_and_push_image(container_id):
             if container:
                 container.buildStatus = "success"
                 container.buildLog = "\n".join(build_log_lines)
+                container.imageSize = image_size
+                container.lastBuiltAt = datetime.now(timezone.utc)
                 session.commit()
 
         print(f"[ImageBuilder] Successfully built and pushed {full_tag}")
@@ -263,3 +275,62 @@ def _update_build_log(container_id, log_text):
                 session.commit()
     except Exception:
         pass  # Non-critical — log update failures shouldn't break the build
+
+
+def _format_size(size_bytes):
+    """Format byte size to human-readable string.
+
+    Args:
+        size_bytes: Size in bytes.
+
+    Returns:
+        str: Formatted size (e.g. "705.5 MB", "1.2 GB").
+    """
+    if size_bytes is None:
+        return "Unknown"
+    for unit in ["B", "KB", "MB", "GB"]:
+        if abs(size_bytes) < 1024:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.1f} TB"
+
+
+def update_all_image_sizes():
+    """Update image sizes for all containers by checking locally available Docker images.
+
+    Lists all Docker images on this host and matches them against container
+    definitions in the database by image name. Updates the imageSize column
+    for any container whose image is found locally. Called once on daemon startup.
+    """
+    try:
+        registry_address = settings_handler.get_setting("docker.registryAddress")
+        images = docker.image.list()
+
+        # Build a map of image tag -> size
+        tag_size_map = {}
+        for img in images:
+            for tag in img.repo_tags:
+                tag_size_map[tag] = img.size
+
+        with Session() as session:
+            containers = session.execute(
+                select(Container).where(Container.removed.isnot(True))
+            ).scalars().all()
+
+            updated = 0
+            for container in containers:
+                full_tag = f"{registry_address}/{container.imageName}:latest"
+                size = tag_size_map.get(full_tag)
+                if size is not None and size != container.imageSize:
+                    container.imageSize = size
+                    updated += 1
+                elif size is None and container.imageSize is not None:
+                    container.imageSize = None
+                    updated += 1
+
+            if updated > 0:
+                session.commit()
+                print(f"[ImageBuilder] Updated image sizes for {updated} container(s)")
+
+    except Exception as e:
+        print(f"[ImageBuilder] Failed to update image sizes: {e}")

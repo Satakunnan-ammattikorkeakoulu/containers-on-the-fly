@@ -21,6 +21,10 @@ export default createVuetify({
       variant: 'outlined',
       persistentHint: true,
     },
+    VSelect: {
+      variant: 'outlined',
+      persistentHint: true,
+    },
     VSwitch: {
       persistentHint: true,
     },

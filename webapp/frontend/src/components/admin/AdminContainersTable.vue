@@ -1,88 +1,102 @@
 <template>
   <div>
-    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Expand Issues" : "Collapse Issues" }}</a>
     <v-data-table
       :headers="table.headers"
       :items="data"
       :sort-by="[{key: 'containerId', order: 'desc'}]"
       class="elevation-1">
 
-      <!-- Public status with colored labels -->
-      <template v-slot:item.public="{item}">
-        <v-chip
-          :color="item.public ? 'green' : 'orange'"
-          text-color="white"
-          size="small"
-        >
-          {{ item.public ? 'Public' : 'Private' }}
-        </v-chip>
+      <!-- Name with tooltip showing details -->
+      <template v-slot:item.name="{item}">
+        <v-tooltip bottom>
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">
+              <v-chip
+                :color="item.public ? 'green' : 'orange'"
+                text-color="white"
+                size="x-small"
+                class="mr-2"
+              >
+                {{ item.public ? 'Public' : 'Private' }}
+              </v-chip><span class="name-link">{{ item.name }}</span>
+            </span>
+          </template>
+          <div style="max-width: 350px;">
+            <div><strong>ID:</strong> {{ item.containerId }}</div>
+            <div><strong>Image:</strong> {{ item.imageName }}</div>
+            <div><strong>Username:</strong> {{ item.containerUsername || 'user' }}</div>
+            <div v-if="item.imageSize"><strong>Size:</strong> {{ formatSize(item.imageSize) }}</div>
+            <div v-if="item.lastBuiltAt"><strong>Last Built:</strong> {{ parseTime(item.lastBuiltAt) }}</div>
+            <div><strong>Created:</strong> {{ item.createdAt ? parseTime(item.createdAt) : '—' }}</div>
+            <div v-if="item.updatedAt"><strong>Updated:</strong> {{ parseTime(item.updatedAt) }}</div>
+            <div v-if="item.description" class="mt-1"><strong>Description:</strong> {{ item.description }}</div>
+          </div>
+        </v-tooltip>
       </template>
 
-      <!-- Username -->
-      <template v-slot:item.containerUsername="{item}">
-        {{ item.containerUsername || 'user' }}
+      <!-- Image name -->
+      <template v-slot:item.imageName="{item}">
+        <span style="font-family: monospace; font-size: 12px;">{{ item.imageName }}</span>
       </template>
 
-      <!-- Build Status -->
+      <!-- Status -->
       <template v-slot:item.buildStatus="{item}">
-        <v-chip
-          v-if="!item.dockerfileCommands"
-          color="grey"
-          text-color="white"
-          size="small"
-        >
-          Externally Managed
-        </v-chip>
-        <v-chip
-          v-else-if="item.buildStatus === 'success'"
-          color="green"
-          text-color="white"
-          size="small"
-        >
-          Built
-        </v-chip>
-        <v-chip
-          v-else-if="item.buildStatus === 'building'"
-          color="orange"
-          text-color="white"
-          size="small"
-        >
-          <v-progress-circular indeterminate size="12" width="2" class="mr-1"></v-progress-circular>
-          Building...
-        </v-chip>
-        <v-chip
-          v-else-if="item.buildStatus === 'pending'"
-          color="yellow"
-          size="small"
-        >
-          Queued
-        </v-chip>
-        <v-chip
-          v-else-if="item.buildStatus === 'failed'"
-          color="red"
-          text-color="white"
-          size="small"
-        >
-          Failed
-        </v-chip>
-        <v-chip
-          v-else
-          color="grey"
-          text-color="white"
-          size="small"
-        >
-          Not Built
-        </v-chip>
+        <div>
+          <v-chip
+            v-if="!item.dockerfileCommands"
+            color="grey"
+            text-color="white"
+            size="small"
+          >
+            Externally Managed
+          </v-chip>
+          <v-chip
+            v-else-if="item.buildStatus === 'success'"
+            color="green"
+            text-color="white"
+            size="small"
+          >
+            Build Success
+          </v-chip>
+          <v-chip
+            v-else-if="item.buildStatus === 'building'"
+            color="orange"
+            text-color="white"
+            size="small"
+          >
+            <v-progress-circular indeterminate size="12" width="2" class="mr-1"></v-progress-circular>
+            Building...
+          </v-chip>
+          <v-chip
+            v-else-if="item.buildStatus === 'pending'"
+            color="yellow"
+            size="small"
+          >
+            Build Queued
+          </v-chip>
+          <v-chip
+            v-else-if="item.buildStatus === 'failed'"
+            color="red"
+            text-color="white"
+            size="small"
+          >
+            Build Failed
+          </v-chip>
+          <v-chip
+            v-else
+            color="grey"
+            text-color="white"
+            size="small"
+          >
+            Not Built
+          </v-chip>
+        </div>
       </template>
 
-      <!-- Created At -->
-      <template v-slot:item.createdAt="{item}">
-        {{ item.createdAt ? parseTime(item.createdAt) : '' }}
-      </template>
-
-      <!-- Updated At -->
-      <template v-slot:item.updatedAt="{item}">
-        {{ item.updatedAt ? parseTime(item.updatedAt) : '' }}
+      <!-- Size -->
+      <template v-slot:item.imageSize="{item}">
+        <span v-if="item.imageSize" style="white-space: nowrap;">{{ formatSize(item.imageSize) }}</span>
+        <span v-else class="text-muted">-</span>
       </template>
 
       <!-- Actions -->
@@ -120,10 +134,9 @@
 
 <script>
   /**
-   * Displays a sortable data table of all container images (Docker image definitions).
-   * Shows container ID, public/private visibility, name, image name, build status,
-   * description, and timestamps. Actions menu allows editing, rebuilding, or removing
-   * a container image. Used in PageAdminContainers.
+   * Displays a sortable data table of all container images.
+   * Shows name (with tooltip for details), image name, build status with size,
+   * and actions. Hover over the name to see ID, username, description, dates, etc.
    */
   import { DisplayTime } from '/src/helpers/time.js'
 
@@ -137,19 +150,12 @@
     },
     data: () => ({
       data: [],
-      readAll: false,
-      hasLongItems: false,
       table: {
         headers: [
-          { title: 'Container ID', key: 'containerId' },
-          { title: 'Public', key: 'public' },
           { title: 'Name', key: 'name' },
-          { title: 'Image name', key: 'imageName' },
-          { title: 'Username', key: 'containerUsername' },
-          { title: 'Build Status', key: 'buildStatus', sortable: false },
-          { title: 'Description', key: 'description' },
-          { title: 'Created At', key: 'createdAt' },
-          { title: 'Updated At', key: 'updatedAt' },
+          { title: 'Image', key: 'imageName' },
+          { title: 'Status', key: 'buildStatus', sortable: false },
+          { title: 'Size', key: 'imageSize', sortable: true },
           { title: '', key: 'actions', sortable: false },
         ],
       }
@@ -170,18 +176,20 @@
       emitViewBuildLog(containerId) {
         this.$emit('emitViewBuildLog', containerId)
       },
-      toggleReadAll() {
-        this.readAll = !this.readAll;
-      },
-      getText(text) {
-        if (this.readAll) return text;
-        else {
-          if (!this.hasLongItems) this.hasLongItems = true;
-          return text.slice(0,10) + "...";
-        }
-      },
       parseTime(timestamp) {
         return DisplayTime(timestamp)
+      },
+      /** Format byte size to human-readable string. */
+      formatSize(bytes) {
+        if (!bytes) return '—';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let size = bytes;
+        let unitIndex = 0;
+        while (size >= 1024 && unitIndex < units.length - 1) {
+          size /= 1024;
+          unitIndex++;
+        }
+        return `${size.toFixed(1)} ${units[unitIndex]}`;
       },
     },
     watch: {
@@ -211,11 +219,11 @@
     color: #ef5350;
   }
 
-  .link-toggle-read-all {
-    margin-bottom: 20px;
-    font-size: 14px;
-    display: inline-block;
-    padding-left: 15px;
-    width: auto;
+  .name-link {
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
   }
 </style>

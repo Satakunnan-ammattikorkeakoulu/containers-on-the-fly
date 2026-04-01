@@ -266,11 +266,13 @@
                 </v-col>
               </v-col>
 
-              <v-row v-for="spec in hardwareDataNoGPUs()" :key="spec.hardwareSpecId" class="spec-row">
-                <v-col cols="12">
-                  <h3>{{ spec.type }}</h3>
-                </v-col>
-                <v-col cols="10" md="6" style="margin: 0 auto; padding: 0 30px;">
+              <v-row>
+                <v-col cols="12" md="6" v-for="spec in hardwareDataNoGPUs()" :key="spec.hardwareSpecId" style="padding: 0 60px;">
+                  <h3 class="text-center">
+                    <v-icon v-if="spec.type.toLowerCase() === 'cpus'" class="mr-1" size="small">mdi-cpu-64-bit</v-icon>
+                    <v-icon v-else-if="spec.type.toLowerCase() === 'ram'" class="mr-1" size="small">mdi-memory</v-icon>
+                    {{ spec.type }}
+                  </h3>
                   <v-slider :min="spec.minimumAmount" show-ticks="always" v-model="selectedHardwareSpecs[spec.hardwareSpecId]" :max="spec.maximumAmountForUser" thumb-label="always" :step="1">
                     <template v-slot:thumb-label="{ modelValue }">
                       {{ (modelValue ?? 0) + " " + spec.format }}
@@ -283,109 +285,82 @@
 
           <!-- Advanced Settings -->
           <v-col cols="12" v-if="computer && hardwareData" style="margin-top: 30px;">
-            <v-expansion-panels v-model="advancedSettingsPanel">
-              <v-expansion-panel>
-                <v-expansion-panel-title style="background-color: #303030;">
-                  <div style="width: 100%; text-align: center;">
-                    <h2 style="margin: 0;">Advanced Settings</h2>
-                  </div>
-                </v-expansion-panel-title>
-                <v-expansion-panel-text>
-                  <!-- Admin extra task: reserve for another user -->
-                  <v-row v-if="isAdmin()" style="margin-top: 20px;">
-                    <v-col cols="12">
-                      <h3>Reserve for another user</h3>
-                      <v-row>
-                        <v-col cols="6" style="margin: 0 auto">
-                          <p><span style="color: gray; font-size: 15px;">Admin only!</span> Write email address of another user, or leave empty to reserve for yourself.</p>
-                          <v-text-field v-model="adminReserveUserEmail" label="" placeholder="Email"></v-text-field>
-                        </v-col>
-                      </v-row>
-                    </v-col>
-                  </v-row>
+            <div class="text-center">
+              <h3 style="margin-bottom: 8px;">Advanced Settings</h3>
+              <a style="cursor: pointer; color: #2196f3; font-size: 14px;" @click="showAdvancedSettings = !showAdvancedSettings">
+                {{ showAdvancedSettings ? 'Hide Advanced Settings' : 'Show Advanced Settings' }}
+              </a>
+            </div>
 
-                  <!-- Reservation Description -->
-                  <v-row style="margin-top: 20px;">
-                    <v-col cols="12">
-                      <h3>Reservation Description</h3>
-                      <v-row>
-                        <v-col cols="6" style="margin: 0 auto">
-                          <p style="color: gray; font-size: 15px; margin-bottom: 0px;">Optional description for your reservation.</p>
-                          <p style="color: gray; font-size: 15px;">(max 50 characters)</p>
-                          <v-text-field 
-                            v-model="reservationDescription" 
-                            label="Description (optional)"
-                            placeholder="Enter description..."
-                            counter="50"
-                            :rules="[rules.maxLength50]"
-                            maxlength="50">
-                          </v-text-field>
-                        </v-col>
-                      </v-row>
-                    </v-col>
-                  </v-row>
+            <div v-if="showAdvancedSettings" style="margin-top: 25px;">
+              <!-- Admin reserve + Description side by side -->
+              <v-row style="margin-bottom: 20px;">
+                <v-col cols="12" :md="isAdmin() ? 6 : 6" :style="isAdmin() ? 'padding: 0 40px;' : 'margin: 0 auto; padding: 0 40px;'" v-if="isAdmin()">
+                  <h3 class="text-center">Reserve for another user</h3>
+                  <p class="text-center"><span style="color: gray; font-size: 15px;">Admin only!</span> Write email address of another user, or leave empty to reserve for yourself.</p>
+                  <v-text-field v-model="adminReserveUserEmail" label="" placeholder="Email"></v-text-field>
+                </v-col>
+                <v-col cols="12" :md="isAdmin() ? 6 : 6" :style="isAdmin() ? 'padding: 0 40px;' : 'margin: 0 auto; padding: 0 40px;'">
+                  <h3 class="text-center">Reservation Description</h3>
+                  <p class="text-center" style="color: gray; font-size: 15px;">Optional description for your reservation. (max 50 characters)</p>
+                  <v-text-field
+                    v-model="reservationDescription"
+                    label="Description (optional)"
+                    placeholder="Enter description..."
+                    counter="50"
+                    :rules="[rules.maxLength50]"
+                    maxlength="50">
+                  </v-text-field>
+                </v-col>
+              </v-row>
 
-                  <!-- SHM Size Configuration -->
-                  <v-row style="margin-top: 20px;">
-                    <v-col cols="12">
-                      <h3>Shared Memory (SHM) Size</h3>
-                      <v-row>
-                        <v-col cols="6" style="margin: 0 auto">
-                          <p style="color: gray; font-size: 15px;">Shared memory for inter-process communication. Required for applications like PyTorch, databases, and parallel computing. Default: 50%</p>
-                          <v-slider
-                            v-model="shmSizePercent"
-                            :min="10"
-                            :max="90"
-                            show-ticks="always"
-                            thumb-label="always"
-                            :step="5"
->
-                            <template v-slot:thumb-label="{ modelValue }">
-                              {{ modelValue }}%
-                            </template>
-                          </v-slider>
-                          <p style="text-align: center; margin-top: 10px;">
-                            SHM Size: {{ shmSizePercent }}% of allocated memory
-                            <span v-if="selectedHardwareSpecs && getMemorySpecId()">
-                              (≈ {{ calculateShmSizeGB() }} GB)
-                            </span>
-                          </p>
-                        </v-col>
-                      </v-row>
-                    </v-col>
-                  </v-row>
+              <!-- SHM + RAM Disk side by side -->
+              <v-row>
+                <v-col cols="12" md="6" style="padding: 0 60px;">
+                  <h3 class="text-center">Shared Memory (SHM) Size</h3>
+                  <p style="color: gray; font-size: 15px;">Shared memory for inter-process communication. Required for applications like PyTorch, databases, and parallel computing. Default: 50%</p>
+                  <v-slider
+                    v-model="shmSizePercent"
+                    :min="10"
+                    :max="90"
+                    show-ticks="always"
+                    thumb-label="always"
+                    :step="5">
+                    <template v-slot:thumb-label="{ modelValue }">
+                      {{ modelValue }}%
+                    </template>
+                  </v-slider>
+                  <p style="text-align: center; margin-top: 10px;">
+                    SHM Size: {{ shmSizePercent }}% of allocated memory
+                    <span v-if="selectedHardwareSpecs && getMemorySpecId()">
+                      (≈ {{ calculateShmSizeGB() }} GB)
+                    </span>
+                  </p>
+                </v-col>
 
-                  <!-- RAM Disk Size Configuration -->
-                  <v-row style="margin-top: 20px;">
-                    <v-col cols="12">
-                      <h3>RAM Disk Size</h3>
-                      <v-row>
-                        <v-col cols="6" style="margin: 0 auto">
-                          <p style="color: gray; font-size: 15px;">Mounts a high-speed RAM-based folder to your home directory. Ideal for caching, temp files, and I/O intensive operations. Default: 0%</p>
-                          <v-slider
-                            v-model="ramDiskSizePercent"
-                            :min="0"
-                            :max="60"
-                            show-ticks="always"
-                            thumb-label="always"
-                            :step="5">
-                            <template v-slot:thumb-label="{ modelValue }">
-                              {{ modelValue }}%
-                            </template>
-                          </v-slider>
-                          <p style="text-align: center; margin-top: 10px;">
-                            RAM Disk Size: {{ ramDiskSizePercent }}% of allocated memory
-                            <span v-if="selectedHardwareSpecs && getMemorySpecId()">
-                              (≈ {{ calculateRamDiskSizeGB() }} GB)
-                            </span>
-                          </p>
-                        </v-col>
-                      </v-row>
-                    </v-col>
-                  </v-row>
-                </v-expansion-panel-text>
-              </v-expansion-panel>
-            </v-expansion-panels>
+                <v-col cols="12" md="6" style="padding: 0 60px;">
+                  <h3 class="text-center">RAM Disk Size</h3>
+                  <p style="color: gray; font-size: 15px;">Mounts a high-speed RAM-based folder to your home directory. Ideal for caching, temp files, and I/O intensive operations. Default: 0%</p>
+                  <v-slider
+                    v-model="ramDiskSizePercent"
+                    :min="0"
+                    :max="60"
+                    show-ticks="always"
+                    thumb-label="always"
+                    :step="5">
+                    <template v-slot:thumb-label="{ modelValue }">
+                      {{ modelValue }}%
+                    </template>
+                  </v-slider>
+                  <p style="text-align: center; margin-top: 10px;">
+                    RAM Disk Size: {{ ramDiskSizePercent }}% of allocated memory
+                    <span v-if="selectedHardwareSpecs && getMemorySpecId()">
+                      (≈ {{ calculateRamDiskSizeGB() }} GB)
+                    </span>
+                  </p>
+                </v-col>
+              </v-row>
+            </div>
           </v-col>
 
         </v-row>
@@ -401,7 +376,7 @@
         </v-row>
 
         <!-- Create reservation button -->
-        <v-row v-if="computer && hardwareData">
+        <v-row v-if="computer && hardwareData" style="margin-top: 40px;">
           <v-col cols="12">
             <v-btn color="primary" @click="submitReservation" :disabled="isSubmittingReservation">Create Reservation</v-btn>
           </v-col>
@@ -518,7 +493,7 @@
       selectedgpus: [], // Contains a list of all selected gpus
       hardwareData: null, // Contains hardware data for the currently selected computer
       selectedHardwareSpecs: {}, // Selected hardware specs for the current computer
-      advancedSettingsPanel: [], // Collapsed by default
+      showAdvancedSettings: false,
       isSubmittingReservation: false, // Set to true when user is submitting the reservation
       rules: {
         maxLength50: value => !value || value.length <= 50 || "Description must be 50 characters or less"
@@ -1289,7 +1264,8 @@
   }
 
   .selected-card {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    border: 2px solid #2196f3 !important;
+    box-shadow: 0 0 12px rgba(33, 150, 243, 0.3) !important;
     transform: translateY(-2px);
     transition: all 0.3s ease;
   }

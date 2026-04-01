@@ -385,8 +385,48 @@ def save_container(containerEdit : ContainerEdit) -> object:
         saved_container_id = container.containerId
   return api_response(True, "Container saved successfully", {"containerId": saved_container_id})
 
+def get_container_remove_info(container_id: int) -> object:
+  """Get information for the container removal confirmation dialog.
+
+  Returns active reservation count, image management mode, and image name
+  so the frontend can show an informative confirmation dialog.
+
+  Args:
+      container_id: Database ID of the container to check.
+
+  Returns:
+      Response with activeReservations, managedExternally, and imageName.
+  """
+  with Session() as session:
+    container = session.execute(
+      select(Container).where(Container.containerId == container_id)
+    ).scalar_one_or_none()
+    if container is None:
+      return api_response(False, "Container not found.")
+
+    # Count active reservations (reserved or started) using this container
+    from database import Reservation, ReservedContainer
+    active_count = session.execute(
+      select(func.count()).select_from(Reservation).join(
+        ReservedContainer, Reservation.reservedContainerId == ReservedContainer.reservedContainerId
+      ).where(
+        ReservedContainer.containerId == container_id,
+        Reservation.status.in_(["reserved", "started"])
+      )
+    ).scalar() or 0
+
+    return api_response(True, "Remove info fetched.", {
+      "activeReservations": active_count,
+      "managedExternally": container.managedExternally if container.managedExternally is not None else True,
+      "imageName": container.imageName,
+    })
+
 def remove_container(containerId : int) -> object:
   """Soft-delete a container by marking it as removed and non-public.
+
+  For containers managed by the Image Builder, queues the Docker image
+  for removal by setting buildStatus to "removing". The daemon will
+  clean up the image on its next polling cycle.
 
   Args:
       containerId: The ID of the container to remove.
@@ -402,6 +442,9 @@ def remove_container(containerId : int) -> object:
     else:
       container.removed = True
       container.public = False
+      # Queue image removal for non-externally managed containers
+      if container.managedExternally == False:
+        container.buildStatus = "removing"
       session.commit()
 
   return api_response(True, "Container removed successfully")

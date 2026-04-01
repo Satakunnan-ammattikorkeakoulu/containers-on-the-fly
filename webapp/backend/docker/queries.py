@@ -213,6 +213,23 @@ def get_containers_requiring_build():
     return containers
 
 
+def get_containers_requiring_image_removal():
+  """Get all container definitions that need their Docker image removed.
+
+  Queries for Container records where buildStatus is "removing",
+  indicating the admin removed the container and the image should
+  be cleaned up from Docker.
+
+  Returns:
+      list: Container ORM objects that need their images removed.
+  """
+  with Session() as session:
+    containers = session.execute(
+      select(Container).where(Container.buildStatus == "removing")
+    ).scalars().all()
+    return containers
+
+
 def reset_stale_building_status():
   """Reset any containers stuck in "building" status back to "pending".
 

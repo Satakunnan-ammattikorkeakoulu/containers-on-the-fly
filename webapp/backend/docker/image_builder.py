@@ -319,6 +319,46 @@ def _format_duration(delta):
     return f"{seconds}s"
 
 
+def remove_image(container_id):
+    """Remove a Docker image for a container that has been deleted.
+
+    Removes the image from the local Docker daemon and updates the
+    container's buildStatus to "removed" in the database.
+
+    Args:
+        container_id: Database ID of the Container whose image to remove.
+
+    Returns:
+        bool: True if the image was removed (or didn't exist), False on error.
+    """
+    try:
+        with Session() as session:
+            container = session.execute(
+                select(Container).where(Container.containerId == container_id)
+            ).scalar_one_or_none()
+            if container is None:
+                return False
+
+            image_name = container.imageName
+            registry_address = settings_handler.get_setting("docker.registryAddress")
+            full_tag = f"{registry_address}/{image_name}:latest"
+
+            try:
+                docker.image.remove(full_tag, force=True)
+                print(f"[ImageBuilder] Removed Docker image {full_tag}")
+            except Exception as e:
+                print(f"[ImageBuilder] Image {full_tag} not found locally, skipping removal: {e}")
+
+            container.buildStatus = "removed"
+            container.imageSize = None
+            session.commit()
+            return True
+
+    except Exception as e:
+        print(f"[ImageBuilder] Failed to remove image for container {container_id}: {e}")
+        return False
+
+
 def update_all_image_sizes():
     """Update image sizes for all containers by checking locally available Docker images.
 

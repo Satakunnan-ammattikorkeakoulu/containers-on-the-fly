@@ -66,6 +66,7 @@ function createUrls(baseAddress) {
     URLS.admin.save_role_hardware_limits = baseAdminUrl + "save_role_hardware_limits"
     URLS.admin.get_role_reservation_limits = baseAdminUrl + "role_reservation_limits"
     URLS.admin.save_role_reservation_limits = baseAdminUrl + "save_role_reservation_limits"
+    URLS.admin.container_remove_info = baseAdminUrl + "container_remove_info"
     URLS.admin.rebuild_container_image = baseAdminUrl + "rebuild_container_image"
     URLS.admin.container_build_status = baseAdminUrl + "container_build_status"
     URLS.admin.container_defaults = baseAdminUrl + "container_defaults"

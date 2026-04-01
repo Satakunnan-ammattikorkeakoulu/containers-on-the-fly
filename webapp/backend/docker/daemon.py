@@ -24,9 +24,9 @@ from docker.queries import (
     get_reservations_requiring_start, get_running_reservations,
     get_reservations_requiring_stop, get_reservations_requiring_restart,
     get_container_information, get_computer_id, get_running_reserved_docker_containers,
-    get_containers_requiring_build, reset_stale_building_status
+    get_containers_requiring_build, get_containers_requiring_image_removal, reset_stale_building_status
 )
-from docker.image_builder import build_and_push_image, update_all_image_sizes
+from docker.image_builder import build_and_push_image, remove_image, update_all_image_sizes
 
 # Runs the script forever
 run: bool = True
@@ -62,6 +62,7 @@ def main():
       restart_crashed_servers()
       restart_servers_requiring_restart()
       process_image_builds()
+      process_image_removals()
 
       # Update monitoring data every 3rd iteration (every 30 seconds)
       if i % 3 == 0:
@@ -154,6 +155,21 @@ def process_image_builds():
       build_and_push_image(container.containerId)
     except Exception as e:
       print(f"Error building image for container {container.containerId}:")
+      print(e)
+
+def process_image_removals():
+  """Remove Docker images for containers that have been deleted by admins.
+
+  Queries for containers with buildStatus "removing" and removes their
+  Docker images one at a time.
+  """
+  containers = get_containers_requiring_image_removal()
+  for container in containers:
+    print(time_now(), f": Removing image for deleted container {container.containerId} ({container.imageName})")
+    try:
+      remove_image(container.containerId)
+    except Exception as e:
+      print(f"Error removing image for container {container.containerId}:")
       print(e)
 
 def stop_orphan_container_reservations():

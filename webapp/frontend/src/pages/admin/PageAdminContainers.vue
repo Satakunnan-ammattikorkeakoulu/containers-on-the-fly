@@ -47,6 +47,38 @@
     </v-row>
     <AdminManageContainerModal @click.stop="dialog = true" v-if="selectedItem" v-on:emitModalClose="closeDialog" :propData="selectedItem" :key="dialogKey"></AdminManageContainerModal>
 
+    <!-- Remove Container Confirmation Dialog -->
+    <v-dialog v-model="removeDialog.show" max-width="550px">
+      <v-card class="pa-4">
+        <v-card-title>Remove Container</v-card-title>
+        <v-card-text>
+          <p class="mb-3">Are you sure you want to remove <strong>{{ removeDialog.imageName }}</strong>?</p>
+
+          <v-alert v-if="removeDialog.activeReservations > 0" type="warning" variant="tonal" density="compact" class="mb-3">
+            There {{ removeDialog.activeReservations === 1 ? 'is' : 'are' }} <strong>{{ removeDialog.activeReservations }}</strong> active reservation{{ removeDialog.activeReservations !== 1 ? 's' : '' }} currently using this container.
+            The container will be hidden from new reservations, but existing reservations will continue until they end.
+          </v-alert>
+          <v-alert v-else type="success" variant="tonal" density="compact" class="mb-3">
+            No active reservations are using this container. It is safe to remove.
+          </v-alert>
+
+          <p v-if="!removeDialog.managedExternally" class="mb-2">
+            The Docker image <strong>{{ removeDialog.imageName }}</strong> will be removed from the container server automatically.
+          </p>
+          <p v-else class="mb-2">
+            This is an externally managed image. The Docker image will <strong>not</strong> be removed — you need to clean it up manually if desired.
+          </p>
+
+          <p class="text-muted">The container will be marked as removed in the database and will no longer be visible to users.</p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="removeDialog.show = false">Cancel</v-btn>
+          <v-btn color="red" variant="text" @click="confirmRemoveContainer">Remove</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Build Log Dialog for rebuild from table -->
     <AdminBuildLogDialog
       v-if="rebuildContainerId !== null"
@@ -96,6 +128,13 @@
       dialogKey: new Date().getTime(),
       tableName: "containers",
       rebuildContainerId: null,
+      removeDialog: {
+        show: false,
+        containerId: null,
+        imageName: '',
+        activeReservations: 0,
+        managedExternally: true,
+      },
     }),
     computed: {
       visibilityOptions() {
@@ -135,47 +174,61 @@
         this.selectedItem = containerId;
         this.dialog = true;
       },
+      /** Fetch removal info and show the confirmation dialog. */
       removeContainer(containerId) {
-        let result = window.confirm("Do you really want to remove the container? It will be marked as removed in the database and as not public anymore.")
-        if (!result) return
-        let params = {
-          "containerId": containerId,
-        }
+        let _this = this;
+        let currentUser = this.store.user;
 
-        let _this = this
-        let currentUser = this.store.user
+        axios({
+          method: "get",
+          url: this.$appSettings.APIServer.admin.container_remove_info,
+          params: { containerId: containerId },
+          headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            _this.removeDialog.containerId = containerId;
+            _this.removeDialog.imageName = response.data.data.imageName;
+            _this.removeDialog.activeReservations = response.data.data.activeReservations;
+            _this.removeDialog.managedExternally = response.data.data.managedExternally;
+            _this.removeDialog.show = true;
+          } else {
+            _this.store.showMessage({ text: response.data.message || "Error fetching container info.", color: "red" })
+          }
+        })
+        .catch(function (error) {
+          console.log(error);
+          _this.store.showMessage({ text: "Error fetching container info.", color: "red" })
+        });
+      },
+      /** Confirm and execute the container removal. */
+      confirmRemoveContainer() {
+        let _this = this;
+        let currentUser = this.store.user;
 
         axios({
           method: "post",
           url: this.$appSettings.APIServer.admin.remove_container,
-          params: params,
-          headers: {
-            "Authorization" : `Bearer ${currentUser.loginToken}`
-          }
+          params: { containerId: this.removeDialog.containerId },
+          headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
         })
         .then(function (response) {
-            // Success
-            if (response.data.status == true) {
-              _this.store.showMessage({ text: "Container removed.", color: "green" })
-              _this.fetch()
-            }
-            // Fail
-            else {
-              console.log("Failed removing container...")
-              console.log(response)
-              let msg = response && response.data && response.data.message ? response.data.message : "There was an error removing the container."
-              _this.store.showMessage({ text: msg, color: "red" })
-            }
+          if (response.data.status == true) {
+            _this.store.showMessage({ text: "Container removed.", color: "green" })
+            _this.fetch()
+          } else {
+            _this.store.showMessage({ text: response.data.message || "Error removing container.", color: "red" })
+          }
+          _this.removeDialog.show = false;
         })
         .catch(function (error) {
-            // Error
-            if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
-            }
-            else {
-              console.log(error)
-              _this.store.showMessage({ text: "Unknown error.", color: "red" })
-            }
+          if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+            _this.store.showMessage({ text: error.response.data.detail, color: "red" })
+          } else {
+            console.log(error)
+            _this.store.showMessage({ text: "Unknown error.", color: "red" })
+          }
+          _this.removeDialog.show = false;
         });
       },
       /** Trigger a rebuild of a container's Docker image. */

@@ -163,6 +163,24 @@ async def save_container(containerEdit : ContainerEdit, token: str = Depends(oau
   force_authentication(token, "admin")
   return functionality.save_container(containerEdit)
 
+@router.get("/container_remove_info")
+async def get_container_remove_info(containerId: int, token: str = Depends(oauth2_scheme)):
+  """Get information needed for the container removal confirmation dialog.
+
+  Returns the number of active reservations using this container,
+  whether the image is managed externally, and the image name.
+
+  Args:
+      containerId: ID of the container to check.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      API response with activeReservations count, managedExternally flag,
+      and imageName.
+  """
+  force_authentication(token, "admin")
+  return functionality.get_container_remove_info(containerId)
+
 @router.post("/remove_container")
 async def remove_container(containerId : int, token: str = Depends(oauth2_scheme)):
   """Remove a container definition by ID.

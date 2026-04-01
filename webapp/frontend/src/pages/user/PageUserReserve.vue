@@ -243,7 +243,7 @@
 
           <v-row v-if="computer && hardwareData">
             <v-col cols="12">
-              <h2 style="margin-top: 15px;">Select Hardware</h2>
+              <h2 id="select-hardware-section" style="margin-top: 15px;">Select Hardware</h2>
 
               <v-col cols="12">
                 <h3 class="text-center">
@@ -260,15 +260,15 @@
                   <v-col
                     v-for="gpu in hardwareDataOnlyGPUs()"
                     :key="gpu.value"
-                    cols="6"
-                    sm="4"
-                    md="3"
+                    cols="4"
+                    sm="3"
+                    md="2"
                   >
                     <v-card
                       :class="{ 'selected-card': selectedgpus.includes(gpu.value) }"
                       @click="toggleGpu(gpu.value)"
                       hover
-                      style="cursor: pointer; min-height: 120px;"
+                      style="cursor: pointer; min-height: 90px;"
                       :outlined="!selectedgpus.includes(gpu.value)"
                     >
                       <v-card-text style="height: 100%;">
@@ -287,8 +287,8 @@
                 </v-row>
               </v-col>
 
-              <v-row>
-                <v-col cols="12" md="6" v-for="spec in hardwareDataNoGPUs()" :key="spec.hardwareSpecId" style="padding: 0 60px;">
+              <v-row v-for="spec in hardwareDataNoGPUs()" :key="spec.hardwareSpecId" justify="center">
+                <v-col cols="12" md="6" style="padding: 0 60px;">
                   <h3 class="text-center">
                     <v-icon v-if="spec.type.toLowerCase() === 'cpus'" class="mr-1" size="small">mdi-cpu-64-bit</v-icon>
                     <v-icon v-else-if="spec.type.toLowerCase() === 'ram'" class="mr-1" size="small">mdi-memory</v-icon>
@@ -770,6 +770,20 @@
 
         // Set default values for selected GPUs
         this.selectedgpus = []
+
+        // Auto-scroll to the "Select Hardware" section
+        try {
+          this.$nextTick(() => {
+            setTimeout(() => {
+              const element = document.getElementById('select-hardware-section');
+              if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }
+            }, 100);
+          });
+        } catch (error) {
+          console.debug('Auto-scroll error:', error);
+        }
       },
       /**
        * Toggles the reservation calendar.

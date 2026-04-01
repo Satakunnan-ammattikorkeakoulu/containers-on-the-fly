@@ -10,7 +10,7 @@ This is **Containers on the Fly** - a web-based Docker container reservation pla
 
 The application follows a multi-component architecture:
 
-- **Frontend**: Vue.js 2 + Vuetify UI framework (`webapp/frontend/`)
+- **Frontend**: Vue.js 3 + Vuetify 4 + Pinia (`webapp/frontend/`)
 - **Backend**: Python 3 + FastAPI + SQLAlchemy ORM (`webapp/backend/`)
 - **Database**: MariaDB with Alembic migrations
 - **Container Management**: Docker + custom Python utility (`docker_utility.py`)

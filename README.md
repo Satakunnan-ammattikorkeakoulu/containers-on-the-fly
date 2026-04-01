@@ -1,6 +1,8 @@
 # Containers on the Fly
 > Instant Up. Timely Down. Simple web-based Docker container reservation platform.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 <img width="200" alt="image 7" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/logo_medium.png">
 
 ## Description
@@ -37,6 +39,7 @@ This project has been featured in the following academic publications:
 </a>
 
 # Table of Contents
+   * [Prerequisites](#prerequisites)
    * [Getting Started](#getting-started)
       * [Installing Main Server](#installing-main-server)
          * [Updating Settings](#updating-settings)
@@ -46,9 +49,12 @@ This project has been featured in the following academic publications:
          * [Updating the Software](#updating-the-software-1)
       * [Automatic Installation: Main Server](#automatic-installation-main-server)
          * [Open Ports](#open-ports)
+         * [Install Required APT Packages](#install-required-apt-packages)
          * [Setup the Main Server](#setup-the-main-server)
          * [Start the Main Server](#start-the-main-server)
       * [Automatic Installation: Container Server](#automatic-installation-container-server)
+         * [Open Ports](#open-ports-1)
+         * [Install Required APT Packages](#install-required-apt-packages-1)
          * [Setup the Docker Utility](#setup-the-docker-utility)
          * [Start Docker Utility](#start-docker-utility)
             * [Start the Servers](#start-the-servers)
@@ -59,6 +65,14 @@ This project has been featured in the following academic publications:
    * [Technical Details](#technical-details)
       * [Frontend](#frontend)
       * [Backend](#backend)
+   * [Contributing](#contributing)
+   * [License](#license)
+
+## Prerequisites
+
+- **OS**: Ubuntu 24.04 (mandatory for automated installation)
+- **User**: A non-root user with sudo permissions
+- **APT packages**: `make`, `lsb-release`, `python3`, `python3-pip`, `python3-venv`, `software-properties-common`
 
 ## Getting Started
 
@@ -265,50 +279,26 @@ And that's it. Now you should be able to reserve the container!
 
 If you wish to use LDAP for the login, then configure the LDAP in the ``user_config/settings`` file. Example settings are commented in the file.
 
-## Commit Message Format
-
-Format all commit messages using conventional commits: `type(scope): description`
-
-**Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`
-
-**Rules**:
-- Write subjects in imperative mood ("Add", "Fix", "Update")
-- Keep messages short — focus on the main changes, not every detail
-- No marketing text ("improved UX", "for better maintainability")
-- No preamble ("This commit introduces...")
-- If there are multiple major changes across areas, group with headers
-
-**Example**:
-```
-Frontend
-feat(teachers): Add new page for teachers to manage their games
-chore(nav): Update the header to include a new link for the games
-
-Backend
-feat(teachers): Add a new route for teacher to fetch game statistics
-fix: Fix group removal logic to not break on empty usernames
-```
-
 ## Testing
 
 The project includes automated tests across four layers:
 
 ```bash
-make test-all              # Run backend + frontend tests (131 tests)
-make test-backend          # 100 pytest tests (unit + integration)
-make test-frontend         # 31 vitest tests (unit + component)
+make test-all              # Run backend + frontend tests
+make test-backend          # pytest (unit + integration)
+make test-frontend         # vitest (unit + component)
 make test-e2e              # Playwright E2E tests (requires running app)
 make test-api              # Bruno CLI API tests (requires running app)
 ```
 
-| Layer | Framework | Count | What it covers |
-|-------|-----------|-------|----------------|
-| Backend unit | pytest | 55 | Password hashing, tokens, settings validation, email, helpers |
-| Backend integration | pytest + FastAPI TestClient | 45 | API endpoints (login, reservations, admin CRUD, roles) |
-| Frontend unit | vitest | 26 | Pinia store, time helpers, URL builder |
-| Frontend component | vitest + vue-test-utils | 5 | Loading, Snackbar components |
-| E2E | Playwright | 17 specs | Login flows, reservations, admin pages, navigation guards |
-| API | Bruno CLI | 56 .bru files | Manual API tests, now CLI-runnable |
+| Layer | Framework | What it covers |
+|-------|-----------|----------------|
+| Backend unit | pytest | Password hashing, tokens, settings validation, email, helpers |
+| Backend integration | pytest + FastAPI TestClient | API endpoints (login, reservations, admin CRUD, roles) |
+| Frontend unit | vitest | Pinia store, time helpers, URL builder |
+| Frontend component | vitest + vue-test-utils | Loading, Snackbar components |
+| E2E | Playwright | Login flows, reservations, admin pages, navigation guards |
+| API | Bruno CLI | Manual API tests, now CLI-runnable |
 
 ### Installing Test Dependencies
 
@@ -350,49 +340,25 @@ The app is split into two projects: frontend and backend. The frontend can be lo
 
 ### Frontend
 
-The frontend has been developed using Vue 2.
+- **Vue 3** with **Vuetify 4** component framework
+- **Pinia** for state management
+- **Vite** build tooling
+- **Day.js** for date/time handling
 
 ### Backend
 
-The backend has been developed using Python 3, SQLAlchemy and FastAPI.
+- **Python 3** with **FastAPI** web framework
+- **SQLAlchemy 2** ORM with **Alembic** migrations
+- **MariaDB** database
+- **Caddy** reverse proxy with automatic HTTPS via Let's Encrypt
+- **pm2** process management
 
 The backend also includes a tool called `docker_utility.py` that handles starting and stopping the reserved containers.
 
-### Documentation Standards
+## Contributing
 
-**Python Backend** uses Google-style docstrings:
+See [CONTRIBUTING.md](CONTRIBUTING.md) for commit message format and documentation standards.
 
-```python
-def reserve_container(user_id, container_id, hours):
-    """Reserve a container for the specified user.
+## License
 
-    Args:
-        user_id: The ID of the user making the reservation.
-        container_id: The target container's database ID.
-        hours: Duration of the reservation in hours.
-
-    Returns:
-        Response with the created reservation details.
-
-    Raises:
-        HTTPException: If the container is already reserved.
-    """
-```
-
-- All functions have docstrings describing purpose, parameters, and return values
-- Module-level docstrings describe each file's purpose
-- Pydantic models have field descriptions for complex types
-
-**Vue Frontend:**
-- Component files have a comment block at the top of `<script>` explaining the component's purpose
-- Complex computed properties and methods have brief JSDoc-style comments
-
-**JavaScript Utilities** use JSDoc-style comments:
-
-```js
-/**
- * Convert a UTC timestamp to the user's local timezone.
- * @param {string} timestamp - ISO 8601 timestamp
- * @returns {string} Formatted local time string
- */
-```
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

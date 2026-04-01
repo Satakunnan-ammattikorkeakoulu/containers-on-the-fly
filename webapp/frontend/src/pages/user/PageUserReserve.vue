@@ -246,24 +246,45 @@
               <h2 style="margin-top: 15px;">Select Hardware</h2>
 
               <v-col cols="12">
-                <h3>GPUs</h3>
-                <v-col cols="12" style="margin: 0 auto">
-                  <div style="margin-bottom: 30px;" v-if="hardwareDataOnlyGPUs().length === 0" class="text-center text--secondary">
-                    No GPUs Available
-                  </div>
-                  <div v-else class="d-flex flex-wrap" style="margin-bottom: 30px; justify-content: center;">
-                    <v-checkbox
-                      v-for="gpu in hardwareDataOnlyGPUs()"
-                      :key="gpu.value"
-                      :value="gpu.value"
-                      v-model="selectedgpus"
-                      :label="gpu.text"
-                      @change="gpuLimit"
-                      class="mr-4 mb-2"
-                      hide-details
-                    ></v-checkbox>
-                  </div>
-                </v-col>
+                <h3 class="text-center">
+                  <v-icon class="mr-1" size="small">mdi-expansion-card</v-icon>
+                  GPUs
+                </h3>
+                <p class="text-center text-medium-emphasis" style="font-size: 13px; margin-bottom: 5px;">
+                  {{ hardwareDataOnlyGPUs().length }} available — select up to {{ getMaxGpus() }}
+                </p>
+                <div style="margin-bottom: 30px; margin-top: 15px;" v-if="hardwareDataOnlyGPUs().length === 0" class="text-center text-medium-emphasis">
+                  No GPUs Available
+                </div>
+                <v-row v-else justify="center" style="margin-top: 15px; margin-bottom: 20px;">
+                  <v-col
+                    v-for="gpu in hardwareDataOnlyGPUs()"
+                    :key="gpu.value"
+                    cols="6"
+                    sm="4"
+                    md="3"
+                  >
+                    <v-card
+                      :class="{ 'selected-card': selectedgpus.includes(gpu.value) }"
+                      @click="toggleGpu(gpu.value)"
+                      hover
+                      style="cursor: pointer; min-height: 120px;"
+                      :outlined="!selectedgpus.includes(gpu.value)"
+                    >
+                      <v-card-text style="height: 100%;">
+                        <div class="d-flex flex-column align-center justify-center h-100 text-center" style="padding: 10px;">
+                          <v-icon
+                            size="28"
+                            class="mb-2"
+                            :color="selectedgpus.includes(gpu.value) ? 'primary' : 'grey'"
+                          >mdi-expansion-card</v-icon>
+                          <div class="font-weight-medium" style="font-size: 14px;">{{ gpu.text.split(': ').slice(1).join(': ') || gpu.text }}</div>
+                          <div class="text-medium-emphasis" style="font-size: 12px;">GPU {{ gpu.text.split(':')[0] }}</div>
+                        </div>
+                      </v-card-text>
+                    </v-card>
+                  </v-col>
+                </v-row>
               </v-col>
 
               <v-row>
@@ -271,11 +292,25 @@
                   <h3 class="text-center">
                     <v-icon v-if="spec.type.toLowerCase() === 'cpus'" class="mr-1" size="small">mdi-cpu-64-bit</v-icon>
                     <v-icon v-else-if="spec.type.toLowerCase() === 'ram'" class="mr-1" size="small">mdi-memory</v-icon>
-                    {{ spec.type }}
+                    {{ formatSpecType(spec.type) }}
                   </h3>
-                  <v-slider :min="spec.minimumAmount" show-ticks="always" v-model="selectedHardwareSpecs[spec.hardwareSpecId]" :max="spec.maximumAmountForUser" thumb-label="always" :step="1">
+                  <p class="text-center text-medium-emphasis" style="font-size: 13px; margin-bottom: 15px;">
+                    <span v-if="spec.type.toLowerCase() === 'cpus'">Number of CPU cores to dedicate</span>
+                    <span v-else-if="spec.type.toLowerCase() === 'ram'">Amount of RAM to allocate</span>
+                    <span v-else>Amount to allocate</span>
+                  </p>
+                  <v-slider
+                    :min="spec.minimumAmount"
+                    show-ticks="always"
+                    v-model="selectedHardwareSpecs[spec.hardwareSpecId]"
+                    :max="spec.maximumAmountForUser"
+                    thumb-label="always"
+                    :step="1"
+                    color="primary"
+                    track-color="grey-darken-2"
+                  >
                     <template v-slot:thumb-label="{ modelValue }">
-                      {{ (modelValue ?? 0) + " " + spec.format }}
+                      <span style="font-size: 15px;">{{ (modelValue ?? 0) }} / {{ spec.maximumAmountForUser }} {{ spec.format }}</span>
                     </template>
                   </v-slider>
                 </v-col>
@@ -327,7 +362,7 @@
                     thumb-label="always"
                     :step="5">
                     <template v-slot:thumb-label="{ modelValue }">
-                      {{ modelValue }}%
+                      <span style="font-size: 15px;">{{ modelValue }}%</span>
                     </template>
                   </v-slider>
                   <p style="text-align: center; margin-top: 10px;">
@@ -349,7 +384,7 @@
                     thumb-label="always"
                     :step="5">
                     <template v-slot:thumb-label="{ modelValue }">
-                      {{ modelValue }}%
+                      <span style="font-size: 15px;">{{ modelValue }}%</span>
                     </template>
                   </v-slider>
                   <p style="text-align: center; margin-top: 10px;">
@@ -567,6 +602,27 @@
       /**
        * Limits the amount of selected GPUs to the maximum amount allowed.
        */
+      /** Get the maximum number of GPUs the user can select. */
+      getMaxGpus() {
+        if (this.isAdmin()) return this.hardwareDataOnlyGPUs().length;
+        let max = 1;
+        this.hardwareData.forEach((spec) => {
+          if (spec.type === "gpus" && spec.maximumAmountForUser) {
+            max = spec.maximumAmountForUser;
+          }
+        });
+        return max;
+      },
+      /** Toggle GPU selection by clicking its card. */
+      toggleGpu(gpuValue) {
+        let index = this.selectedgpus.indexOf(gpuValue);
+        if (index > -1) {
+          this.selectedgpus.splice(index, 1);
+        } else {
+          this.selectedgpus.push(gpuValue);
+        }
+        this.gpuLimit();
+      },
       gpuLimit() {
         // Allow admins to select unlimited GPUs
         if (this.isAdmin()) {
@@ -599,6 +655,11 @@
        * Returns a list of all hardware specs except GPUs in the hardware data.
        * @returns {Array} Array of all hardware specs except GPUs
       */
+      /** Format hardware spec type for display (e.g. "cpus" → "CPUs", "ram" → "RAM"). */
+      formatSpecType(type) {
+        const labels = { 'cpus': 'CPUs', 'ram': 'RAM', 'cpu': 'CPU' };
+        return labels[type.toLowerCase()] || type;
+      },
       hardwareDataNoGPUs() {
         let data = []
         this.hardwareData.forEach((spec) => {

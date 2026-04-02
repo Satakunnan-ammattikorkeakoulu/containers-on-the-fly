@@ -1,7 +1,8 @@
 """Response handlers for user authentication and profile endpoints.
 
 Provides login (password, LDAP, and hybrid authentication), token validation,
-password management, profile retrieval, and SSH key management for users.
+password management, profile retrieval, SSH key management, and container
+lifecycle script path management for users.
 """
 
 from database import User, Session, UserWhitelist, UserBlacklist
@@ -12,6 +13,7 @@ from fastapi import HTTPException, status
 from datetime import datetime, timezone
 from sqlalchemy import select
 import base64
+import re
 
 def login(username, password):
   """Authenticate a user using the configured authentication method.
@@ -183,6 +185,8 @@ def profile(token):
       user_details["createdAt"] = user.userCreatedAt
       user_details["role"] = get_role(user.email)
       user_details["sshPublicKey"] = user.sshPublicKey
+      user_details["startScriptPath"] = user.startScriptPath
+      user_details["stopScriptPath"] = user.stopScriptPath
       return api_response(True, "User details found", { "user": user_details })
 
 def has_password(token):
@@ -283,3 +287,62 @@ def update_ssh_key(token, ssh_public_key):
 
     session.commit()
     return api_response(True, "SSH public key updated successfully.")
+
+SCRIPT_PATH_REGEX = re.compile(r'^/[a-zA-Z0-9._/\-]+$')
+
+def validate_script_path(path):
+  """Validate a container script path.
+
+  Args:
+      path: The script path string to validate.
+
+  Returns:
+      str or None: Error message if invalid, None if valid.
+  """
+  if len(path) > 500:
+    return "Script path must be 500 characters or less."
+  if not SCRIPT_PATH_REGEX.match(path):
+    return "Script path must be an absolute path starting with / and contain only alphanumeric characters, dots, underscores, slashes, and hyphens."
+  return None
+
+def update_script_paths(token, start_script_path, stop_script_path):
+  """Update or remove the authenticated user's container lifecycle script paths.
+
+  Validates that each path is an absolute path with safe characters.
+  Pass None or empty string to remove a script path.
+
+  Args:
+      token: The user's login token.
+      start_script_path: Absolute path to a start script inside the container,
+          or None/empty to remove.
+      stop_script_path: Absolute path to a stop script inside the container,
+          or None/empty to remove.
+
+  Returns:
+      Response indicating success or failure with an appropriate message.
+  """
+  with Session() as session:
+    user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
+    if user is None:
+      return api_response(False, "User not found.")
+
+    if start_script_path and start_script_path.strip():
+      start_script_path = start_script_path.strip()
+      error = validate_script_path(start_script_path)
+      if error:
+        return api_response(False, f"Start script path: {error}")
+      user.startScriptPath = start_script_path
+    else:
+      user.startScriptPath = None
+
+    if stop_script_path and stop_script_path.strip():
+      stop_script_path = stop_script_path.strip()
+      error = validate_script_path(stop_script_path)
+      if error:
+        return api_response(False, f"Stop script path: {error}")
+      user.stopScriptPath = stop_script_path
+    else:
+      user.stopScriptPath = None
+
+    session.commit()
+    return api_response(True, "Script paths updated successfully.")

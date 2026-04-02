@@ -413,6 +413,30 @@
                   </p>
                 </v-col>
               </v-row>
+
+              <!-- Start/Stop Script Paths -->
+              <v-row style="margin-top: 20px;">
+                <v-col cols="12" md="6" style="padding: 0 60px;">
+                  <h3 class="text-center">Start Script Path</h3>
+                  <p style="color: gray; font-size: 15px;">Absolute path to a script inside the container to run on start. Pre-filled from your profile.</p>
+                  <v-text-field
+                    v-model="reservationStartScriptPath"
+                    label="Start Script (optional)"
+                    placeholder=""
+                    :rules="[rules.scriptPath]"
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="12" md="6" style="padding: 0 60px;">
+                  <h3 class="text-center">Stop Script Path</h3>
+                  <p style="color: gray; font-size: 15px;">Absolute path to a script inside the container to run before stop. Pre-filled from your profile.</p>
+                  <v-text-field
+                    v-model="reservationStopScriptPath"
+                    label="Stop Script (optional)"
+                    placeholder=""
+                    :rules="[rules.scriptPath]"
+                  ></v-text-field>
+                </v-col>
+              </v-row>
             </div>
           </v-col>
 
@@ -548,9 +572,12 @@
       hardwareData: null, // Contains hardware data for the currently selected computer
       selectedHardwareSpecs: {}, // Selected hardware specs for the current computer
       showAdvancedSettings: false,
+      reservationStartScriptPath: '', // Start script path override for this reservation
+      reservationStopScriptPath: '', // Stop script path override for this reservation
       isSubmittingReservation: false, // Set to true when user is submitting the reservation
       rules: {
-        maxLength50: value => !value || value.length <= 50 || "Description must be 50 characters or less"
+        maxLength50: value => !value || value.length <= 50 || "Description must be 50 characters or less",
+        scriptPath: v => !v || !v.trim() || v.trim().startsWith('/') || 'Must be an absolute path (starting with /)'
       }
     }),
     mounted() {
@@ -571,6 +598,9 @@
       this.pickedHour = d.getHours() < 10 ? "0"+d.getHours() : d.getHours.toString()
 
       this.fetchReservations()
+      // Pre-fill script paths from user profile (synced via store)
+      this.reservationStartScriptPath = this.store.user.startScriptPath || ''
+      this.reservationStopScriptPath = this.store.user.stopScriptPath || ''
     },
     methods: {
       /**
@@ -954,7 +984,9 @@
           "description": this.reservationDescription && this.reservationDescription.trim() ? this.reservationDescription.trim() : "",
           "shmSizePercent": this.shmSizePercent,
           "ramDiskSizePercent": this.ramDiskSizePercent,
-          "isLowPriority": this.isLowPriority
+          "isLowPriority": this.isLowPriority,
+          "startScriptPath": this.reservationStartScriptPath && this.reservationStartScriptPath.trim() ? this.reservationStartScriptPath.trim() : "",
+          "stopScriptPath": this.reservationStopScriptPath && this.reservationStopScriptPath.trim() ? this.reservationStopScriptPath.trim() : ""
         }
 
         axios({

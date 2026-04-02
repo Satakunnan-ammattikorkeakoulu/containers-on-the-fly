@@ -8,6 +8,7 @@ business logic to ``endpoints.responses.reservation``.
 from fastapi import APIRouter, Depends
 from helpers.server import api_response, force_authentication
 from helpers.auth import check_token, is_admin, get_authenticated_user_id
+from endpoints.responses.user import validate_script_path
 from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import reservation as functionality
 from endpoints.models.reservation import ReservationFilters, UserReservationRequest
@@ -97,12 +98,12 @@ async def get_own_reservation_details(reservationId: int, token: str = Depends(o
   return functionality.get_own_reservation_details(reservationId, userId)
 
 @router.post("/create_reservation")
-async def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, token: str = Depends(oauth2_scheme)):
+async def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, startScriptPath: str = "", stopScriptPath: str = "", token: str = Depends(oauth2_scheme)):
   """Create a new container reservation after validating all inputs.
 
   Validates date, duration, IDs, email format, description length,
-  SHM/RAM-disk percentages, and hardware specs JSON before delegating
-  to the business logic layer.
+  SHM/RAM-disk percentages, script paths, and hardware specs JSON
+  before delegating to the business logic layer.
 
   Args:
       date: Desired start date/time string (max 50 chars).
@@ -116,6 +117,10 @@ async def create_reservation(date: str, duration: int, computerId: int, containe
       shmSizePercent: Shared memory size as a percentage of RAM (0 -- 90).
       ramDiskSizePercent: RAM disk size as a percentage of RAM (0 -- 60).
       isLowPriority: Whether this is a low-priority reservation (default False).
+      startScriptPath: Absolute path to a start script inside the container
+          (optional, overrides user profile default).
+      stopScriptPath: Absolute path to a stop script inside the container
+          (optional, overrides user profile default).
       token: OAuth2 bearer token (injected by Depends).
 
   Returns:
@@ -163,6 +168,21 @@ async def create_reservation(date: str, duration: int, computerId: int, containe
   if not isinstance(ramDiskSizePercent, int) or ramDiskSizePercent < 0 or ramDiskSizePercent > 60:
     return api_response(False, "RAM disk size percentage must be between 0 and 60.")
 
+  # Validate script paths
+  if startScriptPath:
+    startScriptPath = str(startScriptPath).strip()
+    if startScriptPath:
+      error = validate_script_path(startScriptPath)
+      if error:
+        return api_response(False, f"Start script path: {error}")
+
+  if stopScriptPath:
+    stopScriptPath = str(stopScriptPath).strip()
+    if stopScriptPath:
+      error = validate_script_path(stopScriptPath)
+      if error:
+        return api_response(False, f"Stop script path: {error}")
+
   # Validate hardwareSpecs JSON
   try:
     hardwareSpecs = json.loads(hardwareSpecs)
@@ -179,7 +199,7 @@ async def create_reservation(date: str, duration: int, computerId: int, containe
     return api_response(False, "Invalid hardware specs JSON format.")
 
   userId = get_authenticated_user_id(token)
-  return functionality.create_reservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description, shmSizePercent, ramDiskSizePercent, isLowPriority)
+  return functionality.create_reservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description, shmSizePercent, ramDiskSizePercent, isLowPriority, startScriptPath, stopScriptPath)
 
 @router.get("/get_current_reservations")
 async def get_current_reservations(token: str = Depends(oauth2_scheme)):

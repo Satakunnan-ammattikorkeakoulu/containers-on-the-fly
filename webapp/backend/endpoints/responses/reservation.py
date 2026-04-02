@@ -435,7 +435,7 @@ def get_current_reservations() -> object:
 
   return api_response(True, "Current reservations fetched.", { "reservations": reservations })
 
-def create_reservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False):
+def create_reservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, startScriptPath: str = "", stopScriptPath: str = ""):
   """Create a new container reservation with hardware resource allocation.
 
   Validates all inputs including duration limits, resource availability,
@@ -459,6 +459,10 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
           RAM (0-60, default 0).
       isLowPriority: Whether this is a low-priority reservation that
           can be paused when normal reservations need resources.
+      startScriptPath: Absolute path to a start script inside the
+          container (overrides user profile default if set).
+      stopScriptPath: Absolute path to a stop script inside the
+          container (overrides user profile default if set).
 
   Returns:
       Response indicating success with informByEmail flag, or an error
@@ -655,6 +659,8 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       containerId = containerId,
       shmSizePercent = shmSizePercent,
       ramDiskSizePercent = ramDiskSizePercent,
+      startScriptPath = startScriptPath or None,
+      stopScriptPath = stopScriptPath or None,
     )
     #print(orm_to_dict(reservation))
     #print(orm_to_dict(reservation.reservedContainer))

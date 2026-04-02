@@ -6,7 +6,7 @@ not from sub-modules. This facade provides a stable public API.
 """
 
 # Container lifecycle operations
-from docker.containers import start_container, stop_container, restart_container
+from docker.containers import start_container, stop_container, restart_container, run_stop_script
 
 # Connection details / email text generation
 from docker.notifications import generate_connection_text

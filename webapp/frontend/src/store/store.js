@@ -36,7 +36,9 @@ export const useMainStore = defineStore('main', {
         minDuration: 1,
         maxDuration: 48,
         maxActiveReservations: 1
-      }
+      },
+      startScriptPath: "",
+      stopScriptPath: ""
     },
     // App configuration from backend
     appConfig: {
@@ -197,6 +199,8 @@ export const useMainStore = defineStore('main', {
             if (response.data.data.reservationLimits) {
               _this.user.reservationLimits = response.data.data.reservationLimits
             }
+            _this.user.startScriptPath = response.data.data.startScriptPath || ""
+            _this.user.stopScriptPath = response.data.data.stopScriptPath || ""
             localStorage.setItem("user", JSON.stringify(_this.user))
             if (_this.initializing) _this.initializing = false
             return payload.callback({ success: true, message: "Login token OK!" });

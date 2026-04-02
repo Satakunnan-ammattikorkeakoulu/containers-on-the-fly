@@ -163,3 +163,11 @@ a,
 .v-alert__prepend {
   display: none;
 }
+
+.v-card-text {
+  padding: 1.5rem;
+}
+
+.v-input.v-input--horizontal.v-input--indent-details {
+  margin-top: 10px;
+}

@@ -9,6 +9,7 @@ from helpers.auth import create_password
 from settings_handler import settings_handler
 from python_on_whales.exceptions import NoSuchContainer
 import traceback
+import shlex
 from logger import log
 from docker.mounts import build_volume_list, run_user_config_script
 from docker.image_builder import DEFAULT_PASSWORD_COMMAND, DEFAULT_SSH_KEY_DEPLOY_COMMANDS
@@ -198,6 +199,19 @@ def start_container(pars):
 
     non_critical_errors = run_user_config_script(pars["roleMounts"], computer_id, user_email, user_id, container_name)
 
+    # Execute user's start script if configured (non-critical)
+    start_script = pars.get("startScriptPath")
+    if start_script:
+        try:
+            log.info(f"Running start script '{start_script}' in container {container_name}")
+            docker.execute(
+                container=container_name,
+                command=["/bin/bash", "-c", f"timeout 40 {shlex.quote(start_script)}"],
+                user=pars.get("username", "user")
+            )
+        except Exception as e:
+            log.warning(f"Non-critical error running start script in container {container_name}: {e}")
+
     return True, container_name, pars["password"], "", non_critical_errors, cont.id
 
 def stop_container(container_name):
@@ -227,6 +241,29 @@ def stop_container(container_name):
         no_errors = False
 
     return no_errors
+
+def run_stop_script(container_name, stop_script_path, container_username="user"):
+    """Execute a stop script inside a running container before stopping it.
+
+    Non-critical — logs a warning on failure but does not raise. The script
+    runs with a 40-second timeout to prevent blocking container shutdown.
+
+    Args:
+        container_name: Name of the running Docker container.
+        stop_script_path: Absolute path to the stop script inside the container.
+        container_username: Username to run the script as (default "user").
+    """
+    if not stop_script_path:
+        return
+    try:
+        log.info(f"Running stop script '{stop_script_path}' in container {container_name}")
+        docker.execute(
+            container=container_name,
+            command=["/bin/bash", "-c", f"timeout 40 {shlex.quote(stop_script_path)}"],
+            user=container_username
+        )
+    except Exception as e:
+        log.warning(f"Non-critical error running stop script in container {container_name}: {e}")
 
 def restart_container(container_name):
     """Restart a Docker container by name.

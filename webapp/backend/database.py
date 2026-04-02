@@ -41,6 +41,8 @@ class User(Base):
   userCreatedAt = Column(DateTime(timezone=True), server_default=func.now())
   userUpdatedAt = Column(DateTime(timezone=True), onupdate=func.now())
   sshPublicKey = Column(Text, nullable = True)
+  startScriptPath = Column(Text, nullable = True)
+  stopScriptPath = Column(Text, nullable = True)
 
   roles = relationship("Role", secondary = "UserRole", back_populates = "users", single_parent=True)
   reservations = relationship("Reservation", back_populates = "user")
@@ -155,6 +157,8 @@ class ReservedContainer(Base):
   containerDockerErrorMessage = Column(Text, nullable = True)
   shmSizePercent = Column(Integer, nullable = False, default=50) # Shared memory size as percentage of RAM (0-90)
   ramDiskSizePercent = Column(Integer, nullable = False, default=0) # RAM disk size as percentage of RAM (0-60)
+  startScriptPath = Column(Text, nullable = True)
+  stopScriptPath = Column(Text, nullable = True)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 

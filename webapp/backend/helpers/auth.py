@@ -182,7 +182,7 @@ def check_token(token : str) -> object:
       select(User).where(User.loginToken == token, User.loginTokenCreatedAt > min_start_date)
     ).scalar_one_or_none()
     if user is not None:
-      user_data = {"userId": user.userId, "email": user.email}
+      user_data = {"userId": user.userId, "email": user.email, "startScriptPath": user.startScriptPath, "stopScriptPath": user.stopScriptPath}
 
   if user_data is not None:
     user_role = get_role(user_data["email"])
@@ -203,7 +203,9 @@ def check_token(token : str) -> object:
       "email": user_data["email"],
       "role": user_role,
       "roles": user_role_names,
-      "reservationLimits": reservation_limits
+      "reservationLimits": reservation_limits,
+      "startScriptPath": user_data["startScriptPath"],
+      "stopScriptPath": user_data["stopScriptPath"],
     })
   else:
     return helpers.server.api_response(False, "Invalid token.")

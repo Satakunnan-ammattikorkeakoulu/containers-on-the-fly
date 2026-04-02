@@ -17,7 +17,7 @@ from database import Session, Reservation, ReservedContainerPort, Role, Computer
 from helpers.auth import create_password
 from sqlalchemy import select
 
-from docker.containers import start_container, stop_container, restart_container
+from docker.containers import start_container, stop_container, restart_container, run_stop_script
 from docker.monitoring import update_server_monitoring
 from docker.notifications import send_container_started_email, send_container_error_email, send_admin_failure_alert, send_container_paused_email, send_container_resumed_email
 from docker.ports import get_available_port
@@ -310,6 +310,11 @@ def pause_low_priority_for_normal_reservations():
           try:
             container_docker_name = lp_res.reservedContainer.containerDockerName
             if container_docker_name:
+              # Run stop script before pausing the container
+              stop_script = lp_res.reservedContainer.stopScriptPath
+              if stop_script:
+                container_username = (lp_res.reservedContainer.container.containerUsername or "user") if lp_res.reservedContainer.container else "user"
+                run_stop_script(container_docker_name, stop_script, container_username)
               stop_container(container_docker_name)
             lp_res.status = "paused"
             lp_res.reservedContainer.stoppedAt = time_now()
@@ -641,6 +646,8 @@ def start_docker_container(reservation_id: str):
       "sshPublicKey": reservation.user.sshPublicKey,
       "passwordCommand": container_obj.passwordCommand,
       "sshKeyDeployCommands": container_obj.sshKeyDeployCommands,
+      "startScriptPath": reservation.reservedContainer.startScriptPath,
+      "stopScriptPath": reservation.reservedContainer.stopScriptPath,
     }
 
     # Add role-based mounts (now the unified mounting system)
@@ -738,6 +745,11 @@ def stop_docker_container(reservation_id: str):
 
       container_docker_name = reservation.reservedContainer.containerDockerName
       if reservation.status in ("started", "restart_error"):
+        # Run stop script before stopping the container
+        stop_script = reservation.reservedContainer.stopScriptPath
+        if stop_script and container_docker_name:
+          container_username = (reservation.reservedContainer.container.containerUsername or "user") if reservation.reservedContainer.container else "user"
+          run_stop_script(container_docker_name, stop_script, container_username)
         stop_container(container_docker_name)
       # Paused containers are already stopped in Docker, just finalize the status
       reservation.status = "stopped"

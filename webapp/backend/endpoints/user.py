@@ -125,3 +125,28 @@ async def update_ssh_key(request: UpdateSshKeyRequest, token: str = Depends(oaut
   """
   force_authentication(token)
   return functionality.update_ssh_key(token, request.sshPublicKey)
+
+class UpdateScriptPathsRequest(BaseModel):
+  """Request body for updating the user's container lifecycle script paths."""
+
+  startScriptPath: Optional[str] = None
+  stopScriptPath: Optional[str] = None
+
+@router.post("/update_script_paths")
+async def update_script_paths(request: UpdateScriptPathsRequest, token: str = Depends(oauth2_scheme)):
+  """Store or clear the authenticated user's container start/stop script paths.
+
+  These paths point to scripts inside the container that run automatically
+  when containers start or stop. Per-reservation overrides can be set
+  during reservation creation.
+
+  Args:
+      request: Pydantic model with optional ``startScriptPath`` and
+          ``stopScriptPath`` strings.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Success or failure API response.
+  """
+  force_authentication(token)
+  return functionality.update_script_paths(token, request.startScriptPath, request.stopScriptPath)

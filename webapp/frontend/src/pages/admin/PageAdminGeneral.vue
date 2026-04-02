@@ -16,14 +16,14 @@
           <v-expansion-panel>
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-information-outline</v-icon>
-              <span class="font-weight-medium">General Information & Instructions</span>
+              <span class="font-weight-bold">General Information & Instructions</span>
             </v-expansion-panel-title>
             <v-expansion-panel-text>
               <v-form ref="generalForm" v-model="forms.general.valid">
                 
                 <!-- Application Configuration ---->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Application Configuration</h6>
+                  <h3 class="text-h3 mb-2">Application Configuration</h3>
                   <p class="body-2 text-grey mb-4">
                     Configure the basic application settings displayed throughout the system.
                   </p>
@@ -62,7 +62,7 @@
                 
                 <!-- Login Page Information -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Login Page Instructions</h6>
+                  <h3 class="text-h3 mb-2">Login Page Instructions</h3>
                   <p class="body-2 text-grey mb-3">
                     Information text displayed on the login page to provide context or instructions to users.
                   </p>
@@ -77,7 +77,7 @@
                 
                 <!-- Reservation Page Instructions -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Reservation Page Instructions</h6>
+                  <h3 class="text-h3 mb-2">Reservation Page Instructions</h3>
                   <p class="body-2 text-grey mb-3">
                     Instructions displayed to users on top of the reservation page about server usage guidelines and restrictions.
                   </p>
@@ -92,7 +92,7 @@
                 
                 <!-- Email Template Instructions -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Container Reserved Instructions</h6>
+                  <h3 class="text-h3 mb-2">Container Reserved Instructions</h3>
                   <p class="body-2 text-grey mb-3">
                     Guidelines and instructions included in reservation confirmation emails sent to users (at the end of the email) and displayed when clicking "Show Details" on reservations.
                   </p>
@@ -107,7 +107,7 @@
                 
                 <!-- Login Form Field Labels -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Login Form Field Labels</h6>
+                  <h3 class="text-h3 mb-2">Login Form Field Labels</h3>
                   <p class="body-2 text-grey mb-3">
                     Customize the labels for username and password fields on the login page.
                   </p>
@@ -153,14 +153,14 @@
           <v-expansion-panel>
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-account-key</v-icon>
-              <span class="font-weight-medium">Authentication</span>
+              <span class="font-weight-bold">Authentication</span>
             </v-expansion-panel-title>
             <v-expansion-panel-text>
               <v-form ref="authForm" v-model="forms.auth.valid">
                 
                 <!-- Login Type Settings -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Login Method</h6>
+                  <h3 class="text-h3 mb-2">Login Method</h3>
                   <p class="body-2 text-grey mb-4">
                     Choose how users authenticate with the system.
                   </p>
@@ -197,7 +197,7 @@
                 
                 <!-- Session Timeout -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Session Settings</h6>
+                  <h3 class="text-h3 mb-2">Session Settings</h3>
                   <p class="body-2 text-grey mb-4">
                     Configure how long user sessions remain active before requiring re-login.
                   </p>
@@ -220,7 +220,7 @@
                 
                 <!-- LDAP Configuration -->
                 <div class="mb-6" v-if="settings.auth.loginType === 'hybrid'">
-                  <h6 class="text-h6 mb-2">LDAP Server Configuration</h6>
+                  <h3 class="text-h3 mb-2">LDAP Server Configuration</h3>
                   <p class="body-2 text-grey mb-4">
                     Configure connection to your LDAP directory server for user authentication.
                   </p>
@@ -331,7 +331,7 @@
               <!-- Test AD/LDAP Connection Section -->
               <div class="mb-6" v-if="settings.auth.loginType === 'hybrid'">
                 <v-divider class="my-4"></v-divider>
-                <h6 class="text-h6 mb-2">Test AD/LDAP Connection</h6>
+                <h3 class="text-h3 mb-2">Test AD/LDAP Connection</h3>
                 <p class="body-2 text-grey mb-4">
                   Test your LDAP configuration by authenticating with a real username and password.
                   The full LDAP server response (all attributes) will be displayed below.
@@ -391,7 +391,7 @@
           <v-expansion-panel>
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-shield-account</v-icon>
-              <span class="font-weight-medium">User Access Control</span>
+              <span class="font-weight-bold">User Access Control</span>
             </v-expansion-panel-title>
             <v-expansion-panel-text>
               <v-form ref="accessForm" v-model="forms.access.valid">
@@ -399,10 +399,10 @@
                   <v-col cols="12" md="6">
                     <v-card variant="outlined" class="pa-4">
                       <div class="mb-4">
-                        <h6 class="text-h6 mb-2 d-flex align-center">
+                        <h3 class="text-h3 mb-2 d-flex align-center">
                           <v-icon left color="red">mdi-account-cancel</v-icon>
                           Email Blacklist
-                        </h6>
+                        </h3>
                         <p class="body-2 text-grey mb-3">
                           Prevent specific email addresses from logging into the system. Users on this list will be denied access.
                         </p>
@@ -465,10 +465,10 @@
                   <v-col cols="12" md="6">
                     <v-card variant="outlined" class="pa-4">
                       <div class="mb-4">
-                        <h6 class="text-h6 mb-2 d-flex align-center">
+                        <h3 class="text-h3 mb-2 d-flex align-center">
                           <v-icon left color="green">mdi-account-check</v-icon>
                           Email Whitelist
-                        </h6>
+                        </h3>
                         <p class="body-2 text-grey mb-3">
                           Allow only specific email addresses to log into the system. When enabled, only users on this list can access the system.
                         </p>
@@ -548,14 +548,14 @@
           <v-expansion-panel>
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-email-outline</v-icon>
-              <span class="font-weight-medium">Email Configuration</span>
+              <span class="font-weight-bold">Email Configuration</span>
             </v-expansion-panel-title>
             <v-expansion-panel-text>
               
               <!-- Contact Information Section with its own separate form -->
               <v-form ref="contactForm" v-model="forms.contact.valid">
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Contact Email</h6>
+                  <h3 class="text-h3 mb-2">Contact Email</h3>
                   <p class="body-2 text-grey mb-4">
                     Configure the admin contact email address displayed to users throughout the system.
                   </p>
@@ -592,7 +592,7 @@
               <!-- Master Email Enable Section with its own form -->
               <v-form ref="emailEnableForm" v-model="forms.emailEnable.valid">
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Email System</h6>
+                  <h3 class="text-h3 mb-2">Email System</h3>
                   <p class="body-2 text-grey mb-4">
                     Enable or disable email sending from the system. When disabled, no emails will be sent for reservations or notifications.
                   </p>
@@ -609,7 +609,7 @@
               <!-- SMTP Settings Section with its own form -->
               <v-form ref="emailForm" v-model="forms.email.valid">
                 <div class="mb-6" v-if="settings.emailEnable.sendEmail">
-                  <h6 class="text-h6 mb-2">SMTP Server Configuration</h6>
+                  <h3 class="text-h3 mb-2">SMTP Server Configuration</h3>
                   <p class="body-2 text-grey mb-4">
                     Configure the SMTP server settings for sending system emails like reservation confirmations and notifications.
                   </p>
@@ -691,7 +691,7 @@
               
               <!-- Test Email Delivery Section (no form needed, just uses validation) -->
               <div class="mb-6" v-if="settings.emailEnable.sendEmail">
-                <h6 class="text-h6 mb-2">Test Email Delivery</h6>
+                <h3 class="text-h3 mb-2">Test Email Delivery</h3>
                 <p class="body-2 text-grey mb-4">
                   Send a test email to verify that your SMTP configuration is working correctly.
                 </p>
@@ -731,14 +731,14 @@
           <v-expansion-panel>
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-bell-alert</v-icon>
-              <span class="font-weight-medium">System Notifications</span>
+              <span class="font-weight-bold">System Notifications</span>
             </v-expansion-panel-title>
             <v-expansion-panel-text>
               <v-form ref="notificationsForm" v-model="forms.notifications.valid">
                 
                 <!-- Container Failure Alerts -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Container Failure Alerts</h6>
+                  <h3 class="text-h3 mb-2">Container Failure Alerts</h3>
                   <p class="body-2 text-grey mb-4">
                     Configure email notifications when Docker containers fail to start or stop unexpectedly. This helps administrators quickly respond to system issues.
                   </p>
@@ -1542,9 +1542,13 @@ export default {
   flex-shrink: 0 !important;
 }
 
-:deep(.v-expansion-panel-title .font-weight-medium) {
+:deep(.v-expansion-panel-title .font-weight-bold) {
   margin: 0 !important;
   white-space: nowrap !important;
+}
+
+:deep(.v-expansion-panel-text__wrapper) {
+  padding-left: 50px !important;
 }
 
 // Keep the expand/collapse icon on the right
@@ -1553,8 +1557,8 @@ export default {
   flex-shrink: 0 !important;
 }
 
-.font-weight-medium {
-  font-weight: 500 !important;
+.font-weight-bold {
+  font-weight: 700 !important;
   font-size: 18px !important;
 }
 

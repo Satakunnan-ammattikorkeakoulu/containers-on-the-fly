@@ -27,13 +27,21 @@
       </v-col>
       <v-col cols="12" md="3">
         <v-text-field
+          v-model="filters.name"
+          label="Name"
+          clearable
+          @update:model-value="onTextFilterChange"
+        ></v-text-field>
+      </v-col>
+      <v-col cols="12" md="3">
+        <v-text-field
           v-model="filters.email"
           label="Email"
           clearable
           @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="2">
         <v-text-field
           v-model="filters.userId"
           label="User ID"
@@ -110,6 +118,7 @@ export default {
     dialogKey: new Date().getTime(),
     filters: {
       userId: '',
+      name: '',
       email: '',
       role: 'All'
     },
@@ -191,6 +200,7 @@ export default {
           sortBy: _this.tableOptions.sortBy,
           filters: {
             role: _this.filters.role === 'All' ? '' : (_this.filters.role || ''),
+            name: _this.filters.name || '',
             email: _this.filters.email || '',
             userId: _this.filters.userId || '',
           }

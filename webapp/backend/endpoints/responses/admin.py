@@ -73,6 +73,7 @@ def get_reservations(request: AdminReservationRequest) -> object:
   """
   filters = request.filters
   status_filter = filters.get("status", "")
+  user_filter = str(filters.get("user", "")).strip()
   reservation_id_filter = str(filters.get("reservationId", "")).strip()
 
   allowed_sort_keys = {
@@ -136,6 +137,10 @@ def get_reservations(request: AdminReservationRequest) -> object:
             base_filtered = base_filtered.where(Reservation.status.in_(["error", "restart_error"]))
         else:
             base_filtered = base_filtered.where(Reservation.status == status_filter)
+    if user_filter:
+        base_filtered = base_filtered.where(
+            User.email.ilike(f"%{user_filter}%") | User.name.ilike(f"%{user_filter}%")
+        )
     if reservation_id_filter:
         base_filtered = base_filtered.where(
             cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")
@@ -153,6 +158,10 @@ def get_reservations(request: AdminReservationRequest) -> object:
             id_stmt = id_stmt.where(Reservation.status.in_(["error", "restart_error"]))
         else:
             id_stmt = id_stmt.where(Reservation.status == status_filter)
+    if user_filter:
+        id_stmt = id_stmt.where(
+            User.email.ilike(f"%{user_filter}%") | User.name.ilike(f"%{user_filter}%")
+        )
     if reservation_id_filter:
         id_stmt = id_stmt.where(
             cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")
@@ -574,6 +583,7 @@ def get_users(request: AdminUsersRequest) -> object:
     """
     filters = request.filters
     role_filter = filters.get("role", "")
+    name_filter = filters.get("name", "")
     email_filter = filters.get("email", "")
     user_id_filter = filters.get("userId", "")
 
@@ -592,6 +602,8 @@ def get_users(request: AdminUsersRequest) -> object:
             base_stmt = base_stmt.join(UserRole, User.userId == UserRole.userId)\
                 .join(Role, UserRole.roleId == Role.roleId)\
                 .where(Role.name == role_filter)
+        if name_filter:
+            base_stmt = base_stmt.where(User.name.ilike(f"%{name_filter}%"))
         if email_filter:
             base_stmt = base_stmt.where(User.email.ilike(f"%{email_filter}%"))
         if user_id_filter:

@@ -104,6 +104,14 @@
           @update:model-value="onFilterChange"
         ></v-select>
       </v-col>
+      <v-col cols="12" md="3">
+        <v-text-field
+          v-model="filters.user"
+          label="User (email or name)"
+          clearable
+          @update:model-value="onTextFilterChange"
+        ></v-text-field>
+      </v-col>
       <v-col cols="12" md="2">
         <v-text-field
           v-model="filters.reservationId"
@@ -181,6 +189,7 @@
       modalConnectionDetailsReservationId: null,
       filters: {
         status: "All",
+        user: '',
         reservationId: ''
       },
       statusCounts: {},
@@ -296,6 +305,7 @@
             sortBy: _this.tableOptions.sortBy,
             filters: {
               status: _this.filters.status === 'All' ? '' : (_this.filters.status || ''),
+              user: _this.filters.user || '',
               reservationId: _this.filters.reservationId || '',
             }
           },

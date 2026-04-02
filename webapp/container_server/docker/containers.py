@@ -49,11 +49,12 @@ def start_container(pars):
             sshPublicKey (str): SSH public key to deploy into the container.
 
     Returns:
-        tuple: A 5-element tuple of (started, container_name, password,
-            error_message, non_critical_errors) where started is a bool
-            indicating success, and the remaining elements are strings
-            (empty on success for error_message, empty string or message
-            for non_critical_errors).
+        tuple: A 6-element tuple of (started, container_name, password,
+            error_message, non_critical_errors, container_id) where
+            started is a bool indicating success, container_name and
+            password are strings, error_message is a string or Exception
+            (empty on success), non_critical_errors is a string or None,
+            and container_id is the Docker container ID or None on failure.
     """
     try:
         # Verify parameters first

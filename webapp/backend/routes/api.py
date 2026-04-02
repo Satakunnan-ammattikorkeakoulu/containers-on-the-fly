@@ -102,24 +102,6 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
         minimumAmount = 0,
         format = "GPUs",
       ))
-      '''computer.hardwareSpecs.append(HardwareSpec(
-        type = "gpu",
-        maximumAmount = 1,        # Keep as 1
-        maximumAmountForUser = 1, # Keep as 1
-        defaultAmountForUser = 0, # Keep as 0
-        minimumAmount = 0,        # Keep as 0
-        internalId = "0", # Nvidia / cuda ID of the device
-        format = "NVIDIA RTX A5000 24GB",
-      ))
-      computer.hardwareSpecs.append(HardwareSpec(
-        type = "gpu",
-        maximumAmount = 1,        # Keep as 1
-        maximumAmountForUser = 1, # Keep as 1
-        defaultAmountForUser = 0, # Keep as 0
-        minimumAmount = 0,        # Keep as 0
-        internalId = "1", # Nvidia / cuda ID of the device
-        format = "NVIDIA RTX A5000 24GB",
-      ))'''
       computer.hardwareSpecs.append(HardwareSpec(
         type = "ram",
         maximumAmount = 10,

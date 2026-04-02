@@ -7,7 +7,7 @@ business logic to ``endpoints.responses.reservation``.
 
 from fastapi import APIRouter, Depends
 from helpers.server import api_response, force_authentication
-from helpers.auth import check_token, is_admin, get_authenticated_user_id
+from helpers.auth import is_admin, get_authenticated_user_id
 from endpoints.responses.user import validate_script_path
 from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import reservation as functionality

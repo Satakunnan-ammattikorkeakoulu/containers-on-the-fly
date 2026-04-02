@@ -47,7 +47,6 @@ function createUrls(baseAddress) {
     URLS.admin.save_computer = baseAdminUrl + "save_computer"
     URLS.admin.remove_container = baseAdminUrl + "remove_container"
     URLS.admin.remove_computer = baseAdminUrl + "remove_computer"
-    URLS.admin.get_ports = baseAdminUrl + "ports"
     URLS.admin.edit_reservation = baseAdminUrl + "edit_reservation"
     URLS.admin.get_user = baseAdminUrl + "user"
     URLS.admin.save_user = baseAdminUrl + "save_user"
@@ -56,7 +55,6 @@ function createUrls(baseAddress) {
     URLS.admin.save_general_settings = baseAdminUrl + "general-settings"
     URLS.admin.test_email = baseAdminUrl + "test-email"
     URLS.admin.test_ad = baseAdminUrl + "test-ad"
-    URLS.admin.get_servers = baseAdminUrl + "servers"
     URLS.admin.get_server_monitoring = baseAdminUrl + "server"
     // Role management endpoints
     URLS.admin.get_roles = baseAdminUrl + "roles"

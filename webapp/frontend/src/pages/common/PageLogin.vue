@@ -76,9 +76,6 @@
       appName() {
         return this.store.appName
       },
-      loginText() {
-        return this.store.loginText
-      },
       usernameField() {
         return this.store.usernameField
       },

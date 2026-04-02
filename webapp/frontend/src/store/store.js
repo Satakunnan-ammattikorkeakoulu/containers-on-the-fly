@@ -73,8 +73,6 @@ export const useMainStore = defineStore('main', {
     },
     /** @returns {boolean} Whether the store is still performing async initialisation. */
     isInitializing: (state) => state.initializing,
-    /** @returns {boolean} Whether backend app configuration has been loaded successfully. */
-    isConfigLoaded: (state) => state.configLoaded,
     /** @returns {boolean} Whether loading the backend app configuration failed. */
     hasConfigError: (state) => state.configError,
     /** @returns {string} Display name of the application. */
@@ -89,8 +87,6 @@ export const useMainStore = defineStore('main', {
     reservationPageInstructions: (state) => state.appConfig.instructions.reservation,
     /** @returns {string} Instructional text included in reservation emails. */
     emailInstructions: (state) => state.appConfig.instructions.email,
-    /** @returns {string} Login page information text (alias for loginPageInfo). */
-    loginText: (state) => state.appConfig.instructions.login,
     /** @returns {string} Custom label for the username input field. */
     usernameField: (state) => state.appConfig.instructions.usernameFieldLabel,
     /** @returns {string} Custom label for the password input field. */
@@ -165,12 +161,6 @@ export const useMainStore = defineStore('main', {
       this.configError = true;
       this.configErrorMessage = errorMessage;
       this.configLoaded = false;
-    },
-
-    /** Clear any previously recorded configuration error. */
-    clearConfigError() {
-      this.configError = false;
-      this.configErrorMessage = "";
     },
 
     /**

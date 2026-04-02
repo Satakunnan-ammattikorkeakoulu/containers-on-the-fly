@@ -146,12 +146,4 @@ describe('Main Store', () => {
     })
   })
 
-  describe('clearConfigError', () => {
-    it('resets error', () => {
-      store.setConfigError('err')
-      store.clearConfigError()
-      expect(store.configError).toBe(false)
-      expect(store.configErrorMessage).toBe('')
-    })
-  })
 })

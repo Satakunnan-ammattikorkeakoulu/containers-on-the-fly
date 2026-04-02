@@ -88,6 +88,7 @@ export default {
     table: {
       headers: [
         { title: 'User ID', key: 'userId' },
+        { title: 'Name', key: 'name' },
         { title: 'Email', key: 'email' },
         { title: 'Roles', key: 'roles', sortable: false },
         { title: 'Password Set', key: 'hasPassword' },

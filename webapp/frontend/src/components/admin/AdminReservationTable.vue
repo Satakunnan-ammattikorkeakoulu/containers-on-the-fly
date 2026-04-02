@@ -32,7 +32,7 @@
       </template>
       <!-- User -->
       <template v-slot:item.userEmail="{item}">
-        {{ item.userEmail }} <small>(id: {{ item.userId }})</small>
+        {{ item.userEmail }}<span v-if="item.userName"> ({{ item.userName }})</span> <small>(id: {{ item.userId }})</small>
       </template>
       <!-- Start date -->
       <template v-slot:item.startDate="{item}">

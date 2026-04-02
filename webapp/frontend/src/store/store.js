@@ -29,6 +29,7 @@ export const useMainStore = defineStore('main', {
     user: {
       loginToken: "",
       email: "",
+      name: "",
       role: "",
       roles: [],
       loggedinAt: null,
@@ -120,6 +121,7 @@ export const useMainStore = defineStore('main', {
               this.setUser({
                 "loginToken": user.loginToken,
                 "email": user.email,
+                "name": user.name || "",
                 "role": user.role,
                 "roles": user.roles || [],
                 "loggedinAt": user.loggedinAt,
@@ -193,6 +195,7 @@ export const useMainStore = defineStore('main', {
           if (response.data.status == true) {
             _this.user.loginToken = payload.loginToken
             _this.user.email = response.data.data.email
+            _this.user.name = response.data.data.name || ""
             _this.user.role = response.data.data.role
             _this.user.roles = response.data.data.roles || []
             _this.user.loggedinAt = new Date()
@@ -234,6 +237,7 @@ export const useMainStore = defineStore('main', {
       localStorage.removeItem("user")
       this.user.loginToken = ""
       this.user.email = ""
+      this.user.name = ""
       this.user.role = ""
       this.user.roles = []
       this.user.loggedinAt = null

@@ -182,7 +182,7 @@ def check_token(token : str) -> object:
       select(User).where(User.loginToken == token, User.loginTokenCreatedAt > min_start_date)
     ).scalar_one_or_none()
     if user is not None:
-      user_data = {"userId": user.userId, "email": user.email, "startScriptPath": user.startScriptPath, "stopScriptPath": user.stopScriptPath}
+      user_data = {"userId": user.userId, "email": user.email, "name": user.name, "startScriptPath": user.startScriptPath, "stopScriptPath": user.stopScriptPath}
 
   if user_data is not None:
     user_role = get_role(user_data["email"])
@@ -201,6 +201,7 @@ def check_token(token : str) -> object:
     return helpers.server.api_response(True, "Token OK.", {
       "userId": user_data["userId"],
       "email": user_data["email"],
+      "name": user_data["name"],
       "role": user_role,
       "roles": user_role_names,
       "reservationLimits": reservation_limits,
@@ -317,6 +318,7 @@ def get_ldap_user(username, password):
   search_method = get_setting('auth.ldap.searchMethod')
   account_field = get_setting('auth.ldap.accountField')
   email_field = get_setting('auth.ldap.emailField')
+  name_field = get_setting('auth.ldap.nameField')
 
   # Check if LDAP is properly configured
   if not all([ldap_url, username_format, password_format, ldap_domain, search_method, account_field, email_field]):
@@ -333,12 +335,19 @@ def get_ldap_user(username, password):
   with Session() as session:
     try:
       l.simple_bind_s(username_format.replace("{username}", username), password_format.replace("{password}", password))
-      result = l.search_s(ldap_domain, ldap.SCOPE_SUBTREE, search_method.replace("{username}", username), [account_field, email_field])
+      search_attrs = [account_field, email_field]
+      if name_field:
+        search_attrs.append(name_field)
+      result = l.search_s(ldap_domain, ldap.SCOPE_SUBTREE, search_method.replace("{username}", username), search_attrs)
       account = result[0][1][account_field][0].decode("utf-8")
       if account != username:
         return False, "Wrong username / ldap username association"
 
       email = result[0][1][email_field][0].decode("utf-8")
+
+      ldap_name = None
+      if name_field and name_field in result[0][1]:
+        ldap_name = result[0][1][name_field][0].decode("utf-8").strip()[:200]
 
       whitelist_email = session.execute(select(UserWhitelist).where(UserWhitelist.email == email)).scalar_one_or_none()
       if use_whitelisting and whitelist_email == None:
@@ -348,14 +357,18 @@ def get_ldap_user(username, password):
       # User not found? Create it and return the newly created user
       if user == None:
         new_user = User(
-          email = email
+          email = email,
+          name = ldap_name
         )
         session.add(new_user)
         session.commit()
         created_user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
         return True, created_user.userId
-      # User found? Return it
+      # User found? Update name from LDAP and return it
       else:
+        if ldap_name is not None:
+          user.name = ldap_name
+          session.commit()
         return True, user.userId
     except ldap.INVALID_CREDENTIALS:
       return False, "Wrong username or password."

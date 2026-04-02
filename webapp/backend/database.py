@@ -34,6 +34,7 @@ class User(Base):
 
   userId = Column(Integer, primary_key = True, autoincrement = True)
   email = Column(Text, nullable = False)
+  name = Column(Text, nullable = True)
   password = Column(Text, nullable = True)
   passwordSalt = Column(Text, nullable = True)
   loginToken = Column(Text, nullable = True)

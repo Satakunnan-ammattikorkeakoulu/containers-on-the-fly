@@ -126,6 +126,25 @@ async def update_ssh_key(request: UpdateSshKeyRequest, token: str = Depends(oaut
   force_authentication(token)
   return functionality.update_ssh_key(token, request.sshPublicKey)
 
+class UpdateNameRequest(BaseModel):
+  """Request body for updating the user's display name."""
+
+  name: Optional[str] = None
+
+@router.post("/update_name")
+async def update_name(request: UpdateNameRequest, token: str = Depends(oauth2_scheme)):
+  """Update or remove the authenticated user's display name.
+
+  Args:
+      request: Pydantic model with an optional ``name`` string.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Success or failure API response.
+  """
+  force_authentication(token)
+  return functionality.update_name(token, request.name)
+
 class UpdateScriptPathsRequest(BaseModel):
   """Request body for updating the user's container lifecycle script paths."""
 

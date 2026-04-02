@@ -302,6 +302,15 @@
                         :rules="[rules.required]"
                       ></v-text-field>
                     </v-col>
+
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.auth.ldap.nameField"
+                        label="LDAP Name Field (optional)"
+                        placeholder="displayName"
+                        outlined
+                      ></v-text-field>
+                    </v-col>
                   </v-row>
                 </div>
                 
@@ -1025,7 +1034,8 @@ export default {
           domain: '',
           searchMethod: '',
           accountField: '',
-          emailField: ''
+          emailField: '',
+          nameField: ''
         }
       }
     }
@@ -1122,7 +1132,8 @@ export default {
                 domain: data.auth?.ldap?.domain || '',
                 searchMethod: data.auth?.ldap?.searchMethod || '',
                 accountField: data.auth?.ldap?.accountField || '',
-                emailField: data.auth?.ldap?.emailField || ''
+                emailField: data.auth?.ldap?.emailField || '',
+                nameField: data.auth?.ldap?.nameField || ''
               }
             };
             

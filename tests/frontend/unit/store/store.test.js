@@ -59,10 +59,22 @@ describe('Main Store', () => {
   // Actions
   // -----------------------------------------------------------------------
 
+  describe('user.name', () => {
+    it('defaults to empty string', () => {
+      expect(store.user.name).toBe('')
+    })
+
+    it('can be set directly', () => {
+      store.user.name = 'Test User'
+      expect(store.user.name).toBe('Test User')
+    })
+  })
+
   describe('logoutUser', () => {
     it('clears all user data', () => {
       store.user.loginToken = 'token'
       store.user.email = 'test@example.com'
+      store.user.name = 'Test User'
       store.user.role = 'admin'
       store.user.roles = ['admin']
 
@@ -70,6 +82,7 @@ describe('Main Store', () => {
 
       expect(store.user.loginToken).toBe('')
       expect(store.user.email).toBe('')
+      expect(store.user.name).toBe('')
       expect(store.user.role).toBe('')
       expect(store.user.roles).toEqual([])
       expect(store.user.loggedinAt).toBeNull()

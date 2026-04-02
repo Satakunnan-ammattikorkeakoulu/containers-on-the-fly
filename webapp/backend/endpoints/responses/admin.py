@@ -181,6 +181,7 @@ def get_reservations(request: AdminReservationRequest) -> object:
         for reservation in query:
             res = orm_to_dict(reservation)
             res["userEmail"] = reservation.user.email
+            res["userName"] = reservation.user.name
             res["computerName"] = reservation.computer.name
             res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
             container_dict = orm_to_dict(reservation.reservedContainer.container)
@@ -579,6 +580,7 @@ def get_users(request: AdminUsersRequest) -> object:
     allowed_sort_keys = {
         "userId": User.userId,
         "email": User.email,
+        "name": User.name,
         "createdAt": User.userCreatedAt,
         "hasPassword": User.password,
     }
@@ -613,6 +615,7 @@ def get_users(request: AdminUsersRequest) -> object:
             data.append({
                 "userId": user.userId,
                 "email": user.email,
+                "name": user.name,
                 "roles": [role.name for role in user.roles],
                 "createdAt": user.userCreatedAt,
                 "hasPassword": user.password is not None and user.password != "",
@@ -660,7 +663,8 @@ def get_user(userId: int) -> object:
         data = {
             "userId": user.userId,
             "email": user.email,
-            "roles": [role.name for role in user.roles],  # Changed from role.role to role.name
+            "name": user.name,
+            "roles": [role.name for role in user.roles],
             "createdAt": user.userCreatedAt
         }
 
@@ -691,8 +695,10 @@ def save_user(userId: int, data: dict) -> object:
         if userId == -1:
             # Create new user
             hash = hash_password(data["password"])
+            raw_name = data.get("name")
             user = User(
                 email=data["email"],
+                name=raw_name[:200] if raw_name else raw_name,
                 password=base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
                 passwordSalt=base64.b64encode(hash["salt"]).decode('utf-8')
             )
@@ -706,7 +712,9 @@ def save_user(userId: int, data: dict) -> object:
                 return api_response(False, "User not found")
             
             user.email = data["email"]
-            
+            new_name = data.get("name", user.name)
+            user.name = new_name[:200] if new_name else new_name
+
             # Check if we should clear the password
             if "clearPassword" in data and data["clearPassword"]:
                 # Clear both password and salt
@@ -1379,7 +1387,8 @@ def get_general_settings() -> object:
             'auth.ldap.domain',
             'auth.ldap.searchMethod',
             'auth.ldap.accountField',
-            'auth.ldap.emailField'
+            'auth.ldap.emailField',
+            'auth.ldap.nameField'
         ]
         
         # Get all settings
@@ -1440,7 +1449,8 @@ def get_general_settings() -> object:
                     "domain": settings_dict.get('auth.ldap.domain', ''),
                     "searchMethod": settings_dict.get('auth.ldap.searchMethod', ''),
                     "accountField": settings_dict.get('auth.ldap.accountField', ''),
-                    "emailField": settings_dict.get('auth.ldap.emailField', '')
+                    "emailField": settings_dict.get('auth.ldap.emailField', ''),
+                    "nameField": settings_dict.get('auth.ldap.nameField', '')
                 }
             }
         }
@@ -1553,7 +1563,9 @@ def save_general_settings(section: str, settings: dict) -> object:
                     set_setting('auth.ldap.accountField', ldap_settings['accountField'])
                 if 'emailField' in ldap_settings:
                     set_setting('auth.ldap.emailField', ldap_settings['emailField'])
-                
+                if 'nameField' in ldap_settings:
+                    set_setting('auth.ldap.nameField', ldap_settings['nameField'])
+
         else:
             return api_response(False, f"Unknown section: {section}")
             

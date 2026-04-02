@@ -10,13 +10,22 @@
                 <h2 v-else>Edit User</h2>
               </v-col>
 
+              <!-- NAME -->
+              <v-col cols="12">
+                <v-text-field
+                  type="text"
+                  v-model="data.name"
+                  label="Name">
+                </v-text-field>
+              </v-col>
+
               <!-- EMAIL -->
               <v-col cols="12">
-                <v-text-field 
-                  type="text" 
-                  id="email" 
-                  :rules="[rules.required, rules.email]" 
-                  v-model="data.email" 
+                <v-text-field
+                  type="text"
+                  id="email"
+                  :rules="[rules.required, rules.email]"
+                  v-model="data.email"
                   label="Email*">
                 </v-text-field>
               </v-col>

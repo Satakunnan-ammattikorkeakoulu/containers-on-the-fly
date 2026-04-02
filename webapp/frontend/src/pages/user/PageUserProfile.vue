@@ -8,13 +8,49 @@
     <v-row>
       <v-col cols="12">
         <div class="user-info mb-4">
-          <p class="mt-0"><strong>Email:</strong> {{ userEmail }}</p>
+          <p class="mt-0"><strong>Name:</strong> {{ userName || 'Not set' }}</p>
+          <p><strong>Email:</strong> {{ userEmail }}</p>
           <p><strong>Member since:</strong> {{ userCreatedAt }}</p>
           <p v-if="userRoles.length > 0"><strong>Roles:</strong> {{ userRoles.join(', ') }}</p>
         </div>
       </v-col>
     </v-row>
     <v-row>
+      <v-col cols="12" md="6">
+        <v-card>
+          <v-card-text>
+            <div class="name-section">
+              <h3 class="subtitle-18">Display Name</h3>
+              <v-alert type="info" variant="tonal" density="compact" class="mb-8">
+                If you log in through AD/LDAP, this name will be automatically overwritten on each login.
+              </v-alert>
+              <v-text-field
+                v-model="userName"
+                label="Name"
+                placeholder="Your display name"
+                outlined
+                dense
+              ></v-text-field>
+              <v-btn
+                color="primary"
+                :disabled="nameLoading"
+                :loading="nameLoading"
+                @click="updateName"
+              >
+                Save Name
+              </v-btn>
+              <v-btn
+                v-if="userName"
+                text
+                class="ml-2"
+                @click="removeName"
+              >
+                Remove Name
+              </v-btn>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-col>
       <v-col cols="12" md="6">
         <v-card>
           <v-card-text>
@@ -72,6 +108,8 @@
           </v-card-text>
         </v-card>
       </v-col>
+    </v-row>
+    <v-row>
       <v-col cols="12" md="6">
         <v-card>
           <v-card-text>
@@ -114,8 +152,6 @@
           </v-card-text>
         </v-card>
       </v-col>
-    </v-row>
-    <v-row>
       <v-col cols="12" md="6">
         <v-card>
           <v-card-text>
@@ -230,6 +266,8 @@ export default {
       showConfirm: false,
       passwordFormValid: false,
       loading: false,
+      userName: '',
+      nameLoading: false,
       sshPublicKey: '',
       sshKeyLoading: false,
       sshConfigDialog: false,
@@ -277,6 +315,7 @@ export default {
         })
         if (response.data.status && response.data.data.user) {
           this.userProfile = response.data.data.user
+          this.userName = response.data.data.user.name || ''
           this.sshPublicKey = response.data.data.user.sshPublicKey || ''
           this.startScriptPath = response.data.data.user.startScriptPath || ''
           this.stopScriptPath = response.data.data.user.stopScriptPath || ''
@@ -409,6 +448,52 @@ export default {
     async removeSshKey() {
       this.sshPublicKey = ''
       await this.updateSshKey()
+    },
+    async updateName() {
+      const currentUser = this.store.user
+      if (!currentUser || !currentUser.loginToken) return
+
+      this.nameLoading = true
+      try {
+        const response = await axios.post(this.$appSettings.APIServer.user.update_name, {
+          name: this.userName || null
+        }, {
+          headers: {
+            'Authorization': `Bearer ${currentUser.loginToken}`
+          }
+        })
+
+        if (response.data.status) {
+          this.store.setUser({ loginToken: currentUser.loginToken })
+          this.store.showMessage({
+            text: 'Name updated successfully',
+            color: 'green'
+          })
+        } else {
+          this.store.showMessage({
+            text: response.data.message || 'Failed to update name',
+            color: 'red'
+          })
+        }
+      } catch (error) {
+        console.error('Error updating name:', error)
+        let errorMessage = 'Error updating name'
+        if (error.response?.data?.detail) {
+          errorMessage = error.response.data.detail
+        } else if (error.response?.data?.message) {
+          errorMessage = error.response.data.message
+        }
+        this.store.showMessage({
+          text: errorMessage,
+          color: 'red'
+        })
+      } finally {
+        this.nameLoading = false
+      }
+    },
+    async removeName() {
+      this.userName = ''
+      await this.updateName()
     },
     async updateScriptPaths() {
       const currentUser = this.store.user

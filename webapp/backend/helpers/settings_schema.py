@@ -289,6 +289,10 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.DATABASE, SettingType.TEXT, default="",
         description="LDAP email field for user mapping"
     ),
+    "auth.ldap.nameField": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="LDAP attribute to map to user display name (e.g. displayName)"
+    ),
 }
 
 # Helper functions for schema access

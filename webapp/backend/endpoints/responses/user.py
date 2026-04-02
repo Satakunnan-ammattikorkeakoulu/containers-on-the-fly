@@ -182,6 +182,7 @@ def profile(token):
       user_details = {}
       user_details["userId"] = user.userId
       user_details["email"] = user.email
+      user_details["name"] = user.name
       user_details["createdAt"] = user.userCreatedAt
       user_details["role"] = get_role(user.email)
       user_details["sshPublicKey"] = user.sshPublicKey
@@ -346,3 +347,29 @@ def update_script_paths(token, start_script_path, stop_script_path):
 
     session.commit()
     return api_response(True, "Script paths updated successfully.")
+
+def update_name(token, name):
+  """Update or remove the authenticated user's display name.
+
+  Args:
+      token: The user's login token.
+      name: The display name to store, or None/empty to remove.
+
+  Returns:
+      Response indicating success or failure with an appropriate message.
+  """
+  with Session() as session:
+    user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
+    if user is None:
+      return api_response(False, "User not found.")
+
+    if name and name.strip():
+      name = name.strip()
+      if len(name) > 200:
+        return api_response(False, "Name must be 200 characters or less.")
+      user.name = name
+    else:
+      user.name = None
+
+    session.commit()
+    return api_response(True, "Name updated successfully.")

@@ -215,6 +215,107 @@ class TestUpdateSshKey:
         assert resp.status_code in (401, 422)
 
 
+class TestUpdateName:
+
+    def test_set_name(self, test_client, user_token):
+        resp = test_client.post(
+            "/api/user/update_name",
+            json={"name": "Test User"},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_name_shown_in_profile(self, test_client, user_token):
+        test_client.post(
+            "/api/user/update_name",
+            json={"name": "Jane Doe"},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        resp = test_client.get(
+            "/api/user/profile",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        user = resp.json()["data"]["user"]
+        assert user["name"] == "Jane Doe"
+
+    def test_name_shown_in_check_token(self, test_client, user_token):
+        test_client.post(
+            "/api/user/update_name",
+            json={"name": "Token Name"},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        resp = test_client.get(
+            "/api/user/check_token",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.json()["data"]["name"] == "Token Name"
+
+    def test_remove_name_with_empty_string(self, test_client, user_token):
+        # Set a name first
+        test_client.post(
+            "/api/user/update_name",
+            json={"name": "Temp Name"},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        # Remove it
+        resp = test_client.post(
+            "/api/user/update_name",
+            json={"name": ""},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+        # Verify it's gone
+        resp = test_client.get(
+            "/api/user/profile",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.json()["data"]["user"]["name"] is None
+
+    def test_remove_name_with_null(self, test_client, user_token):
+        resp = test_client.post(
+            "/api/user/update_name",
+            json={"name": None},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_name_too_long_rejected(self, test_client, user_token):
+        resp = test_client.post(
+            "/api/user/update_name",
+            json={"name": "A" * 201},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is False
+        assert "200" in resp.json()["message"]
+
+    def test_name_whitespace_stripped(self, test_client, user_token):
+        resp = test_client.post(
+            "/api/user/update_name",
+            json={"name": "  Spaced Name  "},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+        resp = test_client.get(
+            "/api/user/profile",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.json()["data"]["user"]["name"] == "Spaced Name"
+
+    def test_unauthenticated_rejected(self, test_client):
+        resp = test_client.post(
+            "/api/user/update_name",
+            json={"name": "Hacker"},
+        )
+        assert resp.status_code in (401, 422)
+
+
 class TestUpdateScriptPaths:
 
     def test_set_valid_paths(self, test_client, user_token):

@@ -66,6 +66,96 @@ class TestAdminUsers:
         assert resp.json()["status"] is True
 
 
+class TestAdminUserName:
+    """Tests for the name field in admin user management."""
+
+    def test_get_users_includes_name(self, test_client, admin_token):
+        resp = test_client.post(
+            "/api/admin/users",
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {}},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        user = resp.json()["data"]["users"][0]
+        assert "name" in user
+
+    def test_get_user_includes_name(self, test_client, admin_token):
+        # Get a user ID first
+        resp = test_client.post(
+            "/api/admin/users",
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {}},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        user_id = resp.json()["data"]["users"][0]["userId"]
+
+        resp = test_client.get(
+            f"/api/admin/user?userId={user_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert "name" in resp.json()["data"]["user"]
+
+    def test_save_user_sets_name(self, test_client, admin_token):
+        # Get a user ID
+        resp = test_client.post(
+            "/api/admin/users",
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {}},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        users = resp.json()["data"]["users"]
+        user = next(u for u in users if u["email"] == "user@foo.com")
+
+        # Save with name
+        resp = test_client.post(
+            "/api/admin/save_user",
+            json={
+                "userId": user["userId"],
+                "data": {
+                    "email": "user@foo.com",
+                    "name": "Admin Set Name",
+                    "roles": user["roles"],
+                },
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+        # Verify name persisted
+        resp = test_client.get(
+            f"/api/admin/user?userId={user['userId']}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.json()["data"]["user"]["name"] == "Admin Set Name"
+
+    def test_create_user_with_name(self, test_client, admin_token):
+        resp = test_client.post(
+            "/api/admin/save_user",
+            json={
+                "userId": -1,
+                "data": {
+                    "email": "named@foo.com",
+                    "name": "New Named User",
+                    "password": "testpass",
+                    "roles": [],
+                },
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+        # Verify via users list
+        resp = test_client.post(
+            "/api/admin/users",
+            json={"page": 1, "itemsPerPage": 50, "sortBy": [], "filters": {}},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        users = resp.json()["data"]["users"]
+        named_user = next(u for u in users if u["email"] == "named@foo.com")
+        assert named_user["name"] == "New Named User"
+
+
 class TestAdminComputers:
 
     def test_get_computers(self, test_client, admin_token):

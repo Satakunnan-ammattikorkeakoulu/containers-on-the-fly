@@ -22,6 +22,7 @@ function createUrls(baseAddress) {
     let baseUserUrl = baseUrl + "user/"
     URLS.user.login = baseUserUrl + "login"
     URLS.user.check_token = baseUserUrl + "check_token"
+    URLS.user.update_name = baseUserUrl + "update_name"
 
     let baseReservationUrl = baseUrl + "reservation/"
     URLS.reservation.get_available_hardware = baseReservationUrl + "get_available_hardware"

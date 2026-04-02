@@ -591,6 +591,8 @@ def run_daemon():
     global computer_id, api
 
     log.info("Container server daemon started.")
+    log.info("Waiting 3 seconds for backend to initialize...")
+    sleep(3)
     log.info("This software will run infinitely and start / stop servers for reservations.")
 
     # Check Docker support

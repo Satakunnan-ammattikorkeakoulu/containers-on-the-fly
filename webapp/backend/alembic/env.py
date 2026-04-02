@@ -20,7 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import (
     Base, User, UserWhitelist, Role, UserRole,
     Container, ContainerPort, ReservedContainer, ReservedContainerPort,
-    Reservation, Computer, HardwareSpec, ReservedHardwareSpec
+    Reservation, Computer, HardwareSpec, ReservedHardwareSpec,
+    AuditLog
 )
 from helpers.settings_handler import settings_handler
 

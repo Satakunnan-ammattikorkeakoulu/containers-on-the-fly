@@ -37,7 +37,7 @@ def api_response(status, message, extra_data = None):
     response["data"] = extra_data
   return response
 
-def force_authentication(token: str, role_required: str = None) -> Union[bool,HTTPException]:
+def force_authentication(token: str, role_required: str = None) -> Union[int,HTTPException]:
   """Enforce authentication and optionally verify a required role.
 
   Validates the user's token and, if a role is specified, checks that the
@@ -50,7 +50,7 @@ def force_authentication(token: str, role_required: str = None) -> Union[bool,HT
       role_required: An optional role name the user must have (e.g. 'admin').
 
   Returns:
-      True if the user is authenticated and has the required role.
+      The authenticated user's userId (int).
 
   Raises:
       HTTPException: 401 Unauthorized if the token is invalid or the user
@@ -71,13 +71,13 @@ def force_authentication(token: str, role_required: str = None) -> Union[bool,HT
       if role_required == "admin":
         # Use is_admin function which properly checks all roles
         if is_admin(user_id):
-          return True
+          return user_id
         else:
           wrong_role = True
       else:
         # For non-admin roles, check if it's the primary role or in the roles list
         if get_role(user_email) == role_required:
-          return True
+          return user_id
         else:
           # Also check if the role is in user's roles list
           has_role = False
@@ -86,11 +86,11 @@ def force_authentication(token: str, role_required: str = None) -> Union[bool,HT
               has_role = True
               break
           if has_role:
-            return True
+            return user_id
           else:
             wrong_role = True
     else:
-      return True
+      return get_authenticated_user_id(token)
 
   detail_message = "Invalid authentication credentials"
   if wrong_role == True:

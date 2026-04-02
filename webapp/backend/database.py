@@ -440,6 +440,26 @@ class SystemSetting(Base):
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 
+class AuditLog(Base):
+  """Record of a significant user or system action for auditing purposes.
+
+  Captures who performed an action, what was affected, and contextual
+  details. Used by administrators to review activity history. Old entries
+  are automatically purged based on the auditLog.retentionDays setting.
+  """
+  __tablename__ = "AuditLog"
+
+  auditLogId = Column(Integer, primary_key = True, autoincrement = True)
+  userId = Column(ForeignKey("User.userId"), nullable = True)
+  action = Column(Text, nullable = False)
+  resourceType = Column(Text, nullable = True)
+  resourceId = Column(Integer, nullable = True)
+  details = Column(Text, nullable = True)
+  ipAddress = Column(Text, nullable = True)
+  createdAt = Column(DateTime(timezone=True), server_default=func.now())
+
+  user = relationship("User")
+
 # Create session to interact with the database
 from sqlalchemy.orm import sessionmaker
 Session = sessionmaker(bind = engine)

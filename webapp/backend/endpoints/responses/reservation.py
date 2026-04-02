@@ -11,6 +11,7 @@ from helpers.email_notifications import generate_connection_text
 from helpers.server import api_response, orm_to_dict
 from helpers.logger import log
 from helpers.auth import is_admin
+from helpers.tables.audit_log import log_action
 from dateutil import parser
 from dateutil.relativedelta import *
 import datetime
@@ -671,9 +672,13 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     session.add(reservation)
     session.commit()
 
+    created_reservation_id = reservation.reservationId
     from helpers.settings_handler import get_setting
     inform_by_email = get_setting('email.sendEmail')
 
+    log_action(userId, "RESERVATION_CREATE", "reservation", created_reservation_id,
+               {"computerId": computerId, "containerId": containerId, "duration": duration,
+                "description": description})
     return api_response(True, "Reservation created succesfully!", { "informByEmail": inform_by_email })
 
 def cancel_reservation(userId : int, reservationId: str):
@@ -708,6 +713,7 @@ def cancel_reservation(userId : int, reservationId: str):
       reservation.startDate = now
     session.commit()
 
+  log_action(userId, "RESERVATION_CANCEL", "reservation", int(reservationId))
   return api_response(True, "Reservation cancelled.")
 
 def update_reservation_description(userId: int, reservationId: str, description: str):
@@ -737,6 +743,7 @@ def update_reservation_description(userId: int, reservationId: str, description:
     reservation.description = description if description else None
     session.commit()
 
+  log_action(userId, "RESERVATION_UPDATE_DESCRIPTION", "reservation", int(reservationId))
   return api_response(True, "Description updated.")
 
 def extend_reservation(userId : int, reservationId: str, duration: int):
@@ -825,6 +832,8 @@ def extend_reservation(userId : int, reservationId: str, duration: int):
       return api_response(False, "No reservation found.")
     reservation.endDate = reservation.endDate + relativedelta(hours=+duration)
     session.commit()
+    log_action(userId, "RESERVATION_EXTEND", "reservation", int(reservationId),
+               {"duration": duration})
     return api_response(True, "Reservation was extended by " + str(duration) + " hours.")
 
 def restart_container(userId : int, reservationId: str):
@@ -860,10 +869,12 @@ def restart_container(userId : int, reservationId: str):
     if reservation.status == "paused":
       reservation.status = "reserved"
       session.commit()
+      log_action(userId, "RESERVATION_RESTART", "reservation", int(reservationId))
       return api_response(True, "Container will be restarted when resources are available.")
     elif reservation.status in ("started", "restart_error"):
       reservation.status = "restart"
       session.commit()
+      log_action(userId, "RESERVATION_RESTART", "reservation", int(reservationId))
       return api_response(True, "Container will be restarted.")
     else:
       return api_response(False, "Reservation is not currently active, so cannot restart the container.")

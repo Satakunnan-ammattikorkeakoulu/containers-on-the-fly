@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from helpers.server import force_authentication
 from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import admin as functionality
-from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit, RoleMountsEdit, RoleHardwareLimitsEdit, RoleReservationLimitsEdit, AdminUsersRequest
+from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit, RoleMountsEdit, RoleHardwareLimitsEdit, RoleReservationLimitsEdit, AdminUsersRequest, AuditLogRequest
 from endpoints.models.reservation import AdminReservationRequest
 from pydantic import BaseModel, Field
 from typing import Dict, Any
@@ -113,8 +113,8 @@ async def save_computer(computerEdit : ComputerEdit, token: str = Depends(oauth2
   Returns:
       Success or failure API response.
   """
-  force_authentication(token, "admin")
-  return functionality.save_computer(computerEdit)
+  actor_user_id = force_authentication(token, "admin")
+  return functionality.save_computer(computerEdit, actor_user_id)
 
 @router.post("/remove_computer")
 async def remove_computer(computerId : int, token: str = Depends(oauth2_scheme)):
@@ -127,8 +127,8 @@ async def remove_computer(computerId : int, token: str = Depends(oauth2_scheme))
   Returns:
       Success or failure API response.
   """
-  force_authentication(token, "admin")
-  return functionality.remove_computer(computerId)
+  actor_user_id = force_authentication(token, "admin")
+  return functionality.remove_computer(computerId, actor_user_id)
 
 @router.get("/container")
 async def get_container(containerId : int, token: str = Depends(oauth2_scheme)):
@@ -155,8 +155,8 @@ async def save_container(containerEdit : ContainerEdit, token: str = Depends(oau
   Returns:
       Success or failure API response.
   """
-  force_authentication(token, "admin")
-  return functionality.save_container(containerEdit)
+  actor_user_id = force_authentication(token, "admin")
+  return functionality.save_container(containerEdit, actor_user_id)
 
 @router.get("/container_remove_info")
 async def get_container_remove_info(containerId: int, token: str = Depends(oauth2_scheme)):
@@ -187,8 +187,8 @@ async def remove_container(containerId : int, token: str = Depends(oauth2_scheme
   Returns:
       Success or failure API response.
   """
-  force_authentication(token, "admin")
-  return functionality.remove_container(containerId)
+  actor_user_id = force_authentication(token, "admin")
+  return functionality.remove_container(containerId, actor_user_id)
 
 @router.get("/container_defaults")
 async def get_container_defaults(username: str = "user", token: str = Depends(oauth2_scheme)):
@@ -224,8 +224,8 @@ async def rebuild_container_image(containerId: int, token: str = Depends(oauth2_
   Returns:
       Success or failure API response.
   """
-  force_authentication(token, "admin")
-  return functionality.rebuild_container_image(containerId)
+  actor_user_id = force_authentication(token, "admin")
+  return functionality.rebuild_container_image(containerId, actor_user_id)
 
 @router.get("/container_build_status")
 async def get_container_build_status(containerId: int, token: str = Depends(oauth2_scheme)):
@@ -256,8 +256,8 @@ async def edit_reservation(reservationId : int, endDate : str, token: str = Depe
   Returns:
       Success or failure API response.
   """
-  force_authentication(token, "admin")
-  return functionality.edit_reservation(reservationId, endDate)
+  actor_user_id = force_authentication(token, "admin")
+  return functionality.edit_reservation(reservationId, endDate, actor_user_id)
 
 @router.get("/user")
 async def get_user(userId: int, token: str = Depends(oauth2_scheme)):
@@ -284,8 +284,8 @@ async def save_user(userEdit: UserEdit, token: str = Depends(oauth2_scheme)):
     Returns:
         Success or failure API response.
     """
-    force_authentication(token, "admin")
-    return functionality.save_user(userEdit.userId, userEdit.data)
+    actor_user_id = force_authentication(token, "admin")
+    return functionality.save_user(userEdit.userId, userEdit.data, actor_user_id)
 
 @router.get("/roles")
 async def get_roles(token: str = Depends(oauth2_scheme)):
@@ -315,11 +315,11 @@ async def save_role(roleId: int = None, name: str = None, token: str = Depends(o
     Returns:
         Success or failure API response.
     """
-    force_authentication(token, "admin")
+    actor_user_id = force_authentication(token, "admin")
     if roleId:
-        return functionality.edit_role(roleId, name)
+        return functionality.edit_role(roleId, name, actor_user_id)
     else:
-        return functionality.add_role(name)
+        return functionality.add_role(name, actor_user_id)
 
 @router.post("/remove_role")
 async def remove_role(roleId: int, token: str = Depends(oauth2_scheme)):
@@ -332,8 +332,8 @@ async def remove_role(roleId: int, token: str = Depends(oauth2_scheme)):
     Returns:
         Success or failure API response.
     """
-    force_authentication(token, "admin")
-    return functionality.remove_role(roleId)
+    actor_user_id = force_authentication(token, "admin")
+    return functionality.remove_role(roleId, actor_user_id)
 
 @router.get("/role_mounts")
 async def get_role_mounts(roleId: int, token: str = Depends(oauth2_scheme)):
@@ -360,8 +360,8 @@ async def save_role_mounts(roleMountsEdit: RoleMountsEdit, token: str = Depends(
     Returns:
         Success or failure API response.
     """
-    force_authentication(token, "admin")
-    return functionality.save_role_mounts(roleMountsEdit.roleId, roleMountsEdit.mounts)
+    actor_user_id = force_authentication(token, "admin")
+    return functionality.save_role_mounts(roleMountsEdit.roleId, roleMountsEdit.mounts, actor_user_id)
 
 @router.get("/role_hardware_limits")
 async def get_role_hardware_limits(roleId: int, token: str = Depends(oauth2_scheme)):
@@ -388,8 +388,8 @@ async def save_role_hardware_limits(roleHardwareLimitsEdit: RoleHardwareLimitsEd
     Returns:
         Success or failure API response.
     """
-    force_authentication(token, "admin")
-    return functionality.save_role_hardware_limits(roleHardwareLimitsEdit.roleId, roleHardwareLimitsEdit.hardwareLimits)
+    actor_user_id = force_authentication(token, "admin")
+    return functionality.save_role_hardware_limits(roleHardwareLimitsEdit.roleId, roleHardwareLimitsEdit.hardwareLimits, actor_user_id)
 
 @router.get("/role_reservation_limits")
 async def get_role_reservation_limits(roleId: int, token: str = Depends(oauth2_scheme)):
@@ -416,8 +416,8 @@ async def save_role_reservation_limits(roleReservationLimitsEdit: RoleReservatio
     Returns:
         Success or failure API response.
     """
-    force_authentication(token, "admin")
-    return functionality.save_role_reservation_limits(roleReservationLimitsEdit.roleId, roleReservationLimitsEdit.reservationLimits)
+    actor_user_id = force_authentication(token, "admin")
+    return functionality.save_role_reservation_limits(roleReservationLimitsEdit.roleId, roleReservationLimitsEdit.reservationLimits, actor_user_id)
 
 @router.get("/server/{computer_id}/monitoring")
 async def get_server_monitoring(computer_id: int, token: str = Depends(oauth2_scheme)):
@@ -488,8 +488,8 @@ async def save_general_settings(data: GeneralSettingsData, token: str = Depends(
     Returns:
         Success or failure API response.
     """
-    force_authentication(token, "admin")
-    return functionality.save_general_settings(data.section, data.settings)
+    actor_user_id = force_authentication(token, "admin")
+    return functionality.save_general_settings(data.section, data.settings, actor_user_id)
 
 @router.post("/test-email")
 async def send_test_email(data: TestEmailData, token: str = Depends(oauth2_scheme)):
@@ -522,4 +522,18 @@ async def test_ad_connection(data: TestAdData, token: str = Depends(oauth2_schem
     """
     force_authentication(token, "admin")
     return functionality.test_ad_connection(data.username, data.password)
+
+@router.post("/audit-logs")
+async def get_audit_logs(request: AuditLogRequest, token: str = Depends(oauth2_scheme)):
+    """Retrieve paginated audit log entries with optional filtering.
+
+    Args:
+        request: Pagination, sorting, and filter parameters.
+        token: OAuth2 bearer token (injected by Depends).
+
+    Returns:
+        Paginated list of audit log entries with total count and retention setting.
+    """
+    force_authentication(token, "admin")
+    return functionality.get_audit_logs(request)
 

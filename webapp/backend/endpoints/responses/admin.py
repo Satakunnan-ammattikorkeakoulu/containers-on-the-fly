@@ -19,6 +19,7 @@ from sqlalchemy import cast, String
 from helpers.pagination import apply_pagination, get_total_count
 from helpers.logger import log
 from helpers.auth import hash_password, is_correct_password
+from helpers.tables.audit_log import log_action, get_audit_logs as get_audit_logs_helper
 import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
@@ -228,7 +229,7 @@ def get_reservations(request: AdminReservationRequest) -> object:
       "stats": stats,
   })
 
-def save_container(containerEdit : ContainerEdit) -> object:
+def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> object:
   """Create or update a container definition.
 
   For new containers (containerId == -1), creates a new Container record
@@ -423,6 +424,13 @@ def save_container(containerEdit : ContainerEdit) -> object:
         _ensure_ssh_port(session, container)
         session.commit()
         saved_container_id = container.containerId
+  is_new = containerEdit.containerId == -1
+  log_action(
+      actor_user_id,
+      "CONTAINER_CREATE" if is_new else "CONTAINER_UPDATE",
+      "container", saved_container_id,
+      {"name": containerEdit.data.get("name"), "imageName": containerEdit.data.get("imageName")}
+  )
   return api_response(True, "Container saved successfully", {"containerId": saved_container_id})
 
 def get_container_remove_info(container_id: int) -> object:
@@ -461,7 +469,7 @@ def get_container_remove_info(container_id: int) -> object:
       "imageName": container.imageName,
     })
 
-def remove_container(containerId : int) -> object:
+def remove_container(containerId : int, actor_user_id: int = None) -> object:
   """Soft-delete a container by marking it as removed and non-public.
 
   For containers managed by the Image Builder, queues the Docker image
@@ -470,6 +478,7 @@ def remove_container(containerId : int) -> object:
 
   Args:
       containerId: The ID of the container to remove.
+      actor_user_id: The userId of the admin performing the action.
 
   Returns:
       Response indicating success or failure with an appropriate message.
@@ -480,6 +489,8 @@ def remove_container(containerId : int) -> object:
     if container is None:
       return api_response(False, "Container not found.")
     else:
+      container_name = container.name
+      container_image = container.imageName
       container.removed = True
       container.public = False
       # Queue image removal for non-externally managed containers
@@ -487,9 +498,11 @@ def remove_container(containerId : int) -> object:
         container.buildStatus = "removing"
       session.commit()
 
+  log_action(actor_user_id, "CONTAINER_DELETE", "container", containerId,
+             {"name": container_name, "imageName": container_image})
   return api_response(True, "Container removed successfully")
 
-def rebuild_container_image(container_id: int) -> object:
+def rebuild_container_image(container_id: int, actor_user_id: int = None) -> object:
   """Queue a container image for rebuild by setting buildStatus to "pending".
 
   The Docker utility daemon will pick this up on its next polling cycle
@@ -498,6 +511,7 @@ def rebuild_container_image(container_id: int) -> object:
 
   Args:
       container_id: Database ID of the container to rebuild.
+      actor_user_id: The userId of the admin performing the action.
 
   Returns:
       Response indicating success or failure with an appropriate message.
@@ -515,6 +529,7 @@ def rebuild_container_image(container_id: int) -> object:
     container.buildStatus = "pending"
     container.buildLog = ""
     session.commit()
+  log_action(actor_user_id, "CONTAINER_REBUILD", "container", container_id)
   return api_response(True, "Image build queued. The Docker utility will build it shortly.")
 
 def get_container_defaults(username: str = "user") -> object:
@@ -684,7 +699,7 @@ def get_user(userId: int) -> object:
 
     return api_response(True, "User fetched successfully", {"user": data})
 
-def save_user(userId: int, data: dict) -> object:
+def save_user(userId: int, data: dict, actor_user_id: int = None) -> object:
     """Create or update a user account.
 
     For new users (userId == -1), creates a new User with hashed password.
@@ -696,6 +711,7 @@ def save_user(userId: int, data: dict) -> object:
         userId: The ID of the user to update, or -1 to create a new user.
         data: Dictionary containing email, password (optional),
             clearPassword (optional bool), and roles (list of role names).
+        actor_user_id: The userId of the admin performing the action.
 
     Returns:
         Response indicating success or failure with an appropriate message.
@@ -755,6 +771,15 @@ def save_user(userId: int, data: dict) -> object:
                     user.roles.append(role)
         
         session.commit()
+        is_new = userId == -1
+        audit_details = {"email": data.get("email"), "roles": data.get("roles", [])}
+        if not is_new:
+            if data.get("clearPassword"):
+                audit_details["passwordCleared"] = True
+            elif data.get("password"):
+                audit_details["passwordChanged"] = True
+        log_action(actor_user_id, "USER_CREATE" if is_new else "USER_UPDATE",
+                   "user", user.userId, audit_details)
         return api_response(True, "User saved successfully")
 
 def get_hardware() -> object:
@@ -894,7 +919,7 @@ def get_computer(computerId : int) -> object:
 
   return api_response(True, "Data fetched.", { "data": data })
 
-def save_computer(computerEdit : ComputerEdit) -> object:
+def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> object:
   """Create or update a computer (server) and its hardware specifications.
 
   For new computers (computerId == -1), creates a Computer record with
@@ -960,6 +985,7 @@ def save_computer(computerEdit : ComputerEdit) -> object:
         computer.hardwareSpecs.append(gpu_spec)
       session.add(computer)
       session.commit()
+      saved_computer_id = computer.computerId
     # Otherwise, edit computer
     else:
       log.debug(computerEdit.data.get("hardware").get("gpus"))
@@ -1014,13 +1040,22 @@ def save_computer(computerEdit : ComputerEdit) -> object:
         #for port in containerEdit.data.get("ports", []):
         #  container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
         session.commit()
+        saved_computer_id = computer.computerId
+  is_new = computerEdit.computerId == -1
+  log_action(
+      actor_user_id,
+      "COMPUTER_CREATE" if is_new else "COMPUTER_UPDATE",
+      "computer", saved_computer_id,
+      {"name": computerEdit.data.get("name"), "ip": computerEdit.data.get("ip")}
+  )
   return api_response(True, "Computer saved successfully")
 
-def remove_computer(computerId : int) -> object:
+def remove_computer(computerId : int, actor_user_id: int = None) -> object:
   """Soft-delete a computer by marking it as removed and non-public.
 
   Args:
       computerId: The ID of the computer to remove.
+      actor_user_id: The userId of the admin performing the action.
 
   Returns:
       Response indicating success or failure with an appropriate message.
@@ -1031,13 +1066,15 @@ def remove_computer(computerId : int) -> object:
     if computer is None:
       return api_response(False, "Computer not found.")
     else:
+      computer_name = computer.name
       computer.removed = True
       computer.public = False
       session.commit()
-  
+
+  log_action(actor_user_id, "COMPUTER_DELETE", "computer", computerId, {"name": computer_name})
   return api_response(True, "Computer removed successfully")
 
-def edit_reservation(reservationId : int, end_date_str : str) -> object:
+def edit_reservation(reservationId : int, end_date_str : str, actor_user_id: int = None) -> object:
   """Update a reservation's end date.
 
   Parses the provided date string and sets it as the new end date
@@ -1046,6 +1083,7 @@ def edit_reservation(reservationId : int, end_date_str : str) -> object:
   Args:
       reservationId: The ID of the reservation to edit.
       end_date_str: The new end date as an ISO-format string.
+      actor_user_id: The userId of the admin performing the action.
 
   Returns:
       Response indicating success or failure with an appropriate message.
@@ -1061,9 +1099,12 @@ def edit_reservation(reservationId : int, end_date_str : str) -> object:
     if reservation is None:
       return api_response(False, "Reservation not found.")
     else:
+      old_end_date = reservation.endDate.isoformat() if reservation.endDate else None
       reservation.endDate = parsed_end_date
       session.commit()
 
+  log_action(actor_user_id, "RESERVATION_ADMIN_EDIT", "reservation", reservationId,
+             {"oldEndDate": old_end_date, "newEndDate": end_date_str})
   return api_response(True, "Reservation was edited succesfully.")
 
 def get_all_roles() -> object:
@@ -1077,11 +1118,12 @@ def get_all_roles() -> object:
     
     return api_response(True, "Roles fetched successfully.", {"roles": data})
 
-def add_role(name: str) -> object:
+def add_role(name: str, actor_user_id: int = None) -> object:
     """Create a new role with the given name.
 
     Args:
         name: The name for the new role.
+        actor_user_id: The userId of the admin performing the action.
 
     Returns:
         Response with the created role data, or an error if creation fails.
@@ -1089,14 +1131,16 @@ def add_role(name: str) -> object:
     success, message, role_dict = add_role_helper(name)
     if not success:
         return api_response(False, message)
+    log_action(actor_user_id, "ROLE_CREATE", "role", role_dict.get("roleId"), {"name": name})
     return api_response(True, message, role_dict)
 
-def edit_role(roleId: int, name: str) -> object:
+def edit_role(roleId: int, name: str, actor_user_id: int = None) -> object:
     """Rename an existing role.
 
     Args:
         roleId: The ID of the role to edit.
         name: The new name for the role.
+        actor_user_id: The userId of the admin performing the action.
 
     Returns:
         Response with the updated role data, or an error if the edit fails.
@@ -1104,13 +1148,15 @@ def edit_role(roleId: int, name: str) -> object:
     success, message, role_dict = edit_role_helper(roleId, name)
     if not success:
         return api_response(False, message)
+    log_action(actor_user_id, "ROLE_UPDATE", "role", roleId, {"newName": name})
     return api_response(True, message, role_dict)
 
-def remove_role(roleId: int) -> object:
+def remove_role(roleId: int, actor_user_id: int = None) -> object:
     """Delete a role by ID.
 
     Args:
         roleId: The ID of the role to remove.
+        actor_user_id: The userId of the admin performing the action.
 
     Returns:
         Response indicating success or failure with an appropriate message.
@@ -1118,6 +1164,7 @@ def remove_role(roleId: int) -> object:
     success, message = remove_role_helper(roleId)
     if not success:
         return api_response(False, message)
+    log_action(actor_user_id, "ROLE_DELETE", "role", roleId)
     return api_response(True, message)
 
 def get_role_mounts(roleId: int) -> object:
@@ -1136,7 +1183,7 @@ def get_role_mounts(roleId: int) -> object:
     except Exception as e:
         return api_response(False, f"Error retrieving role mounts: {str(e)}")
 
-def save_role_mounts(roleId: int, mounts: list) -> object:
+def save_role_mounts(roleId: int, mounts: list, actor_user_id: int = None) -> object:
     """Replace all volume mount configurations for a role.
 
     Deletes existing mounts and saves the provided list as the new
@@ -1146,6 +1193,7 @@ def save_role_mounts(roleId: int, mounts: list) -> object:
         roleId: The ID of the role.
         mounts: List of mount dicts, each containing host path,
             container path, and read-only flag.
+        actor_user_id: The userId of the admin performing the action.
 
     Returns:
         Response indicating success or failure with an appropriate message.
@@ -1153,6 +1201,9 @@ def save_role_mounts(roleId: int, mounts: list) -> object:
     try:
         from helpers.tables.role import save_role_mounts as save_role_mounts_helper
         success, message = save_role_mounts_helper(roleId, mounts)
+        if success:
+            log_action(actor_user_id, "ROLE_MOUNTS_UPDATE", "role", roleId,
+                       {"mountCount": len(mounts)})
         return api_response(success, message)
     except Exception as e:
         return api_response(False, f"Error saving role mounts: {str(e)}")
@@ -1173,7 +1224,7 @@ def get_role_hardware_limits(roleId: int) -> object:
     except Exception as e:
         return api_response(False, f"Error retrieving role hardware limits: {str(e)}")
 
-def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> object:
+def save_role_hardware_limits(roleId: int, hardwareLimits: list, actor_user_id: int = None) -> object:
     """Replace all hardware resource limits for a role.
 
     Deletes existing limits and saves the provided list as the new
@@ -1183,6 +1234,7 @@ def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> object:
         roleId: The ID of the role.
         hardwareLimits: List of hardware limit dicts, each containing
             hardwareSpecId and maximumAmountForRole.
+        actor_user_id: The userId of the admin performing the action.
 
     Returns:
         Response indicating success or failure with an appropriate message.
@@ -1190,6 +1242,8 @@ def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> object:
     try:
         from helpers.tables.role import save_role_hardware_limits as save_role_hardware_limits_helper
         success, message = save_role_hardware_limits_helper(roleId, hardwareLimits)
+        if success:
+            log_action(actor_user_id, "ROLE_HARDWARE_LIMITS_UPDATE", "role", roleId)
         return api_response(success, message)
     except Exception as e:
         return api_response(False, f"Error saving role hardware limits: {str(e)}")
@@ -1211,13 +1265,14 @@ def get_role_reservation_limits(roleId: int) -> object:
     except Exception as e:
         return api_response(False, f"Error retrieving role reservation limits: {str(e)}")
 
-def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> object:
+def save_role_reservation_limits(roleId: int, reservationLimits: dict, actor_user_id: int = None) -> object:
     """Replace reservation limits for a role.
 
     Args:
         roleId: The ID of the role.
         reservationLimits: Dictionary containing minDuration (hours),
             maxDuration (hours), and maxActiveReservations.
+        actor_user_id: The userId of the admin performing the action.
 
     Returns:
         Response indicating success or failure with an appropriate message.
@@ -1225,6 +1280,8 @@ def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> object
     try:
         from helpers.tables.role import save_role_reservation_limits as save_role_reservation_limits_helper
         success, message = save_role_reservation_limits_helper(roleId, reservationLimits)
+        if success:
+            log_action(actor_user_id, "ROLE_RESERVATION_LIMITS_UPDATE", "role", roleId)
         return api_response(success, message)
     except Exception as e:
         return api_response(False, f"Error saving role reservation limits: {str(e)}")
@@ -1474,16 +1531,17 @@ def get_general_settings() -> object:
     except Exception as e:
         return api_response(False, f"Error retrieving settings: {str(e)}")
 
-def save_general_settings(section: str, settings: dict) -> object:
+def save_general_settings(section: str, settings: dict, actor_user_id: int = None) -> object:
     """Save admin settings for a specific configuration section.
 
     Persists settings to the database for the given section. Supported
     sections: general, access, email, contact, emailEnable, notifications,
-    and auth (including nested LDAP settings).
+    auth (including nested LDAP settings), and auditLog.
 
     Args:
         section: The settings section name to save.
         settings: Dictionary of key-value pairs for the section.
+        actor_user_id: The userId of the admin performing the action.
 
     Returns:
         Response indicating success or failure with an appropriate message.
@@ -1580,11 +1638,21 @@ def save_general_settings(section: str, settings: dict) -> object:
                 if 'nameField' in ldap_settings:
                     set_setting('auth.ldap.nameField', ldap_settings['nameField'])
 
+        elif section == "auditLog":
+            if 'retentionDays' in settings:
+                set_setting('auditLog.retentionDays', settings['retentionDays'])
+
         else:
             return api_response(False, f"Unknown section: {section}")
-            
+
+        # Build audit details, excluding sensitive values
+        safe_keys = list(settings.keys())
+        audit_details = {"section": section, "keys": safe_keys}
+        if section == "email" and "smtpPassword" in settings:
+            audit_details["smtpPasswordChanged"] = True
+        log_action(actor_user_id, "SETTINGS_UPDATE", "settings", None, audit_details)
         return api_response(True, f"Settings for {section} saved successfully")
-        
+
     except Exception as e:
         return api_response(False, f"Error saving settings: {str(e)}")
 
@@ -1730,3 +1798,17 @@ def test_ad_connection(username: str, password: str) -> object:
         return api_response(False, "Server unreachable: Failed to connect to the LDAP server. Check the URL and ensure the server is running.")
     except Exception as e:
         return api_response(False, f"LDAP connection test failed: {str(e)}")
+
+def get_audit_logs(request) -> object:
+    """Retrieve paginated audit log entries with optional filtering.
+
+    Delegates to the audit_log helper which handles query building,
+    filtering, pagination, and response formatting.
+
+    Args:
+        request: AuditLogRequest with pagination, sorting, and filter params.
+
+    Returns:
+        Response with paginated logs, totalItems, and retentionDays.
+    """
+    return get_audit_logs_helper(request)

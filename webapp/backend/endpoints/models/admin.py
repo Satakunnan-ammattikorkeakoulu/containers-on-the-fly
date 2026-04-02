@@ -19,6 +19,16 @@ class AdminUsersRequest(PaginationParams):
     pass
 
 
+class AuditLogRequest(PaginationParams):
+    """Request model for paginated, filtered audit log listing.
+
+    Inherits page, itemsPerPage, sortBy, and filters from PaginationParams.
+    Supported filter keys: action, resourceType, user, dateFrom, dateTo.
+    """
+
+    pass
+
+
 class ContainerEdit(BaseModel):
     """Request model for editing a container's properties.
 

@@ -248,6 +248,13 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         description="Email addresses for alerts (JSON array)"
     ),
     
+    # Audit Log Settings
+    "auditLog.retentionDays": SettingSetting(
+        SettingSource.DATABASE, SettingType.INTEGER, default=180,
+        min_value=0, max_value=3650,
+        description="Number of days to keep audit log entries (0 = keep forever)"
+    ),
+
     # Authentication Settings
     "auth.loginType": SettingSetting(
         SettingSource.DATABASE, SettingType.TEXT, default="password",

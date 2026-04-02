@@ -823,3 +823,18 @@ test-all: ## Run backend + container server + frontend tests (not E2E — those 
 	@$(MAKE) test-backend
 	@$(MAKE) test-container-server
 	@$(MAKE) test-frontend
+
+
+# ===========================================================================
+# Documentation
+# ===========================================================================
+
+generate-db-diagram: ## Generate database ER diagram from SQLAlchemy models (Mermaid)
+	@echo "Generating database diagram..."
+	@$(PYTHON) scripts/generate_db_diagram.py
+	@echo "$(GREEN)Database diagram generated: additional_documentation/database_diagram.md$(RESET)"
+
+generate-db-diagram-png: generate-db-diagram ## Generate database ER diagram as PNG (requires Node.js)
+	@echo "Rendering diagram to PNG..."
+	@npx -y @mermaid-js/mermaid-cli mmdc -i additional_documentation/database_diagram.md -o additional_documentation/database_diagram.png -t neutral -b white -w 2400
+	@echo "$(GREEN)Database diagram PNG generated: additional_documentation/database_diagram.png$(RESET)"

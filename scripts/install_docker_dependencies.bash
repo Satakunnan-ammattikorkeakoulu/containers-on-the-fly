@@ -300,11 +300,11 @@ if [ "$IS_MAIN_SERVER" = "true" ]; then
         echo "Waiting for registry to be ready..."
         sleep 5
 
-        # Build base-ubuntu image to be used as an example with default setup
-        sudo -u $CURRENT_USER docker build -t $INSECURE_REGISTRY/ubuntu-base:latest -f DockerfileContainerExample . || \
-            echo -e "${RED}Warning: Could not build base image. You can build it manually later.${RESET}"
-        sudo -u $CURRENT_USER docker push $INSECURE_REGISTRY/ubuntu-base:latest || \
-            echo -e "${RED}Warning: Could not push base image to registry. You can push it manually later.${RESET}"
+        # Smoke-test the registry with a tiny image
+        sudo -u $CURRENT_USER docker tag hello-world $INSECURE_REGISTRY/hello-world:latest || \
+            echo -e "${RED}Warning: Could not tag hello-world image. You can test the registry manually later.${RESET}"
+        sudo -u $CURRENT_USER docker push $INSECURE_REGISTRY/hello-world:latest || \
+            echo -e "${RED}Warning: Could not push to registry. You can test it manually later.${RESET}"
     fi
 else
     echo "Container server detected - skipping Docker registry setup (will connect to main server registry)"

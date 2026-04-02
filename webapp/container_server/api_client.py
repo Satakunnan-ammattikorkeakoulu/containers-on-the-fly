@@ -7,7 +7,7 @@ and includes retry logic with exponential backoff for transient failures.
 
 import time
 import requests
-from logger import log
+from helpers.logger import log
 
 
 class DaemonApiClient:

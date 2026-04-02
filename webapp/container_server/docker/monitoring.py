@@ -10,7 +10,7 @@ import psutil
 import subprocess
 import time
 from datetime import datetime, timezone
-from logger import log
+from helpers.logger import log
 
 
 def read_version_file():

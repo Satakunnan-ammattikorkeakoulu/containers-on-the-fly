@@ -9,10 +9,10 @@ from time import sleep
 from datetime import timezone, datetime, timedelta
 import sys
 
-from logger import log
-from settings_handler import settings_handler
+from helpers.logger import log
+from helpers.settings_handler import settings_handler
 from api_client import DaemonApiClient
-from utils import create_password
+from helpers.utils import create_password
 
 from docker.containers import start_container, stop_container, restart_container, run_stop_script
 from docker.monitoring import collect_server_metrics, collect_server_logs

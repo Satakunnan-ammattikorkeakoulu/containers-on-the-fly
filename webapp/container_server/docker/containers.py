@@ -5,12 +5,12 @@ No database access, no email, no filesystem setup (that's in mounts.py).
 """
 
 from python_on_whales import docker
-from utils import create_password
-from settings_handler import settings_handler
+from helpers.utils import create_password
+from helpers.settings_handler import settings_handler
 from python_on_whales.exceptions import NoSuchContainer
 import traceback
 import shlex
-from logger import log
+from helpers.logger import log
 from docker.mounts import build_volume_list, run_user_config_script
 from docker.image_builder import DEFAULT_PASSWORD_COMMAND, DEFAULT_SSH_KEY_DEPLOY_COMMANDS
 from docker.ssh_host_keys import inject_host_keys

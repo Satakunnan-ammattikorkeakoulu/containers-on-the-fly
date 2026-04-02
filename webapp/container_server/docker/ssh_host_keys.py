@@ -11,7 +11,7 @@ import subprocess
 import traceback
 
 from python_on_whales import docker
-from logger import log
+from helpers.logger import log
 
 
 # Key types to generate, matching standard openssh-server defaults

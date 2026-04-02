@@ -7,8 +7,8 @@ actual port availability.
 
 import random
 import socket
-from settings_handler import settings_handler
-from logger import log
+from helpers.settings_handler import settings_handler
+from helpers.logger import log
 
 
 def is_port_in_use(port: int) -> bool:

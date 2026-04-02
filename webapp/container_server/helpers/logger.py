@@ -3,7 +3,7 @@
 Provides a colored console logger without database dependencies.
 
 Usage:
-    from logger import log
+    from helpers.logger import log
     log.info("Hello world!")
 """
 
@@ -51,7 +51,7 @@ _LOG_LEVEL_MAP = {
 
 _configured_level = "DEBUG"
 try:
-    from settings_handler import settings_handler
+    from helpers.settings_handler import settings_handler
     _configured_level = settings_handler.get_setting("app.logLevel") or "DEBUG"
 except Exception:
     pass

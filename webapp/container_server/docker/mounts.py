@@ -15,7 +15,7 @@ import re
 def remove_special_characters(string):
     """Remove all non-alphanumeric characters (except whitespace) from a string."""
     return re.sub(r'[^a-zA-Z0-9\s]', '', string)
-from logger import log
+from helpers.logger import log
 
 
 def substitute_mount_variables(path, user_email, user_id):

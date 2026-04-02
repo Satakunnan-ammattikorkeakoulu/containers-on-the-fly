@@ -15,8 +15,8 @@ import shutil
 import traceback
 from datetime import datetime, timezone
 from python_on_whales import docker
-from settings_handler import settings_handler
-from logger import log
+from helpers.settings_handler import settings_handler
+from helpers.logger import log
 
 # Pattern for valid Docker image names
 _VALID_IMAGE_NAME_RE = re.compile(r'^[a-zA-Z0-9._/:\-]+$')

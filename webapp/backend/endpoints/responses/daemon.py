@@ -410,8 +410,16 @@ def report_started(reservation_id: int, data, computer_id: int):
 
         session.commit()
 
-        # Build port list for email
+        # Collect email data while still in session scope
         container_obj = rc.container
+        email_recipient = reservation.user.email
+        email_image_name = container_obj.imageName
+        email_computer_ip = reservation.computer.ip
+        email_end_date = reservation.endDate
+        email_username = container_obj.containerUsername or "user"
+        log_user_id = reservation.userId
+
+        # Build port list for email
         email_ports = []
         for port in data.ports:
             # Find the service name from the container's port definitions
@@ -426,20 +434,15 @@ def report_started(reservation_id: int, data, computer_id: int):
                 "outsidePort": port.outsidePort,
             })
 
-        # Send notification email
-        send_container_started_email(
-            reservation.user.email,
-            container_obj.imageName,
-            reservation.computer.ip,
-            email_ports,
-            data.sshPassword,
-            data.nonCriticalErrors,
-            reservation.endDate,
-            container_obj.containerUsername or "user",
-        )
+    # Send notification email outside session to avoid holding DB connection during SMTP I/O
+    send_container_started_email(
+        email_recipient, email_image_name, email_computer_ip,
+        email_ports, data.sshPassword, data.nonCriticalErrors,
+        email_end_date, email_username,
+    )
 
-        log.info(f"Container started for reservation {reservation_id}, user={reservation.userId}, docker_name={data.containerDockerName}")
-        return api_response(True, "Reservation marked as started")
+    log.info(f"Container started for reservation {reservation_id}, user={log_user_id}, docker_name={data.containerDockerName}")
+    return api_response(True, "Reservation marked as started")
 
 
 def report_start_failed(reservation_id: int, data, computer_id: int):
@@ -475,17 +478,21 @@ def report_start_failed(reservation_id: int, data, computer_id: int):
         reservation.reservedContainer.containerStatus = "error"
         session.commit()
 
+        # Collect email data while still in session scope
         container_obj = reservation.reservedContainer.container
+        email_recipient = reservation.user.email
         image_name = container_obj.imageName if container_obj else "unknown"
+        computer_name = reservation.computer.name
 
-        send_container_error_email(reservation.user.email, data.errorMessage)
-        send_admin_failure_alert(
-            reservation.user.email, reservation_id,
-            image_name, reservation.computer.name, data.errorMessage,
-        )
+    # Send notification emails outside session to avoid holding DB connection during SMTP I/O
+    send_container_error_email(email_recipient, data.errorMessage)
+    send_admin_failure_alert(
+        email_recipient, reservation_id,
+        image_name, computer_name, data.errorMessage,
+    )
 
-        log.error(f"Container start failed for reservation {reservation_id}: {data.errorMessage}")
-        return api_response(True, "Reservation marked as error")
+    log.error(f"Container start failed for reservation {reservation_id}: {data.errorMessage}")
+    return api_response(True, "Reservation marked as error")
 
 
 def report_stopped(reservation_id: int, computer_id: int):
@@ -552,13 +559,17 @@ def report_paused(reservation_id: int, data, computer_id: int):
         reservation.reservedContainer.containerStatus = "paused"
         session.commit()
 
-        send_container_paused_email(
-            reservation.user.email, data.imageName,
-            data.computerName, reservation_id,
-        )
+        # Collect email data while still in session scope
+        email_recipient = reservation.user.email
 
-        log.info(f"Low-priority reservation {reservation_id} paused")
-        return api_response(True, "Reservation marked as paused")
+    # Send notification email outside session to avoid holding DB connection during SMTP I/O
+    send_container_paused_email(
+        email_recipient, data.imageName,
+        data.computerName, reservation_id,
+    )
+
+    log.info(f"Low-priority reservation {reservation_id} paused")
+    return api_response(True, "Reservation marked as paused")
 
 
 def report_resumed(reservation_id: int, computer_id: int):

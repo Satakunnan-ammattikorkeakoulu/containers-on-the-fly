@@ -17,7 +17,7 @@ from endpoints.models.admin import AdminUsersRequest
 from sqlalchemy.orm import joinedload
 from sqlalchemy import cast, String
 from helpers.pagination import apply_pagination, get_total_count
-from logger import log
+from helpers.logger import log
 from helpers.auth import hash_password, is_correct_password
 import base64
 from endpoints.models.admin import UserEdit
@@ -1348,7 +1348,7 @@ def get_general_settings() -> object:
         blacklisted and whitelisted email lists.
     """
     try:
-        from settings_handler import get_setting, get_multiple_settings
+        from helpers.settings_handler import get_setting, get_multiple_settings
         from helpers.tables.user_access_control import get_blacklisted_emails, get_whitelisted_emails
         
         # Define all settings with their defaults
@@ -1465,7 +1465,7 @@ def save_general_settings(section: str, settings: dict) -> object:
         Response indicating success or failure with an appropriate message.
     """
     try:
-        from settings_handler import set_setting
+        from helpers.settings_handler import set_setting
         from helpers.tables.user_access_control import set_blacklisted_emails, set_whitelisted_emails
         
         if section == "general":
@@ -1576,7 +1576,7 @@ def send_test_email(email: str) -> object:
         or describing the error that occurred.
     """
     try:
-        from settings_handler import get_setting
+        from helpers.settings_handler import get_setting
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart

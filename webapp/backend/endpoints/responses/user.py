@@ -6,7 +6,7 @@ lifecycle script path management for users.
 """
 
 from database import User, Session, UserWhitelist, UserBlacklist
-from settings_handler import get_setting
+from helpers.settings_handler import get_setting
 from helpers.server import api_response
 from helpers.auth import create_login_token, hash_password, is_correct_password, check_token, get_ldap_user, get_role
 from fastapi import HTTPException, status

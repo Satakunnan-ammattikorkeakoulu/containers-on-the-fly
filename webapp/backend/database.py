@@ -6,7 +6,7 @@ Uses MariaDB via PyMySQL with connection pooling.
 """
 
 from sqlalchemy import create_engine
-from settings_handler import settings_handler
+from helpers.settings_handler import settings_handler
 import pymysql
 engine = create_engine(
     settings_handler.get_setting("database.engineUri"), 

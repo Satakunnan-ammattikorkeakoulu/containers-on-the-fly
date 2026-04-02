@@ -1,6 +1,6 @@
 """Tests for settings_schema.py — schema definitions and validation logic."""
 
-from settings_schema import (
+from helpers.settings_schema import (
     SETTINGS_SCHEMA,
     SettingSource,
     SettingType,

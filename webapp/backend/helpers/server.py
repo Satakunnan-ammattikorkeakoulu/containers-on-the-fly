@@ -13,7 +13,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import joinedload
 from helpers.auth import *
 from database import User, Computer, Session
-from settings_handler import settings_handler
+from helpers.settings_handler import settings_handler
 
 def api_response(status, message, extra_data = None):
   """Build a standardized API response dict.

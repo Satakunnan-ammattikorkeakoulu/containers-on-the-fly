@@ -20,7 +20,7 @@ from helpers.email_notifications import (
     send_container_paused_email, send_container_resumed_email,
     send_admin_failure_alert,
 )
-from logger import log
+from helpers.logger import log
 
 
 def _time_now():

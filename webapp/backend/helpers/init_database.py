@@ -11,11 +11,11 @@ Usage:
 import sys
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import OperationalError
-from settings_handler import settings_handler
+from helpers.settings_handler import settings_handler
 import subprocess
 import os
 from database import Base, engine, Session  # Import Session as well
-from logger import log
+from helpers.logger import log
 
 def database_exists():
     """Check if any tables exist in the database.

@@ -39,7 +39,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # 3. Patch settings_handler to use test settings (SQLite URI)
 # ---------------------------------------------------------------------------
-import settings_handler as _sh_module
+import helpers.settings_handler as _sh_module
 
 _test_settings_path = os.path.join(os.path.dirname(__file__), "test_settings.json")
 _test_settings = _sh_module.UnifiedSettings(config_location=_test_settings_path)

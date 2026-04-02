@@ -5,7 +5,7 @@ such as application name, timezone, login instructions, and contact info.
 """
 
 from helpers.server import api_response
-from logger import log
+from helpers.logger import log
 
 def get_public_config() -> object:
     """Return public app configuration that does not require authentication.
@@ -19,7 +19,7 @@ def get_public_config() -> object:
         instruction texts, and login field labels.
     """
     try:
-        from settings_handler import get_multiple_settings
+        from helpers.settings_handler import get_multiple_settings
         
         # Define public settings keys that don't require admin access
         setting_keys = [

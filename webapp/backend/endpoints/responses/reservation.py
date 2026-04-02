@@ -9,7 +9,7 @@ retrieval for active reservations.
 from database import Session, Computer, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec
 from helpers.email_notifications import generate_connection_text
 from helpers.server import api_response, orm_to_dict
-from logger import log
+from helpers.logger import log
 from helpers.auth import is_admin
 from dateutil import parser
 from dateutil.relativedelta import *
@@ -19,7 +19,7 @@ from endpoints.models.reservation import ReservationFilters, UserReservationRequ
 from sqlalchemy import select, delete, func, cast, String
 from sqlalchemy.orm import joinedload
 from helpers.pagination import apply_pagination, get_total_count
-from settings_handler import get_setting
+from helpers.settings_handler import get_setting
 
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
 # TODO: Should also be able to only fail there is not enough resources any computer. Right now it fails if any of the computers are out of resources for the given time period.
@@ -667,7 +667,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     session.add(reservation)
     session.commit()
 
-    from settings_handler import get_setting
+    from helpers.settings_handler import get_setting
     inform_by_email = get_setting('email.sendEmail')
 
     return api_response(True, "Reservation created succesfully!", { "informByEmail": inform_by_email })

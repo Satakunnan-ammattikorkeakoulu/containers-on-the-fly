@@ -22,7 +22,7 @@ from database import (
     Container, ContainerPort, ReservedContainer, ReservedContainerPort,
     Reservation, Computer, HardwareSpec, ReservedHardwareSpec
 )
-from settings_handler import settings_handler
+from helpers.settings_handler import settings_handler
 
 # this is the Alembic Config object
 config = context.config

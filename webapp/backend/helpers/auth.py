@@ -11,7 +11,7 @@ import hmac
 import random
 import string
 from database import User, Session, UserWhitelist
-from settings_handler import get_setting
+from helpers.settings_handler import get_setting
 import helpers.server
 #import ldap3 as ldap
 import ldap
@@ -171,7 +171,7 @@ def check_token(token : str) -> object:
   if token == "" or token is None: return helpers.server.api_response(False, "Token cannot be empty.")
 
   def time_now(): return datetime.datetime.now(datetime.timezone.utc)
-  from settings_handler import get_setting
+  from helpers.settings_handler import get_setting
   session_timeout = get_setting('auth.sessionTimeoutMinutes')
   min_start_date = time_now() - timedelta(minutes=session_timeout)
 
@@ -307,7 +307,7 @@ def get_ldap_user(username, password):
           - On success: (True, userId) with the local user's database ID.
           - On failure: (False, error_message) with a descriptive error string.
   """
-  from settings_handler import get_setting
+  from helpers.settings_handler import get_setting
 
   # Get LDAP settings from database
   ldap_url = get_setting('auth.ldap.url')

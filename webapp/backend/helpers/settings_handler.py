@@ -6,7 +6,7 @@ from settings.json at startup. Database settings (runtime config) are loaded
 on demand from the SystemSetting table with caching.
 
 Usage:
-    from settings_handler import settings_handler
+    from helpers.settings_handler import settings_handler
     url = settings_handler.get_setting("app.url")
 """
 
@@ -15,7 +15,7 @@ import os
 import sys
 import re
 from typing import Any, Optional, Dict, List, Union
-from settings_schema import SETTINGS_SCHEMA, SettingSource, SettingType, get_setting_definition, validate_setting_value
+from helpers.settings_schema import SETTINGS_SCHEMA, SettingSource, SettingType, get_setting_definition, validate_setting_value
 
 class UnifiedSettingsError(Exception):
     """Custom exception for settings-related errors"""
@@ -125,7 +125,7 @@ class UnifiedSettings:
             # Log error but don't fail - allow fallback to individual queries
             # Lazy import to avoid circular dependency with logger module
             try:
-                from logger import log as _log
+                from helpers.logger import log as _log
                 _log.warning(f"Could not load database settings cache: {e}")
             except ImportError:
                 pass
@@ -167,7 +167,7 @@ class UnifiedSettings:
             return value
         except Exception as e:
             try:
-                from logger import log as _log
+                from helpers.logger import log as _log
                 _log.warning(f"Error getting database setting {key}: {e}")
             except ImportError:
                 pass
@@ -286,7 +286,7 @@ class UnifiedSettings:
             
         except Exception as e:
             try:
-                from logger import log as _log
+                from helpers.logger import log as _log
                 _log.error(f"Error setting {key}: {e}")
             except ImportError:
                 pass
@@ -420,7 +420,7 @@ class UnifiedSettings:
         }
 
 # Create global instance for backward compatibility
-# This allows existing code to use: from settings_handler import settings_handler
+# This allows existing code to use: from helpers.settings_handler import settings_handler
 settings_handler = UnifiedSettings()
 
 # Convenience functions for direct access

@@ -8,8 +8,8 @@ optionally seeds test data in development mode.
 
 from fastapi import APIRouter
 from endpoints import user, reservation, admin, app, daemon
-from settings_handler import settings_handler
-from logger import log
+from helpers.settings_handler import settings_handler
+from helpers.logger import log
 from helpers.auth import hash_password
 from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, Container
 from sqlalchemy import select

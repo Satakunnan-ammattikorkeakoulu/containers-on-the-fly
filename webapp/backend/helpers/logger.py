@@ -5,7 +5,7 @@ objects to dictionaries for readable log output, and a colored formatter
 that applies ANSI color codes based on log level.
 
 Usage:
-    from logger import log
+    from helpers.logger import log
     log.info("Hello world!")
     log.info(my_database_object)
 """
@@ -20,7 +20,7 @@ class CustomLogger(logging.Logger):
 
   Example usage::
 
-      from logger import log
+      from helpers.logger import log
       log.info("Hello world!")
       log.info(myDatabaseObject)
       log.warning("Something went wrong!")
@@ -109,7 +109,7 @@ _LOG_LEVEL_MAP = {
 
 _configured_level = "DEBUG"
 try:
-    from settings_handler import settings_handler
+    from helpers.settings_handler import settings_handler
     _configured_level = settings_handler.get_setting("app.logLevel") or "DEBUG"
 except Exception:
     pass  # Fall back to DEBUG if settings not yet available

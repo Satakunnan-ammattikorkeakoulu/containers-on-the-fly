@@ -5,7 +5,7 @@ database tables, used to control which email addresses can access the system.
 """
 from database import UserBlacklist, UserWhitelist, Session
 from sqlalchemy import select, delete
-from logger import log
+from helpers.logger import log
 
 def get_blacklisted_emails():
     """Get all blacklisted email addresses.

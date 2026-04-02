@@ -8,8 +8,8 @@ state changes.
 
 import os
 from helpers.email import send_email
-from settings_handler import get_setting
-from logger import log
+from helpers.settings_handler import get_setting
+from helpers.logger import log
 
 
 def generate_connection_text(image, ip, ports, password, include_email_details, non_critical_errors, end_date=None, username="user"):

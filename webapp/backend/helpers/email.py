@@ -8,8 +8,8 @@ import smtplib
 import socket
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from settings_handler import get_setting
-from logger import log
+from helpers.settings_handler import get_setting
+from helpers.logger import log
 
 def send_email(to, mail_subject, mail_body):
     """Send a plain-text email using the configured SMTP server.

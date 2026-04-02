@@ -28,7 +28,7 @@ class DaemonApiClient:
         self.session.headers["X-Daemon-Api-Key"] = api_key
         self.session.headers["X-Daemon-Server-Name"] = server_name
 
-    def _request(self, method: str, path: str, json=None, retries=3, timeout=30):
+    def _request(self, method: str, path: str, json=None, retries=3, timeout=30, retry_delay=None):
         """Make an HTTP request with retry logic.
 
         Args:
@@ -37,6 +37,8 @@ class DaemonApiClient:
             json: Request body as dict (for POST).
             retries: Number of retry attempts on failure.
             timeout: Request timeout in seconds.
+            retry_delay: Fixed delay in seconds between retries. If None,
+                uses exponential backoff (2^attempt seconds).
 
         Returns:
             Parsed JSON response dict, or None on failure.
@@ -49,15 +51,20 @@ class DaemonApiClient:
                 return resp.json()
             except requests.exceptions.ConnectionError as e:
                 if attempt < retries - 1:
-                    wait = 2 ** attempt
-                    log.warning(f"Backend unreachable ({e}), retrying in {wait}s...")
+                    wait = retry_delay if retry_delay is not None else 2 ** attempt
+                    log.warning(f"Backend unreachable ({e}), retrying in {wait}s ({attempt + 1}/{retries})...")
                     time.sleep(wait)
                 else:
                     log.error(f"Backend unreachable after {retries} attempts: {e}")
                     return None
             except requests.exceptions.HTTPError as e:
-                log.error(f"API error {resp.status_code} for {method} {path}: {resp.text}")
-                return None
+                if resp.status_code >= 500 and attempt < retries - 1:
+                    wait = retry_delay if retry_delay is not None else 2 ** attempt
+                    log.warning(f"Server error {resp.status_code} for {method} {path}, retrying in {wait}s ({attempt + 1}/{retries})...")
+                    time.sleep(wait)
+                else:
+                    log.error(f"API error {resp.status_code} for {method} {path}: {resp.text}")
+                    return None
             except Exception as e:
                 log.error(f"Unexpected error calling {method} {path}: {e}")
                 return None
@@ -97,7 +104,7 @@ class DaemonApiClient:
         Returns:
             Computer ID, or None if not found.
         """
-        resp = self._request("GET", f"/computer-id/{server_name}")
+        resp = self._request("GET", f"/computer-id/{server_name}", retries=5, retry_delay=5)
         if resp and resp.get("status"):
             return resp.get("data", {}).get("computerId")
         return None
@@ -117,7 +124,8 @@ class DaemonApiClient:
         Returns:
             True on success.
         """
-        resp = self._request("POST", f"/reservation/{reservation_id}/started", json=data)
+        resp = self._request("POST", f"/reservation/{reservation_id}/started", json=data,
+                             retries=5, retry_delay=5)
         return resp is not None and resp.get("status", False)
 
     def report_start_failed(self, reservation_id: int, error_message: str) -> bool:
@@ -131,7 +139,8 @@ class DaemonApiClient:
             True on success.
         """
         resp = self._request("POST", f"/reservation/{reservation_id}/start-failed",
-                             json={"errorMessage": error_message})
+                             json={"errorMessage": error_message},
+                             retries=5, retry_delay=5)
         return resp is not None and resp.get("status", False)
 
     def report_stopped(self, reservation_id: int) -> bool:
@@ -143,7 +152,8 @@ class DaemonApiClient:
         Returns:
             True on success.
         """
-        resp = self._request("POST", f"/reservation/{reservation_id}/stopped")
+        resp = self._request("POST", f"/reservation/{reservation_id}/stopped",
+                             retries=5, retry_delay=5)
         return resp is not None and resp.get("status", False)
 
     def report_paused(self, reservation_id: int, image_name: str, computer_name: str) -> bool:
@@ -158,7 +168,8 @@ class DaemonApiClient:
             True on success.
         """
         resp = self._request("POST", f"/reservation/{reservation_id}/paused",
-                             json={"imageName": image_name, "computerName": computer_name})
+                             json={"imageName": image_name, "computerName": computer_name},
+                             retries=5, retry_delay=5)
         return resp is not None and resp.get("status", False)
 
     def report_resumed(self, reservation_id: int) -> bool:
@@ -170,7 +181,8 @@ class DaemonApiClient:
         Returns:
             True on success.
         """
-        resp = self._request("POST", f"/reservation/{reservation_id}/resumed")
+        resp = self._request("POST", f"/reservation/{reservation_id}/resumed",
+                             retries=5, retry_delay=5)
         return resp is not None and resp.get("status", False)
 
     def report_restarted(self, reservation_id: int, success: bool, error_message: str = "") -> bool:
@@ -185,7 +197,8 @@ class DaemonApiClient:
             True on success.
         """
         resp = self._request("POST", f"/reservation/{reservation_id}/restarted",
-                             json={"success": success, "errorMessage": error_message})
+                             json={"success": success, "errorMessage": error_message},
+                             retries=5, retry_delay=5)
         return resp is not None and resp.get("status", False)
 
     # ------------------------------------------------------------------
@@ -217,7 +230,8 @@ class DaemonApiClient:
         Returns:
             True on success.
         """
-        resp = self._request("POST", f"/container/{container_id}/build-complete", json=data)
+        resp = self._request("POST", f"/container/{container_id}/build-complete", json=data,
+                             retries=5, retry_delay=5)
         return resp is not None and resp.get("status", False)
 
     def report_image_removed(self, container_id: int, build_status: str) -> bool:

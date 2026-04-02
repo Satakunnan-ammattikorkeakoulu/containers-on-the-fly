@@ -256,6 +256,15 @@ After making code changes, especially to frontend/backend configuration or busin
 pm2 restart all    # Restart all services to apply changes
 ```
 
+### Test Coverage for New Features
+After implementing a new feature or significant change, evaluate whether new tests would be beneficial and suggest this to the user. Consider adding tests when:
+- A new API endpoint was added or an existing endpoint's behavior changed
+- New business logic was introduced (validation, data transformation, access control)
+- A new database column or model was added that affects queries or responses
+- Frontend store state or actions were modified
+
+Do NOT suggest tests for trivial changes (config edits, copy/label updates, documentation).
+
 ### Automated Code Review (Post-Implementation)
 
 After completing a feature or task (not after every individual edit), automatically run review skills and tests **in the background** against unstaged changes:

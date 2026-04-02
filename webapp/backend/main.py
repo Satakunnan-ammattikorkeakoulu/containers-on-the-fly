@@ -12,17 +12,37 @@ from routes.api import router as api_router
 from helpers.settings_handler import settings_handler
 
 
-class DaemonPollingFilter(logging.Filter):
-    """Suppress access logs for routine daemon polling endpoints returning 200."""
+class PollingEndpointFilter(logging.Filter):
+    """Suppress access logs for routine polling endpoints returning 200.
+
+    High-frequency endpoints (frontend auto-refresh and daemon polling)
+    generate excessive log noise. Only non-200 responses are logged for
+    these paths so errors remain visible.
+    """
 
     _QUIET_PATHS = {
+        # Daemon polling
         "/api/daemon/tasks",
         "/api/daemon/orphan-check",
         "/api/daemon/monitoring",
+        # Frontend user polling (15s interval)
+        "/api/reservation/get_own_reservations",
+        # Frontend admin polling (15-30s interval)
+        "/api/admin/reservations",
+        "/api/admin/users",
+        "/api/admin/containers",
+        "/api/admin/computers",
+        "/api/admin/hardware",
+        "/api/admin/roles",
     }
 
+    _QUIET_PREFIXES = (
+        # Matches /api/admin/server/{computerId}/monitoring
+        "/api/admin/server/",
+    )
+
     def filter(self, record):
-        """Allow the log record unless it matches a quiet daemon path with 200 status.
+        """Allow the log record unless it matches a quiet path with 200 status.
 
         Args:
             record: The log record to evaluate.
@@ -31,10 +51,14 @@ class DaemonPollingFilter(logging.Filter):
             False to suppress the record, True to allow it.
         """
         msg = record.getMessage()
-        if "200" in msg:
-            for path in self._QUIET_PATHS:
-                if path in msg:
-                    return False
+        if "200" not in msg:
+            return True
+        for path in self._QUIET_PATHS:
+            if path in msg:
+                return False
+        for prefix in self._QUIET_PREFIXES:
+            if prefix in msg and "/monitoring" in msg:
+                return False
         return True
 
 app = FastAPI()
@@ -64,5 +88,5 @@ if __name__ == '__main__':
     reload = True
     #if production == True: logLevel = "critical"
     if production == True: reload = False
-    logging.getLogger("uvicorn.access").addFilter(DaemonPollingFilter())
+    logging.getLogger("uvicorn.access").addFilter(PollingEndpointFilter())
     uvicorn.run("main:app", host="0.0.0.0", port=int(settings_handler.get_setting("app.port")), log_level=logLevel, reload=reload)

@@ -98,8 +98,7 @@ def get_user_reservation_limits(userId: int) -> dict:
       A dict with keys 'minDuration' (hours), 'maxDuration' (hours),
       and 'maxActiveReservations' (int).
   """
-  from database import UserRole, Role
-  from helpers.tables.role import get_role_reservation_limits
+  from database import UserRole, Role, RoleReservationLimit
 
   with Session() as session:
     # Get all user roles explicitly assigned
@@ -118,6 +117,16 @@ def get_user_reservation_limits(userId: int) -> dict:
     default_max = 1440 if user_is_admin else 48  # 60 days for admin, 48 hours for others
     default_active = 99 if user_is_admin else 1
 
+    # Fetch all reservation limits for user's roles in a single query
+    role_ids = [role.roleId for role in user_roles]
+    role_limits_map = {}
+    if role_ids:
+      all_limits = session.execute(
+        select(RoleReservationLimit).where(RoleReservationLimit.roleId.in_(role_ids))
+      ).scalars().all()
+      for limit in all_limits:
+        role_limits_map[limit.roleId] = limit
+
     # Start with the most restrictive defaults
     min_duration = float('inf')
     max_duration = 0
@@ -125,19 +134,32 @@ def get_user_reservation_limits(userId: int) -> dict:
 
     # Apply the most permissive limits from all roles
     for role in user_roles:
-      limits = get_role_reservation_limits(role.roleId)
+      # Determine per-role defaults
+      if role.name == "admin":
+        role_default_min, role_default_max, role_default_active = 1, 1440, 99
+      else:
+        role_default_min, role_default_max, role_default_active = 1, 48, 1
+
+      # Use stored limits if they exist, otherwise use role defaults
+      db_limit = role_limits_map.get(role.roleId)
+      if db_limit:
+        role_min = db_limit.minDuration if db_limit.minDuration is not None else role_default_min
+        role_max = db_limit.maxDuration if db_limit.maxDuration is not None else role_default_max
+        role_active = db_limit.maxActiveReservations if db_limit.maxActiveReservations is not None else role_default_active
+      else:
+        role_min, role_max, role_active = role_default_min, role_default_max, role_default_active
 
       # Use the lowest minimum duration (most permissive)
-      if limits['minDuration'] < min_duration:
-        min_duration = limits['minDuration']
+      if role_min < min_duration:
+        min_duration = role_min
 
       # Use the highest maximum duration (most permissive)
-      if limits['maxDuration'] > max_duration:
-        max_duration = limits['maxDuration']
+      if role_max > max_duration:
+        max_duration = role_max
 
       # Use the highest max active reservations (most permissive)
-      if limits['maxActiveReservations'] > max_active_reservations:
-        max_active_reservations = limits['maxActiveReservations']
+      if role_active > max_active_reservations:
+        max_active_reservations = role_active
 
     # If no roles found, use defaults
     if min_duration == float('inf'):

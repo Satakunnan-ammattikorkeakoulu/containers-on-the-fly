@@ -668,7 +668,9 @@ def get_user(userId: int) -> object:
     data = {}
 
     with Session() as session:
-        user = session.execute(select(User).where(User.userId == userId)).scalar_one_or_none()
+        user = session.execute(
+            select(User).options(joinedload(User.roles)).where(User.userId == userId)
+        ).unique().scalar_one_or_none()
         if user is None:
             return api_response(False, "User not found")
 

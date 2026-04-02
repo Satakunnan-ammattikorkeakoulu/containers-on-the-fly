@@ -69,16 +69,74 @@ class TestRequest:
         assert mock_request.call_count == 2
 
     @patch.object(requests.Session, "request")
-    def test_returns_none_on_http_error(self, mock_request):
+    def test_returns_none_on_4xx_http_error(self, mock_request):
         mock_resp = MagicMock()
-        mock_resp.status_code = 500
-        mock_resp.text = "Internal Server Error"
+        mock_resp.status_code = 404
+        mock_resp.text = "Not Found"
         mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError()
         mock_request.return_value = mock_resp
 
         client = self._make_client()
         result = client._request("GET", "/tasks")
         assert result is None
+        assert mock_request.call_count == 1
+
+    @patch("api_client.time.sleep")
+    @patch.object(requests.Session, "request")
+    def test_retries_on_5xx_http_error(self, mock_request, mock_sleep):
+        mock_fail = MagicMock()
+        mock_fail.status_code = 500
+        mock_fail.text = "Internal Server Error"
+        mock_fail.raise_for_status.side_effect = requests.exceptions.HTTPError()
+
+        mock_ok = MagicMock()
+        mock_ok.json.return_value = {"status": True}
+        mock_ok.raise_for_status = MagicMock()
+
+        mock_request.side_effect = [mock_fail, mock_ok]
+
+        client = self._make_client()
+        result = client._request("GET", "/tasks", retries=3)
+        assert result == {"status": True}
+        assert mock_request.call_count == 2
+
+    @patch("api_client.time.sleep")
+    @patch.object(requests.Session, "request")
+    def test_returns_none_after_all_5xx_retries_exhausted(self, mock_request, mock_sleep):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 502
+        mock_resp.text = "Bad Gateway"
+        mock_resp.raise_for_status.side_effect = requests.exceptions.HTTPError()
+        mock_request.return_value = mock_resp
+
+        client = self._make_client()
+        result = client._request("GET", "/tasks", retries=3)
+        assert result is None
+        assert mock_request.call_count == 3
+
+    @patch("api_client.time.sleep")
+    @patch.object(requests.Session, "request")
+    def test_fixed_retry_delay(self, mock_request, mock_sleep):
+        mock_request.side_effect = requests.exceptions.ConnectionError("refused")
+
+        client = self._make_client()
+        client._request("GET", "/tasks", retries=3, retry_delay=5)
+        assert mock_sleep.call_args_list == [
+            ((5,),),
+            ((5,),),
+        ]
+
+    @patch("api_client.time.sleep")
+    @patch.object(requests.Session, "request")
+    def test_exponential_backoff_without_retry_delay(self, mock_request, mock_sleep):
+        mock_request.side_effect = requests.exceptions.ConnectionError("refused")
+
+        client = self._make_client()
+        client._request("GET", "/tasks", retries=3)
+        assert mock_sleep.call_args_list == [
+            ((1,),),
+            ((2,),),
+        ]
 
 
 class TestGetTasks:
@@ -176,6 +234,7 @@ class TestReportMethods:
         mock_req.assert_called_once_with(
             "POST", "/reservation/1/start-failed",
             json={"errorMessage": "error msg"},
+            retries=5, retry_delay=5,
         )
 
     @patch.object(DaemonApiClient, "_request")

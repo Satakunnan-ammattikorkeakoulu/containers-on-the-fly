@@ -111,16 +111,13 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
       container_dict.pop("buildLog", None)
       containers.append(container_dict)
 
-  # Get user's roles and their hardware limits
-  user_role_limits = {}
-  if user_id:
-    from database import RoleHardwareLimit, UserRole
-    with Session() as session:
-      # Get all roles for the user
+    # Get user's roles and their hardware limits (in the same session)
+    user_role_limits = {}
+    if user_id:
+      from database import RoleHardwareLimit, UserRole
       user_roles = session.execute(select(UserRole).where(UserRole.userId == user_id)).scalars().all()
       role_ids = [ur.roleId for ur in user_roles]
 
-      # Get all hardware limits for user's roles
       if role_ids:
         role_limits = session.execute(select(RoleHardwareLimit).where(
           RoleHardwareLimit.roleId.in_(role_ids)
@@ -486,6 +483,10 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
   date = parser.parse(date)
   end_date = date+relativedelta(hours=+duration)
 
+  # Phase 1: Validation session — resolve user, check limits, validate inputs
+  is_user_admin = False
+  resolved_user_id = userId
+
   with Session() as session:
     # Check that user exists
     user = session.execute(select(User).where( User.userId == userId )).scalar_one_or_none()
@@ -500,7 +501,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     container = session.execute(select(Container).where( Container.containerId == containerId )).scalar_one_or_none()
     if (container == None):
       return api_response(False, "Container not found.")
-    
+
     # Verify user can access this container
     if container.public == False and not is_user_admin:
       return api_response(False, "Access denied to private container.")
@@ -559,26 +560,31 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       another_user = session.execute(select(User).where( User.email == adminReserveUserEmail )).scalar_one_or_none()
       if (another_user == None):
         return api_response(False, "User for which you tried to reserve for did not exist. Check the email address: " + adminReserveUserEmail)
-      user = another_user
+      resolved_user_id = another_user.userId
+    else:
+      resolved_user_id = user.userId
 
-    # Make sure that there are enough resources for the reservation
-    # Low-priority reservations skip the time-slot availability check (they start when resources are free)
-    if not isLowPriority:
-      available_hardware_response = get_available_hardware(date.isoformat(), duration, hardwareSpecs, is_user_admin, None, user.userId)
-      if (available_hardware_response["status"] == False):
-        return api_response(False, available_hardware_response["message"])
+  # Phase 2: Check hardware availability outside session to avoid nested sessions
+  if not isLowPriority:
+    available_hardware_response = get_available_hardware(date.isoformat(), duration, hardwareSpecs, is_user_admin, None, resolved_user_id)
+    if (available_hardware_response["status"] == False):
+      return api_response(False, available_hardware_response["message"])
+
+  # Phase 3: Creation session — build and persist the reservation
+  with Session() as session:
+    user = session.execute(select(User).where( User.userId == resolved_user_id )).scalar_one_or_none()
 
     # Create the base reservation
     reservation_data = {
       "reservedContainerId": containerId,
       "startDate": date,
       "endDate": end_date,
-      "userId": user.userId,
+      "userId": resolved_user_id,
       "computerId": computerId,
       "status": "reserved",
       "isLowPriority": isLowPriority,
     }
-    
+
     # Only add description if it's provided and not empty
     if description and description.strip():
       reservation_data["description"] = description.strip()
@@ -588,7 +594,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     # Get user's role-based hardware limits
     user_role_limits = {}
     from database import RoleHardwareLimit, UserRole
-    user_roles = session.execute(select(UserRole).where(UserRole.userId == user.userId)).scalars().all()
+    user_roles = session.execute(select(UserRole).where(UserRole.userId == resolved_user_id)).scalars().all()
     role_ids = [ur.roleId for ur in user_roles]
 
     if role_ids and not is_user_admin:
@@ -644,7 +650,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
 
         if val > effective_limit:
           return api_response(False, f"Trying to utilize hardware specs above the user maximum amount for {hardware_spec.type} {hardware_spec.format}: {val} > {effective_limit}")
-      
+
       # Only add resources over 0
       if val > 0:
         reservation.reservedHardwareSpecs.append(
@@ -661,8 +667,6 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       startScriptPath = startScriptPath or None,
       stopScriptPath = stopScriptPath or None,
     )
-    #print(orm_to_dict(reservation))
-    #print(orm_to_dict(reservation.reservedContainer))
     user.reservations.append(reservation)
     session.add(reservation)
     session.commit()
@@ -753,7 +757,7 @@ def extend_reservation(userId : int, reservationId: str, duration: int):
       Response indicating success with the extension amount, or an
       error message if extension is not possible.
   """
-  # Check that user owns the given reservation and it can be found
+  # Phase 1: Read session — validate ownership, status, GPU conflicts, collect data
   # Admins can extend any reservation
 
   with Session() as session:
@@ -799,22 +803,29 @@ def extend_reservation(userId : int, reservationId: str, duration: int):
         if conflicting_reservation:
           return api_response(False, f"Cannot extend reservation: GPU {spec.hardwareSpec.format} (ID: {spec.hardwareSpec.internalId}) is already reserved by another user during the requested extension period.")
 
-    # Check that there are enough resources for the reservation extension
-    # Reducable specs comes from the current reservation
+    # Collect data needed for availability check and update
     reducable_specs = {}
     for spec in reservation.reservedHardwareSpecs:
       reducable_specs[spec.hardwareSpecId] = spec.amount
-    available_hardware_response = get_available_hardware(end_time_string, duration, reducable_specs, False, reservation.reservationId, reservation.userId)
-    if available_hardware_response["status"]:
-      # Extend the reservation
-      reservation.endDate = reservation.endDate + relativedelta(hours=+duration)
-      session.commit()
-      return api_response(True, "Reservation was extended by " + str(duration) + " hours.")
-    else:
-      log.debug(available_hardware_response["message"])
-      return api_response(False, "Cannot extend reservation due to lack of resources. Try with less hours.")
+    res_id = reservation.reservationId
+    res_user_id = reservation.userId
 
-  return api_response(False, "Error.")
+  # Phase 2: Check resource availability outside session to avoid nested sessions
+  available_hardware_response = get_available_hardware(end_time_string, duration, reducable_specs, False, res_id, res_user_id)
+  if not available_hardware_response["status"]:
+    log.debug(available_hardware_response["message"])
+    return api_response(False, "Cannot extend reservation due to lack of resources. Try with less hours.")
+
+  # Phase 3: Update session — apply the extension
+  with Session() as session:
+    reservation = session.execute(
+      select(Reservation).where(Reservation.reservationId == res_id)
+    ).scalar_one_or_none()
+    if reservation is None:
+      return api_response(False, "No reservation found.")
+    reservation.endDate = reservation.endDate + relativedelta(hours=+duration)
+    session.commit()
+    return api_response(True, "Reservation was extended by " + str(duration) + " hours.")
 
 def restart_container(userId : int, reservationId: str):
   """Request a restart for a reservation's running container.

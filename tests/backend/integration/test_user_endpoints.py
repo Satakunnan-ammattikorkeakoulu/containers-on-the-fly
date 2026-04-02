@@ -95,6 +95,101 @@ class TestCheckToken:
         assert "maxDuration" in limits
         assert "maxActiveReservations" in limits
 
+    def test_admin_reservation_limits_values(self, test_client, admin_token):
+        """Admin users get permissive default limits (60-day max, 99 active)."""
+        resp = test_client.get(
+            "/api/user/check_token",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        limits = resp.json()["data"]["reservationLimits"]
+        assert limits["minDuration"] == 1
+        assert limits["maxDuration"] == 1440  # 60 days
+        assert limits["maxActiveReservations"] == 99
+
+    def test_normal_user_reservation_limits_defaults(self, test_client, user_token):
+        """Normal user without custom roles gets restrictive defaults."""
+        resp = test_client.get(
+            "/api/user/check_token",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        limits = resp.json()["data"]["reservationLimits"]
+        assert limits["minDuration"] == 1
+        assert limits["maxDuration"] == 48  # 2 days
+        assert limits["maxActiveReservations"] == 1
+
+    def test_role_reservation_limits_applied(self, test_client, user_token):
+        """Custom role reservation limits are reflected in check_token response."""
+        import database as db
+        from sqlalchemy import select
+
+        with db.Session() as session:
+            # Create a role with custom reservation limits
+            role = db.Role(name="power_user")
+            session.add(role)
+            session.flush()
+
+            limits = db.RoleReservationLimit(
+                roleId=role.roleId,
+                minDuration=1,
+                maxDuration=168,  # 7 days
+                maxActiveReservations=5,
+            )
+            session.add(limits)
+
+            # Assign role to normal user
+            user = session.execute(
+                select(db.User).where(db.User.email == "user@foo.com")
+            ).scalar_one()
+            user.roles.append(role)
+            session.commit()
+
+        resp = test_client.get(
+            "/api/user/check_token",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        result_limits = resp.json()["data"]["reservationLimits"]
+        assert result_limits["maxDuration"] == 168
+        assert result_limits["maxActiveReservations"] == 5
+
+    def test_most_permissive_role_limits_win(self, test_client, user_token):
+        """When user has multiple roles, the most permissive limit is used."""
+        import database as db
+        from sqlalchemy import select
+
+        with db.Session() as session:
+            user = session.execute(
+                select(db.User).where(db.User.email == "user@foo.com")
+            ).scalar_one()
+
+            # Role A: max 72 hours, 2 active
+            role_a = db.Role(name="role_a")
+            session.add(role_a)
+            session.flush()
+            session.add(db.RoleReservationLimit(
+                roleId=role_a.roleId, minDuration=2, maxDuration=72, maxActiveReservations=2,
+            ))
+            user.roles.append(role_a)
+
+            # Role B: max 120 hours, 3 active
+            role_b = db.Role(name="role_b")
+            session.add(role_b)
+            session.flush()
+            session.add(db.RoleReservationLimit(
+                roleId=role_b.roleId, minDuration=1, maxDuration=120, maxActiveReservations=3,
+            ))
+            user.roles.append(role_b)
+            session.commit()
+
+        resp = test_client.get(
+            "/api/user/check_token",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        limits = resp.json()["data"]["reservationLimits"]
+        # Most permissive: lowest min, highest max
+        assert limits["minDuration"] == 1
+        assert limits["maxDuration"] == 120
+        assert limits["maxActiveReservations"] == 3
+
 
 class TestProfile:
 

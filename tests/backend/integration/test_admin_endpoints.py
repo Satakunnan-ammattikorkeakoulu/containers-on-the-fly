@@ -65,6 +65,45 @@ class TestAdminUsers:
         assert resp.status_code == 200
         assert resp.json()["status"] is True
 
+    def test_get_user_includes_roles(self, test_client, admin_token):
+        """get_user response includes the user's roles list."""
+        # Get admin user ID
+        resp = test_client.post(
+            "/api/admin/users",
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {}},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        admin_user = next(
+            u for u in resp.json()["data"]["users"] if u["email"] == "admin@foo.com"
+        )
+
+        resp = test_client.get(
+            f"/api/admin/user?userId={admin_user['userId']}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        data = resp.json()["data"]["user"]
+        assert "roles" in data
+        assert "admin" in data["roles"]
+
+    def test_get_user_roles_for_normal_user(self, test_client, admin_token):
+        """Normal user without extra roles has empty roles list."""
+        resp = test_client.post(
+            "/api/admin/users",
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {}},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        normal_user = next(
+            u for u in resp.json()["data"]["users"] if u["email"] == "user@foo.com"
+        )
+
+        resp = test_client.get(
+            f"/api/admin/user?userId={normal_user['userId']}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        data = resp.json()["data"]["user"]
+        assert "roles" in data
+        assert isinstance(data["roles"], list)
+
 
 class TestAdminUserName:
     """Tests for the name field in admin user management."""

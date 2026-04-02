@@ -54,6 +54,7 @@ function createUrls(baseAddress) {
     URLS.admin.get_general_settings = baseAdminUrl + "general-settings"
     URLS.admin.save_general_settings = baseAdminUrl + "general-settings"
     URLS.admin.test_email = baseAdminUrl + "test-email"
+    URLS.admin.test_ad = baseAdminUrl + "test-ad"
     URLS.admin.get_servers = baseAdminUrl + "servers"
     URLS.admin.get_server_monitoring = baseAdminUrl + "server"
     // Role management endpoints

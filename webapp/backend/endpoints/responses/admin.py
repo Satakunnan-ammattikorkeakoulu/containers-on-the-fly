@@ -1622,3 +1622,85 @@ def send_test_email(email: str) -> object:
         
     except Exception as e:
         return api_response(False, f"Failed to send test email: {str(e)}")
+
+def test_ad_connection(username: str, password: str) -> object:
+    """Test AD/LDAP connection and return all attributes for the matched user.
+
+    Uses the currently saved LDAP settings to bind and search. Returns all
+    attributes from the LDAP response so the admin can verify the configuration.
+    Does not create users, check whitelists, or modify any database state.
+
+    Args:
+        username: The LDAP username to test with.
+        password: The LDAP password to test with.
+
+    Returns:
+        Response with full LDAP attributes on success, or error message on failure.
+    """
+    try:
+        import ldap
+        from helpers.settings_handler import get_setting
+
+        # Get LDAP settings from database
+        ldap_url = get_setting('auth.ldap.url')
+        username_format = get_setting('auth.ldap.usernameFormat')
+        password_format = get_setting('auth.ldap.passwordFormat')
+        ldap_domain = get_setting('auth.ldap.domain')
+        search_method = get_setting('auth.ldap.searchMethod')
+        account_field = get_setting('auth.ldap.accountField')
+        email_field = get_setting('auth.ldap.emailField')
+
+        # Check if LDAP is properly configured
+        if not all([ldap_url, username_format, password_format, ldap_domain, search_method, account_field, email_field]):
+            return api_response(False, "LDAP is not properly configured. Please fill in all LDAP settings and save before testing.")
+
+        # Disable certificate checks (mirrors get_ldap_user behavior)
+        ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+        conn = ldap.initialize(ldap_url)
+        conn.set_option(ldap.OPT_NETWORK_TIMEOUT, 6)
+        conn.set_option(ldap.OPT_TIMEOUT, 6)
+        conn.set_option(ldap.OPT_REFERRALS, ldap.OPT_OFF)
+
+        # Bind with provided credentials
+        bind_dn = username_format.replace("{username}", username)
+        bind_pw = password_format.replace("{password}", password)
+        conn.simple_bind_s(bind_dn, bind_pw)
+
+        # Search for the user, requesting ALL attributes
+        search_filter = search_method.replace("{username}", username)
+        result = conn.search_s(ldap_domain, ldap.SCOPE_SUBTREE, search_filter)
+
+        conn.unbind_s()
+
+        if not result or not result[0] or not result[0][1]:
+            return api_response(False, "LDAP bind succeeded but no user entry was found matching the search filter.")
+
+        # Decode all attributes from bytes to strings for JSON serialization
+        dn = result[0][0]
+        raw_attrs = result[0][1]
+        decoded_attrs = {}
+        for key, values in raw_attrs.items():
+            decoded_values = []
+            for v in values:
+                try:
+                    decoded_values.append(v.decode('utf-8'))
+                except (UnicodeDecodeError, AttributeError):
+                    decoded_values.append(base64.b64encode(v).decode('ascii'))
+            if len(decoded_values) == 1:
+                decoded_attrs[key] = decoded_values[0]
+            else:
+                decoded_attrs[key] = decoded_values
+
+        response_data = {
+            "dn": dn,
+            "attributes": decoded_attrs
+        }
+
+        return api_response(True, "LDAP connection test successful", response_data)
+
+    except ldap.INVALID_CREDENTIALS:
+        return api_response(False, "Invalid credentials: The username or password was rejected by the LDAP server.")
+    except ldap.SERVER_DOWN:
+        return api_response(False, "Server unreachable: Failed to connect to the LDAP server. Check the URL and ensure the server is running.")
+    except Exception as e:
+        return api_response(False, f"LDAP connection test failed: {str(e)}")

@@ -318,6 +318,63 @@
                   </v-col>
                 </v-row>
               </v-form>
+
+              <!-- Test AD/LDAP Connection Section -->
+              <div class="mb-6" v-if="settings.auth.loginType === 'hybrid'">
+                <v-divider class="my-4"></v-divider>
+                <h6 class="text-h6 mb-2">Test AD/LDAP Connection</h6>
+                <p class="body-2 text-grey mb-4">
+                  Test your LDAP configuration by authenticating with a real username and password.
+                  The full LDAP server response (all attributes) will be displayed below.
+                </p>
+
+                <v-row>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="testAdUsername"
+                      label="LDAP Username"
+                      placeholder="jdoe"
+                      outlined
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="testAdPassword"
+                      label="LDAP Password"
+                      type="password"
+                      outlined
+                      @keyup.enter="testAdConnection"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+
+                <v-row>
+                  <v-col cols="12">
+                    <v-btn
+                      color="primary"
+                      :loading="testingAd"
+                      :disabled="!testAdUsername || !testAdPassword"
+                      @click="testAdConnection"
+                    >
+                      Test AD Connection
+                    </v-btn>
+                  </v-col>
+                </v-row>
+
+                <v-row v-if="testAdResult">
+                  <v-col cols="12">
+                    <v-textarea
+                      v-model="testAdResult"
+                      label="LDAP Server Response"
+                      readonly
+                      outlined
+                      auto-grow
+                      rows="10"
+                    ></v-textarea>
+                  </v-col>
+                </v-row>
+              </div>
+
             </v-expansion-panel-text>
           </v-expansion-panel>
 
@@ -774,6 +831,10 @@ export default {
     }, // Track which settings have been initialized from backend
     testEmail: '',
     sendingTest: false,
+    testAdUsername: '',
+    testAdPassword: '',
+    testingAd: false,
+    testAdResult: '',
     
     // New email inputs
     newBlacklistEmail: '',
@@ -1300,7 +1361,72 @@ export default {
         this.sendingTest = false;
       }
     },
-    
+
+    async testAdConnection() {
+      if (!this.testAdUsername || !this.testAdPassword) {
+        this.store.showMessage({
+          text: 'Please enter both username and password',
+          color: 'red'
+        });
+        return;
+      }
+
+      try {
+        this.testingAd = true;
+        this.testAdResult = '';
+
+        let _this = this;
+        let currentUser = this.store.user;
+
+        axios({
+          method: "post",
+          url: this.$appSettings.APIServer.admin.test_ad,
+          data: {
+            username: this.testAdUsername,
+            password: this.testAdPassword
+          },
+          headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            _this.store.showMessage({
+              text: 'LDAP connection test successful',
+              color: 'green'
+            });
+            _this.testAdResult = JSON.stringify(response.data.data, null, 2);
+          } else {
+            _this.store.showMessage({
+              text: response.data.message || 'LDAP connection test failed',
+              color: "red"
+            });
+            _this.testAdResult = 'Error: ' + (response.data.message || 'LDAP connection test failed');
+          }
+          _this.testingAd = false;
+        })
+        .catch(function (error) {
+          console.error('Failed to test AD connection:', error);
+          let errorMessage = 'Failed to test AD connection';
+          if (error.response && error.response.data) {
+            errorMessage = error.response.data.detail || error.response.data.message || errorMessage;
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+          _this.store.showMessage({ text: errorMessage, color: "red" });
+          _this.testAdResult = 'Error: ' + errorMessage;
+          _this.testingAd = false;
+        });
+
+      } catch (error) {
+        console.error('Failed to test AD connection:', error);
+        this.store.showMessage({
+          text: 'Failed to test AD connection',
+          color: 'red'
+        });
+        this.testAdResult = 'Error: ' + error.message;
+        this.testingAd = false;
+      }
+    },
+
     isValidEmail(email) {
       if (!email) return false;
       const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;

@@ -13,7 +13,7 @@ from endpoints.models.reservation import ReservationFilters, AdminReservationReq
 from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole, ServerStatus, ServerLogs
 from sqlalchemy import desc, Column, Integer, Text, Float, ForeignKey, DateTime, UniqueConstraint, Boolean, BigInteger, func
 import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from helpers.tables.role import get_roles, get_role_by_id, add_role as add_role_helper, edit_role as edit_role_helper, remove_role as remove_role_helper
 from helpers.server import api_response, orm_to_dict
 from typing import Dict, Any, List
@@ -463,6 +463,12 @@ class TestEmailData(BaseModel):
 
     email: str
 
+class TestAdData(BaseModel):
+    """Request body for testing AD/LDAP connection."""
+
+    username: str = Field(max_length=256)
+    password: str = Field(max_length=256)
+
 @router.get("/general-settings")
 async def get_general_settings(token: str = Depends(oauth2_scheme)):
     """Retrieve all database-backed general settings grouped by section.
@@ -503,4 +509,22 @@ async def send_test_email(data: TestEmailData, token: str = Depends(oauth2_schem
     """
     force_authentication(token, "admin")
     return functionality.send_test_email(data.email)
+
+@router.post("/test-ad")
+async def test_ad_connection(data: TestAdData, token: str = Depends(oauth2_scheme)):
+    """Test AD/LDAP connection with provided credentials.
+
+    Performs an LDAP bind and search using the provided credentials against
+    the currently saved LDAP configuration. Returns all attributes from the
+    LDAP server response. Does not create users or modify any state.
+
+    Args:
+        data: Pydantic model containing username and password.
+        token: OAuth2 bearer token (injected by Depends).
+
+    Returns:
+        Success response with full LDAP attributes, or failure with error message.
+    """
+    force_authentication(token, "admin")
+    return functionality.test_ad_connection(data.username, data.password)
 

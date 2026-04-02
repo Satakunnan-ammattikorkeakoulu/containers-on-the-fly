@@ -344,7 +344,6 @@ setup-main-server: check-root check-os-ubuntu interactive-settings-creation appl
 	echo ""
 	@chmod +x scripts/install_webserver_dependencies.bash
 	@./scripts/install_webserver_dependencies.bash
-	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location -qq
 	@echo "$(GREEN)Installing frontend dependencies (clean install)...$(RESET)"
 	cd webapp/frontend && sudo -u $${SUDO_USER:-$(shell whoami)} sh -c 'rm -rf package-lock.json && rm -rf node_modules || true && npm install'
 
@@ -437,7 +436,6 @@ setup-container-server: check-root check-os-ubuntu interactive-docker-settings-c
 
 	@chmod +x scripts/install_docker_dependencies.bash
 	@./scripts/install_docker_dependencies.bash
-	sudo -u $${SUDO_USER:-$(shell whoami)} $(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location -qq
 	@REAL_USER=$${SUDO_USER:-$$(logname 2>/dev/null || echo $$(whoami))}; \
 	usermod -aG docker $$REAL_USER; \
 	echo "Added user $$REAL_USER to docker group"

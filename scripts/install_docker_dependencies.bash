@@ -312,3 +312,9 @@ fi
 
 echo "Docker daemon configuration updated and Docker service is running."
 echo "You need to restart the machine before the Nvidia drivers will work."
+
+# Install Python dependencies
+echo "Installing Python dependencies..."
+sudo -u "$CURRENT_USER" pip3 install -r "$CURRENT_DIR/webapp/backend/requirements.txt" --break-system-packages --ignore-installed --no-warn-script-location -qq
+sudo -u "$CURRENT_USER" pip3 install -r "$CURRENT_DIR/webapp/container_server/requirements.txt" --break-system-packages --ignore-installed --no-warn-script-location -qq
+echo -e "${GREEN}Python dependencies installed.${RESET}"

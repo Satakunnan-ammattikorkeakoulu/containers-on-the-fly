@@ -8,7 +8,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 RESET='\033[0m'
 CURRENT_DIR=$(pwd)
-CURRENT_USER=$(whoami)
+CURRENT_USER=${SUDO_USER:-$(logname 2>/dev/null || whoami)}
 
 # Load settings
 source "$CURRENT_DIR/user_config/settings"
@@ -296,3 +296,8 @@ pm2 set pm2-logrotate:workerInterval 60 > /dev/null 2>&1
 pm2 set pm2-logrotate:rotateInterval '0 0 * * *' > /dev/null 2>&1
 pm2 set pm2-logrotate:rotateModule true > /dev/null 2>&1
 echo -e "${GREEN}pm2-logrotate configured.${RESET}"
+
+# Install Python dependencies
+echo "Installing Python dependencies..."
+sudo -u "$CURRENT_USER" pip3 install -r "$CURRENT_DIR/webapp/backend/requirements.txt" --break-system-packages --ignore-installed --no-warn-script-location -qq
+echo -e "${GREEN}Python dependencies installed.${RESET}"

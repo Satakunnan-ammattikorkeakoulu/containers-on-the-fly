@@ -330,13 +330,36 @@ docker compose -f tests/docker-compose.test.yml down
 
 ## Technical Details
 
-* Click on the image to view full size
-
-<a href="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/architecture.png" target="_blank">
-  <img width="600" alt="Login interface" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/architecture.png">
-</a>
-
 The app is split into three components: frontend, backend, and container server. The frontend is located at `webapp/frontend`, the backend at `webapp/backend`, and the container server at `webapp/container_server`. The frontend and backend run on different ports. The container server is a separate daemon that handles starting, stopping, and monitoring reserved containers.
+
+```mermaid
+graph TB
+    subgraph MainServer["Main Server — Web servers, database, local Docker registry"]
+        Caddy["<b>Caddy Reverse Proxy</b><br/>Automatic HTTPS via Let's Encrypt<br/>Proxies HTTP/S requests to frontend and backend"]
+
+        Frontend["<b>Frontend</b><br/>Vue 3 + Vuetify 4 + Pinia<br/>Built with Vite<br/><br/><i>webapp/frontend</i>"]
+
+        Backend["<b>Backend</b><br/>FastAPI REST server<br/><br/><i>webapp/backend</i>"]
+
+        Registry["<b>Local Docker Registry</b><br/>Stores Docker images for containers<br/>Port 5000"]
+
+        DB[("<b>MariaDB</b>")]
+    end
+
+    subgraph ContainerServers["Container Servers — Manage reserved containers"]
+        ContainerServer["<b>Container Server Daemon</b><br/>Manages launch, stop, restart, and monitoring<br/>of Docker containers via the backend REST API<br/><br/><i>webapp/container_server</i>"]
+
+        Containers["Running Containers"]
+    end
+
+    User((User)) -->|HTTP/S| Caddy
+    Caddy -->|"Requests excluding /api"| Frontend
+    Caddy -->|"Requests to /api"| Backend
+    Backend <--> DB
+    ContainerServer -->|"REST API"| Backend
+    ContainerServer --> Containers
+    ContainerServer -->|"Pull images"| Registry
+```
 
 ### Frontend
 

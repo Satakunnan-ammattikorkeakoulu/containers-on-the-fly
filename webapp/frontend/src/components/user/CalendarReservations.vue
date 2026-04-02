@@ -257,7 +257,7 @@
           if (ratio > 0.75) indicatorClass = 'resource-high'
           else if (ratio > 0.25) indicatorClass = 'resource-medium'
           
-          let displayText = ''
+          let displayText
           if (spec.type.toLowerCase() === 'gpu' || spec.type.toLowerCase() === 'gpus') {
             displayText = `GPU: ${Math.round(spec.available)}/${Math.round(spec.maximum)}`
           } else if (spec.type.toLowerCase() === 'cpu' || spec.type.toLowerCase() === 'cpus') {

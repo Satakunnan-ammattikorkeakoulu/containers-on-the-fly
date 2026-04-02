@@ -1,12 +1,12 @@
-"""Tests for helpers/email.py — with mocked SMTP and settings."""
+"""Tests for helpers/email_sender.py — with mocked SMTP and settings."""
 
 from unittest.mock import patch, MagicMock
-from helpers.email import send_email
+from helpers.email_sender import send_email
 
 
 class TestSendEmail:
 
-    @patch("helpers.email.get_setting")
+    @patch("helpers.email_sender.get_setting")
     def test_does_not_send_when_disabled(self, mock_get_setting):
         mock_get_setting.return_value = False
         # Should return immediately without attempting SMTP
@@ -14,7 +14,7 @@ class TestSendEmail:
         # get_setting should only be called once (for email.sendEmail)
         mock_get_setting.assert_called_once_with("email.sendEmail")
 
-    @patch("helpers.email.get_setting")
+    @patch("helpers.email_sender.get_setting")
     def test_does_not_send_with_incomplete_settings(self, mock_get_setting):
         def side_effect(key):
             values = {
@@ -31,8 +31,8 @@ class TestSendEmail:
         # Should print warning and return without crashing
         send_email("test@example.com", "Subject", "Body")
 
-    @patch("helpers.email.smtplib")
-    @patch("helpers.email.get_setting")
+    @patch("helpers.email_sender.smtplib")
+    @patch("helpers.email_sender.get_setting")
     def test_sends_email_with_starttls(self, mock_get_setting, mock_smtplib):
         def side_effect(key):
             values = {
@@ -57,8 +57,8 @@ class TestSendEmail:
         mock_smtp.send_message.assert_called_once()
         mock_smtp.quit.assert_called_once()
 
-    @patch("helpers.email.smtplib")
-    @patch("helpers.email.get_setting")
+    @patch("helpers.email_sender.smtplib")
+    @patch("helpers.email_sender.get_setting")
     def test_sends_email_with_ssl_on_port_465(self, mock_get_setting, mock_smtplib):
         def side_effect(key):
             values = {

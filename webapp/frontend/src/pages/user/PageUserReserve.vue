@@ -1183,12 +1183,12 @@
         prioritySpecs.forEach(spec => {
           if (spec.maximumAmountForUser > 0) {
             // Clean up the display format
-            let displayName = spec.type
+            let displayName
             if (spec.type === "cpus") displayName = "CPUs"
             else if (spec.type === "memory") displayName = "RAM"
             else if (spec.type === "storage") displayName = "Storage"
             else displayName = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
-            
+
             formattedSpecs.push(`${spec.maximumAmountForUser} ${spec.format} ${displayName}`)
           }
         })
@@ -1221,9 +1221,9 @@
         let sortedOtherSpecs = [...otherSpecs].sort((a, b) => a.type.localeCompare(b.type))
         
         sortedOtherSpecs.forEach(spec => {
-          let displayName = spec.type
-          let text = ""
-          
+          let displayName
+          let text
+
           if (spec.type === "cpus") {
             displayName = "CPUs"
             text = `${spec.maximumAmountForUser} ${displayName}`

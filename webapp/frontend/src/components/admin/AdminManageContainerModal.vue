@@ -385,7 +385,7 @@
           required: value => !!value || "Required",
           imageName: value => {
             if (!value || value.trim() === '') return true;
-            if (!/^[a-z0-9][a-z0-9._/\-]{0,127}$/.test(value)) return 'Only lowercase letters, digits, dots, hyphens, underscores, and forward slashes.';
+            if (!/^[a-z0-9][a-z0-9._/-]{0,127}$/.test(value)) return 'Only lowercase letters, digits, dots, hyphens, underscores, and forward slashes.';
             return true;
           },
           username: value => {

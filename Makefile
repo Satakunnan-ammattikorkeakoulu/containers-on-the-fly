@@ -741,8 +741,7 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 init-database: ## Initialize database (for both new and existing environments)
 	@echo ""
 	@echo "Initializing database..."
-	@chmod +x $(BACKEND_PATH)/helpers/init_database.py
-	@cd $(BACKEND_PATH) && $(PYTHON) helpers/init_database.py
+	@cd $(BACKEND_PATH) && $(PYTHON) -m helpers.init_database
 	@echo "Stopping all pm2 processes to prevent database locks..."
 	@pm2 stop all || true
 	@echo ""

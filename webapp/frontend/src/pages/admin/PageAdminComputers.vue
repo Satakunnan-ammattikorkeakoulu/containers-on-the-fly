@@ -260,7 +260,7 @@
                 _this.lastUpdateTime[server.computerId] = Date.now();
               }
             }
-          } catch (error) {
+          } catch {
             // Server is not responding or has no monitoring data
             // Don't update lastUpdateTime if the request failed
           }
@@ -357,7 +357,7 @@
               lastUpdated: null
             };
           }
-        } catch (error) {
+        } catch {
           // Failed to fetch monitoring data
           _this.monitoringData[computerId] = {
             loading: false,

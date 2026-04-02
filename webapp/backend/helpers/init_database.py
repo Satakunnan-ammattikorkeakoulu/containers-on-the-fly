@@ -55,7 +55,7 @@ def run_alembic_command(command):
     try:
         result = subprocess.run(
             ["alembic"] + command.split(),
-            cwd=os.path.dirname(__file__),
+            cwd=os.path.join(os.path.dirname(__file__), ".."),
             capture_output=True,
             text=True,
             check=True

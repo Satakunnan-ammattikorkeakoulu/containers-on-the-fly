@@ -7,7 +7,7 @@ state changes.
 """
 
 import os
-from helpers.email import send_email
+from helpers.email_sender import send_email
 from helpers.settings_handler import get_setting
 from helpers.logger import log
 

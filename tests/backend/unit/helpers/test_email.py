@@ -10,7 +10,8 @@ class TestSendEmail:
     def test_does_not_send_when_disabled(self, mock_get_setting):
         mock_get_setting.return_value = False
         # Should return immediately without attempting SMTP
-        send_email("test@example.com", "Subject", "Body")
+        thread = send_email("test@example.com", "Subject", "Body")
+        thread.join(timeout=5)
         # get_setting should only be called once (for email.sendEmail)
         mock_get_setting.assert_called_once_with("email.sendEmail")
 
@@ -29,7 +30,8 @@ class TestSendEmail:
 
         mock_get_setting.side_effect = side_effect
         # Should print warning and return without crashing
-        send_email("test@example.com", "Subject", "Body")
+        thread = send_email("test@example.com", "Subject", "Body")
+        thread.join(timeout=5)
 
     @patch("helpers.email_sender.smtplib")
     @patch("helpers.email_sender.get_setting")
@@ -49,7 +51,8 @@ class TestSendEmail:
         mock_smtp = MagicMock()
         mock_smtplib.SMTP.return_value = mock_smtp
 
-        send_email("test@example.com", "Test Subject", "Test Body")
+        thread = send_email("test@example.com", "Test Subject", "Test Body")
+        thread.join(timeout=5)
 
         mock_smtplib.SMTP.assert_called_once_with(host="smtp.example.com", port=587)
         mock_smtp.starttls.assert_called_once()
@@ -75,7 +78,8 @@ class TestSendEmail:
         mock_smtp = MagicMock()
         mock_smtplib.SMTP_SSL.return_value = mock_smtp
 
-        send_email("test@example.com", "Test Subject", "Test Body")
+        thread = send_email("test@example.com", "Test Subject", "Test Body")
+        thread.join(timeout=5)
 
         mock_smtplib.SMTP_SSL.assert_called_once_with(host="smtp.example.com", port=465)
         mock_smtp.login.assert_called_once()

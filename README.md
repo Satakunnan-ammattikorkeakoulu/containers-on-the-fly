@@ -55,8 +55,8 @@ This project has been featured in the following academic publications:
       * [Automatic Installation: Container Server](#automatic-installation-container-server)
          * [Open Ports](#open-ports-1)
          * [Install Required APT Packages](#install-required-apt-packages-1)
-         * [Setup the Docker Utility](#setup-the-docker-utility)
-         * [Start Docker Utility](#start-docker-utility)
+         * [Setup the Container Server](#setup-the-container-server)
+         * [Start Container Server](#start-container-server)
             * [Start the Servers](#start-the-servers)
    * [Additional Tasks](#additional-tasks)
       * [Creating Reservable Containers](#creating-reservable-containers)
@@ -110,7 +110,7 @@ If you change any settings in the ``user_config/settings`` file, just run these 
 
 ```
 make start-main-server
-make start-docker-utility
+make start-container-server
 ```
 
 #### Updating the Software
@@ -124,17 +124,17 @@ To update the software to latest version:
 In the main server, run these:
 ```
 sudo make setup-main-server
-sudo make setup-docker-utility
+sudo make setup-container-server
 make start-main-server
-make start-docker-utility
+make start-container-server
 ```
 
 ##### In each additional container server (if any)
 After that, update each additional container server (if any). On each additional container server (if any), run:
 ```
 git pull
-sudo make setup-docker-utility
-make start-docker-utility
+sudo make setup-container-server
+make start-container-server
 ```
 
 ### Installing Additional Container Servers
@@ -152,7 +152,7 @@ After the main server has been installed, it is possible to create more Ubuntu 2
 If you change any settings in the ``user_config/settings`` file, just run this command again to apply the settings and to restart the container server:
 
 ```
-make start-docker-utility
+make start-container-server
 ```
 
 #### Updating the Software
@@ -224,27 +224,27 @@ Install required APT packages:
 sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv software-properties-common
 ```
 
-#### Setup the Docker Utility
+#### Setup the Container Server
 
-Set up the docker utility with:
+Set up the container server with:
 
 ```bash
-sudo make setup-docker-utility
+sudo make setup-container-server
 ```
 
 > Note that after the initial setup the script asks you to review the ``user_config/settings`` file. You should do it before you finish the installation.
 
-It is required to restart the server after finishing the installation of the Docker utility.
+It is required to restart the server after finishing the installation of the container server.
 
-#### Start Docker Utility
+#### Start Container Server
 
-After the setup is complete and the server has been restarted, run the Docker utility with:
+After the setup is complete and the server has been restarted, run the container server with:
 
 ```bash
-make start-docker-utility
+make start-container-server
 ```
 
-That's it! If the container crashes or something happens to the utility, then you should only need to run the `make start-docker-utility` command again.
+That's it! If the container crashes or something happens to the container server, then you should only need to run the `make start-container-server` command again.
 
 ##### Start the Servers
 
@@ -284,7 +284,7 @@ If you wish to use LDAP for the login, then configure the LDAP in the ``user_con
 The project includes automated tests across four layers:
 
 ```bash
-make test-all              # Run backend + frontend tests
+make test-all              # Run backend + container server + frontend tests
 make test-backend          # pytest (unit + integration)
 make test-frontend         # vitest (unit + component)
 make test-e2e              # Playwright E2E tests (requires running app)
@@ -336,7 +336,7 @@ docker compose -f tests/docker-compose.test.yml down
   <img width="600" alt="Login interface" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/architecture.png">
 </a>
 
-The app is split into two projects: frontend and backend. The frontend can be located from `webapp/frontend` and backend from `webapp/backend`. Both the frontend and backend will run on different ports. The backend also includes a separate script for starting and stopping the reserved containers, called `docker_utility.py`.
+The app is split into three components: frontend, backend, and container server. The frontend is located at `webapp/frontend`, the backend at `webapp/backend`, and the container server at `webapp/container_server`. The frontend and backend run on different ports. The container server is a separate daemon that handles starting, stopping, and monitoring reserved containers.
 
 ### Frontend
 
@@ -353,7 +353,7 @@ The app is split into two projects: frontend and backend. The frontend can be lo
 - **Caddy** reverse proxy with automatic HTTPS via Let's Encrypt
 - **pm2** process management
 
-The backend also includes a tool called `docker_utility.py` that handles starting and stopping the reserved containers.
+The container server (`webapp/container_server`) is a separate daemon that handles starting, stopping, and monitoring reserved containers via Docker.
 
 ## Contributing
 

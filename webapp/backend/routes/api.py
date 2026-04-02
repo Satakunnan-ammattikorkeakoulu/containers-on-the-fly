@@ -11,7 +11,7 @@ from endpoints import user, reservation, admin, app, daemon
 from helpers.settings_handler import settings_handler
 from helpers.logger import log
 from helpers.auth import hash_password
-from database import ContainerPort, Session, User, Role, Computer, HardwareSpec, Container
+from database import Session, User, Role, Computer, HardwareSpec
 from sqlalchemy import select
 import base64
 import sqlalchemy as sa
@@ -138,19 +138,3 @@ if settings_handler.get_setting("app.addTestDataInDevelopment"):
       ))
       session.commit()
 
-    # Container
-    container = session.execute(select(Container).where(Container.imageName == "ubuntu-base")).scalar_one_or_none()
-    if container is None:
-      log.info("Creating test data: container with imageName ubuntu-base")
-      container = Container(
-        public = True,
-        imageName = "ubuntu-base",
-        name = "Ubuntu Base Image",
-        description = "Ubuntu Base Image"
-      )
-      container.containerPorts.append(ContainerPort(
-        serviceName = "SSH",
-        port = 22
-      ))
-      session.add(container)
-      session.commit()

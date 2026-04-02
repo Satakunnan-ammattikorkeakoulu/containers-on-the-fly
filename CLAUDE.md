@@ -70,26 +70,33 @@ python main.py         # Start container server daemon
 
 ## Code Architecture Patterns
 
-### Backend Structure
+### Backend Structure (`webapp/backend/`)
 - **Endpoints** (`endpoints/`): FastAPI route handlers
 - **Responses** (`endpoints/responses/`): Business logic and response formatting
-- **Helpers** (`helpers/`): Utility functions and database table operations
+- **Helpers** (`helpers/`): Utility functions, settings, auth, and database table operations
 - **Models** (`database.py`): SQLAlchemy ORM models
-- **Docker Management** (`docker/`): Container orchestration utilities
+- **Routes** (`routes/`): API route registration
 
-### Frontend Structure
+### Container Server Structure (`webapp/container_server/`)
+- **Docker** (`docker/`): Container orchestration utilities (containers, ports, mounts, monitoring, image building, SSH host keys)
+- **Helpers** (`helpers/`): Settings handler, logger, and utilities
+- **API Client** (`api_client.py`): Communication with the main backend
+- **Daemon** (`daemon.py`): Main daemon process for container lifecycle management
+
+### Frontend Structure (`webapp/frontend/`)
 - **Components** (`src/components/`): Reusable Vue components organized by feature
   - `admin/`: Admin interface components
   - `user/`: User interface components  
   - `global/`: Shared components
 - **Pages** (`src/pages/`): Route-specific page components
+- **Views** (`src/views/`): View wrappers for pages
 - **Layouts** (`src/layouts/`): Page layout templates
-- **Store** (`src/store/`): Vuex state management
+- **Store** (`src/store/`): Pinia state management
 - **Router** (`src/router/`): Vue Router configuration
 
 ### Authentication & Security
 - Uses FastAPI's OAuth2PasswordBearer for authentication
-- `ForceAuthentication()` decorator for endpoint protection
+- `force_authentication()` function for endpoint protection
 - Role-based access control with admin/user separation
 - Session management with token validation
 
@@ -111,15 +118,15 @@ python main.py         # Start container server daemon
 ### Backend Settings Architecture
 The backend uses a unified settings system that handles both file-based and database settings:
 
-- **Settings Handler**: `webapp/backend/settings_handler.py` - Unified interface for all settings
-- **Settings Schema**: `webapp/backend/settings_schema.py` - Defines all settings with types, defaults, and validation
+- **Settings Handler**: `webapp/backend/helpers/settings_handler.py` - Unified interface for all settings
+- **Settings Schema**: `webapp/backend/helpers/settings_schema.py` - Defines all settings with types, defaults, and validation
 - **Two Types of Settings**:
   1. **File-based settings**: Infrastructure config (ports, IPs, paths) stored in `settings.json`
   2. **Database settings**: Runtime config (emails, features) stored in `SystemSetting` table
 
 ### Adding New Settings
 When adding a new setting, you must:
-1. Add it to `webapp/backend/settings_schema.py` with proper type and default value
+1. Add it to `webapp/backend/helpers/settings_schema.py` with proper type and default value
 2. For file-based settings:
    - Add to `user_config/settings_example`
    - Add to `user_config/templates/backend_settings.json` if needed by backend
@@ -180,12 +187,12 @@ fix: Fix group removal logic to not break on empty usernames
 - **Never stage or commit**: Do NOT run `git add`, `git commit`, or any git command that stages or commits changes. The user will always do this manually.
 - **Plan before implementing**: When asked for a plan or design, present the plan and wait for approval before writing any code. Do not implement unless explicitly asked.
 - **UI changes — change only what was requested**: When modifying frontend components, only change the elements explicitly requested. Do not move, resize, restyle, or reorganize other elements in the same component or page. If an adjacent change seems beneficial, mention it and wait for approval.
-- **Respect existing structure**: When adding new items to arrays, config objects, endpoint lists (like `AppUrls.js`), database models, or Vuex store modules, study the existing entries first and replicate their exact pattern (spacing, naming, ordering conventions).
+- **Respect existing structure**: When adding new items to arrays, config objects, endpoint lists (like `AppUrls.js`), database models, or Pinia store, study the existing entries first and replicate their exact pattern (spacing, naming, ordering conventions).
 
 ### Common Pitfalls
 
 - **Session management**: Always use `with Session() as session:` context manager. Do NOT call `session.close()` inside a `with` block (it is redundant). Access ORM objects only within the session scope.
-- **Authentication patterns**: The codebase uses two auth patterns: `ForceAuthentication(token)` raises HTTPException if not authenticated, and `ForceAuthentication(token, "admin")` additionally checks for admin role. For admin endpoints always pass `"admin"` as the second argument.
+- **Authentication patterns**: The codebase uses two auth patterns: `force_authentication(token)` raises HTTPException if not authenticated, and `force_authentication(token, "admin")` additionally checks for admin role. For admin endpoints always pass `"admin"` as the second argument.
 - **Response wrapper**: Always return via `Response(status, message, data)` from `helpers.server`. Never return raw dicts from endpoint response functions.
 - **Frontend date handling**: Always use Day.js via `helpers/time.js` utilities (`DisplayTime` and `TimestampToLocalTimeZone`). Never use raw `Date()` or `moment`.
 - **Pydantic models for POST bodies**: POST endpoints that accept JSON bodies must define a Pydantic model in `endpoints/models/`. GET endpoints use query parameters directly.
@@ -285,7 +292,8 @@ make migrate-database
 - Session management with secure token handling
 
 ### Dependencies
-- **Backend**: FastAPI, SQLAlchemy, PyMySQL, ldap3, python-on-whales, alembic
+- **Backend**: FastAPI, SQLAlchemy, PyMySQL, ldap3, python-ldap, alembic, pydantic
+- **Container Server**: python-on-whales, requests, psutil
 - **Frontend**: Vue.js 3, Vuetify 4, Vue Router, Pinia, axios, dayjs
 - **Testing**: pytest, httpx, vitest, @vue/test-utils, Playwright, Bruno CLI
 - **Process Management**: pm2, Caddy reverse proxy

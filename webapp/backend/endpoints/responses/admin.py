@@ -526,7 +526,7 @@ def get_container_defaults(username: str = "user") -> object:
   if username in _RESERVED_USERNAMES:
     return api_response(False, f"Username '{username}' is reserved.")
 
-  from docker.image_builder import get_default_dockerfile_body, DEFAULT_CMD, DEFAULT_PASSWORD_COMMAND, DEFAULT_SSH_KEY_DEPLOY_COMMANDS
+  from helpers.container_defaults import get_default_dockerfile_body, DEFAULT_CMD, DEFAULT_PASSWORD_COMMAND, DEFAULT_SSH_KEY_DEPLOY_COMMANDS
 
   return api_response(True, "Defaults fetched.", {
     "dockerfileBody": get_default_dockerfile_body(username),

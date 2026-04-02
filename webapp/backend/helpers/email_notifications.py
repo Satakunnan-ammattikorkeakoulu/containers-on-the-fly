@@ -1,8 +1,9 @@
-"""Email notification and connection text generation for container events.
+"""Email notification templates for container lifecycle events.
 
 Generates human-readable connection instructions for started containers
-and sends email notifications for container start, error, and failure
-events. Used by the daemon when container state changes.
+and sends email notifications for container start, error, pause, resume,
+and failure events. Called by daemon response handlers when container
+state changes.
 """
 
 import os
@@ -25,13 +26,14 @@ def generate_connection_text(image, ip, ports, password, include_email_details, 
         ports: List of port dictionaries, each containing serviceName,
             localPort, and outsidePort keys. The SSH port entry is
             extracted and formatted specially.
-        password: Password for the container's "user" account.
+        password: Password for the container's user account.
         include_email_details: Whether to include email-specific text
             such as contact info and no-reply notice.
         non_critical_errors: Non-critical error messages to append to
             the output text.
         end_date: Optional datetime when the reservation ends. Converted
             to the configured timezone for display.
+        username: Container username for SSH connection strings.
 
     Returns:
         str: Formatted connection details text.

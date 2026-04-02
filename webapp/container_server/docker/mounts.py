@@ -9,7 +9,12 @@ import os
 import shutil
 import getpass
 import subprocess
-from helpers.utils import remove_special_characters
+import re
+
+
+def remove_special_characters(string):
+    """Remove all non-alphanumeric characters (except whitespace) from a string."""
+    return re.sub(r'[^a-zA-Z0-9\s]', '', string)
 from logger import log
 
 

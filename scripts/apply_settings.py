@@ -213,6 +213,7 @@ class SettingsApplier:
         template_mappings = {
             'backend_settings.json': self.base_dir / "webapp" / "backend" / "settings.json",
             'frontend_settings.js': self.base_dir / "webapp" / "frontend" / "src" / "AppSettings.js",
+            'container_server_settings.json': self.base_dir / "webapp" / "container_server" / "settings.json",
         }
         
         # Only include Caddyfile for main server context
@@ -304,7 +305,8 @@ class SettingsApplier:
             print("\n✅ Settings applied successfully!")
             print(f"Generated files:")
             print(f"  - Backend settings: webapp/backend/settings.json")
-            
+            print(f"  - Container server settings: webapp/container_server/settings.json")
+
             # Only show frontend settings if the template exists
             frontend_template = self.templates_dir / 'frontend_settings.js'
             if frontend_template.exists():

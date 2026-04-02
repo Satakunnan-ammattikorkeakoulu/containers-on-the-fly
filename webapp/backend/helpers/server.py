@@ -1,16 +1,18 @@
 """Server helper utilities for API responses and authentication enforcement.
 
 Provides the standard API response wrapper, authentication enforcement for
-endpoints, and ORM-to-dict conversion for SQLAlchemy models.
+endpoints, ORM-to-dict conversion for SQLAlchemy models, and daemon API key
+validation.
 """
 
+import hmac
 from typing import Union
 from fastapi import HTTPException, status
 from sqlalchemy import inspect, select
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import joinedload
 from helpers.auth import *
-from database import User, Session
+from database import User, Computer, Session
 from settings_handler import settings_handler
 
 def api_response(status, message, extra_data = None):
@@ -98,6 +100,55 @@ def force_authentication(token: str, role_required: str = None) -> Union[bool,HT
     detail = detail_message,
     headers = {"WWW-Authenticate": "Bearer"},
   )
+
+def force_daemon_authentication(api_key: str, server_name: str) -> int:
+  """Enforce daemon API key authentication and resolve the computer ID.
+
+  Validates the daemon's API key against the configured shared secret
+  using constant-time comparison. Then looks up the Computer record by
+  server name to get the computerId.
+
+  Args:
+      api_key: The API key sent by the daemon via X-Daemon-Api-Key header.
+      server_name: The daemon's server name sent via X-Daemon-Server-Name header.
+
+  Returns:
+      The computerId for the authenticated server.
+
+  Raises:
+      HTTPException: 401 if the API key is missing, invalid, or the
+          server name cannot be found in the database.
+  """
+  configured_key = settings_handler.get_setting("daemon.apiKey")
+  if not configured_key or not api_key:
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="Daemon API key not configured or not provided",
+    )
+
+  if not hmac.compare_digest(api_key, configured_key):
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="Invalid daemon API key",
+    )
+
+  if not server_name:
+    raise HTTPException(
+      status_code=status.HTTP_401_UNAUTHORIZED,
+      detail="Server name not provided",
+    )
+
+  with Session() as session:
+    computer = session.execute(
+      select(Computer).where(Computer.name == server_name)
+    ).scalar_one_or_none()
+    if not computer:
+      raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Unknown server name",
+      )
+    return computer.computerId
+
 
 def orm_to_dict(self):
     """Convert a SQLAlchemy ORM model instance to a plain dictionary.

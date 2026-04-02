@@ -15,6 +15,8 @@ user_config/Caddyfile
 user_config/settings
 webapp/backend/docker/local_overrides.py
 webapp/backend/data/ssh_host_keys/
+webapp/container_server/data/ssh_host_keys/
+webapp/container_server/settings.json
 .vscode
 .settings_just_created
 .server_type

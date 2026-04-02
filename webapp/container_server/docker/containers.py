@@ -5,7 +5,7 @@ No database access, no email, no filesystem setup (that's in mounts.py).
 """
 
 from python_on_whales import docker
-from helpers.auth import create_password
+from utils import create_password
 from settings_handler import settings_handler
 from python_on_whales.exceptions import NoSuchContainer
 import traceback

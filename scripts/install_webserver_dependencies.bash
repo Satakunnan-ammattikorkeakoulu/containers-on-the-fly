@@ -138,10 +138,8 @@ if [ $? -ne 0 ]; then
     install_mariadb
 fi
 
-# Allow MariaDB to listen on all interfaces to allow remote connections
-# Don't worry, we have disabled by default all incoming connections to ports with iptables before this.
-# We just need to do this to in the future allow remote connections from possible container servers.
-sudo sed -i 's/^bind-address\s*=.*$/bind-address = 0.0.0.0/' "/etc/mysql/mariadb.conf.d/50-server.cnf"
+# MariaDB only needs to listen on localhost -- container servers communicate
+# through the backend REST API, not direct database connections.
 
 # Ensure MariaDB starts on boot and start the service
 sudo systemctl enable mariadb
@@ -290,16 +288,11 @@ if ! pm2 describe pm2-logrotate > /dev/null 2>&1; then
     pm2 install pm2-logrotate
 fi
 
-# Configure pm2-logrotate settings
-# Maximum size of a single log file before rotation
-pm2 set pm2-logrotate:max_size 500M
-# Number of rotated log files to retain (90 days at ~1 rotation/day)
-pm2 set pm2-logrotate:retain 90
-# Enable compression of rotated log files
-pm2 set pm2-logrotate:compress true
-# Check for rotation every 60 seconds
-pm2 set pm2-logrotate:workerInterval 60
-# Rotate daily at midnight
-pm2 set pm2-logrotate:rotateInterval '0 0 * * *'
-# Rotate the pm2 module logs too
-pm2 set pm2-logrotate:rotateModule true
+# Configure pm2-logrotate settings (suppress verbose output)
+pm2 set pm2-logrotate:max_size 500M > /dev/null 2>&1
+pm2 set pm2-logrotate:retain 90 > /dev/null 2>&1
+pm2 set pm2-logrotate:compress true > /dev/null 2>&1
+pm2 set pm2-logrotate:workerInterval 60 > /dev/null 2>&1
+pm2 set pm2-logrotate:rotateInterval '0 0 * * *' > /dev/null 2>&1
+pm2 set pm2-logrotate:rotateModule true > /dev/null 2>&1
+echo -e "${GREEN}pm2-logrotate configured.${RESET}"

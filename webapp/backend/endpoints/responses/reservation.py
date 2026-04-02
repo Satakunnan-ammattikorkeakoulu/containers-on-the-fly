@@ -7,7 +7,7 @@ retrieval for active reservations.
 """
 
 from database import Session, Computer, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec
-from docker import get_email_container_started, restart_container
+from helpers.email_notifications import generate_connection_text
 from helpers.server import api_response, orm_to_dict
 from logger import log
 from helpers.auth import is_admin
@@ -15,7 +15,6 @@ from dateutil import parser
 from dateutil.relativedelta import *
 import datetime
 from datetime import timezone, timedelta
-from docker import stop_container
 from endpoints.models.reservation import ReservationFilters, UserReservationRequest
 from sqlalchemy import select, delete, func, cast, String
 from sqlalchemy.orm import joinedload
@@ -344,7 +343,7 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
     container_username = reservation.reservedContainer.container.containerUsername or "user"
 
     # Pass a copy of ports list — generate_connection_text mutates it by removing the SSH entry
-    connection_text = get_email_container_started(
+    connection_text = generate_connection_text(
       reservation.reservedContainer.container.imageName,
       reservation.computer.ip,
       list(ports_for_email),

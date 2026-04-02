@@ -5,6 +5,7 @@
 ################################################################################
 
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 RED='\033[0;31m'
 RESET='\033[0m'
 CURRENT_DIR=$(pwd)
@@ -88,7 +89,14 @@ else
     echo -e "${GREEN}Group 'containerfly' already exists.${RESET}"
 fi
 
-sudo ubuntu-drivers install nvidia:570-server-open #-qq >/dev/null 2>&1
+# Install NVIDIA GPU drivers if ubuntu-drivers is available
+if command -v ubuntu-drivers >/dev/null 2>&1; then
+    sudo ubuntu-drivers install nvidia:570-server-open
+else
+    echo -e "${YELLOW}Warning: ubuntu-drivers not found. NVIDIA GPU driver was not installed.${RESET}"
+    echo "This may mean your system has no NVIDIA GPU or is running an unsupported architecture."
+    echo "GPU support in containers will not be available. You can ignore this if you don't need GPUs."
+fi
 
 # Add Docker's official GPG key if it's not already added
 if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
@@ -131,19 +139,14 @@ if ! pm2 describe pm2-logrotate > /dev/null 2>&1; then
     pm2 install pm2-logrotate
 fi
 
-# Configure pm2-logrotate settings
-# Maximum size of a single log file before rotation
-pm2 set pm2-logrotate:max_size 500M
-# Number of rotated log files to retain (90 days at ~1 rotation/day)
-pm2 set pm2-logrotate:retain 90
-# Enable compression of rotated log files
-pm2 set pm2-logrotate:compress true
-# Check for rotation every 60 seconds
-pm2 set pm2-logrotate:workerInterval 60
-# Rotate daily at midnight
-pm2 set pm2-logrotate:rotateInterval '0 0 * * *'
-# Rotate the pm2 module logs too
-pm2 set pm2-logrotate:rotateModule true
+# Configure pm2-logrotate settings (suppress verbose output)
+pm2 set pm2-logrotate:max_size 500M > /dev/null 2>&1
+pm2 set pm2-logrotate:retain 90 > /dev/null 2>&1
+pm2 set pm2-logrotate:compress true > /dev/null 2>&1
+pm2 set pm2-logrotate:workerInterval 60 > /dev/null 2>&1
+pm2 set pm2-logrotate:rotateInterval '0 0 * * *' > /dev/null 2>&1
+pm2 set pm2-logrotate:rotateModule true > /dev/null 2>&1
+echo -e "${GREEN}pm2-logrotate configured.${RESET}"
 
 # Exit immediately if a command exits with a non-zero status.
 set -e

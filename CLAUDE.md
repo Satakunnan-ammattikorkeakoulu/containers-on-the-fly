@@ -13,7 +13,7 @@ The application follows a multi-component architecture:
 - **Frontend**: Vue.js 3 + Vuetify 4 + Pinia (`webapp/frontend/`)
 - **Backend**: Python 3 + FastAPI + SQLAlchemy ORM (`webapp/backend/`)
 - **Database**: MariaDB with Alembic migrations
-- **Container Management**: Docker + custom Python utility (`docker_utility.py`)
+- **Container Server**: Docker container management daemon (`webapp/container_server/`)
 - **Reverse Proxy**: Caddy with automatic HTTPS
 - **Process Management**: pm2 for production deployment
 - **Build System**: Make-based automation with comprehensive setup scripts
@@ -25,11 +25,11 @@ The application follows a multi-component architecture:
 # Start development servers
 make start-dev-frontend          # Vue.js dev server with hot reload
 make start-dev-backend           # FastAPI backend with auto-reload
-make start-dev-docker-utility    # Docker utility for container management
+make start-dev-container-server  # Container server daemon for container management
 
 # Production deployment
 make start-main-server           # Start/restart all main server services
-make start-docker-utility        # Start/restart Docker utility
+make start-container-server      # Start/restart container server daemon
 
 # Configuration management
 make apply-settings              # Apply user_config/settings to templates
@@ -62,8 +62,10 @@ npm run test:coverage  # Tests with coverage report
 ```bash
 cd webapp/backend
 python main.py         # Start FastAPI server
-python docker_utility.py   # Start Docker container utility
 alembic upgrade head   # Apply database migrations
+
+cd webapp/container_server
+python main.py         # Start container server daemon
 ```
 
 ## Code Architecture Patterns
@@ -391,7 +393,7 @@ cd tests/api && npm install
 
 ### Manual Testing
 1. Test main server setup: `make start-main-server`
-2. Test Docker utility: `make start-docker-utility`
+2. Test container server: `make start-container-server`
 3. Test database operations: `make init-database`
 4. Frontend linting: `cd webapp/frontend && npm run lint`
 5. Manual testing via web interface and container reservations

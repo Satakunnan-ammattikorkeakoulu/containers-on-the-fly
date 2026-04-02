@@ -21,5 +21,8 @@
       "enabled": true,
       "shm_size": "{{DOCKER_SHM_SIZE}}",
       "debugSkipGpuDedication": {{DEBUG_SKIP_GPU_DEDICATION}}
+    },
+    "daemon": {
+      "apiKey": "{{DAEMON_API_KEY}}"
     }
-  } 
+  }

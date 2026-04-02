@@ -268,7 +268,21 @@ apply-settings: # Applies the settings from user_config/settings to template fil
 	@chmod +x scripts/apply_settings.py
 	@$(PYTHON) scripts/apply_settings.py
 
-apply-settings-main-server: # Applies settings for main server context
+ensure-daemon-api-key: verify-config-file-exists # Ensures DAEMON_API_KEY exists and is populated in user_config/settings
+	@if ! grep -q "^DAEMON_API_KEY=" user_config/settings; then \
+		echo '' >> user_config/settings; \
+		echo '' >> user_config/settings; \
+		echo 'DAEMON_API_KEY=""' >> user_config/settings; \
+	fi
+	@EXISTING_DAEMON_KEY=$$(grep "^DAEMON_API_KEY=" user_config/settings | cut -d'"' -f2); \
+	if [ -z "$$EXISTING_DAEMON_KEY" ]; then \
+		DAEMON_KEY=$$(openssl rand -base64 48 | tr -d "=+/" | cut -c1-48); \
+		DAEMON_KEY_ESCAPED=$$(printf '%s\n' "$$DAEMON_KEY" | sed 's/[\/&]/\\&/g'); \
+		sed -i "s/^DAEMON_API_KEY=.*/DAEMON_API_KEY=\"$$DAEMON_KEY_ESCAPED\"/" user_config/settings; \
+		echo "Generated daemon API key."; \
+	fi
+
+apply-settings-main-server: ensure-daemon-api-key # Applies settings for main server context
 	@chmod +x scripts/apply_settings.py
 	@CONTAINERFLY_CONTEXT=main-server $(PYTHON) scripts/apply_settings.py
 
@@ -371,10 +385,10 @@ start-main-server: check-not-root verify-config-file-exists apply-settings-main-
 	echo "$(GREEN)Note:$(RESET) Run this task again after changing settings or pulling updates to restart servers and apply changes." && \
 	echo "" && \
 	echo "Potential Next Step:" && \
-	echo "* If you have not yet setup the Docker utility, run $(GREEN)$(BOLD)sudo make setup-docker-utility$(RESET) to start setting it up.$(RESET)" && \
+	echo "* If you have not yet setup the container server, run $(GREEN)$(BOLD)sudo make setup-container-server$(RESET) to start setting it up.$(RESET)" && \
 	echo ""
 
-setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the Docker utility. The Docker utility will start, stop, and restart the containers on this machine. Call 'make start-docker-utility' after setup.
+setup-container-server: check-root check-os-ubuntu interactive-docker-settings-creation apply-settings ## Run this with sudo. Setups the container server daemon. Call 'make start-container-server' after setup.
 	@IS_MAIN_SERVER=$$(cat .server_type 2>/dev/null || echo "true"); \
 	if [ "$$IS_MAIN_SERVER" = "false" ]; then \
 		echo ""; \
@@ -451,31 +465,26 @@ setup-docker-utility: check-root check-os-ubuntu interactive-docker-settings-cre
 	@echo "\n$(GREEN)The Docker utility has been setup.\n"
 	@echo "NEXT STEPS:"
 	@echo "1. Restart the machine for all the changes to take effect."
-	@echo "2. Run $(BOLD)make start-docker-utility$(RESET)$(GREEN) to start the Docker utility.$(RESET)\n"
+	@echo "2. Run $(BOLD)make start-container-server$(RESET)$(GREEN) to start the container server daemon.$(RESET)\n"
 	@rm -f .server_type
 
-start-docker-utility: check-not-root apply-settings ## Starts the Docker utility. The utility starts, stops, restarts reserved containers on this server. pm2 process manager is used to run the script in the background. Run this again after changing settings to restart the Docker utility and apply changes.
+setup-docker-utility: setup-container-server ## Alias for setup-container-server (backward compatibility)
+
+start-container-server: check-not-root apply-settings ## Starts the container server daemon. The daemon starts, stops, and restarts reserved containers on this server via the backend REST API. Run this again after changing settings to restart.
 	@echo ""
-	@echo "Verifying that connection to the database can be established..."
-	@CONNECTION_URI=$$(grep '"engineUri"' webapp/backend/settings.json | sed 's/.*"engineUri": "\(.*\)".*/\1/') && \
-	CONNECTION_OK=$$($(PYTHON) scripts/verify_db_connection.py "$$CONNECTION_URI") && \
-	if [ "$$CONNECTION_OK" = "CONNECTION_OK" ]; then \
-		echo "Connection to the database was successful. Proceeding."; \
-	else \
-		echo "\n$(RED)Connection to the database could not be established. Please check that you have the webapp/settings database connection settings properly configured and that connection to the database can be established. You need to at least run the command sudo make allow-container-server IP=<IP_ADDRESS> in the main server to allow the container server to access the database.$(RESET)"; \
-		exit 1; \
-	fi
 	@-pm2 delete backendDockerUtil 2>/dev/null
-	@cd webapp/backend && pm2 start "$(PYTHON) docker_utility.py" --name backendDockerUtil --log-date-format="YYYY-MM-DD HH:mm Z"
+	@cd webapp/container_server && pm2 start "$(PYTHON) main.py" --name backendDockerUtil --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save
 	@echo ""
-	@echo "\n$(GREEN)$(BOLD)Docker utility is now running.$(RESET)"
+	@echo "\n$(GREEN)$(BOLD)Container server daemon is now running.$(RESET)"
 	@echo "Containers will now automatically start, stop, and restart on this server."
 	@echo ""
 	@echo "View logs: $(GREEN)$(BOLD)make logs$(RESET)"
 	@echo ""
-	@echo "$(GREEN)Note:$(RESET) Run this task again after changing settings to restart the Docker utility and apply changes."
+	@echo "$(GREEN)Note:$(RESET) Run this task again after changing settings to restart the container server and apply changes."
 	@echo ""
+
+start-docker-utility: start-container-server ## Alias for start-container-server (backward compatibility)
 
 allow-container-server: check-os-ubuntu ## Allows an external given container server to access this main server. For example: make allow-container-server IP=62.151.151.151
 	@if [ -z "$(IP)" ]; then \
@@ -494,7 +503,7 @@ allow-container-server: check-os-ubuntu ## Allows an external given container se
 	# Allow IP for Docker registry port 5000 access
 	sudo iptables -I DOCKER-USER -s $(IP) -p tcp --dport 5000 -j ACCEPT
 	sudo iptables -I DOCKER-USER -s $(IP) -p udp --dport 5000 -j ACCEPT
-	
+
 	# Save iptables rules to make them persistent
 	@echo "Saving iptables rules for persistence..."
 	@mkdir -p /etc/iptables
@@ -522,8 +531,10 @@ start-dev-frontend: apply-settings
 start-dev-backend: apply-settings install-backend-deps init-database
 	cd webapp/backend && $(PYTHON) main.py
 
-start-dev-docker-utility: apply-settings install-backend-deps
-	cd webapp/backend && $(PYTHON) docker_utility.py
+start-dev-container-server: apply-settings
+	cd webapp/container_server && $(PYTHON) main.py
+
+start-dev-docker-utility: start-dev-container-server ## Alias for start-dev-container-server (backward compatibility)
 
 interactive-docker-settings-creation: # Creates Docker utility settings interactively
 	@echo ""

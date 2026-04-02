@@ -142,7 +142,13 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.FILE, SettingType.TEXT, default="data/ssh_host_keys",
         description="Directory for persistent SSH host keys injected into containers to prevent known_hosts conflicts"
     ),
-    
+
+    # Daemon Configuration
+    "daemon.apiKey": SettingSetting(
+        SettingSource.FILE, SettingType.TEXT, default="",
+        description="Shared API key for container server daemon authentication with the backend"
+    ),
+
     # ===== DATABASE-BASED SETTINGS (User-Configurable) =====
     # These can be modified through the admin interface
     

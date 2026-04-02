@@ -7,7 +7,7 @@ optionally seeds test data in development mode.
 """
 
 from fastapi import APIRouter
-from endpoints import user, reservation, admin, app
+from endpoints import user, reservation, admin, app, daemon
 from settings_handler import settings_handler
 from logger import log
 from helpers.auth import hash_password
@@ -21,6 +21,7 @@ router.include_router(user.router)
 router.include_router(reservation.router)
 router.include_router(admin.router)
 router.include_router(app.router)
+router.include_router(daemon.router)
 
 
 # Run code here when server starts

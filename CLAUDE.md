@@ -304,7 +304,7 @@ make migrate-database
 
 ### Running Tests
 ```bash
-# All automated tests (backend + frontend)
+# All automated tests (backend + container server + frontend)
 make test-all
 
 # Backend only
@@ -312,6 +312,11 @@ make test-backend                # All backend tests (unit + integration)
 make test-backend-unit           # Unit tests only (no DB)
 make test-backend-integration    # Integration tests (SQLite in-memory)
 make test-backend-coverage       # With HTML coverage report
+
+# Container server only
+make test-container-server       # All container server tests
+make test-container-server-unit  # Unit tests only
+make test-container-server-coverage  # With HTML coverage report
 
 # Frontend only
 make test-frontend               # Unit + component tests (vitest)
@@ -336,13 +341,23 @@ tests/
 │   ├── conftest.py              # Shared fixtures, SQLite in-memory DB setup
 │   ├── test_settings.json       # Test-specific settings
 │   ├── unit/                    # Pure function tests (no DB)
-│   │   ├── helpers/             # auth, utils, server, email
-│   │   └── test_settings_schema.py
+│   │   ├── helpers/             # auth, utils, server, email, pagination,
+│   │   │                        # container_defaults, email_notifications
+│   │   ├── test_settings_schema.py
+│   │   └── test_validate_script_path.py
 │   └── integration/             # API endpoint tests with test DB
 │       ├── test_user_endpoints.py
 │       ├── test_reservation_endpoints.py
 │       ├── test_admin_endpoints.py
+│       ├── test_daemon_endpoints.py
 │       └── test_app_endpoints.py
+├── container_server/
+│   ├── conftest.py              # Path setup, settings patch, docker/psutil mocks
+│   ├── test_settings.json       # Test-specific settings
+│   └── unit/
+│       ├── helpers/             # utils, settings_handler
+│       ├── docker/              # ports, mounts, image_builder, ssh_host_keys, monitoring
+│       └── test_api_client.py   # DaemonApiClient tests
 ├── frontend/
 │   ├── setup.js                 # Vitest setup (mocks axios)
 │   ├── unit/                    # Store, helpers, URL builder tests
@@ -359,6 +374,7 @@ tests/
 ### Test Architecture Notes
 - **Backend unit tests** use no database — they test pure functions in `helpers/` and `settings_schema.py`
 - **Backend integration tests** use SQLite in-memory via `StaticPool` — the `conftest.py` patches `settings_handler` and `database.engine` at import time to avoid MySQL dependencies
+- **Container server tests** use a separate `conftest.py` that adds `webapp/container_server` to `sys.path`, patches `settings_handler` with test settings, and mocks `python_on_whales` and `psutil`. No database is needed — all Docker/system calls are mocked
 - **Frontend tests** run via vitest with jsdom. Test files live outside `webapp/frontend/` so `test.alias` in `vite.config.js` maps package imports to the frontend's `node_modules`
 - **Component tests** use `shallowMount` with Vuetify stubs (Vuetify 4 auto-import sub-paths are not compatible with alias-based resolution in the test environment)
 - **E2E tests** require the full app stack running (use `docker-compose.test.yml` or manual startup with `ADD_TEST_DATA=true`)
@@ -380,6 +396,9 @@ Playwright uses an **auth setup project** to avoid login race conditions: `auth.
 ```bash
 # Backend
 pip install -r tests/backend/requirements-test.txt
+
+# Container server
+pip install -r tests/container_server/requirements-test.txt
 
 # Frontend (already in devDependencies after npm install)
 cd webapp/frontend && npm install

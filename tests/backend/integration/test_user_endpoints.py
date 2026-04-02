@@ -164,3 +164,107 @@ class TestChangePassword:
         assert resp.status_code == 200
         assert resp.json()["status"] is False
         assert "at least 5" in resp.json()["message"]
+
+
+class TestUpdateSshKey:
+
+    def test_set_valid_rsa_key(self, test_client, user_token):
+        key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQ... user@host"
+        resp = test_client.post(
+            "/api/user/update_ssh_key",
+            json={"sshPublicKey": key},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_set_valid_ed25519_key(self, test_client, user_token):
+        key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... user@host"
+        resp = test_client.post(
+            "/api/user/update_ssh_key",
+            json={"sshPublicKey": key},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_invalid_key_format_rejected(self, test_client, user_token):
+        resp = test_client.post(
+            "/api/user/update_ssh_key",
+            json={"sshPublicKey": "not-a-valid-key"},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is False
+        assert "Invalid" in resp.json()["message"]
+
+    def test_remove_key_with_empty_string(self, test_client, user_token):
+        resp = test_client.post(
+            "/api/user/update_ssh_key",
+            json={"sshPublicKey": ""},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_unauthenticated_rejected(self, test_client):
+        resp = test_client.post(
+            "/api/user/update_ssh_key",
+            json={"sshPublicKey": "ssh-rsa AAAA..."},
+        )
+        assert resp.status_code in (401, 422)
+
+
+class TestUpdateScriptPaths:
+
+    def test_set_valid_paths(self, test_client, user_token):
+        resp = test_client.post(
+            "/api/user/update_script_paths",
+            json={
+                "startScriptPath": "/home/user/start.sh",
+                "stopScriptPath": "/home/user/stop.sh",
+            },
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_invalid_path_rejected(self, test_client, user_token):
+        resp = test_client.post(
+            "/api/user/update_script_paths",
+            json={
+                "startScriptPath": "relative/path.sh",
+                "stopScriptPath": "",
+            },
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is False
+
+    def test_remove_paths_with_empty_strings(self, test_client, user_token):
+        resp = test_client.post(
+            "/api/user/update_script_paths",
+            json={"startScriptPath": "", "stopScriptPath": ""},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_paths_shown_in_profile(self, test_client, user_token):
+        # Set paths
+        test_client.post(
+            "/api/user/update_script_paths",
+            json={
+                "startScriptPath": "/opt/scripts/start.sh",
+                "stopScriptPath": "/opt/scripts/stop.sh",
+            },
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        # Check profile
+        resp = test_client.get(
+            "/api/user/profile",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        user = resp.json()["data"]["user"]
+        assert user["startScriptPath"] == "/opt/scripts/start.sh"
+        assert user["stopScriptPath"] == "/opt/scripts/stop.sh"

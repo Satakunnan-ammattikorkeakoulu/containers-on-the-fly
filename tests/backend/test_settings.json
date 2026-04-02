@@ -11,6 +11,9 @@
     "engineUri": "sqlite:///:memory:",
     "debugPrinting": false
   },
+  "daemon": {
+    "apiKey": "test-daemon-api-key"
+  },
   "docker": {
     "registryAddress": "localhost:5000",
     "serverName": "test-server",

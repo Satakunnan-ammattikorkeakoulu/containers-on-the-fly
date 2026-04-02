@@ -3,6 +3,7 @@ PIP=pip
 
 # Define variables
 BACKEND_PATH = webapp/backend
+CONTAINER_SERVER_PATH = webapp/container_server
 BACKEND_SRC = main.py
 FOLDER_SRC=src
 APP_ENTRYPOINT=$(FOLDER_SRC)/main.py
@@ -781,6 +782,15 @@ test-backend: ## Run all backend tests
 test-backend-coverage: ## Run backend tests with coverage report
 	@cd $(BACKEND_PATH) && $(PYTHON) -m pytest ../../tests/backend -v --cov=. --cov-report=html
 
+test-container-server-unit: ## Run container server unit tests
+	@cd $(CONTAINER_SERVER_PATH) && $(PYTHON) -m pytest ../../tests/container_server/unit -v
+
+test-container-server: ## Run all container server tests
+	@cd $(CONTAINER_SERVER_PATH) && $(PYTHON) -m pytest ../../tests/container_server -v
+
+test-container-server-coverage: ## Run container server tests with coverage report
+	@cd $(CONTAINER_SERVER_PATH) && $(PYTHON) -m pytest ../../tests/container_server -v --cov=. --cov-report=html
+
 test-frontend: ## Run frontend unit and component tests
 	@cd webapp/frontend && npx vitest run
 
@@ -812,6 +822,7 @@ test-api: ## Run Bruno CLI API tests (requires running app)
 	  cd ../.. && cd $(BACKEND_PATH) && $(PYTHON) ../../tests/scripts/teardown_test_users.py; \
 	  exit $$EXIT
 
-test-all: ## Run backend + frontend tests (not E2E — those need a running app)
+test-all: ## Run backend + container server + frontend tests (not E2E — those need a running app)
 	@$(MAKE) test-backend
+	@$(MAKE) test-container-server
 	@$(MAKE) test-frontend

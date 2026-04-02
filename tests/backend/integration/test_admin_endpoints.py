@@ -204,3 +204,96 @@ class TestAdminGeneralSettings:
             headers={"Authorization": f"Bearer {user_token}"},
         )
         assert resp.status_code == 401
+
+
+class TestAdminReservations:
+
+    def test_get_reservations(self, test_client, admin_token):
+        resp = test_client.post(
+            "/api/admin/reservations",
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {}},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] is True
+        assert "reservations" in data["data"]
+        assert "totalItems" in data["data"]
+
+    def test_get_reservations_with_pagination(self, test_client, admin_token):
+        resp = test_client.post(
+            "/api/admin/reservations",
+            json={"page": 1, "itemsPerPage": 5, "sortBy": [], "filters": {}},
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_get_reservations_requires_admin(self, test_client, user_token):
+        resp = test_client.post(
+            "/api/admin/reservations",
+            json={"page": 1, "itemsPerPage": 10, "sortBy": [], "filters": {}},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 401
+
+
+class TestAdminHardware:
+
+    def test_get_hardware(self, test_client, admin_token):
+        resp = test_client.get(
+            "/api/admin/hardware",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] is True
+        assert "hardware" in data["data"]
+        # Should have cpus, ram, gpus from seed data
+        types = [h["type"] for h in data["data"]["hardware"]]
+        assert "cpus" in types
+        assert "ram" in types
+
+    def test_get_hardware_requires_admin(self, test_client, user_token):
+        resp = test_client.get(
+            "/api/admin/hardware",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 401
+
+
+class TestAdminContainerDefaults:
+
+    def test_get_container_defaults(self, test_client, admin_token):
+        resp = test_client.get(
+            "/api/admin/container_defaults",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] is True
+        defaults = data["data"]
+        assert "dockerfileBody" in defaults
+        assert "containerCmd" in defaults
+        assert "passwordCommand" in defaults
+
+    def test_get_container_defaults_custom_username(self, test_client, admin_token):
+        resp = test_client.get(
+            "/api/admin/container_defaults?username=student",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()["data"]
+        assert "student" in data["dockerfileBody"]
+
+
+class TestAdminServerMonitoring:
+
+    def test_get_servers_for_monitoring(self, test_client, admin_token):
+        resp = test_client.get(
+            "/api/admin/servers",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] is True

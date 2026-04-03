@@ -375,6 +375,38 @@ start-main-server: check-not-root verify-config-file-exists apply-settings-main-
 	@cd webapp/frontend && pm2 restart frontend 2>/dev/null || pm2 start "npm run production" --name frontend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@cd webapp/backend && pm2 restart backend 2>/dev/null || pm2 start "$(PYTHON) main.py" --name backend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save
+	@ADD_TEST=$$(grep "^ADD_TEST_DATA=" user_config/settings 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]'); \
+	if [ "$$ADD_TEST" = "true" ] || [ -z "$$ADD_TEST" ]; then \
+		echo ""; \
+		echo "$(GREEN)$(BOLD)Seed Test Data$(RESET)"; \
+		echo "Creates test accounts and a server entry for development/testing:"; \
+		echo "  - Admin user:  admin@foo.com (password: test)"; \
+		echo "  - Normal user: user@foo.com (password: test)"; \
+		echo "  - Server 'server1' with CPU/RAM/GPU hardware specs"; \
+		echo ""; \
+		echo "$(RED)$(BOLD)NOTE:$(RESET) If this is a first-time setup, it is $(GREEN)$(BOLD)HIGHLY recommended$(RESET) to seed test data."; \
+		echo "Without it, there are no user accounts to log in with and the first-time"; \
+		echo "setup expects the container server to be named 'server1'."; \
+		echo ""; \
+		echo "This prompt will not appear again on future restarts."; \
+		echo "To seed test data later, run: $(GREEN)$(BOLD)make seed-data$(RESET)"; \
+		echo ""; \
+		echo -n "Seed test data? (y/N): "; \
+		read SEED_CHOICE; \
+		if [ "$$SEED_CHOICE" = "y" ] || [ "$$SEED_CHOICE" = "Y" ]; then \
+			echo ""; \
+			$(MAKE) seed-data; \
+		else \
+			echo ""; \
+			echo "Skipped. Run $(GREEN)$(BOLD)make seed-data$(RESET) anytime to seed test data."; \
+		fi; \
+		if grep -q "^ADD_TEST_DATA=" user_config/settings 2>/dev/null; then \
+			sed -i 's/^ADD_TEST_DATA=.*/ADD_TEST_DATA=false/' user_config/settings; \
+		else \
+			printf '\n\n# Set to true to prompt for seeding test data on next server start.\n# Run make seed-data anytime to seed manually.\nADD_TEST_DATA=false\n' >> user_config/settings; \
+		fi; \
+		echo ""; \
+	fi
 	@URL=$$(grep -o '"url": "[^"]*"' webapp/backend/settings.json | cut -d'"' -f4) && \
 	echo "" && \
 	echo "" && \
@@ -485,6 +517,35 @@ start-container-server: check-not-root apply-settings ## Starts the container se
 
 start-docker-utility: start-container-server ## Alias for start-container-server (backward compatibility)
 
+update-main-server: check-not-root verify-config-file-exists ## Pull latest code, update dependencies, and restart main server
+	@echo ""
+	@echo "$(GREEN)$(BOLD)Updating main server...$(RESET)"
+	@echo ""
+	@echo "Pulling latest code..."
+	@git pull
+	@echo ""
+	@echo "Installing backend dependencies..."
+	@$(PIP) install -r webapp/backend/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location -qq
+	@echo ""
+	@echo "Installing frontend dependencies..."
+	@cd webapp/frontend && npm install
+	@echo ""
+	@$(MAKE) start-main-server
+
+update-container-server: check-not-root verify-config-file-exists ## Pull latest code, update dependencies, and restart container server
+	@echo ""
+	@echo "$(GREEN)$(BOLD)Updating container server...$(RESET)"
+	@echo ""
+	@echo "Pulling latest code..."
+	@git pull
+	@echo ""
+	@echo "Installing container server dependencies..."
+	@$(PIP) install -r webapp/container_server/requirements.txt --break-system-packages --ignore-installed --no-warn-script-location -qq
+	@echo ""
+	@$(MAKE) start-container-server
+
+update-docker-utility: update-container-server ## Alias for update-container-server (backward compatibility)
+
 allow-container-server: check-os-ubuntu ## Allows an external given container server to access this main server. For example: make allow-container-server IP=62.151.151.151
 	@if [ -z "$(IP)" ]; then \
 		echo "No IP address provided. Usage: make allow-container-server IP=<IP_ADDRESS>"; \
@@ -534,6 +595,9 @@ start-dev-container-server: apply-settings
 	cd webapp/container_server && $(PYTHON) main.py
 
 start-dev-docker-utility: start-dev-container-server ## Alias for start-dev-container-server (backward compatibility)
+
+seed-data: check-not-root verify-config-file-exists ## Seed test data (admin user, normal user, test server with hardware specs)
+	@cd $(BACKEND_PATH) && $(PYTHON) ../../scripts/seed_test_data.py
 
 interactive-docker-settings-creation: # Creates Docker utility settings interactively
 	@echo ""

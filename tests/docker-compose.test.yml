@@ -30,7 +30,6 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URI: "mysql+pymysql://testuser:testpass@mariadb/containerfly_test"
-      ADD_TEST_DATA: "true"
       APP_PORT: "8000"
       APP_URL: "http://localhost"
       DOCKER_ENABLED: "false"

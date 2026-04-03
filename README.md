@@ -92,7 +92,7 @@ Main server contains the web interface, database, local docker registry. Follow 
 3. [Install the Container Server](#automatic-installation-container-server)
 4. [Create reservable containers (images)](#creating-reservable-containers)
 
-By default, the setting `ADD_TEST_DATA` is set to true (we recommend setting it like this), which sets up the server machine, adds default docker images and adds default admin and a regular user accounts to the system automatically. The default accounts are as follows:
+After starting the main server with `make start-main-server`, you will be prompted to seed test data. You can also run `make seed-data` at any time. This creates a server entry and default accounts:
 
 ```
 username: admin@foo.com

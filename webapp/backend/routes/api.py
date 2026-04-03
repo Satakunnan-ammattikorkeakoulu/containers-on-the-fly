@@ -2,19 +2,15 @@
 
 Registers all endpoint routers (user, reservation, admin, app) onto a
 single FastAPI APIRouter. Also runs one-time startup logic when the module
-is imported: ensures required roles exist ("everyone", "admin") and
-optionally seeds test data in development mode.
+is imported: ensures required roles exist ("everyone", "admin").
 """
 
 from fastapi import APIRouter
 from endpoints import user, reservation, admin, app, daemon
 from helpers.settings_handler import settings_handler
 from helpers.logger import log
-from helpers.auth import hash_password
-from database import Session, User, Role, Computer, HardwareSpec
+from database import Session, Role
 from sqlalchemy import select
-import base64
-import sqlalchemy as sa
 
 router = APIRouter()
 router.include_router(user.router)
@@ -50,73 +46,4 @@ with Session() as session:
       name = "admin"
     ))
     session.commit()
-
-if settings_handler.get_setting("app.addTestDataInDevelopment"):
-  with Session() as session:
-    # Admin user
-    adminUser = session.execute(select(User).where(User.email == "admin@foo.com")).scalar_one_or_none()
-    if adminUser is None:
-      log.info("Creating test data: admin user with email admin@foo.com")
-      hash = hash_password("test")
-      adminUser = User(
-        email = "admin@foo.com",
-        password = base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
-        passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
-      )
-      adminRole = session.execute(select(Role).where(Role.name == "admin")).scalar_one_or_none()
-      adminUser.roles.append(adminRole)
-      session.add(adminUser)
-      session.commit()
-
-    # Normal User
-    normalUser = session.execute(select(User).where(User.email == "user@foo.com")).scalar_one_or_none()
-    if normalUser is None:
-      log.info("Creating test data: normal user with email user@foo.com")
-      hash = hash_password("test")
-      normalUser = User(
-        email = "user@foo.com",
-        password = base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
-        passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
-      )
-      session.add(normalUser)
-      session.commit()
-
-    # Computer
-    computer = session.execute(select(Computer).where(Computer.name == "server1")).scalar_one_or_none()
-    if computer is None:
-      log.info("Creating test data: computer named server1")
-      computer = Computer( name = "server1", ip = settings_handler.get_setting("app.serverIp"), public = True )
-      session.add(computer)
-      session.commit()
-
-    # Hardware Specs for computer
-    computer = session.execute(select(Computer).where(Computer.name == "server1")).scalar_one_or_none()
-    if len(computer.hardwareSpecs) == 0:
-      log.info("Creating test data: hardware specs for a computer")
-      computer.hardwareSpecs.append(HardwareSpec(
-        type = "gpus",
-        maximumAmount = 0,
-        # Only this will have effect on GPUS to set how many can be reserved, individual GPUs are then individually set as described below
-        maximumAmountForUser = 1,
-        defaultAmountForUser = 0,
-        minimumAmount = 0,
-        format = "GPUs",
-      ))
-      computer.hardwareSpecs.append(HardwareSpec(
-        type = "ram",
-        maximumAmount = 10,
-        maximumAmountForUser = 10,
-        defaultAmountForUser = 1,
-        minimumAmount = 1,
-        format = "GB",
-      ))
-      computer.hardwareSpecs.append(HardwareSpec(
-        type = "cpus",
-        maximumAmount = 5,
-        maximumAmountForUser = 5,
-        defaultAmountForUser = 1,
-        minimumAmount = 1,
-        format = "CPUs",
-      ))
-      session.commit()
 

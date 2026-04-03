@@ -113,11 +113,10 @@ BACKEND_PORT=8000
 FRONTEND_PORT=8080
 
 # Set to true to enable debug printing for database operations
+# Note: It is recommended to ONLY enable this while debugging / developing, as enabling this feature
+# a lot of data will be logged in the console / log files
 DATABASE_DEBUG=false
 
-# Set to true to add test data (like, admin user, computer, and test container) when the server starts
-# Recommended to always keep this on, and then manually remove the test data after setup.
-ADD_TEST_DATA=true
 
 # Set to true to skip actual GPU device dedication (for testing without real GPUs)
 # When enabled, GPU reservation logic runs but containers won't have GPU access
@@ -137,3 +136,8 @@ LOG_LEVEL="DEBUG"
 # These ports will be allowed through the firewall in addition to the standard ports
 # Example: "8080,9000,3306" or leave empty for no additional ports
 FIREWALL_ADDITIONAL_PORTS=""
+
+# Set to true to prompt for seeding test data on next server start (make start-main-server)
+# This is automatically set to false after the prompt is shown.
+# You can also always run `make seed-data` anytime to seed manually.
+ADD_TEST_DATA=true

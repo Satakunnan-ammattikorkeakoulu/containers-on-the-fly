@@ -4,8 +4,7 @@
     "serverIp": "127.0.0.1",
     "clientUrl": "http://localhost:8080",
     "port": 8000,
-    "production": false,
-    "addTestDataInDevelopment": false
+    "production": false
   },
   "database": {
     "engineUri": "sqlite:///:memory:",

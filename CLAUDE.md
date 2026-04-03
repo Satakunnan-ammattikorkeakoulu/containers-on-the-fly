@@ -398,7 +398,7 @@ tests/
 - **Container server tests** use a separate `conftest.py` that adds `webapp/container_server` to `sys.path`, patches `settings_handler` with test settings, and mocks `python_on_whales` and `psutil`. No database is needed — all Docker/system calls are mocked
 - **Frontend tests** run via vitest with jsdom. Test files live outside `webapp/frontend/` so `test.alias` in `vite.config.js` maps package imports to the frontend's `node_modules`
 - **Component tests** use `shallowMount` with Vuetify stubs (Vuetify 4 auto-import sub-paths are not compatible with alias-based resolution in the test environment)
-- **E2E tests** require the full app stack running (use `docker-compose.test.yml` or manual startup with `ADD_TEST_DATA=true`)
+- **E2E tests** require the full app stack running (use `docker-compose.test.yml` or manual startup, then `make seed-data` to seed test data)
 
 ### E2E & API Test User Management
 E2E (Playwright) and API (Bruno) tests use **temporary test accounts** created automatically before tests and deleted afterward — they never use real user accounts. The flow is:

@@ -88,7 +88,7 @@ class SettingsApplier:
             
         # Convert boolean strings to proper JSON boolean values
         bool_settings = [
-            'DATABASE_DEBUG', 'ADD_TEST_DATA', 
+            'DATABASE_DEBUG',
             'MAIN_SERVER_WEB_HTTPS', 'DEBUG_SKIP_GPU_DEDICATION'
         ]
         

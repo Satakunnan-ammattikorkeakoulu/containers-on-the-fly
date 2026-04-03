@@ -16,7 +16,7 @@ from sqlalchemy import select
 import base64
 import re
 
-def login(username, password, ip_address=None):
+def login(username, password):
   """Authenticate a user using the configured authentication method.
 
   Supports password-only, LDAP-only, and hybrid (password-then-LDAP)
@@ -52,14 +52,14 @@ def login(username, password, ip_address=None):
     if use_blacklisting:
       blacklist_email = session.execute(select(UserBlacklist).where(UserBlacklist.email == username)).scalar_one_or_none()
       if blacklist_email is not None:
-        log_action(None, "LOGIN_FAILED", details={"email": username, "reason": "blacklisted"}, ip_address=ip_address)
+        log_action(None, "LOGIN_FAILED", "user", details={"email": username, "reason": "blacklisted"})
         return api_response(False, "You are not allowed to login (blacklisted).")
 
     # Check whitelist if enabled
     if use_whitelisting:
       whitelist_email = session.execute(select(UserWhitelist).where(UserWhitelist.email == username)).scalar_one_or_none()
       if whitelist_email is None:
-        log_action(None, "LOGIN_FAILED", details={"email": username, "reason": "not whitelisted"}, ip_address=ip_address)
+        log_action(None, "LOGIN_FAILED", "user", details={"email": username, "reason": "not whitelisted"})
         return api_response(False, "You are not allowed to login (not whitelisted).")
 
     # Helper function to create login token
@@ -67,7 +67,7 @@ def login(username, password, ip_address=None):
       user.loginToken = create_login_token()
       user.loginTokenCreatedAt = datetime.now(timezone.utc)
       session.commit()
-      log_action(user.userId, "LOGIN", ip_address=ip_address)
+      log_action(user.userId, "LOGIN", "user")
       return {
         "access_token": user.loginToken,
         "token_type": "bearer"
@@ -77,15 +77,15 @@ def login(username, password, ip_address=None):
     def try_password_auth():
       # Check if user exists and has password set
       if not user:
-        log_action(None, "LOGIN_FAILED", details={"email": username, "reason": "user not found"}, ip_address=ip_address)
+        log_action(None, "LOGIN_FAILED", "user", details={"email": username, "reason": "user not found"})
         raise HTTPException(status_code=400, detail="User not found.")
 
       if user.password == "" or user.password is None:
-        log_action(user.userId, "LOGIN_FAILED", details={"email": username, "reason": "no password set"}, ip_address=ip_address)
+        log_action(user.userId, "LOGIN_FAILED", "user", details={"email": username, "reason": "no password set"})
         raise HTTPException(status_code=400, detail="User password was not set yet. Please set the password first to login.")
 
       if is_correct_password(base64.b64decode(user.passwordSalt), base64.b64decode(user.password), password) == False:
-        log_action(user.userId, "LOGIN_FAILED", details={"email": username, "reason": "incorrect password"}, ip_address=ip_address)
+        log_action(user.userId, "LOGIN_FAILED", "user", details={"email": username, "reason": "incorrect password"})
         raise HTTPException(status_code=400, detail="Incorrect password.")
 
       # Password is correct

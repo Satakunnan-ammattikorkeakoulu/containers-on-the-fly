@@ -7,9 +7,11 @@ In production mode, hot-reload is disabled.
 import logging
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from routes.api import router as api_router
 from helpers.settings_handler import settings_handler
+from helpers.request_context import set_client_ip
 
 
 class PollingEndpointFilter(logging.Filter):
@@ -62,6 +64,17 @@ class PollingEndpointFilter(logging.Filter):
         return True
 
 app = FastAPI()
+
+
+class ClientIPMiddleware(BaseHTTPMiddleware):
+    """Store the client IP in request context for use by audit logging."""
+
+    async def dispatch(self, request: Request, call_next):
+        set_client_ip(request.client.host if request.client else None)
+        return await call_next(request)
+
+
+app.add_middleware(ClientIPMiddleware)
 
 # Setup allowed origins
 origins = [

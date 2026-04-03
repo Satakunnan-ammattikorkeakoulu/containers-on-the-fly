@@ -699,12 +699,20 @@ def cancel_reservation(userId : int, reservationId: int):
   # Admins can cancel any reservation
   # print("Starting to cancel reservation: " + reservationId)
   with Session() as session:
-    reservation = None
-    if is_admin(userId) == False:
-      reservation = session.execute(select(Reservation).where( Reservation.reservationId == reservationId, Reservation.userId == userId )).scalar_one_or_none()
-    else:
-      reservation = session.execute(select(Reservation).where( Reservation.reservationId == reservationId )).scalar_one_or_none()
+    query = select(Reservation).where(Reservation.reservationId == reservationId)
+    if not is_admin(userId):
+      query = query.where(Reservation.userId == userId)
+    query = query.options(
+      joinedload(Reservation.computer),
+      joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
+    )
+    reservation = session.execute(query).scalar_one_or_none()
     if reservation is None: return api_response(False, "No reservation found.")
+
+    owner_id = reservation.userId
+    computer_name = reservation.computer.name if reservation.computer else None
+    container_name = reservation.reservedContainer.container.name if reservation.reservedContainer and reservation.reservedContainer.container else None
+    container_image = reservation.reservedContainer.container.imageName if reservation.reservedContainer and reservation.reservedContainer.container else None
 
     now = datetime.datetime.now(datetime.timezone.utc)
     reservation.endDate = now
@@ -713,7 +721,10 @@ def cancel_reservation(userId : int, reservationId: int):
       reservation.startDate = now
     session.commit()
 
-  log_action(userId, "RESERVATION_CANCEL", "reservation", int(reservationId))
+  cancelled_by = "admin" if userId != owner_id else "user"
+  log_action(userId, "RESERVATION_CANCEL", "reservation", int(reservationId),
+             {"cancelledBy": cancelled_by, "computerName": computer_name,
+              "containerName": container_name, "containerImage": container_image})
   return api_response(True, "Reservation cancelled.")
 
 def update_reservation_description(userId: int, reservationId: int, description: str):

@@ -4,7 +4,7 @@ Handles login, token validation, password management, user profile retrieval,
 and SSH public key updates.
 """
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from helpers.server import api_response, force_authentication
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from endpoints.responses import user as functionality
@@ -20,19 +20,17 @@ router = APIRouter(
 )
 
 @router.post("/login")
-async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
   """Authenticate a user with username and password.
 
   Args:
-      request: FastAPI request object (used to extract client IP).
       form_data: OAuth2 form containing ``username`` and ``password``.
 
   Returns:
       API response with an access token on success, or an error message
       on failure.
   """
-  ip_address = request.client.host if request.client else None
-  return functionality.login(form_data.username, form_data.password, ip_address=ip_address)
+  return functionality.login(form_data.username, form_data.password)
 
 @router.get("/check_token")
 async def check_token(token: str = Depends(oauth2_scheme)):

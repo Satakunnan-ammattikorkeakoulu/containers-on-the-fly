@@ -4,6 +4,7 @@ from unittest.mock import patch
 import database as db
 from sqlalchemy import select
 from helpers.tables.audit_log import log_action, get_audit_logs
+from helpers.request_context import set_client_ip
 
 
 class _FakeRequest:
@@ -22,7 +23,8 @@ class TestLogAction:
             user = s.execute(select(db.User).where(db.User.email == "admin@foo.com")).scalar_one()
             user_id = user.userId
 
-        log_action(user_id, "LOGIN", ip_address="127.0.0.1")
+        set_client_ip("127.0.0.1")
+        log_action(user_id, "LOGIN")
 
         with db.Session() as s:
             entries = s.execute(select(db.AuditLog)).scalars().all()
@@ -46,7 +48,8 @@ class TestLogAction:
             assert '"container"' in entry.details
 
     def test_none_actor(self):
-        log_action(None, "LOGIN_FAILED", ip_address="10.0.0.1")
+        set_client_ip("10.0.0.1")
+        log_action(None, "LOGIN_FAILED")
         with db.Session() as s:
             entry = s.execute(select(db.AuditLog)).scalar_one()
             assert entry.userId is None

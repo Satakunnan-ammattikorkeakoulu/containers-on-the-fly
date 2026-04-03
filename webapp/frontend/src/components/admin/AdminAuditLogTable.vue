@@ -37,11 +37,6 @@
         {{ item.resourceType || '-' }}
       </template>
 
-      <!-- Resource ID -->
-      <template v-slot:item.resourceId="{item}">
-        {{ item.resourceId != null ? item.resourceId : '-' }}
-      </template>
-
       <!-- Details -->
       <template v-slot:item.details="{item}">
         <v-tooltip v-if="item.details" location="bottom">
@@ -68,6 +63,7 @@
  * Emits pagination/sort changes to the parent via @update:options.
  */
 import { DisplayTime } from '/src/helpers/time.js'
+import { getActionColor } from '/src/helpers/auditLog.js'
 
 export default {
   name: 'AdminAuditLogTable',
@@ -104,7 +100,6 @@ export default {
         { title: 'User', key: 'userEmail', sortable: true },
         { title: 'Resource', key: 'resourceType', sortable: true },
         { title: 'Action', key: 'action', sortable: true },
-        { title: 'Resource ID', key: 'resourceId', sortable: false },
         { title: 'Details', key: 'details', sortable: false },
         { title: 'IP', key: 'ipAddress', sortable: false },
       ],
@@ -118,18 +113,7 @@ export default {
     onOptionsUpdate(options) {
       this.$emit('update:options', options)
     },
-    getActionColor(action) {
-      if (!action) return 'grey';
-      if (action.startsWith('LOGIN_FAILED')) return 'red';
-      if (action.startsWith('LOGIN')) return 'blue';
-      if (action.startsWith('RESERVATION')) return 'green';
-      if (action.startsWith('USER')) return 'orange';
-      if (action.startsWith('ROLE')) return 'purple';
-      if (action.startsWith('CONTAINER')) return 'teal';
-      if (action.startsWith('COMPUTER')) return 'indigo';
-      if (action.startsWith('SETTINGS')) return 'grey';
-      return 'grey';
-    },
+    getActionColor,
     formatDetailsShort(details) {
       if (!details) return '-';
       if (typeof details === 'string') return details.substring(0, 50);

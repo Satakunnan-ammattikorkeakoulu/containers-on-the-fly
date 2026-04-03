@@ -384,6 +384,9 @@ def get_ldap_user(username, password):
         session.add(new_user)
         session.commit()
         created_user = session.execute(select(User).where(User.email == email)).scalar_one_or_none()
+        from helpers.tables.audit_log import log_action
+        log_action(created_user.userId, "USER_CREATE", "user", created_user.userId,
+                   {"email": email, "source": "ldap"})
         return True, created_user.userId
       # User found? Update name from LDAP and return it
       else:

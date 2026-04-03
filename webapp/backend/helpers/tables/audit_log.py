@@ -14,10 +14,14 @@ from helpers.server import api_response, orm_to_dict
 from helpers.pagination import apply_pagination, get_total_count
 from helpers.settings_handler import settings_handler
 from helpers.logger import log
+from helpers.request_context import get_client_ip
 
 
-def log_action(actor_user_id, action, resource_type=None, resource_id=None, details=None, ip_address=None):
+def log_action(actor_user_id, action, resource_type=None, resource_id=None, details=None):
     """Record an audit log entry for a significant action.
+
+    The client IP address is automatically captured from the request context
+    (set by middleware), so callers do not need to pass it.
 
     This function is fire-and-forget: it catches all exceptions internally
     so that audit logging never breaks the calling operation.
@@ -32,7 +36,6 @@ def log_action(actor_user_id, action, resource_type=None, resource_id=None, deta
             not applicable.
         details: Optional dict of additional context. Serialized to JSON.
             Must never contain passwords, tokens, or SSH keys.
-        ip_address: Optional client IP address (primarily for login events).
     """
     try:
         details_json = json.dumps(details) if details else None
@@ -43,7 +46,7 @@ def log_action(actor_user_id, action, resource_type=None, resource_id=None, deta
                 resourceType=resource_type,
                 resourceId=resource_id,
                 details=details_json,
-                ipAddress=ip_address
+                ipAddress=get_client_ip()
             )
             session.add(entry)
             session.commit()
@@ -111,6 +114,8 @@ def get_audit_logs(request):
             query = query.where(
                 or_(User.email.ilike(user_search), User.name.ilike(user_search))
             )
+        if filters.get("ip"):
+            query = query.where(AuditLog.ipAddress.ilike(f"%{filters['ip']}%"))
         if parsed_from:
             query = query.where(AuditLog.createdAt >= parsed_from)
         if parsed_to:

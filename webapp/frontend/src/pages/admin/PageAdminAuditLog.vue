@@ -53,23 +53,32 @@
       </v-card>
     </v-dialog>
 
-    <!-- Filters -->
+    <!-- Filters row 1 -->
     <v-row class="text-center row-filters justify-center">
-      <v-col cols="12" md="2">
-        <v-select
+      <v-col cols="12" md="3">
+        <v-autocomplete
           :items="resourceTypeItems"
           label="Resource Type"
           v-model="filters.resourceType"
-          @update:model-value="onFilterChange"
-        ></v-select>
+          @update:model-value="onResourceTypeChange"
+        ></v-autocomplete>
       </v-col>
-      <v-col cols="12" md="2">
-        <v-select
-          :items="actionItems"
+      <v-col cols="12" md="3">
+        <v-autocomplete
+          :items="filteredActionItems"
           label="Action"
           v-model="filters.action"
           @update:model-value="onFilterChange"
-        ></v-select>
+        >
+          <template v-slot:item="{ item, props }">
+            <v-list-item v-bind="props">
+              <template v-slot:title>
+                <v-chip v-if="item.value" :color="getActionColor(item.value)" size="small" variant="tonal">{{ item.value }}</v-chip>
+                <span v-else class="text-grey">All</span>
+              </template>
+            </v-list-item>
+          </template>
+        </v-autocomplete>
       </v-col>
       <v-col cols="12" md="3">
         <v-text-field
@@ -79,7 +88,18 @@
           @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="2">
+    </v-row>
+    <!-- Filters row 2 -->
+    <v-row class="text-center row-filters-second justify-center">
+      <v-col cols="12" md="3">
+        <v-text-field
+          v-model="filters.ip"
+          label="IP Address"
+          clearable
+          @update:model-value="onTextFilterChange"
+        ></v-text-field>
+      </v-col>
+      <v-col cols="12" md="3">
         <v-text-field
           v-model="filters.dateFrom"
           label="Date From (start of day)"
@@ -87,7 +107,7 @@
           @update:model-value="onFilterChange"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="2">
+      <v-col cols="12" md="3">
         <v-text-field
           v-model="filters.dateTo"
           label="Date To (end of day)"
@@ -95,7 +115,7 @@
           @update:model-value="onFilterChange"
         ></v-text-field>
       </v-col>
-      <v-col cols="auto" class="d-flex align-center">
+      <v-col cols="12" md="1" class="d-flex align-center justify-center">
         <v-tooltip text="Refresh data" :open-delay="0">
           <template v-slot:activator="{ props }">
             <v-btn icon variant="text" v-bind="props" @click="fetch">
@@ -137,6 +157,7 @@
 import axios from 'axios';
 import Loading from '/src/components/global/Loading.vue';
 import AdminAuditLogTable from '/src/components/admin/AdminAuditLogTable.vue';
+import { getActionColor } from '/src/helpers/auditLog.js';
 import { useMainStore } from '@/store/store'
 
 export default {
@@ -164,6 +185,7 @@ export default {
       action: '',
       resourceType: '',
       user: '',
+      ip: '',
       dateFrom: '',
       dateTo: '',
     },
@@ -173,29 +195,71 @@ export default {
       sortBy: [{key: 'createdAt', order: 'desc'}],
     },
     debounceTimer: null,
-    actionItems: [
-      '', 'LOGIN', 'LOGIN_FAILED',
-      'RESERVATION_CREATE', 'RESERVATION_CANCEL', 'RESERVATION_EXTEND',
-      'RESERVATION_RESTART', 'RESERVATION_UPDATE_DESCRIPTION', 'RESERVATION_ADMIN_EDIT',
-      'USER_CREATE', 'USER_UPDATE',
-      'ROLE_CREATE', 'ROLE_UPDATE', 'ROLE_DELETE',
-      'ROLE_MOUNTS_UPDATE', 'ROLE_HARDWARE_LIMITS_UPDATE', 'ROLE_RESERVATION_LIMITS_UPDATE',
-      'CONTAINER_CREATE', 'CONTAINER_UPDATE', 'CONTAINER_DELETE', 'CONTAINER_REBUILD',
-      'COMPUTER_CREATE', 'COMPUTER_UPDATE', 'COMPUTER_DELETE',
-      'SETTINGS_UPDATE',
+    allActionItems: [
+      { title: 'All', value: '', resourceType: '' },
+      { title: 'LOGIN', value: 'LOGIN', resourceType: 'user' },
+      { title: 'LOGIN_FAILED', value: 'LOGIN_FAILED', resourceType: 'user' },
+      { title: 'RESERVATION_CREATE', value: 'RESERVATION_CREATE', resourceType: 'reservation' },
+      { title: 'RESERVATION_CANCEL', value: 'RESERVATION_CANCEL', resourceType: 'reservation' },
+      { title: 'RESERVATION_EXTEND', value: 'RESERVATION_EXTEND', resourceType: 'reservation' },
+      { title: 'RESERVATION_RESTART', value: 'RESERVATION_RESTART', resourceType: 'reservation' },
+      { title: 'RESERVATION_UPDATE_DESCRIPTION', value: 'RESERVATION_UPDATE_DESCRIPTION', resourceType: 'reservation' },
+      { title: 'RESERVATION_ADMIN_EDIT', value: 'RESERVATION_ADMIN_EDIT', resourceType: 'reservation' },
+      { title: 'USER_CREATE', value: 'USER_CREATE', resourceType: 'user' },
+      { title: 'USER_UPDATE', value: 'USER_UPDATE', resourceType: 'user' },
+      { title: 'ROLE_CREATE', value: 'ROLE_CREATE', resourceType: 'role' },
+      { title: 'ROLE_UPDATE', value: 'ROLE_UPDATE', resourceType: 'role' },
+      { title: 'ROLE_DELETE', value: 'ROLE_DELETE', resourceType: 'role' },
+      { title: 'ROLE_MOUNTS_UPDATE', value: 'ROLE_MOUNTS_UPDATE', resourceType: 'role' },
+      { title: 'ROLE_HARDWARE_LIMITS_UPDATE', value: 'ROLE_HARDWARE_LIMITS_UPDATE', resourceType: 'role' },
+      { title: 'ROLE_RESERVATION_LIMITS_UPDATE', value: 'ROLE_RESERVATION_LIMITS_UPDATE', resourceType: 'role' },
+      { title: 'CONTAINER_CREATE', value: 'CONTAINER_CREATE', resourceType: 'container' },
+      { title: 'CONTAINER_UPDATE', value: 'CONTAINER_UPDATE', resourceType: 'container' },
+      { title: 'CONTAINER_DELETE', value: 'CONTAINER_DELETE', resourceType: 'container' },
+      { title: 'CONTAINER_REBUILD', value: 'CONTAINER_REBUILD', resourceType: 'container' },
+      { title: 'COMPUTER_CREATE', value: 'COMPUTER_CREATE', resourceType: 'computer' },
+      { title: 'COMPUTER_UPDATE', value: 'COMPUTER_UPDATE', resourceType: 'computer' },
+      { title: 'COMPUTER_DELETE', value: 'COMPUTER_DELETE', resourceType: 'computer' },
+      { title: 'SETTINGS_UPDATE', value: 'SETTINGS_UPDATE', resourceType: 'settings' },
     ],
-    resourceTypeItems: ['', 'reservation', 'user', 'role', 'container', 'computer', 'settings'],
+    resourceTypeItems: [
+      { title: 'All', value: '' },
+      { title: 'reservation', value: 'reservation' },
+      { title: 'user', value: 'user' },
+      { title: 'role', value: 'role' },
+      { title: 'container', value: 'container' },
+      { title: 'computer', value: 'computer' },
+      { title: 'settings', value: 'settings' },
+    ],
   }),
   mounted() {
     this.fetch();
   },
+  computed: {
+    filteredActionItems() {
+      if (!this.filters.resourceType) return this.allActionItems;
+      return this.allActionItems.filter(a => a.value === '' || a.resourceType === this.filters.resourceType);
+    },
+  },
   methods: {
+    getActionColor,
     onTableOptionsUpdate(options) {
       this.tableOptions.page = options.page;
       this.tableOptions.itemsPerPage = options.itemsPerPage;
       if (options.sortBy && options.sortBy.length > 0) {
         this.tableOptions.sortBy = options.sortBy;
       }
+      this.fetch();
+    },
+    onResourceTypeChange() {
+      // Clear action filter if it doesn't match the new resource type
+      if (this.filters.action) {
+        const match = this.allActionItems.find(a => a.value === this.filters.action);
+        if (match && match.resourceType && match.resourceType !== this.filters.resourceType) {
+          this.filters.action = '';
+        }
+      }
+      this.tableOptions.page = 1;
       this.fetch();
     },
     onFilterChange() {
@@ -225,6 +289,7 @@ export default {
             action: _this.filters.action || '',
             resourceType: _this.filters.resourceType || '',
             user: _this.filters.user || '',
+            ip: _this.filters.ip || '',
             dateFrom: _this.filters.dateFrom || '',
             dateTo: _this.filters.dateTo || '',
           }
@@ -317,6 +382,11 @@ export default {
 
 .row-filters {
   margin-top: 30px;
+  margin-bottom: 0px;
+}
+
+.row-filters-second {
+  margin-top: 0px;
   margin-bottom: 0px;
 }
 </style>

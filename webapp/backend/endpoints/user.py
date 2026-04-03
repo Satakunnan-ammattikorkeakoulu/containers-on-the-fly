@@ -33,7 +33,7 @@ def login(form_data: OAuth2PasswordRequestForm = Depends()):
   return functionality.login(form_data.username, form_data.password)
 
 @router.get("/check_token")
-async def check_token(token: str = Depends(oauth2_scheme)):
+def check_token(token: str = Depends(oauth2_scheme)):
   """Validate whether the provided bearer token is still active.
 
   Args:
@@ -45,7 +45,7 @@ async def check_token(token: str = Depends(oauth2_scheme)):
   return functionality.check_user_token(token)
 
 @router.post("/create_password")
-async def create_password(password: str, token: str = Depends(oauth2_scheme)):
+def create_password(password: str, token: str = Depends(oauth2_scheme)):
   """Set an initial local password for an LDAP-authenticated user.
 
   Args:
@@ -59,7 +59,7 @@ async def create_password(password: str, token: str = Depends(oauth2_scheme)):
   return functionality.create_password(password)
 
 @router.get("/profile")
-async def profile(token: str = Depends(oauth2_scheme)):
+def profile(token: str = Depends(oauth2_scheme)):
   """Retrieve the authenticated user's profile information.
 
   Args:
@@ -72,7 +72,7 @@ async def profile(token: str = Depends(oauth2_scheme)):
   return functionality.profile(token)
 
 @router.get("/has_password")
-async def has_password(token: str = Depends(oauth2_scheme)):
+def has_password(token: str = Depends(oauth2_scheme)):
   """Check whether the authenticated user has a local password set.
 
   Args:
@@ -91,7 +91,7 @@ class ChangePasswordRequest(BaseModel):
   newPassword: str
 
 @router.post("/change_password")
-async def change_password(request: ChangePasswordRequest, token: str = Depends(oauth2_scheme)):
+def change_password(request: ChangePasswordRequest, token: str = Depends(oauth2_scheme)):
   """Change the authenticated user's password.
 
   Args:
@@ -110,7 +110,7 @@ class UpdateSshKeyRequest(BaseModel):
   sshPublicKey: Optional[str] = None
 
 @router.post("/update_ssh_key")
-async def update_ssh_key(request: UpdateSshKeyRequest, token: str = Depends(oauth2_scheme)):
+def update_ssh_key(request: UpdateSshKeyRequest, token: str = Depends(oauth2_scheme)):
   """Store or clear the authenticated user's SSH public key.
 
   The key is deployed to containers on launch so the user can SSH in
@@ -132,7 +132,7 @@ class UpdateNameRequest(BaseModel):
   name: Optional[str] = None
 
 @router.post("/update_name")
-async def update_name(request: UpdateNameRequest, token: str = Depends(oauth2_scheme)):
+def update_name(request: UpdateNameRequest, token: str = Depends(oauth2_scheme)):
   """Update or remove the authenticated user's display name.
 
   Args:
@@ -152,7 +152,7 @@ class UpdateScriptPathsRequest(BaseModel):
   stopScriptPath: Optional[str] = None
 
 @router.post("/update_script_paths")
-async def update_script_paths(request: UpdateScriptPathsRequest, token: str = Depends(oauth2_scheme)):
+def update_script_paths(request: UpdateScriptPathsRequest, token: str = Depends(oauth2_scheme)):
   """Store or clear the authenticated user's container start/stop script paths.
 
   These paths point to scripts inside the container that run automatically

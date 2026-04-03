@@ -13,7 +13,7 @@ router = APIRouter(
 )
 
 @router.get("/config")
-async def get_public_config():
+def get_public_config():
     """Return public app configuration (no authentication required).
 
     Provides configuration data needed by the frontend before users log in,

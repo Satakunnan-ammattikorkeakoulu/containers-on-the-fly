@@ -41,7 +41,7 @@ def _auth(api_key: str, server_name: str) -> int:
 # ---------------------------------------------------------------------------
 
 @router.get("/tasks")
-async def get_tasks(
+def get_tasks(
     x_daemon_api_key: str = Header(...),
     x_daemon_server_name: str = Header(...),
 ):
@@ -56,7 +56,7 @@ async def get_tasks(
 
 
 @router.get("/orphan-check")
-async def get_orphan_check(
+def get_orphan_check(
     x_daemon_api_key: str = Header(...),
     x_daemon_server_name: str = Header(...),
 ):
@@ -69,7 +69,7 @@ async def get_orphan_check(
 
 
 @router.get("/computer-id/{server_name}")
-async def get_computer_id(
+def get_computer_id(
     server_name: str,
     x_daemon_api_key: str = Header(...),
     x_daemon_server_name: str = Header(...),
@@ -87,7 +87,7 @@ async def get_computer_id(
 # ---------------------------------------------------------------------------
 
 @router.post("/reservation/{reservation_id}/started")
-async def reservation_started(
+def reservation_started(
     reservation_id: int,
     request: ReservationStartedRequest,
     x_daemon_api_key: str = Header(...),
@@ -99,7 +99,7 @@ async def reservation_started(
 
 
 @router.post("/reservation/{reservation_id}/start-failed")
-async def reservation_start_failed(
+def reservation_start_failed(
     reservation_id: int,
     request: ReservationStartFailedRequest,
     x_daemon_api_key: str = Header(...),
@@ -111,7 +111,7 @@ async def reservation_start_failed(
 
 
 @router.post("/reservation/{reservation_id}/stopped")
-async def reservation_stopped(
+def reservation_stopped(
     reservation_id: int,
     x_daemon_api_key: str = Header(...),
     x_daemon_server_name: str = Header(...),
@@ -122,7 +122,7 @@ async def reservation_stopped(
 
 
 @router.post("/reservation/{reservation_id}/paused")
-async def reservation_paused(
+def reservation_paused(
     reservation_id: int,
     request: ReservationPausedRequest,
     x_daemon_api_key: str = Header(...),
@@ -134,7 +134,7 @@ async def reservation_paused(
 
 
 @router.post("/reservation/{reservation_id}/resumed")
-async def reservation_resumed(
+def reservation_resumed(
     reservation_id: int,
     x_daemon_api_key: str = Header(...),
     x_daemon_server_name: str = Header(...),
@@ -145,7 +145,7 @@ async def reservation_resumed(
 
 
 @router.post("/reservation/{reservation_id}/restarted")
-async def reservation_restarted(
+def reservation_restarted(
     reservation_id: int,
     request: ReservationRestartedRequest,
     x_daemon_api_key: str = Header(...),
@@ -161,7 +161,7 @@ async def reservation_restarted(
 # ---------------------------------------------------------------------------
 
 @router.post("/container/{container_id}/build-progress")
-async def container_build_progress(
+def container_build_progress(
     container_id: int,
     request: BuildProgressRequest,
     x_daemon_api_key: str = Header(...),
@@ -173,7 +173,7 @@ async def container_build_progress(
 
 
 @router.post("/container/{container_id}/build-complete")
-async def container_build_complete(
+def container_build_complete(
     container_id: int,
     request: BuildCompleteRequest,
     x_daemon_api_key: str = Header(...),
@@ -185,7 +185,7 @@ async def container_build_complete(
 
 
 @router.post("/container/{container_id}/image-removed")
-async def container_image_removed(
+def container_image_removed(
     container_id: int,
     request: ImageRemovedRequest,
     x_daemon_api_key: str = Header(...),
@@ -197,7 +197,7 @@ async def container_image_removed(
 
 
 @router.post("/container/{container_id}/image-size")
-async def container_image_size(
+def container_image_size(
     container_id: int,
     request: ImageSizeRequest,
     x_daemon_api_key: str = Header(...),
@@ -213,7 +213,7 @@ async def container_image_size(
 # ---------------------------------------------------------------------------
 
 @router.post("/reset-stale-builds")
-async def reset_stale_builds(
+def reset_stale_builds(
     x_daemon_api_key: str = Header(...),
     x_daemon_server_name: str = Header(...),
 ):
@@ -226,7 +226,7 @@ async def reset_stale_builds(
 
 
 @router.post("/update-image-sizes")
-async def update_image_sizes(
+def update_image_sizes(
     request: ImageSizeBatchRequest,
     x_daemon_api_key: str = Header(...),
     x_daemon_server_name: str = Header(...),
@@ -237,7 +237,7 @@ async def update_image_sizes(
 
 
 @router.post("/monitoring")
-async def submit_monitoring(
+def submit_monitoring(
     request: MonitoringRequest,
     x_daemon_api_key: str = Header(...),
     x_daemon_server_name: str = Header(...),

@@ -24,7 +24,7 @@ router = APIRouter(
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login")
 
 @router.get("/get_available_hardware")
-async def get_available_hardware(date : str, duration: int, token: str = Depends(oauth2_scheme)):
+def get_available_hardware(date : str, duration: int, token: str = Depends(oauth2_scheme)):
   """Retrieve hardware resources available for a given date and duration.
 
   Args:
@@ -39,7 +39,7 @@ async def get_available_hardware(date : str, duration: int, token: str = Depends
   return functionality.get_available_hardware(date, duration, None, is_admin(userId), None, userId)
 
 @router.get("/get_availability_timeline")
-async def get_availability_timeline(startDate: str, endDate: str, token: str = Depends(oauth2_scheme)):
+def get_availability_timeline(startDate: str, endDate: str, token: str = Depends(oauth2_scheme)):
   """Retrieve a timeline of hardware availability over a date range.
 
   Args:
@@ -54,7 +54,7 @@ async def get_availability_timeline(startDate: str, endDate: str, token: str = D
   return functionality.get_availability_timeline(startDate, endDate, is_admin(userId))
 
 @router.get("/get_all_reservations_for_calendar")
-async def get_all_reservations_for_calendar(startDate: str, endDate: str, token: str = Depends(oauth2_scheme)):
+def get_all_reservations_for_calendar(startDate: str, endDate: str, token: str = Depends(oauth2_scheme)):
   """Retrieve all reservations within a date range for the calendar view.
 
   Args:
@@ -69,7 +69,7 @@ async def get_all_reservations_for_calendar(startDate: str, endDate: str, token:
   return functionality.get_all_reservations_for_calendar(startDate, endDate)
 
 @router.post("/get_own_reservations")
-async def get_own_reservations(request: UserReservationRequest, token: str = Depends(oauth2_scheme)):
+def get_own_reservations(request: UserReservationRequest, token: str = Depends(oauth2_scheme)):
   """Retrieve the authenticated user's own reservations with pagination.
 
   Args:
@@ -83,7 +83,7 @@ async def get_own_reservations(request: UserReservationRequest, token: str = Dep
   return functionality.get_own_reservations(userId, request)
 
 @router.get("/get_own_reservation_details")
-async def get_own_reservation_details(reservationId: int, token: str = Depends(oauth2_scheme)):
+def get_own_reservation_details(reservationId: int, token: str = Depends(oauth2_scheme)):
   """Retrieve detailed information for one of the user's own reservations.
 
   Args:
@@ -98,7 +98,7 @@ async def get_own_reservation_details(reservationId: int, token: str = Depends(o
   return functionality.get_own_reservation_details(reservationId, userId)
 
 @router.post("/create_reservation")
-async def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, startScriptPath: str = "", stopScriptPath: str = "", token: str = Depends(oauth2_scheme)):
+def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, startScriptPath: str = "", stopScriptPath: str = "", token: str = Depends(oauth2_scheme)):
   """Create a new container reservation after validating all inputs.
 
   Validates date, duration, IDs, email format, description length,
@@ -202,7 +202,7 @@ async def create_reservation(date: str, duration: int, computerId: int, containe
   return functionality.create_reservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description, shmSizePercent, ramDiskSizePercent, isLowPriority, startScriptPath, stopScriptPath)
 
 @router.get("/get_current_reservations")
-async def get_current_reservations(token: str = Depends(oauth2_scheme)):
+def get_current_reservations(token: str = Depends(oauth2_scheme)):
   """Retrieve all currently active (running) reservations.
 
   Args:
@@ -215,7 +215,7 @@ async def get_current_reservations(token: str = Depends(oauth2_scheme)):
   return functionality.get_current_reservations()
 
 @router.post("/cancel_reservation")
-async def cancel_reservation(reservationId: int, token: str = Depends(oauth2_scheme)):
+def cancel_reservation(reservationId: int, token: str = Depends(oauth2_scheme)):
   """Cancel a reservation owned by the authenticated user.
 
   Args:
@@ -229,7 +229,7 @@ async def cancel_reservation(reservationId: int, token: str = Depends(oauth2_sch
   return functionality.cancel_reservation(userId, reservationId)
 
 @router.post("/extend_reservation")
-async def extend_reservation(reservationId: int, duration : int, token: str = Depends(oauth2_scheme)):
+def extend_reservation(reservationId: int, duration : int, token: str = Depends(oauth2_scheme)):
   """Extend the end time of an active reservation.
 
   Args:
@@ -244,7 +244,7 @@ async def extend_reservation(reservationId: int, duration : int, token: str = De
   return functionality.extend_reservation(userId, reservationId, duration)
 
 @router.post("/update_reservation_description")
-async def update_reservation_description(reservationId: int, description: str = "", token: str = Depends(oauth2_scheme)):
+def update_reservation_description(reservationId: int, description: str = "", token: str = Depends(oauth2_scheme)):
   """Update the description of an existing reservation.
 
   Sanitizes the description by stripping whitespace and removing
@@ -269,7 +269,7 @@ async def update_reservation_description(reservationId: int, description: str = 
   return functionality.update_reservation_description(userId, reservationId, description)
 
 @router.post("/restart_container")
-async def restart_container(reservationId: int, token: str = Depends(oauth2_scheme)):
+def restart_container(reservationId: int, token: str = Depends(oauth2_scheme)):
   """Restart the Docker container associated with a reservation.
 
   Args:

@@ -22,7 +22,7 @@ router = APIRouter(
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="user/login")  # Make sure the tokenUrl is correct
 
 @router.post("/reservations")
-async def get_reservations(request: AdminReservationRequest, token: str = Depends(oauth2_scheme)):
+def get_reservations(request: AdminReservationRequest, token: str = Depends(oauth2_scheme)):
   """Retrieve paginated reservations matching the given filters.
 
   Args:
@@ -36,7 +36,7 @@ async def get_reservations(request: AdminReservationRequest, token: str = Depend
   return functionality.get_reservations(request)
 
 @router.post("/users")
-async def get_users(request: AdminUsersRequest, token: str = Depends(oauth2_scheme)):
+def get_users(request: AdminUsersRequest, token: str = Depends(oauth2_scheme)):
   """Retrieve paginated users matching the given filters.
 
   Args:
@@ -50,7 +50,7 @@ async def get_users(request: AdminUsersRequest, token: str = Depends(oauth2_sche
   return functionality.get_users(request)
 
 @router.get("/hardware")
-async def get_hardware(token: str = Depends(oauth2_scheme)):
+def get_hardware(token: str = Depends(oauth2_scheme)):
   """Retrieve all hardware specifications.
 
   Args:
@@ -63,7 +63,7 @@ async def get_hardware(token: str = Depends(oauth2_scheme)):
   return functionality.get_hardware()
 
 @router.get("/containers")
-async def get_containers(token: str = Depends(oauth2_scheme)):
+def get_containers(token: str = Depends(oauth2_scheme)):
   """Retrieve all container definitions.
 
   Args:
@@ -76,7 +76,7 @@ async def get_containers(token: str = Depends(oauth2_scheme)):
   return functionality.get_containers()
 
 @router.get("/computers")
-async def get_computers(token: str = Depends(oauth2_scheme)):
+def get_computers(token: str = Depends(oauth2_scheme)):
   """Retrieve all computer (server) records.
 
   Args:
@@ -89,7 +89,7 @@ async def get_computers(token: str = Depends(oauth2_scheme)):
   return functionality.get_computers()
 
 @router.get("/computer")
-async def get_computer(computerId : int, token: str = Depends(oauth2_scheme)):
+def get_computer(computerId : int, token: str = Depends(oauth2_scheme)):
   """Retrieve details for a single computer.
 
   Args:
@@ -103,7 +103,7 @@ async def get_computer(computerId : int, token: str = Depends(oauth2_scheme)):
   return functionality.get_computer(computerId)
 
 @router.post("/save_computer")
-async def save_computer(computerEdit : ComputerEdit, token: str = Depends(oauth2_scheme)):
+def save_computer(computerEdit : ComputerEdit, token: str = Depends(oauth2_scheme)):
   """Create or update a computer record.
 
   Args:
@@ -117,7 +117,7 @@ async def save_computer(computerEdit : ComputerEdit, token: str = Depends(oauth2
   return functionality.save_computer(computerEdit, actor_user_id)
 
 @router.post("/remove_computer")
-async def remove_computer(computerId : int, token: str = Depends(oauth2_scheme)):
+def remove_computer(computerId : int, token: str = Depends(oauth2_scheme)):
   """Remove a computer record by ID.
 
   Args:
@@ -131,7 +131,7 @@ async def remove_computer(computerId : int, token: str = Depends(oauth2_scheme))
   return functionality.remove_computer(computerId, actor_user_id)
 
 @router.get("/container")
-async def get_container(containerId : int, token: str = Depends(oauth2_scheme)):
+def get_container(containerId : int, token: str = Depends(oauth2_scheme)):
   """Retrieve details for a single container definition.
 
   Args:
@@ -145,7 +145,7 @@ async def get_container(containerId : int, token: str = Depends(oauth2_scheme)):
   return functionality.get_container(containerId)
 
 @router.post("/save_container")
-async def save_container(containerEdit : ContainerEdit, token: str = Depends(oauth2_scheme)):
+def save_container(containerEdit : ContainerEdit, token: str = Depends(oauth2_scheme)):
   """Create or update a container definition.
 
   Args:
@@ -159,7 +159,7 @@ async def save_container(containerEdit : ContainerEdit, token: str = Depends(oau
   return functionality.save_container(containerEdit, actor_user_id)
 
 @router.get("/container_remove_info")
-async def get_container_remove_info(containerId: int, token: str = Depends(oauth2_scheme)):
+def get_container_remove_info(containerId: int, token: str = Depends(oauth2_scheme)):
   """Get information needed for the container removal confirmation dialog.
 
   Returns the number of active reservations using this container,
@@ -177,7 +177,7 @@ async def get_container_remove_info(containerId: int, token: str = Depends(oauth
   return functionality.get_container_remove_info(containerId)
 
 @router.post("/remove_container")
-async def remove_container(containerId : int, token: str = Depends(oauth2_scheme)):
+def remove_container(containerId : int, token: str = Depends(oauth2_scheme)):
   """Remove a container definition by ID.
 
   Args:
@@ -191,7 +191,7 @@ async def remove_container(containerId : int, token: str = Depends(oauth2_scheme
   return functionality.remove_container(containerId, actor_user_id)
 
 @router.get("/container_defaults")
-async def get_container_defaults(username: str = "user", token: str = Depends(oauth2_scheme)):
+def get_container_defaults(username: str = "user", token: str = Depends(oauth2_scheme)):
   """Get default values for a new container (Dockerfile body, CMD, runtime commands).
 
   Used by the frontend to pre-fill the container creation form and for
@@ -210,7 +210,7 @@ async def get_container_defaults(username: str = "user", token: str = Depends(oa
   return functionality.get_container_defaults(username)
 
 @router.post("/rebuild_container_image")
-async def rebuild_container_image(containerId: int, token: str = Depends(oauth2_scheme)):
+def rebuild_container_image(containerId: int, token: str = Depends(oauth2_scheme)):
   """Queue a container image rebuild.
 
   Sets the container's buildStatus to "pending" so the Docker utility
@@ -228,7 +228,7 @@ async def rebuild_container_image(containerId: int, token: str = Depends(oauth2_
   return functionality.rebuild_container_image(containerId, actor_user_id)
 
 @router.get("/container_build_status")
-async def get_container_build_status(containerId: int, token: str = Depends(oauth2_scheme)):
+def get_container_build_status(containerId: int, token: str = Depends(oauth2_scheme)):
   """Get the current build status and log for a container image.
 
   Used by the frontend to poll build progress while an image is being
@@ -245,7 +245,7 @@ async def get_container_build_status(containerId: int, token: str = Depends(oaut
   return functionality.get_container_build_status(containerId)
 
 @router.post("/edit_reservation")
-async def edit_reservation(reservationId : int, endDate : str, token: str = Depends(oauth2_scheme)):
+def edit_reservation(reservationId : int, endDate : str, token: str = Depends(oauth2_scheme)):
   """Edit a reservation's end date.
 
   Args:
@@ -260,7 +260,7 @@ async def edit_reservation(reservationId : int, endDate : str, token: str = Depe
   return functionality.edit_reservation(reservationId, endDate, actor_user_id)
 
 @router.get("/user")
-async def get_user(userId: int, token: str = Depends(oauth2_scheme)):
+def get_user(userId: int, token: str = Depends(oauth2_scheme)):
     """Retrieve details for a single user.
 
     Args:
@@ -274,7 +274,7 @@ async def get_user(userId: int, token: str = Depends(oauth2_scheme)):
     return functionality.get_user(userId)
 
 @router.post("/save_user")
-async def save_user(userEdit: UserEdit, token: str = Depends(oauth2_scheme)):
+def save_user(userEdit: UserEdit, token: str = Depends(oauth2_scheme)):
     """Update a user's profile data.
 
     Args:
@@ -288,7 +288,7 @@ async def save_user(userEdit: UserEdit, token: str = Depends(oauth2_scheme)):
     return functionality.save_user(userEdit.userId, userEdit.data, actor_user_id)
 
 @router.get("/roles")
-async def get_roles(token: str = Depends(oauth2_scheme)):
+def get_roles(token: str = Depends(oauth2_scheme)):
     """Retrieve all roles.
 
     Args:
@@ -301,7 +301,7 @@ async def get_roles(token: str = Depends(oauth2_scheme)):
     return functionality.get_all_roles()
 
 @router.post("/save_role")
-async def save_role(roleId: int = None, name: str = None, token: str = Depends(oauth2_scheme)):
+def save_role(roleId: int = None, name: str = None, token: str = Depends(oauth2_scheme)):
     """Create a new role or rename an existing one.
 
     If ``roleId`` is provided the existing role is renamed; otherwise a new
@@ -322,7 +322,7 @@ async def save_role(roleId: int = None, name: str = None, token: str = Depends(o
         return functionality.add_role(name, actor_user_id)
 
 @router.post("/remove_role")
-async def remove_role(roleId: int, token: str = Depends(oauth2_scheme)):
+def remove_role(roleId: int, token: str = Depends(oauth2_scheme)):
     """Remove a role by ID.
 
     Args:
@@ -336,7 +336,7 @@ async def remove_role(roleId: int, token: str = Depends(oauth2_scheme)):
     return functionality.remove_role(roleId, actor_user_id)
 
 @router.get("/role_mounts")
-async def get_role_mounts(roleId: int, token: str = Depends(oauth2_scheme)):
+def get_role_mounts(roleId: int, token: str = Depends(oauth2_scheme)):
     """Retrieve volume mount configurations for a role.
 
     Args:
@@ -350,7 +350,7 @@ async def get_role_mounts(roleId: int, token: str = Depends(oauth2_scheme)):
     return functionality.get_role_mounts(roleId)
 
 @router.post("/save_role_mounts")
-async def save_role_mounts(roleMountsEdit: RoleMountsEdit, token: str = Depends(oauth2_scheme)):
+def save_role_mounts(roleMountsEdit: RoleMountsEdit, token: str = Depends(oauth2_scheme)):
     """Save volume mount configurations for a role.
 
     Args:
@@ -364,7 +364,7 @@ async def save_role_mounts(roleMountsEdit: RoleMountsEdit, token: str = Depends(
     return functionality.save_role_mounts(roleMountsEdit.roleId, roleMountsEdit.mounts, actor_user_id)
 
 @router.get("/role_hardware_limits")
-async def get_role_hardware_limits(roleId: int, token: str = Depends(oauth2_scheme)):
+def get_role_hardware_limits(roleId: int, token: str = Depends(oauth2_scheme)):
     """Retrieve hardware resource limits for a role.
 
     Args:
@@ -378,7 +378,7 @@ async def get_role_hardware_limits(roleId: int, token: str = Depends(oauth2_sche
     return functionality.get_role_hardware_limits(roleId)
 
 @router.post("/save_role_hardware_limits")
-async def save_role_hardware_limits(roleHardwareLimitsEdit: RoleHardwareLimitsEdit, token: str = Depends(oauth2_scheme)):
+def save_role_hardware_limits(roleHardwareLimitsEdit: RoleHardwareLimitsEdit, token: str = Depends(oauth2_scheme)):
     """Save hardware resource limits for a role.
 
     Args:
@@ -392,7 +392,7 @@ async def save_role_hardware_limits(roleHardwareLimitsEdit: RoleHardwareLimitsEd
     return functionality.save_role_hardware_limits(roleHardwareLimitsEdit.roleId, roleHardwareLimitsEdit.hardwareLimits, actor_user_id)
 
 @router.get("/role_reservation_limits")
-async def get_role_reservation_limits(roleId: int, token: str = Depends(oauth2_scheme)):
+def get_role_reservation_limits(roleId: int, token: str = Depends(oauth2_scheme)):
     """Retrieve reservation limits for a role.
 
     Args:
@@ -406,7 +406,7 @@ async def get_role_reservation_limits(roleId: int, token: str = Depends(oauth2_s
     return functionality.get_role_reservation_limits(roleId)
 
 @router.post("/save_role_reservation_limits")
-async def save_role_reservation_limits(roleReservationLimitsEdit: RoleReservationLimitsEdit, token: str = Depends(oauth2_scheme)):
+def save_role_reservation_limits(roleReservationLimitsEdit: RoleReservationLimitsEdit, token: str = Depends(oauth2_scheme)):
     """Save reservation limits for a role.
 
     Args:
@@ -420,7 +420,7 @@ async def save_role_reservation_limits(roleReservationLimitsEdit: RoleReservatio
     return functionality.save_role_reservation_limits(roleReservationLimitsEdit.roleId, roleReservationLimitsEdit.reservationLimits, actor_user_id)
 
 @router.get("/server/{computer_id}/monitoring")
-async def get_server_monitoring(computer_id: int, token: str = Depends(oauth2_scheme)):
+def get_server_monitoring(computer_id: int, token: str = Depends(oauth2_scheme)):
     """Retrieve monitoring data for a specific container server.
 
     Args:
@@ -434,7 +434,7 @@ async def get_server_monitoring(computer_id: int, token: str = Depends(oauth2_sc
     return functionality.get_server_monitoring(computer_id)
 
 @router.get("/servers")
-async def get_servers_for_monitoring(token: str = Depends(oauth2_scheme)):
+def get_servers_for_monitoring(token: str = Depends(oauth2_scheme)):
     """Retrieve all servers with their monitoring status overview.
 
     Args:
@@ -465,7 +465,7 @@ class TestAdData(BaseModel):
     password: str = Field(max_length=256)
 
 @router.get("/general-settings")
-async def get_general_settings(token: str = Depends(oauth2_scheme)):
+def get_general_settings(token: str = Depends(oauth2_scheme)):
     """Retrieve all database-backed general settings grouped by section.
 
     Args:
@@ -478,7 +478,7 @@ async def get_general_settings(token: str = Depends(oauth2_scheme)):
     return functionality.get_general_settings()
 
 @router.post("/general-settings")
-async def save_general_settings(data: GeneralSettingsData, token: str = Depends(oauth2_scheme)):
+def save_general_settings(data: GeneralSettingsData, token: str = Depends(oauth2_scheme)):
     """Save a section of general settings to the database.
 
     Args:
@@ -492,7 +492,7 @@ async def save_general_settings(data: GeneralSettingsData, token: str = Depends(
     return functionality.save_general_settings(data.section, data.settings, actor_user_id)
 
 @router.post("/test-email")
-async def send_test_email(data: TestEmailData, token: str = Depends(oauth2_scheme)):
+def send_test_email(data: TestEmailData, token: str = Depends(oauth2_scheme)):
     """Send a test email to verify SMTP configuration.
 
     Args:
@@ -506,7 +506,7 @@ async def send_test_email(data: TestEmailData, token: str = Depends(oauth2_schem
     return functionality.send_test_email(data.email)
 
 @router.post("/test-ad")
-async def test_ad_connection(data: TestAdData, token: str = Depends(oauth2_scheme)):
+def test_ad_connection(data: TestAdData, token: str = Depends(oauth2_scheme)):
     """Test AD/LDAP connection with provided credentials.
 
     Performs an LDAP bind and search using the provided credentials against
@@ -524,7 +524,7 @@ async def test_ad_connection(data: TestAdData, token: str = Depends(oauth2_schem
     return functionality.test_ad_connection(data.username, data.password)
 
 @router.post("/audit-logs")
-async def get_audit_logs(request: AuditLogRequest, token: str = Depends(oauth2_scheme)):
+def get_audit_logs(request: AuditLogRequest, token: str = Depends(oauth2_scheme)):
     """Retrieve paginated audit log entries with optional filtering.
 
     Args:

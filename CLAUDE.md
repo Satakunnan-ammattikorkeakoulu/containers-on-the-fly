@@ -189,6 +189,10 @@ fix: Fix group removal logic to not break on empty usernames
 - **UI changes — change only what was requested**: When modifying frontend components, only change the elements explicitly requested. Do not move, resize, restyle, or reorganize other elements in the same component or page. If an adjacent change seems beneficial, mention it and wait for approval.
 - **Respect existing structure**: When adding new items to arrays, config objects, endpoint lists (like `AppUrls.js`), database models, or Pinia store, study the existing entries first and replicate their exact pattern (spacing, naming, ordering conventions).
 
+### Function Return Values
+- **2 values**: Tuples are fine (e.g., `return success, message`)
+- **3+ values**: Always return a dictionary instead of a tuple. Dictionary keys are self-documenting and easier to extend without breaking callers. Example: `return {"started": True, "containerName": name, "error": ""}` instead of `return True, name, ""`
+
 ### Common Pitfalls
 
 - **Session management**: Always use `with Session() as session:` context manager. Do NOT call `session.close()` inside a `with` block (it is redundant). Access ORM objects only within the session scope.

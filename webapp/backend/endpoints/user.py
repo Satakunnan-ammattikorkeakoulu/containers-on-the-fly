@@ -20,7 +20,7 @@ router = APIRouter(
 )
 
 @router.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
   """Authenticate a user with username and password.
 
   Args:

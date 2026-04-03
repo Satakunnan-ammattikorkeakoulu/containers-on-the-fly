@@ -595,7 +595,7 @@
         dayHours.push( { "text": i + ":00", "value": current } )
       }
       this.hours = dayHours
-      this.pickedHour = d.getHours() < 10 ? "0"+d.getHours() : d.getHours.toString()
+      this.pickedHour = d.getHours() < 10 ? "0"+d.getHours() : d.getHours().toString()
 
       this.fetchReservations()
       // Pre-fill script paths from user profile (synced via store)

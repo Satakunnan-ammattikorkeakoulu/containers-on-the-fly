@@ -161,8 +161,8 @@ async def create_reservation(date: str, duration: int, computerId: int, containe
     description = re.sub(r'[<>"\']', '', description)
 
   # Validate SHM size percentage
-  if not isinstance(shmSizePercent, int) or shmSizePercent < 0 or shmSizePercent > 90:
-    return api_response(False, "SHM size percentage must be between 0 and 90.")
+  if not isinstance(shmSizePercent, int) or shmSizePercent < 10 or shmSizePercent > 90:
+    return api_response(False, "SHM size percentage must be between 10 and 90.")
 
   # Validate RAM disk size percentage
   if not isinstance(ramDiskSizePercent, int) or ramDiskSizePercent < 0 or ramDiskSizePercent > 60:

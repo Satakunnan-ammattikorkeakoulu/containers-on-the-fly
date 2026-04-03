@@ -155,7 +155,7 @@ class ReservedContainer(Base):
   containerDockerId = Column(Text, nullable = True) # Coming from Docker
   sshPassword = Column(Text, nullable = True)
   containerDockerErrorMessage = Column(Text, nullable = True)
-  shmSizePercent = Column(Integer, nullable = False, default=50) # Shared memory size as percentage of RAM (0-90)
+  shmSizePercent = Column(Integer, nullable = False, default=50) # Shared memory size as percentage of RAM (10-90)
   ramDiskSizePercent = Column(Integer, nullable = False, default=0) # RAM disk size as percentage of RAM (0-60)
   startScriptPath = Column(Text, nullable = True)
   stopScriptPath = Column(Text, nullable = True)

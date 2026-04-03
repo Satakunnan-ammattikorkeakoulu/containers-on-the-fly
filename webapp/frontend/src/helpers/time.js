@@ -9,8 +9,10 @@
 import dayjs from "dayjs";
 import utc from 'dayjs/plugin/utc'
 import timezone from 'dayjs/plugin/timezone'
+import relativeTime from 'dayjs/plugin/relativeTime'
 dayjs.extend(utc)
 dayjs.extend(timezone)
+dayjs.extend(relativeTime)
 import { useMainStore } from '/src/store/store.js'
 
 /**
@@ -43,4 +45,14 @@ function TimestampToLocalTimeZone(timestamp) {
   return time.toISOString()
 }
 
-export { DisplayTime, TimestampToLocalTimeZone }
+/**
+ * Format an ISO timestamp as a relative time string (e.g. "3 minutes ago").
+ * @param {string} timestamp - ISO 8601 timestamp (with or without trailing "Z").
+ * @returns {string} Relative time string.
+ */
+function RelativeTime(timestamp) {
+  if (timestamp.slice(-1) !== "Z") timestamp = timestamp + "Z"
+  return dayjs(timestamp).fromNow()
+}
+
+export { DisplayTime, TimestampToLocalTimeZone, RelativeTime }

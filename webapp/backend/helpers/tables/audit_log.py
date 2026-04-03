@@ -99,7 +99,7 @@ def get_audit_logs(request):
     Args:
         request: An AuditLogRequest instance with page, itemsPerPage,
             sortBy, and filters fields. Supported filter keys:
-            action, resourceType, user (email/name search), dateFrom, dateTo.
+            action, resourceType, user (email/name search), ip, dateFrom, dateTo.
 
     Returns:
         An api_response dict with logs list, totalItems, and retentionDays.

@@ -134,6 +134,7 @@
       <v-col cols="12">
         <AdminAuditLogTable
           @update:options="onTableOptionsUpdate"
+          @filterBy="onCellFilterClick"
           :propItems="logs"
           :totalItems="totalItems"
           :loading="loading"
@@ -177,6 +178,7 @@ export default {
     AdminAuditLogTable,
   },
   data: () => ({
+    intervalFetch: null,
     initialLoading: true,
     loading: false,
     savingRetention: false,
@@ -227,17 +229,18 @@ export default {
       { title: 'SETTINGS_UPDATE', value: 'SETTINGS_UPDATE', resourceType: 'settings' },
     ],
     resourceTypeItems: [
-      { title: 'All', value: '' },
-      { title: 'reservation', value: 'reservation' },
-      { title: 'user', value: 'user' },
-      { title: 'role', value: 'role' },
-      { title: 'container', value: 'container' },
-      { title: 'computer', value: 'computer' },
-      { title: 'settings', value: 'settings' },
+      { title: 'All', value: '', props: { prependIcon: 'mdi-filter-off' } },
+      { title: 'Reservation', value: 'reservation', props: { prependIcon: 'mdi-calendar-clock' } },
+      { title: 'User', value: 'user', props: { prependIcon: 'mdi-account' } },
+      { title: 'Role', value: 'role', props: { prependIcon: 'mdi-shield-account' } },
+      { title: 'Container', value: 'container', props: { prependIcon: 'mdi-cube-outline' } },
+      { title: 'Computer', value: 'computer', props: { prependIcon: 'mdi-server' } },
+      { title: 'Settings', value: 'settings', props: { prependIcon: 'mdi-cog' } },
     ],
   }),
   mounted() {
     this.fetch();
+    this.intervalFetch = setInterval(() => { this.fetch() }, 30000);
   },
   computed: {
     filteredActionItems() {
@@ -262,6 +265,20 @@ export default {
         if (match && match.resourceType && match.resourceType !== this.filters.resourceType) {
           this.filters.action = '';
         }
+      }
+      this.tableOptions.page = 1;
+      this.fetch();
+    },
+    onCellFilterClick({ key, value }) {
+      if (key === 'resourceType') {
+        this.filters.resourceType = value;
+        this.onResourceTypeChange();
+      } else if (key === 'action') {
+        this.filters.action = value;
+      } else if (key === 'user') {
+        this.filters.user = value;
+      } else if (key === 'ipAddress') {
+        this.filters.ip = value;
       }
       this.tableOptions.page = 1;
       this.fetch();
@@ -357,6 +374,7 @@ export default {
     },
   },
   beforeUnmount() {
+    clearInterval(this.intervalFetch);
     clearTimeout(this.debounceTimer);
   }
 }

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends
 from helpers.server import force_authentication
 from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import admin as functionality
-from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit, RoleMountsEdit, RoleHardwareLimitsEdit, RoleReservationLimitsEdit, AdminUsersRequest, AuditLogRequest
+from endpoints.models.admin import ContainerEdit, ComputerEdit, UserEdit, RoleMountsEdit, RoleHardwareLimitsEdit, RoleReservationLimitsEdit, AdminUsersRequest, AuditLogRequest, AnalyticsRequest
 from endpoints.models.reservation import AdminReservationRequest
 from pydantic import BaseModel, Field
 from typing import Dict, Any
@@ -536,4 +536,19 @@ def get_audit_logs(request: AuditLogRequest, token: str = Depends(oauth2_scheme)
     """
     force_authentication(token, "admin")
     return functionality.get_audit_logs(request)
+
+@router.post("/analytics")
+async def get_analytics(request: AnalyticsRequest, token: str = Depends(oauth2_scheme)):
+    """Retrieve usage analytics data for the admin dashboard.
+
+    Args:
+        request: Time range parameters (days lookback).
+        token: OAuth2 bearer token (injected by Depends).
+
+    Returns:
+        Aggregated analytics including activity trends, status breakdown,
+        action counts, top users, and per-server reservation counts.
+    """
+    force_authentication(token, "admin")
+    return functionality.get_analytics(request)
 

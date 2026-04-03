@@ -38,6 +38,9 @@ def log_action(actor_user_id, action, resource_type=None, resource_id=None, deta
             Must never contain passwords, tokens, or SSH keys.
     """
     try:
+        retention_days = settings_handler.get_setting("auditLog.retentionDays")
+        if retention_days is not None and retention_days == -1:
+            return  # Audit logging is disabled
         details_json = json.dumps(details) if details else None
         with Session() as session:
             entry = AuditLog(
@@ -53,6 +56,19 @@ def log_action(actor_user_id, action, resource_type=None, resource_id=None, deta
             _cleanup_old_logs(session)
     except Exception as e:
         log.error(f"Failed to write audit log entry: {e}")
+
+
+def purge_all_logs():
+    """Delete all audit log entries. Called when audit logging is disabled.
+
+    Failures are logged but never raised.
+    """
+    try:
+        with Session() as session:
+            session.execute(delete(AuditLog))
+            session.commit()
+    except Exception as e:
+        log.error(f"Failed to purge audit logs: {e}")
 
 
 def _cleanup_old_logs(session):

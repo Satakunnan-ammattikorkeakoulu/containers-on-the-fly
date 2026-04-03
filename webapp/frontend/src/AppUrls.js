@@ -71,6 +71,7 @@ function createUrls(baseAddress) {
     URLS.admin.container_build_status = baseAdminUrl + "container_build_status"
     URLS.admin.container_defaults = baseAdminUrl + "container_defaults"
     URLS.admin.get_audit_logs = baseAdminUrl + "audit-logs"
+    URLS.admin.get_analytics = baseAdminUrl + "analytics"
 
     let baseAppUrl = baseUrl + "app/"
     URLS.app.get_config = baseAppUrl + "config"

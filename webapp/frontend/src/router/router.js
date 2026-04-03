@@ -93,6 +93,12 @@ const routes = [
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
+    path: '/admin/analytics',
+    name: 'admin/analytics',
+    component: () => import('../views/admin/ViewAdminAnalytics.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
     path: "/:catchAll(.*)",
     name: "NotFound",
     component: () => import('../views/ViewPageNotFound.vue'),

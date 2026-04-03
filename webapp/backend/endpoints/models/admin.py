@@ -9,6 +9,18 @@ from typing import Dict, Any, List
 from endpoints.models.pagination import PaginationParams
 
 
+class AnalyticsRequest(BaseModel):
+    """Request model for the usage analytics endpoint.
+
+    Attributes:
+        dateFrom: Start date string (YYYY-MM-DD). Empty string means no lower bound.
+        dateTo: End date string (YYYY-MM-DD). Empty string means no upper bound.
+    """
+
+    dateFrom: str = ""
+    dateTo: str = ""
+
+
 class AdminUsersRequest(PaginationParams):
     """Request model for paginated, filtered admin user listing.
 

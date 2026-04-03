@@ -17,6 +17,7 @@
             <router-link to="/admin/computers" :class="{ 'nav-active': $route.path === '/admin/computers' }">Computers</router-link>
             <router-link to="/admin/containers" :class="{ 'nav-active': $route.path === '/admin/containers' }">Containers</router-link>
             <router-link to="/admin/audit-log" :class="{ 'nav-active': $route.path === '/admin/audit-log' }">Audit Log</router-link>
+            <router-link to="/admin/analytics" :class="{ 'nav-active': $route.path === '/admin/analytics' }">Analytics</router-link>
           </div>
           <!-- Admin links: dropdown on narrow screens -->
           <div class="admin-dropdown" v-if="isAdmin">
@@ -32,6 +33,7 @@
                 <v-list-item :to="'/admin/computers'"><v-list-item-title>Computers</v-list-item-title></v-list-item>
                 <v-list-item :to="'/admin/containers'"><v-list-item-title>Containers</v-list-item-title></v-list-item>
                 <v-list-item :to="'/admin/audit-log'"><v-list-item-title>Audit Log</v-list-item-title></v-list-item>
+                <v-list-item :to="'/admin/analytics'"><v-list-item-title>Analytics</v-list-item-title></v-list-item>
               </v-list>
             </v-menu>
           </div>

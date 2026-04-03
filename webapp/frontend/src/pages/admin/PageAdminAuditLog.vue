@@ -6,7 +6,7 @@
         <h2 class="m-0">Audit Log</h2>
         <p class="audit-log-description">
           Records of all significant user and admin actions in the system.
-          The current retention is <strong>{{ retentionDays > 0 ? retentionDays + ' days' : 'forever' }}</strong>
+          The current retention is <strong>{{ retentionDays === -1 ? 'disabled' : (retentionDays > 0 ? retentionDays + ' days' : 'forever') }}</strong>
           <a class="retention-toggle-link" @click="showRetentionEditor = !showRetentionEditor">{{ showRetentionEditor ? '(hide)' : '(change)' }}</a>
         </p>
       </v-col>
@@ -18,16 +18,16 @@
         <div class="d-flex align-center" style="gap: 12px;">
           <v-text-field
             v-model.number="retentionDays"
-            label="Retention (days, 0 = forever)"
+            label="Retention (days, 0 = forever, -1 = disabled)"
             type="number"
             density="compact"
             hide-details
-            style="min-width: 250px"
+            style="min-width: 350px"
           ></v-text-field>
           <v-btn color="primary" size="small" @click="confirmSaveRetention" :loading="savingRetention">Save</v-btn>
         </div>
         <span style="font-size: 14px; opacity: 0.5;">
-          Entries older than the retention period are automatically removed when new events are logged.
+          Entries older than the retention period are automatically removed when new events are logged. Set to -1 to disable audit logging entirely.
         </span>
       </v-col>
     </v-row>
@@ -37,7 +37,11 @@
       <v-card>
         <v-card-title>Change retention period?</v-card-title>
         <v-card-text>
-          <span v-if="retentionDays > 0">
+          <span v-if="retentionDays === -1">
+            Audit logging will be <strong>disabled</strong>. All existing audit log entries will be permanently deleted and no new events will be recorded.
+            This cannot be undone.
+          </span>
+          <span v-else-if="retentionDays > 0">
             Audit log entries older than <strong>{{ retentionDays }} days</strong> will be automatically deleted.
             This cannot be undone.
           </span>

@@ -251,8 +251,8 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
     # Audit Log Settings
     "auditLog.retentionDays": SettingSetting(
         SettingSource.DATABASE, SettingType.INTEGER, default=180,
-        min_value=0, max_value=3650,
-        description="Number of days to keep audit log entries (0 = keep forever)"
+        min_value=-1, max_value=3650,
+        description="Number of days to keep audit log entries (0 = keep forever, -1 = disabled)"
     ),
 
     # Authentication Settings

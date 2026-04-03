@@ -5,7 +5,7 @@ management, container and computer (server) CRUD, user management, role and
 permission management, server monitoring, and general application settings.
 """
 
-from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedContainerPort, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs
+from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedContainerPort, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs, AuditLog
 from dateutil import parser
 from dateutil.relativedelta import *
 from datetime import timezone, timedelta
@@ -1641,6 +1641,10 @@ def save_general_settings(section: str, settings: dict, actor_user_id: int = Non
         elif section == "auditLog":
             if 'retentionDays' in settings:
                 set_setting('auditLog.retentionDays', settings['retentionDays'])
+                # When set to -1 (disabled), purge all existing audit log entries
+                if settings['retentionDays'] == -1:
+                    from helpers.tables.audit_log import purge_all_logs
+                    purge_all_logs()
 
         else:
             return api_response(False, f"Unknown section: {section}")
@@ -1812,3 +1816,154 @@ def get_audit_logs(request) -> object:
         Response with paginated logs, totalItems, and retentionDays.
     """
     return get_audit_logs_helper(request)
+
+
+def get_analytics(request) -> object:
+    """Retrieve usage analytics data aggregated from audit logs and reservations.
+
+    Runs five aggregation queries over the requested time range to produce
+    chart-ready datasets: daily activity trends, reservation status breakdown,
+    action type counts, top users by activity, and reservations per server.
+
+    Args:
+        request: AnalyticsRequest with a ``days`` field (0 = all time).
+
+    Returns:
+        Response with dailyActivity, reservationStatuses, actionCounts,
+        topUsers, reservationsByComputer, and retentionDays.
+    """
+    from helpers.settings_handler import settings_handler
+
+    now = datetime.datetime.now(timezone.utc)
+
+    # Parse date range filters
+    parsed_from = None
+    parsed_to = None
+    if request.dateFrom:
+        try:
+            parsed_from = parser.parse(request.dateFrom)
+        except (ValueError, TypeError):
+            return api_response(False, "Invalid dateFrom value.")
+    if request.dateTo:
+        try:
+            parsed_to = parser.parse(request.dateTo)
+        except (ValueError, TypeError):
+            return api_response(False, "Invalid dateTo value.")
+
+    def _apply_audit_date_filter(stmt, date_col):
+        """Apply dateFrom/dateTo filters to a statement."""
+        result = stmt
+        if parsed_from:
+            result = result.where(date_col >= parsed_from)
+        if parsed_to:
+            result = result.where(date_col < parsed_to + timedelta(days=1))
+        return result
+
+    reservation_actions = ["RESERVATION_CREATE", "RESERVATION_CANCEL",
+                           "RESERVATION_EXTEND", "RESERVATION_RESTART"]
+    login_actions = ["LOGIN", "LOGIN_FAILED"]
+
+    with Session() as session:
+        # --- Query 1: Daily activity (line chart) ---
+        daily_stmt = select(
+            func.date(AuditLog.createdAt).label("day"),
+            func.sum(case(
+                (AuditLog.action.in_(reservation_actions), 1),
+                else_=0
+            )).label("reservations"),
+            func.sum(case(
+                (AuditLog.action.in_(login_actions), 1),
+                else_=0
+            )).label("logins"),
+        )
+        daily_stmt = _apply_audit_date_filter(daily_stmt, AuditLog.createdAt)
+        daily_stmt = daily_stmt.group_by(func.date(AuditLog.createdAt)).order_by(func.date(AuditLog.createdAt))
+        daily_rows = session.execute(daily_stmt).all()
+
+        # Build a dict of existing days for gap-filling
+        daily_map = {}
+        for row in daily_rows:
+            day_str = str(row.day)
+            daily_map[day_str] = {
+                "day": day_str,
+                "reservations": int(row.reservations or 0),
+                "logins": int(row.logins or 0),
+            }
+
+        # Fill in zero-value days for gaps in the range
+        daily_activity = []
+        if parsed_from:
+            start_date = parsed_from.date()
+        elif daily_rows:
+            start_date = daily_rows[0].day
+        else:
+            start_date = now.date()
+
+        if parsed_to:
+            end_date = parsed_to.date()
+        else:
+            end_date = now.date()
+
+        current = start_date
+        while current <= end_date:
+            day_str = str(current)
+            if day_str in daily_map:
+                daily_activity.append(daily_map[day_str])
+            else:
+                daily_activity.append({"day": day_str, "reservations": 0, "logins": 0})
+            current += timedelta(days=1)
+
+        # --- Query 2: Reservation status breakdown (doughnut chart) ---
+        status_stmt = select(Reservation.status, func.count().label("count"))
+        status_stmt = _apply_audit_date_filter(status_stmt, Reservation.createdAt)
+        status_stmt = status_stmt.group_by(Reservation.status)
+        status_rows = session.execute(status_stmt).all()
+
+        reservation_statuses = {}
+        for row in status_rows:
+            reservation_statuses[row.status] = row.count
+
+        # --- Query 3: Action type counts (bar chart) ---
+        action_stmt = select(
+            AuditLog.action,
+            func.count().label("count")
+        )
+        action_stmt = _apply_audit_date_filter(action_stmt, AuditLog.createdAt)
+        action_stmt = action_stmt.group_by(AuditLog.action).order_by(func.count().desc())
+        action_rows = session.execute(action_stmt).all()
+
+        action_counts = [{"action": row.action, "count": row.count} for row in action_rows]
+
+        # --- Query 4: Top 10 users by activity (bar chart) ---
+        users_stmt = select(
+            User.email,
+            User.name,
+            func.count().label("count")
+        ).select_from(AuditLog).join(User, AuditLog.userId == User.userId)
+        users_stmt = _apply_audit_date_filter(users_stmt, AuditLog.createdAt)
+        users_stmt = users_stmt.group_by(AuditLog.userId, User.email, User.name).order_by(func.count().desc()).limit(10)
+        user_rows = session.execute(users_stmt).all()
+
+        top_users = [{"email": row.email, "name": row.name, "count": row.count} for row in user_rows]
+
+        # --- Query 5: Reservations by computer/server (bar chart) ---
+        computer_stmt = select(
+            Computer.name.label("computerName"),
+            func.count().label("count")
+        ).select_from(Reservation).join(Computer, Reservation.computerId == Computer.computerId)
+        computer_stmt = _apply_audit_date_filter(computer_stmt, Reservation.createdAt)
+        computer_stmt = computer_stmt.group_by(Reservation.computerId, Computer.name).order_by(func.count().desc())
+        computer_rows = session.execute(computer_stmt).all()
+
+        reservations_by_computer = [{"computerName": row.computerName, "count": row.count} for row in computer_rows]
+
+    retention_days = settings_handler.get_setting("auditLog.retentionDays")
+
+    return api_response(True, "Analytics data fetched.", {
+        "dailyActivity": daily_activity,
+        "reservationStatuses": reservation_statuses,
+        "actionCounts": action_counts,
+        "topUsers": top_users,
+        "reservationsByComputer": reservations_by_computer,
+        "retentionDays": retention_days,
+    })

@@ -182,8 +182,11 @@ export default {
 <style scoped lang="scss">
 .filterable {
   cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
   &:hover {
-    text-decoration: underline;
+    text-decoration-style: solid;
   }
 }
 

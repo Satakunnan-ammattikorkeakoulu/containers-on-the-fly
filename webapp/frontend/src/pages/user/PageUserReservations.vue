@@ -153,6 +153,8 @@
       if (localStorage.getItem("justReserved") === "true") {
         this.justReserved = true;
         localStorage.removeItem("justReserved");
+        // Refetch after 6 seconds so the new reservation's status has time to update
+        setTimeout(() => this.fetchReservations(), 6000);
       }
       if (localStorage.getItem("justReservedInformEmail") === "true") {
         this.informByEmail = true;

@@ -153,7 +153,6 @@ class ReservedContainer(Base):
   containerDockerName = Column(Text, nullable = True)
   containerStatus = Column(Text, nullable = True) # Coming from Docker
   containerDockerId = Column(Text, nullable = True) # Coming from Docker
-  containerId = Column(ForeignKey("Container.containerId"), nullable = False)
   sshPassword = Column(Text, nullable = True)
   containerDockerErrorMessage = Column(Text, nullable = True)
   shmSizePercent = Column(Integer, nullable = False, default=50) # Shared memory size as percentage of RAM (0-90)
@@ -181,7 +180,10 @@ class ReservedContainerPort(Base):
   outsidePort = Column(Integer, nullable = False)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
-  UniqueConstraint('reservedContainerId', 'localPort', name='outsidePort')
+
+  __table_args__ = (
+    UniqueConstraint('reservedContainerId', 'outsidePort', name='uq_reserved_container_outside_port'),
+  )
 
   reservedContainer = relationship("ReservedContainer", back_populates = "reservedContainerPorts")
   containerPort = relationship("ContainerPort", back_populates = "reservedContainerPorts")

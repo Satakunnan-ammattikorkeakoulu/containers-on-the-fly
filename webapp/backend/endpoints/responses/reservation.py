@@ -629,6 +629,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
         return api_response(False, f"You can only reserve {gpu_limit_from_roles} GPU(s) at a time.")
 
     # Enhanced hardware specification validation
+    reserved_specs_summary = []
     for key, val in hardwareSpecs.items():
       # Validate hardware spec exists
       hardware_spec = session.execute(select(HardwareSpec).where( HardwareSpec.hardwareSpecId == key )).scalar_one_or_none()
@@ -654,6 +655,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
 
       # Only add resources over 0
       if val > 0:
+        reserved_specs_summary.append({"type": hardware_spec.type, "format": hardware_spec.format, "amount": val})
         reservation.reservedHardwareSpecs.append(
           ReservedHardwareSpec(
             hardwareSpecId = key,
@@ -677,8 +679,11 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     inform_by_email = get_setting('email.sendEmail')
 
     log_action(userId, "RESERVATION_CREATE", "reservation", created_reservation_id,
-               {"computerId": computerId, "containerId": containerId, "duration": duration,
-                "description": description})
+               {"computerName": computer.name, "containerName": container.name,
+                "containerImage": container.imageName, "duration": duration,
+                "description": description, "hardwareSpecs": reserved_specs_summary,
+                "shmSizePercent": shmSizePercent, "ramDiskSizePercent": ramDiskSizePercent,
+                "isLowPriority": isLowPriority})
     return api_response(True, "Reservation created succesfully!", { "informByEmail": inform_by_email })
 
 def cancel_reservation(userId : int, reservationId: int):
@@ -837,14 +842,23 @@ def extend_reservation(userId : int, reservationId: int, duration: int):
   # Phase 3: Update session — apply the extension
   with Session() as session:
     reservation = session.execute(
-      select(Reservation).where(Reservation.reservationId == res_id)
-    ).scalar_one_or_none()
+      select(Reservation)
+      .options(
+        joinedload(Reservation.computer),
+        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
+      )
+      .where(Reservation.reservationId == res_id)
+    ).unique().scalar_one_or_none()
     if reservation is None:
       return api_response(False, "No reservation found.")
+    computer_name = reservation.computer.name if reservation.computer else None
+    container_name = reservation.reservedContainer.container.name if reservation.reservedContainer and reservation.reservedContainer.container else None
+    container_image = reservation.reservedContainer.container.imageName if reservation.reservedContainer and reservation.reservedContainer.container else None
     reservation.endDate = reservation.endDate + relativedelta(hours=+duration)
     session.commit()
     log_action(userId, "RESERVATION_EXTEND", "reservation", int(reservationId),
-               {"duration": duration})
+               {"duration": duration, "computerName": computer_name,
+                "containerName": container_name, "containerImage": container_image})
     return api_response(True, "Reservation was extended by " + str(duration) + " hours.")
 
 def restart_container(userId : int, reservationId: int):
@@ -868,7 +882,10 @@ def restart_container(userId : int, reservationId: int):
   # Admins can restart any container
   with Session() as session:
     stmt = select(Reservation)\
-      .options(joinedload(Reservation.reservedContainer))\
+      .options(
+        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
+        joinedload(Reservation.computer),
+      )\
       .where( Reservation.reservationId == reservationId )
     if is_admin(userId) == False:
       stmt = stmt.where(Reservation.userId == userId )
@@ -877,15 +894,20 @@ def restart_container(userId : int, reservationId: int):
     if reservation is None:
       return api_response(False, "No reservation found.")
 
+    computer_name = reservation.computer.name if reservation.computer else None
+    container_name = reservation.reservedContainer.container.name if reservation.reservedContainer and reservation.reservedContainer.container else None
+    container_image = reservation.reservedContainer.container.imageName if reservation.reservedContainer and reservation.reservedContainer.container else None
+    audit_details = {"computerName": computer_name, "containerName": container_name, "containerImage": container_image}
+
     if reservation.status == "paused":
       reservation.status = "reserved"
       session.commit()
-      log_action(userId, "RESERVATION_RESTART", "reservation", int(reservationId))
+      log_action(userId, "RESERVATION_RESTART", "reservation", int(reservationId), audit_details)
       return api_response(True, "Container will be restarted when resources are available.")
     elif reservation.status in ("started", "restart_error"):
       reservation.status = "restart"
       session.commit()
-      log_action(userId, "RESERVATION_RESTART", "reservation", int(reservationId))
+      log_action(userId, "RESERVATION_RESTART", "reservation", int(reservationId), audit_details)
       return api_response(True, "Container will be restarted.")
     else:
       return api_response(False, "Reservation is not currently active, so cannot restart the container.")

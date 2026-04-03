@@ -5,7 +5,7 @@
       <v-col cols="12">
         <h4 class="m-0">Admin</h4>
         <h2 class="m-0">All Reservations</h2>
-        <p class="dim m-0 mb-40">Listing reservations with filtering and date range support</p>
+        <p class="dim m-0 mb-40">Listing reservations for all users</p>
       </v-col>
     </v-row>
 
@@ -92,8 +92,14 @@
       </v-row>
     </div>
 
+    <v-row v-if="!initialLoading && !showFilters" class="text-center" style="margin-top: 0px; margin-bottom: 24px;">
+      <v-col cols="12">
+        <a class="show-filters-link" @click="showFilters = true">Show Filters</a>
+      </v-col>
+    </v-row>
+
     <!-- Filters row 1 -->
-    <v-row class="text-center row-filters justify-center" v-if="!initialLoading">
+    <v-row class="text-center row-filters justify-center" v-if="!initialLoading && showFilters">
       <v-col cols="12" md="2">
         <v-select
           :items="statusItems"
@@ -148,7 +154,7 @@
     </v-row>
 
     <!-- Filters row 2: date range -->
-    <v-row class="text-center row-filters-second justify-center" v-if="!initialLoading">
+    <v-row class="text-center row-filters-second justify-center" v-if="!initialLoading && showFilters">
       <v-col cols="12" md="2">
         <v-text-field
           v-model="filters.reservationId"
@@ -178,7 +184,7 @@
     </v-row>
 
     <!-- Filter summary -->
-    <v-row v-if="!initialLoading" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
+    <v-row v-if="!initialLoading && showFilters" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
       <v-col cols="12" md="9" class="text-center">
         <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
         <v-menu location="bottom center" :close-on-content-click="true">
@@ -253,6 +259,7 @@
       UserReservationsModalConnectionDetails
     },
     data: () => ({
+      showFilters: false,
       intervalFetchReservations: null,
       initialLoading: true,
       loading: false,
@@ -658,6 +665,16 @@
 <style scoped lang="scss">
   .loading {
     margin: 60px auto;
+  }
+
+  .show-filters-link {
+    font-size: 14px;
+    cursor: pointer;
+    color: #42A5F5;
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
   }
 
   .row-filters {

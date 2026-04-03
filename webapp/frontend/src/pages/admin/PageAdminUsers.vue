@@ -10,11 +10,13 @@
     <v-row class="text-center">
       <v-col cols="12">
         <v-btn color="green" @click="addUser">Create New User</v-btn>
+        <br>
+        <a v-if="!showFilters" class="show-filters-link" style="margin-top: 12px; margin-bottom: 24px; display: inline-block;" @click="showFilters = true">Show Filters</a>
       </v-col>
     </v-row>
 
-    <!-- Filters -->
-    <v-row class="text-center row-filters justify-center">
+    <!-- Filters row 1 -->
+    <v-row v-if="showFilters" class="text-center row-filters justify-center">
       <v-col cols="12" md="3">
         <v-select
           :items="roleItems"
@@ -33,6 +35,10 @@
           @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
+    </v-row>
+
+    <!-- Filters row 2 -->
+    <v-row v-if="showFilters" class="text-center row-filters-second justify-center">
       <v-col cols="12" md="3">
         <v-text-field
           v-model="filters.email"
@@ -41,7 +47,7 @@
           @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="2">
+      <v-col cols="12" md="3">
         <v-text-field
           v-model="filters.userId"
           label="User ID"
@@ -107,6 +113,7 @@ export default {
     AdminManageUserModal
   },
   data: () => ({
+    showFilters: false,
     intervalFetch: null,
     initialLoading: true,
     loading: false,
@@ -244,8 +251,23 @@ export default {
   margin: 60px auto;
 }
 
+.show-filters-link {
+  font-size: 14px;
+  cursor: pointer;
+  color: #42A5F5;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
 .row-filters {
-  margin-top: 50px;
+  margin-top: 30px;
+  margin-bottom: 0px;
+}
+
+.row-filters-second {
+  margin-top: 0px;
   margin-bottom: 0px;
 }
 </style>

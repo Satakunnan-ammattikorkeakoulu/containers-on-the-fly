@@ -45,12 +45,12 @@
     <v-row class="text-center">
       <v-col cols="12">
         <h2 class="m-0">Your Reservations</h2>
-        <p class="dim m-0">Your container reservations</p>
+        <a v-if="!showFilters" class="show-filters-link" @click="showFilters = true">Show Filters</a>
       </v-col>
     </v-row>
 
     <!-- Filters -->
-    <v-row class="text-center row-filters justify-center">
+    <v-row v-if="showFilters" class="text-center row-filters justify-center">
       <v-col cols="12" md="3">
         <v-select
           :items="statusItems"
@@ -93,7 +93,7 @@
     </v-row>
 
     <!-- Filter summary -->
-    <v-row v-if="!initialLoading" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
+    <v-row v-if="!initialLoading && showFilters" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
       <v-col cols="12" md="9" class="text-center">
         <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
         <a v-if="hasActiveFilters" class="filter-summary-link" @click="resetFilters">Reset Filters</a>
@@ -162,6 +162,7 @@
       CalendarReservations
     },
     data: () => ({
+      showFilters: false,
       filters: {
         status: "All",
         dateFrom: '',
@@ -591,6 +592,16 @@
 <style scoped lang="scss">
   .loading {
     margin: 60px auto;
+  }
+
+  .show-filters-link {
+    font-size: 14px;
+    cursor: pointer;
+    color: #42A5F5;
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
   }
 
   .row-filters {

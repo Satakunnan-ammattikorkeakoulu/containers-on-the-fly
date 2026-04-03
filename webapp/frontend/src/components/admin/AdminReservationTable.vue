@@ -1,6 +1,5 @@
 <template>
   <div>
-    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Expand Issues" : "Collapse Issues" }}</a>
     <v-data-table-server
       :headers="table.headers"
       :items="propReservations"
@@ -89,9 +88,17 @@
           <div v-else>No container ID</div>
         </v-tooltip>
       </template>
-      <!-- Container Status -->
+      <!-- Container Status / Issues -->
       <template v-slot:item.containerStatus="{item}">
-        {{ (item.status == "error" || item.status == "restart_error") && item.reservedContainer.containerDockerErrorMessage ? getText(item.reservedContainer.containerDockerErrorMessage) : '' }}
+        <span v-if="(item.status == 'error' || item.status == 'restart_error') && item.reservedContainer.containerDockerErrorMessage">
+          <span v-if="!readAll">{{ item.reservedContainer.containerDockerErrorMessage.slice(0, 10) }}...
+            <a class="issue-action-link" @click="readAll = true">Expand</a>
+          </span>
+          <span v-else>{{ item.reservedContainer.containerDockerErrorMessage }}
+            <a class="issue-action-link" @click="copyIssueText(item.reservedContainer.containerDockerErrorMessage)">Copy</a>
+            <a class="issue-action-link" @click="readAll = false">Collapse</a>
+          </span>
+        </span>
       </template>
       <!-- Details link -->
       <template v-slot:item.details="{item}">
@@ -173,7 +180,6 @@
     data: () => ({
       cancellingReservation: false,
       readAll: false,
-      hasLongItems: false,
       table: {
         headers: [
           {
@@ -207,15 +213,11 @@
         }
         return "No ports"
       },
-      toggleReadAll() {
-        this.readAll = !this.readAll;
-      },
-      getText(text) {
-        if (this.readAll) return text;
-        else {
-          if (!this.hasLongItems) this.hasLongItems = true;
-          return text.slice(0,10) + "...";
-        }
+      copyIssueText(text) {
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+          this.store.showMessage({ text: "Issue text copied to clipboard", color: "green" });
+        });
       },
       copyContainerId(containerId) {
         if (!containerId) return
@@ -302,12 +304,15 @@
     color: #ef5350;
   }
 
-  .link-toggle-read-all {
-    margin-bottom: 20px;
-    font-size: 14px;
-    display: inline-block;
-    padding-left: 15px;
-    width: auto;
+  .issue-action-link {
+    font-size: 12px;
+    margin-left: 4px;
+    cursor: pointer;
+    color: #42A5F5;
+    text-decoration: none;
+    &:hover {
+      text-decoration: underline;
+    }
   }
 
   .resource-link {

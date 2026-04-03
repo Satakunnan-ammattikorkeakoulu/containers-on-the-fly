@@ -35,3 +35,13 @@ tests/e2e/.auth/
 tests/backend/.pytest_cache/
 tests/backend/htmlcov/
 tests/backend/**/__pycache__/
+tests/container_server/.pytest_cache/
+tests/container_server/htmlcov/
+tests/container_server/**/__pycache__/
+
+# Coverage artifacts
+webapp/backend/.coverage
+webapp/backend/htmlcov/
+webapp/container_server/.coverage
+webapp/container_server/htmlcov/
+webapp/frontend/coverage/

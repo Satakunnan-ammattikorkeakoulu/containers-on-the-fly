@@ -25,6 +25,28 @@ describe('Main Store', () => {
     })
   })
 
+  describe('isInitializing', () => {
+    it('defaults to true', () => {
+      expect(store.isInitializing).toBe(true)
+    })
+
+    it('reflects state change', () => {
+      store.initializing = false
+      expect(store.isInitializing).toBe(false)
+    })
+  })
+
+  describe('hasConfigError', () => {
+    it('defaults to false', () => {
+      expect(store.hasConfigError).toBe(false)
+    })
+
+    it('returns true after setConfigError', () => {
+      store.setConfigError('Oops')
+      expect(store.hasConfigError).toBe(true)
+    })
+  })
+
   describe('appName', () => {
     it('returns default when not configured', () => {
       expect(store.appName).toBe('Containers on the Fly')
@@ -33,6 +55,64 @@ describe('Main Store', () => {
     it('returns configured name', () => {
       store.appConfig.app.name = 'My App'
       expect(store.appName).toBe('My App')
+    })
+  })
+
+  describe('appTimezone', () => {
+    it('defaults to empty string', () => {
+      expect(store.appTimezone).toBe('')
+    })
+
+    it('returns configured timezone', () => {
+      store.appConfig.app.timezone = 'Europe/Helsinki'
+      expect(store.appTimezone).toBe('Europe/Helsinki')
+    })
+  })
+
+  describe('contactEmail', () => {
+    it('defaults to empty string', () => {
+      expect(store.contactEmail).toBe('')
+    })
+
+    it('returns configured email', () => {
+      store.appConfig.app.contactEmail = 'admin@example.com'
+      expect(store.contactEmail).toBe('admin@example.com')
+    })
+  })
+
+  describe('instruction getters', () => {
+    it('loginPageInfo returns configured value', () => {
+      store.appConfig.instructions.login = 'Use your LDAP credentials'
+      expect(store.loginPageInfo).toBe('Use your LDAP credentials')
+    })
+
+    it('reservationPageInstructions returns configured value', () => {
+      store.appConfig.instructions.reservation = 'Pick a time slot'
+      expect(store.reservationPageInstructions).toBe('Pick a time slot')
+    })
+
+    it('emailInstructions returns configured value', () => {
+      store.appConfig.instructions.email = 'Check your inbox'
+      expect(store.emailInstructions).toBe('Check your inbox')
+    })
+
+    it('usernameField returns configured label', () => {
+      store.appConfig.instructions.usernameFieldLabel = 'Employee ID'
+      expect(store.usernameField).toBe('Employee ID')
+    })
+
+    it('passwordField returns configured label', () => {
+      store.appConfig.instructions.passwordFieldLabel = 'LDAP Password'
+      expect(store.passwordField).toBe('LDAP Password')
+    })
+  })
+
+  describe('userReservationLimits', () => {
+    it('returns full limits object', () => {
+      const limits = store.userReservationLimits
+      expect(limits).toHaveProperty('minDuration')
+      expect(limits).toHaveProperty('maxDuration')
+      expect(limits).toHaveProperty('maxActiveReservations')
     })
   })
 
@@ -118,6 +198,21 @@ describe('Main Store', () => {
       store.showMessage({ text: 'test' })
       expect(store.snackbar.color).toBe('primary')
     })
+
+    it('accepts custom timeout', () => {
+      store.showMessage({ text: 'quick', timeout: 2000 })
+      expect(store.snackbar.timeout).toBe(2000)
+    })
+
+    it('accepts forced multiline', () => {
+      store.showMessage({ text: 'short', multiline: true })
+      expect(store.snackbar.multiline).toBe(true)
+    })
+
+    it('sets close button', () => {
+      store.showMessage({ text: 'closeable', close: true })
+      expect(store.snackbar.close).toBe(true)
+    })
   })
 
   describe('closeMessage', () => {
@@ -135,6 +230,13 @@ describe('Main Store', () => {
       expect(store.configLoaded).toBe(true)
       expect(store.configError).toBe(false)
     })
+
+    it('clears previous error state', () => {
+      store.setConfigError('old error')
+      store.setAppConfig({ app: { name: 'Fixed' } })
+      expect(store.configError).toBe(false)
+      expect(store.configErrorMessage).toBe('')
+    })
   })
 
   describe('setConfigError', () => {
@@ -143,6 +245,32 @@ describe('Main Store', () => {
       expect(store.configError).toBe(true)
       expect(store.configErrorMessage).toBe('Connection failed')
       expect(store.configLoaded).toBe(false)
+    })
+  })
+
+  describe('setUser', () => {
+    it('calls callback with failure when no token', () => {
+      const callback = vi.fn()
+      store.setUser({ callback })
+      expect(callback).toHaveBeenCalledWith(
+        expect.objectContaining({ success: false })
+      )
+    })
+
+    it('creates default callback when none provided', () => {
+      // Should not throw when called without callback
+      store.setUser({ loginToken: '' })
+    })
+  })
+
+  describe('initialiseStore', () => {
+    it('defaults initializing to true', () => {
+      expect(store.initializing).toBe(true)
+    })
+
+    it('initializing can be set to false', () => {
+      store.initializing = false
+      expect(store.initializing).toBe(false)
     })
   })
 

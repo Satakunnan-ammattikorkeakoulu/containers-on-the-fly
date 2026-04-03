@@ -31,9 +31,16 @@
       <template v-slot:item.reservationId="{item}">
         #{{ item.reservationId }}
       </template>
-      <!-- User -->
+      <!-- User (clickable to filter) -->
       <template v-slot:item.userEmail="{item}">
-        {{ item.userEmail }}<span v-if="item.userName"> ({{ item.userName }})</span> <small>(id: {{ item.userId }})</small>
+        <v-tooltip location="bottom" text="Click to filter by this user">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props" class="filterable" @click="$emit('filterByUser', item.userEmail)">
+              {{ item.userEmail }}<span v-if="item.userName"> ({{ item.userName }})</span>
+            </span>
+          </template>
+        </v-tooltip>
+        <small>(id: {{ item.userId }})</small>
       </template>
       <!-- Start date -->
       <template v-slot:item.startDate="{item}">
@@ -86,6 +93,12 @@
       <template v-slot:item.containerStatus="{item}">
         {{ (item.status == "error" || item.status == "restart_error") && item.reservedContainer.containerDockerErrorMessage ? getText(item.reservedContainer.containerDockerErrorMessage) : '' }}
       </template>
+      <!-- Details link -->
+      <template v-slot:item.details="{item}">
+        <a v-if="item.status === 'started'" class="actions-link" @click="emitShowReservationDetails(item.reservationId)">
+          Show Details
+        </a>
+      </template>
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
         <v-menu v-if="item.status === 'reserved' || item.status === 'started' || item.status === 'restart_error' || item.status === 'paused'">
@@ -95,10 +108,6 @@
             </a>
           </template>
           <v-list density="compact">
-            <v-list-item v-if="item.status === 'started'" @click="emitShowReservationDetails(item.reservationId)">
-              <template v-slot:prepend><v-icon size="small">mdi-information-outline</v-icon></template>
-              <v-list-item-title>Show Details</v-list-item-title>
-            </v-list-item>
             <v-list-item @click="emitChangeEndDate(item.reservationId)">
               <template v-slot:prepend><v-icon size="small">mdi-calendar-edit</v-icon></template>
               <v-list-item-title>Change End Date</v-list-item-title>
@@ -180,6 +189,7 @@
           { title: 'Resources', key: 'resourcesInfo', sortable: false },
           { title: 'Docker Name', key: 'dockerName', sortable: false },
           { title: 'Issues', key: 'containerStatus', sortable: false },
+          { title: '', key: 'details', sortable: false },
           { title: '', key: 'actions', sortable: false },
         ],
       }
@@ -267,6 +277,16 @@
 </script>
 
 <style scoped lang="scss">
+  .filterable {
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+    &:hover {
+      text-decoration-style: solid;
+    }
+  }
+
   .actions-link {
     color: #2196f3;
     cursor: pointer;

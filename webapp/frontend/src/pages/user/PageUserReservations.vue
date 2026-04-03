@@ -56,10 +56,21 @@
           :items="statusItems"
           label="Status"
           v-model="filters.status"
-          item-title="text"
-          item-value="value"
           @update:model-value="onFilterChange"
-        ></v-select>
+        >
+          <template v-slot:item="{ item, props }">
+            <v-list-item v-bind="props">
+              <template v-slot:title>
+                <v-chip v-if="item.value && item.value !== 'All'" :color="getStatusColor(item.value)" size="small" variant="tonal">{{ item.title }}</v-chip>
+                <span v-else>{{ item.title }}</span>
+              </template>
+            </v-list-item>
+          </template>
+          <template v-slot:selection="{ item }">
+            <v-chip v-if="item.value && item.value !== 'All'" :color="getStatusColor(item.value)" size="small" variant="tonal">{{ item.title }}</v-chip>
+            <span v-else>{{ item.title }}</span>
+          </template>
+        </v-select>
       </v-col>
       <v-col cols="12" md="3">
         <v-text-field
@@ -194,6 +205,13 @@
       this.intervalFetchReservations = setInterval(() => { this.fetchReservations()}, 15000)
     },
     methods: {
+      getStatusColor(status) {
+        if (status == "reserved") return "primary"
+        else if (status == "started") return "green"
+        else if (status == "stopped") return "red"
+        else if (status == "error") return "orange"
+        else if (status == "paused") return "warning"
+      },
       /** Handles pagination/sort changes from the data table. */
       onTableOptionsUpdate(options) {
         this.tableOptions.page = options.page;
@@ -534,12 +552,12 @@
     computed: {
       statusItems() {
         const items = [
-          { text: `All (${this.totalReservationCount})`, value: 'All' },
-          { text: `Reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
-          { text: `Running (${this.statusCounts.started || 0})`, value: 'started' },
-          { text: `Paused (${this.statusCounts.paused || 0})`, value: 'paused' },
-          { text: `Stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
-          { text: `Error (${this.statusCounts.error || 0})`, value: 'error' }
+          { title: `All (${this.totalReservationCount})`, value: 'All' },
+          { title: `Reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
+          { title: `Running (${this.statusCounts.started || 0})`, value: 'started' },
+          { title: `Paused (${this.statusCounts.paused || 0})`, value: 'paused' },
+          { title: `Error (${this.statusCounts.error || 0})`, value: 'error' },
+          { title: `Stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' }
         ];
         return items;
       },

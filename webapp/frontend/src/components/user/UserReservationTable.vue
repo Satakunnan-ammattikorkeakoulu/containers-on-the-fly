@@ -81,6 +81,12 @@
       <template v-slot:item.containerStatus="{item}">
         {{ (item.status == "error" || item.status == "restart_error") && item.reservedContainer.containerDockerErrorMessage ? getText(item.reservedContainer.containerDockerErrorMessage) : '' }}
       </template>
+      <!-- Details link -->
+      <template v-slot:item.details="{item}">
+        <a v-if="item.status === 'started'" class="actions-link" @click="emitShowReservationDetails(item.reservationId)">
+          Show Details
+        </a>
+      </template>
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
         <v-menu v-if="item.status === 'reserved' || item.status === 'started' || item.status === 'restart_error' || item.status === 'paused'">
@@ -90,10 +96,6 @@
             </a>
           </template>
           <v-list density="compact">
-            <v-list-item v-if="item.status === 'started'" @click="emitShowReservationDetails(item.reservationId)">
-              <template v-slot:prepend><v-icon size="small">mdi-information-outline</v-icon></template>
-              <v-list-item-title>Show Details</v-list-item-title>
-            </v-list-item>
             <v-list-item v-if="item.status === 'started' && lessHoursThan(new Date(item.endDate), 24)" @click="emitExtendReservation(item.reservationId)">
               <template v-slot:prepend><v-icon size="small">mdi-clock-plus-outline</v-icon></template>
               <v-list-item-title>Extend Reservation</v-list-item-title>
@@ -173,6 +175,7 @@
           { title: 'Resources', key: 'resourcesInfo', sortable: false },
           { title: 'Description', key: 'description', sortable: false },
           { title: 'Issues', key: 'containerStatus', sortable: false },
+          { title: '', key: 'details', sortable: false },
           { title: '', key: 'actions', sortable: false },
         ],
       }

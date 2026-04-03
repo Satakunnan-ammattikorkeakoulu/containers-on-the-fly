@@ -99,10 +99,21 @@
           :items="statusItems"
           label="Status"
           v-model="filters.status"
-          item-title="text"
-          item-value="value"
           @update:model-value="onFilterChange"
-        ></v-select>
+        >
+          <template v-slot:item="{ item, props }">
+            <v-list-item v-bind="props">
+              <template v-slot:title>
+                <v-chip v-if="item.value && item.value !== 'All'" :color="getStatusColor(item.value)" size="small" variant="tonal">{{ item.title }}</v-chip>
+                <span v-else>{{ item.title }}</span>
+              </template>
+            </v-list-item>
+          </template>
+          <template v-slot:selection="{ item }">
+            <v-chip v-if="item.value && item.value !== 'All'" :color="getStatusColor(item.value)" size="small" variant="tonal">{{ item.title }}</v-chip>
+            <span v-else>{{ item.title }}</span>
+          </template>
+        </v-select>
       </v-col>
       <v-col cols="12" md="2">
         <v-select
@@ -134,6 +145,10 @@
           @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
+    </v-row>
+
+    <!-- Filters row 2: date range -->
+    <v-row class="text-center row-filters-second justify-center" v-if="!initialLoading">
       <v-col cols="12" md="2">
         <v-text-field
           v-model="filters.reservationId"
@@ -142,10 +157,6 @@
           @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
-    </v-row>
-
-    <!-- Filters row 2: date range -->
-    <v-row class="text-center row-filters-second justify-center" v-if="!initialLoading">
       <v-col cols="12" md="3">
         <v-text-field
           v-model="filters.dateFrom"
@@ -170,6 +181,16 @@
     <v-row v-if="!initialLoading" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
       <v-col cols="12" md="9" class="text-center">
         <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
+        <v-menu location="bottom center" :close-on-content-click="true">
+          <template v-slot:activator="{ props }">
+            <a class="filter-summary-link" v-bind="props">Quick Filters</a>
+          </template>
+          <v-list density="compact">
+            <v-list-item v-for="preset in quickPresets" :key="preset.label" @click="applyPreset(preset.days)">
+              <v-list-item-title>{{ preset.label }}</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
         <a v-if="hasActiveFilters" class="filter-summary-link" @click="resetFilters">Reset Filters</a>
         <a class="filter-summary-link" @click="fetchReservations">Refresh Data</a>
       </v-col>
@@ -182,6 +203,7 @@
             @emitChangeEndDate="changeEndDate"
             @emitRestartContainer="restartContainer"
             @emitShowReservationDetails="showReservationDetails"
+            @filterByUser="onFilterByUser"
             @update:options="onTableOptionsUpdate"
             :propReservations="reservations"
             :totalItems="totalItems"
@@ -268,16 +290,26 @@
         sortBy: [{key: 'reservationId', order: 'desc'}],
       },
       debounceTimer: null,
+      quickPresets: [
+        { label: 'Today', days: 0 },
+        { label: 'Yesterday', days: 1 },
+        { label: 'Last 3 days', days: 3 },
+        { label: 'Last week', days: 7 },
+        { label: 'Last 2 weeks', days: 14 },
+        { label: 'Last month', days: 30 },
+        { label: 'Last 3 months', days: 90 },
+        { label: 'Last year', days: 365 },
+      ],
     }),
     computed: {
       statusItems() {
         const items = [
-          { text: `All (${(this.statusCounts.reserved || 0) + (this.statusCounts.started || 0) + (this.statusCounts.stopped || 0) + (this.statusCounts.error || 0) + (this.statusCounts.paused || 0)})`, value: 'All' },
-          { text: `Reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
-          { text: `Running (${this.statusCounts.started || 0})`, value: 'started' },
-          { text: `Paused (${this.statusCounts.paused || 0})`, value: 'paused' },
-          { text: `Stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' },
-          { text: `Error (${this.statusCounts.error || 0})`, value: 'error' }
+          { title: `All (${(this.statusCounts.reserved || 0) + (this.statusCounts.started || 0) + (this.statusCounts.stopped || 0) + (this.statusCounts.error || 0) + (this.statusCounts.paused || 0)})`, value: 'All' },
+          { title: `Reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
+          { title: `Running (${this.statusCounts.started || 0})`, value: 'started' },
+          { title: `Paused (${this.statusCounts.paused || 0})`, value: 'paused' },
+          { title: `Error (${this.statusCounts.error || 0})`, value: 'error' },
+          { title: `Stopped (${this.statusCounts.stopped || 0})`, value: 'stopped' }
         ];
         return items;
       },
@@ -323,6 +355,13 @@
       this.intervalFetchReservations = setInterval(() => { this.fetchReservations()}, 15000)
     },
     methods: {
+      getStatusColor(status) {
+        if (status == "reserved") return "primary"
+        else if (status == "started") return "green"
+        else if (status == "stopped") return "red"
+        else if (status == "error") return "orange"
+        else if (status == "paused") return "warning"
+      },
       /** Handles pagination/sort changes from the data table. */
       onTableOptionsUpdate(options) {
         this.tableOptions.page = options.page;
@@ -330,6 +369,11 @@
         if (options.sortBy && options.sortBy.length > 0) {
           this.tableOptions.sortBy = options.sortBy;
         }
+        this.fetchReservations();
+      },
+      onFilterByUser(email) {
+        this.filters.user = email;
+        this.tableOptions.page = 1;
         this.fetchReservations();
       },
       /** Handles dropdown filter changes (immediate). */
@@ -343,6 +387,24 @@
           this.filters[filterKey] = '';
         }
         this.onFilterChange();
+      },
+      applyPreset(days) {
+        const today = new Date();
+        const from = new Date(today);
+        if (days === 0) {
+          this.filters.dateFrom = today.toISOString().split('T')[0];
+          this.filters.dateTo = today.toISOString().split('T')[0];
+        } else if (days === 1) {
+          from.setDate(from.getDate() - 1);
+          this.filters.dateFrom = from.toISOString().split('T')[0];
+          this.filters.dateTo = from.toISOString().split('T')[0];
+        } else {
+          from.setDate(from.getDate() - (days - 1));
+          this.filters.dateFrom = from.toISOString().split('T')[0];
+          this.filters.dateTo = today.toISOString().split('T')[0];
+        }
+        this.tableOptions.page = 1;
+        this.fetchReservations();
       },
       /** Reset all filters to defaults. */
       resetFilters() {

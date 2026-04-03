@@ -76,6 +76,10 @@ def get_reservations(request: AdminReservationRequest) -> object:
   status_filter = filters.get("status", "")
   user_filter = str(filters.get("user", "")).strip()
   reservation_id_filter = str(filters.get("reservationId", "")).strip()
+  computer_id_filter = filters.get("computerId", "")
+  container_id_filter = filters.get("containerId", "")
+  date_from_filter = str(filters.get("dateFrom", "")).strip()
+  date_to_filter = str(filters.get("dateTo", "")).strip()
 
   allowed_sort_keys = {
       "reservationId": Reservation.reservationId,
@@ -129,23 +133,46 @@ def get_reservations(request: AdminReservationRequest) -> object:
         "lastThreeMonths": stats_row.total or 0,
     }
 
+    def _apply_reservation_filters(query):
+        """Apply shared reservation filters to a query."""
+        if status_filter:
+            if status_filter == "error":
+                query = query.where(Reservation.status.in_(["error", "restart_error"]))
+            else:
+                query = query.where(Reservation.status == status_filter)
+        if user_filter:
+            query = query.where(
+                User.email.ilike(f"%{user_filter}%") | User.name.ilike(f"%{user_filter}%")
+            )
+        if reservation_id_filter:
+            query = query.where(
+                cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")
+            )
+        if computer_id_filter:
+            try:
+                query = query.where(Reservation.computerId == int(computer_id_filter))
+            except (ValueError, TypeError):
+                pass
+        if container_id_filter:
+            query = query.join(ReservedContainer, Reservation.reservedContainerId == ReservedContainer.reservedContainerId)\
+                .where(ReservedContainer.containerId == int(container_id_filter))
+        if date_from_filter:
+            try:
+                query = query.where(Reservation.startDate >= parser.parse(date_from_filter))
+            except (ValueError, TypeError):
+                pass
+        if date_to_filter:
+            try:
+                query = query.where(Reservation.startDate < parser.parse(date_to_filter) + timedelta(days=1))
+            except (ValueError, TypeError):
+                pass
+        return query
+
     # Build filtered base query (for counting and pagination)
     base_filtered = select(Reservation).where(time_scope)
     # Need join to User for userEmail sorting — always join since it's lightweight
     base_filtered = base_filtered.join(User, Reservation.userId == User.userId)
-    if status_filter:
-        if status_filter == "error":
-            base_filtered = base_filtered.where(Reservation.status.in_(["error", "restart_error"]))
-        else:
-            base_filtered = base_filtered.where(Reservation.status == status_filter)
-    if user_filter:
-        base_filtered = base_filtered.where(
-            User.email.ilike(f"%{user_filter}%") | User.name.ilike(f"%{user_filter}%")
-        )
-    if reservation_id_filter:
-        base_filtered = base_filtered.where(
-            cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")
-        )
+    base_filtered = _apply_reservation_filters(base_filtered)
 
     # Total count of filtered results
     total_items = get_total_count(session, base_filtered)
@@ -154,19 +181,7 @@ def get_reservations(request: AdminReservationRequest) -> object:
     # Rebuild ID query with same filters and joins to avoid cartesian product
     id_stmt = select(Reservation.reservationId).where(time_scope)\
         .join(User, Reservation.userId == User.userId)
-    if status_filter:
-        if status_filter == "error":
-            id_stmt = id_stmt.where(Reservation.status.in_(["error", "restart_error"]))
-        else:
-            id_stmt = id_stmt.where(Reservation.status == status_filter)
-    if user_filter:
-        id_stmt = id_stmt.where(
-            User.email.ilike(f"%{user_filter}%") | User.name.ilike(f"%{user_filter}%")
-        )
-    if reservation_id_filter:
-        id_stmt = id_stmt.where(
-            cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")
-        )
+    id_stmt = _apply_reservation_filters(id_stmt)
     id_stmt = apply_pagination(
         id_stmt, request.sortBy, request.page,
         request.itemsPerPage, allowed_sort_keys
@@ -222,11 +237,22 @@ def get_reservations(request: AdminReservationRequest) -> object:
                     })
             reservations.append(res)
 
+  # Fetch available computers and containers for filter dropdowns
+  with Session() as session:
+    computers_list = session.execute(
+        select(Computer.computerId, Computer.name).where(Computer.removed.isnot(True))
+    ).all()
+    containers_list = session.execute(
+        select(Container.containerId, Container.name).where(Container.removed.isnot(True))
+    ).all()
+
   return api_response(True, "Reservations fetched.", {
       "reservations": reservations,
       "totalItems": total_items,
       "statusCounts": status_counts,
       "stats": stats,
+      "availableComputers": [{"id": c[0], "name": c[1]} for c in computers_list],
+      "availableContainers": [{"id": c[0], "name": c[1]} for c in containers_list],
   })
 
 def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> object:

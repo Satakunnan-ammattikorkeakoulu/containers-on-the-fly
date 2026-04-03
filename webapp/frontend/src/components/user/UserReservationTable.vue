@@ -8,6 +8,7 @@
       :loading="loading"
       :sort-by="sortBy"
       :items-per-page="itemsPerPage"
+      :items-per-page-options="[10, 25, 50]"
       :page="page"
       @update:options="onOptionsUpdate"
       class="elevation-1">

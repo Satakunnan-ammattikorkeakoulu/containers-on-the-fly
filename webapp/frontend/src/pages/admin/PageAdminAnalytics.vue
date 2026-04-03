@@ -203,13 +203,17 @@
       applyPreset(days) {
         const today = new Date()
         const from = new Date(today)
-        if (days === 1) {
+        if (days === 0) {
+          // Today only
+          this.dateFrom = today.toISOString().split('T')[0]
+          this.dateTo = today.toISOString().split('T')[0]
+        } else if (days === 1) {
           // Yesterday only
           from.setDate(from.getDate() - 1)
           this.dateFrom = from.toISOString().split('T')[0]
           this.dateTo = from.toISOString().split('T')[0]
         } else {
-          from.setDate(from.getDate() - days)
+          from.setDate(from.getDate() - (days - 1))
           this.dateFrom = from.toISOString().split('T')[0]
           this.dateTo = today.toISOString().split('T')[0]
         }

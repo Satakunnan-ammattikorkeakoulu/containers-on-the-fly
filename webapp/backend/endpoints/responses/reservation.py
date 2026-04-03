@@ -189,6 +189,8 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
   """
   filters = request.filters
   status_filter = filters.get("status", "")
+  date_from_filter = str(filters.get("dateFrom", "")).strip()
+  date_to_filter = str(filters.get("dateTo", "")).strip()
 
   allowed_sort_keys = {
       "reservationId": Reservation.reservationId,
@@ -197,25 +199,47 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
       "endDate": Reservation.endDate,
   }
 
-  def time_now(): return datetime.datetime.now(datetime.timezone.utc)
-  min_start_date = time_now() - timedelta(days=90)
-  time_scope = (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now())
+  def _apply_user_reservation_filters(query):
+      """Apply shared filters for user reservation queries."""
+      if status_filter:
+          if status_filter == "error":
+              query = query.where(Reservation.status.in_(["error", "restart_error"]))
+          else:
+              query = query.where(Reservation.status == status_filter)
+      if date_from_filter:
+          try:
+              query = query.where(Reservation.startDate >= parser.parse(date_from_filter))
+          except (ValueError, TypeError):
+              pass
+      if date_to_filter:
+          try:
+              query = query.where(Reservation.startDate < parser.parse(date_to_filter) + timedelta(days=1))
+          except (ValueError, TypeError):
+              pass
+      return query
 
   with Session() as session:
-    # Status counts (unfiltered by status, scoped to userId + 90 days)
+    # Status counts (unfiltered by status, but scoped to date range if set)
     status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0, "paused": 0}
-    count_rows = session.execute(
-        select(Reservation.status, func.count())
-        .where(Reservation.userId == userId, time_scope)
-        .group_by(Reservation.status)
-    ).all()
+    status_query = select(Reservation.status, func.count()).where(Reservation.userId == userId)
+    if date_from_filter:
+        try:
+            status_query = status_query.where(Reservation.startDate >= parser.parse(date_from_filter))
+        except (ValueError, TypeError):
+            pass
+    if date_to_filter:
+        try:
+            status_query = status_query.where(Reservation.startDate < parser.parse(date_to_filter) + timedelta(days=1))
+        except (ValueError, TypeError):
+            pass
+    count_rows = session.execute(status_query.group_by(Reservation.status)).all()
     for s, c in count_rows:
         if s == "restart_error":
             status_counts["error"] += c
         elif s in status_counts:
             status_counts[s] = c
 
-    # Active reservation count (no 90-day scope — for limit enforcement)
+    # Active reservation count (no date scope — for limit enforcement)
     active_count = session.execute(
         select(func.count())
         .select_from(Reservation)
@@ -226,23 +250,15 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
     ).scalar()
 
     # Build filtered base query
-    base_filtered = select(Reservation).where(Reservation.userId == userId, time_scope)
-    if status_filter:
-        if status_filter == "error":
-            base_filtered = base_filtered.where(Reservation.status.in_(["error", "restart_error"]))
-        else:
-            base_filtered = base_filtered.where(Reservation.status == status_filter)
+    base_filtered = select(Reservation).where(Reservation.userId == userId)
+    base_filtered = _apply_user_reservation_filters(base_filtered)
 
     # Total count of filtered results
     total_items = get_total_count(session, base_filtered)
 
     # Paginate IDs first (subquery pattern to avoid joinedload + LIMIT issues)
-    id_stmt = select(Reservation.reservationId).where(Reservation.userId == userId, time_scope)
-    if status_filter:
-        if status_filter == "error":
-            id_stmt = id_stmt.where(Reservation.status.in_(["error", "restart_error"]))
-        else:
-            id_stmt = id_stmt.where(Reservation.status == status_filter)
+    id_stmt = select(Reservation.reservationId).where(Reservation.userId == userId)
+    id_stmt = _apply_user_reservation_filters(id_stmt)
     id_stmt = apply_pagination(
         id_stmt, request.sortBy, request.page,
         request.itemsPerPage, allowed_sort_keys

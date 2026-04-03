@@ -5,7 +5,7 @@
       <v-col cols="12">
         <h4 class="m-0">Admin</h4>
         <h2 class="m-0">All Reservations</h2>
-        <p class="dim m-0 mb-40">Listing reservations from past 3 months</p>
+        <p class="dim m-0 mb-40">Listing reservations with filtering and date range support</p>
       </v-col>
     </v-row>
 
@@ -92,9 +92,9 @@
       </v-row>
     </div>
 
-    <!-- Filters -->
+    <!-- Filters row 1 -->
     <v-row class="text-center row-filters justify-center" v-if="!initialLoading">
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="2">
         <v-select
           :items="statusItems"
           label="Status"
@@ -102,6 +102,28 @@
           item-title="text"
           item-value="value"
           @update:model-value="onFilterChange"
+        ></v-select>
+      </v-col>
+      <v-col cols="12" md="2">
+        <v-select
+          :items="computerItems"
+          label="Computer"
+          v-model="filters.computerId"
+          item-title="text"
+          item-value="value"
+          :clearable="!!filters.computerId"
+          @update:model-value="onDropdownClear('computerId')"
+        ></v-select>
+      </v-col>
+      <v-col cols="12" md="2">
+        <v-select
+          :items="containerItems"
+          label="Container"
+          v-model="filters.containerId"
+          item-title="text"
+          item-value="value"
+          :clearable="!!filters.containerId"
+          @update:model-value="onDropdownClear('containerId')"
         ></v-select>
       </v-col>
       <v-col cols="12" md="3">
@@ -119,6 +141,37 @@
           clearable
           @update:model-value="onTextFilterChange"
         ></v-text-field>
+      </v-col>
+    </v-row>
+
+    <!-- Filters row 2: date range -->
+    <v-row class="text-center row-filters-second justify-center" v-if="!initialLoading">
+      <v-col cols="12" md="3">
+        <v-text-field
+          v-model="filters.dateFrom"
+          label="Date From (start of day)"
+          type="date"
+          clearable
+          @update:model-value="onFilterChange"
+        ></v-text-field>
+      </v-col>
+      <v-col cols="12" md="3">
+        <v-text-field
+          v-model="filters.dateTo"
+          label="Date To (end of day)"
+          type="date"
+          clearable
+          @update:model-value="onFilterChange"
+        ></v-text-field>
+      </v-col>
+    </v-row>
+
+    <!-- Filter summary -->
+    <v-row v-if="!initialLoading" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
+      <v-col cols="12" md="9" class="text-center">
+        <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
+        <a v-if="hasActiveFilters" class="filter-summary-link" @click="resetFilters">Reset Filters</a>
+        <a class="filter-summary-link" @click="fetchReservations">Refresh Data</a>
       </v-col>
     </v-row>
 
@@ -187,10 +240,16 @@
       informByEmail: false,
       modalConnectionDetailsVisible: false,
       modalConnectionDetailsReservationId: null,
+      availableComputers: [],
+      availableContainers: [],
       filters: {
         status: "All",
         user: '',
-        reservationId: ''
+        reservationId: '',
+        computerId: '',
+        containerId: '',
+        dateFrom: '',
+        dateTo: '',
       },
       statusCounts: {},
       stats: {
@@ -221,6 +280,32 @@
           { text: `Error (${this.statusCounts.error || 0})`, value: 'error' }
         ];
         return items;
+      },
+      computerItems() {
+        const items = [{ text: 'All', value: '' }];
+        items.push(...this.availableComputers.map(c => ({ text: c.name, value: c.id })));
+        return items;
+      },
+      containerItems() {
+        const items = [{ text: 'All', value: '' }];
+        items.push(...this.availableContainers.map(c => ({ text: c.name, value: c.id })));
+        return items;
+      },
+      dateRangeDays() {
+        if (!this.filters.dateFrom || !this.filters.dateTo) return null;
+        const from = new Date(this.filters.dateFrom);
+        const to = new Date(this.filters.dateTo);
+        const diffMs = to - from;
+        if (diffMs < 0) return null;
+        return Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+      },
+      hasActiveFilters() {
+        return !!(
+          (this.filters.status && this.filters.status !== 'All') ||
+          this.filters.user || this.filters.reservationId ||
+          this.filters.computerId || this.filters.containerId ||
+          this.filters.dateFrom || this.filters.dateTo
+        );
       }
     },
     mounted () {
@@ -249,6 +334,25 @@
       },
       /** Handles dropdown filter changes (immediate). */
       onFilterChange() {
+        this.tableOptions.page = 1;
+        this.fetchReservations();
+      },
+      /** Handles clearable dropdown filters — resets null to empty string. */
+      onDropdownClear(filterKey) {
+        if (this.filters[filterKey] === null || this.filters[filterKey] === undefined) {
+          this.filters[filterKey] = '';
+        }
+        this.onFilterChange();
+      },
+      /** Reset all filters to defaults. */
+      resetFilters() {
+        this.filters.status = 'All';
+        this.filters.user = '';
+        this.filters.reservationId = '';
+        this.filters.computerId = '';
+        this.filters.containerId = '';
+        this.filters.dateFrom = '';
+        this.filters.dateTo = '';
         this.tableOptions.page = 1;
         this.fetchReservations();
       },
@@ -307,6 +411,10 @@
               status: _this.filters.status === 'All' ? '' : (_this.filters.status || ''),
               user: _this.filters.user || '',
               reservationId: _this.filters.reservationId || '',
+              computerId: _this.filters.computerId || '',
+              containerId: _this.filters.containerId || '',
+              dateFrom: _this.filters.dateFrom || '',
+              dateTo: _this.filters.dateTo || '',
             }
           },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
@@ -317,6 +425,8 @@
               _this.totalItems = response.data.data.totalItems
               _this.statusCounts = response.data.data.statusCounts || {}
               _this.stats = response.data.data.stats || _this.stats
+              _this.availableComputers = response.data.data.availableComputers || []
+              _this.availableContainers = response.data.data.availableContainers || []
             }
             else {
               console.log("Failed getting reservations...")
@@ -496,5 +606,27 @@
   #stats-row .row.mb-4, #stats-row .row.mb-6 {
     margin-bottom: 0px !important;
     margin-top: 0px !important;
+  }
+
+  .row-filters-second {
+    margin-top: 0px;
+    margin-bottom: 0px;
+  }
+
+  .filter-summary-text {
+    font-size: 14px;
+    opacity: 0.5;
+  }
+
+  .filter-summary-link {
+    font-size: 14px;
+    margin-left: 8px;
+    cursor: pointer;
+    color: #42A5F5;
+    text-decoration: none;
+  }
+
+  .filter-summary-link:hover {
+    text-decoration: underline;
   }
 </style>

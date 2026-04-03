@@ -64,7 +64,8 @@
           :items="resourceTypeItems"
           label="Resource Type"
           v-model="filters.resourceType"
-          @update:model-value="onResourceTypeChange"
+          :clearable="!!filters.resourceType"
+          @update:model-value="onResourceTypeClear"
         ></v-autocomplete>
       </v-col>
       <v-col cols="12" md="3">
@@ -72,7 +73,8 @@
           :items="filteredActionItems"
           label="Action"
           v-model="filters.action"
-          @update:model-value="onFilterChange"
+          :clearable="!!filters.action"
+          @update:model-value="onActionClear"
         >
           <template v-slot:item="{ item, props }">
             <v-list-item v-bind="props">
@@ -119,14 +121,24 @@
           @update:model-value="onFilterChange"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="1" class="d-flex align-center justify-center">
-        <v-tooltip text="Refresh data" :open-delay="0">
+    </v-row>
+
+    <!-- Filter summary -->
+    <v-row v-if="!initialLoading" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
+      <v-col cols="12" md="9" class="text-center">
+        <span class="filter-summary-text">Showing <strong>{{ logs.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
+        <v-menu location="bottom center" :close-on-content-click="true">
           <template v-slot:activator="{ props }">
-            <v-btn icon variant="text" v-bind="props" @click="fetch">
-              <v-icon>mdi-refresh</v-icon>
-            </v-btn>
+            <a class="filter-summary-link" v-bind="props">Quick Filters</a>
           </template>
-        </v-tooltip>
+          <v-list density="compact">
+            <v-list-item v-for="preset in quickPresets" :key="preset.label" @click="applyPreset(preset.days)">
+              <v-list-item-title>{{ preset.label }}</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+        <a v-if="hasActiveFilters" class="filter-summary-link" @click="resetFilters">Reset Filters</a>
+        <a class="filter-summary-link" @click="fetch">Refresh Data</a>
       </v-col>
     </v-row>
 
@@ -201,6 +213,15 @@ export default {
       sortBy: [{key: 'createdAt', order: 'desc'}],
     },
     debounceTimer: null,
+    quickPresets: [
+      { label: 'Today', days: 0 },
+      { label: 'Yesterday', days: 1 },
+      { label: 'Last 3 days', days: 3 },
+      { label: 'Last week', days: 7 },
+      { label: 'Last 2 weeks', days: 14 },
+      { label: 'Last month', days: 30 },
+      { label: 'Last year', days: 365 },
+    ],
     allActionItems: [
       { title: 'All', value: '', resourceType: '' },
       { title: 'LOGIN', value: 'LOGIN', resourceType: 'user' },
@@ -247,9 +268,50 @@ export default {
       if (!this.filters.resourceType) return this.allActionItems;
       return this.allActionItems.filter(a => a.value === '' || a.resourceType === this.filters.resourceType);
     },
+    dateRangeDays() {
+      if (!this.filters.dateFrom || !this.filters.dateTo) return null;
+      const from = new Date(this.filters.dateFrom);
+      const to = new Date(this.filters.dateTo);
+      const diffMs = to - from;
+      if (diffMs < 0) return null;
+      return Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+    },
+    hasActiveFilters() {
+      return !!(this.filters.action || this.filters.resourceType || this.filters.user || this.filters.ip || this.filters.dateFrom || this.filters.dateTo);
+    },
   },
   methods: {
     getActionColor,
+    applyPreset(days) {
+      const today = new Date();
+      const from = new Date(today);
+      if (days === 0) {
+        // Today only
+        this.filters.dateFrom = today.toISOString().split('T')[0];
+        this.filters.dateTo = today.toISOString().split('T')[0];
+      } else if (days === 1) {
+        // Yesterday only
+        from.setDate(from.getDate() - 1);
+        this.filters.dateFrom = from.toISOString().split('T')[0];
+        this.filters.dateTo = from.toISOString().split('T')[0];
+      } else {
+        from.setDate(from.getDate() - (days - 1));
+        this.filters.dateFrom = from.toISOString().split('T')[0];
+        this.filters.dateTo = today.toISOString().split('T')[0];
+      }
+      this.tableOptions.page = 1;
+      this.fetch();
+    },
+    resetFilters() {
+      this.filters.action = '';
+      this.filters.resourceType = '';
+      this.filters.user = '';
+      this.filters.ip = '';
+      this.filters.dateFrom = '';
+      this.filters.dateTo = '';
+      this.tableOptions.page = 1;
+      this.fetch();
+    },
     onTableOptionsUpdate(options) {
       this.tableOptions.page = options.page;
       this.tableOptions.itemsPerPage = options.itemsPerPage;
@@ -257,6 +319,14 @@ export default {
         this.tableOptions.sortBy = options.sortBy;
       }
       this.fetch();
+    },
+    onResourceTypeClear(val) {
+      if (val === null || val === undefined) this.filters.resourceType = '';
+      this.onResourceTypeChange();
+    },
+    onActionClear(val) {
+      if (val === null || val === undefined) this.filters.action = '';
+      this.onFilterChange();
     },
     onResourceTypeChange() {
       // Clear action filter if it doesn't match the new resource type
@@ -410,5 +480,22 @@ export default {
 .row-filters-second {
   margin-top: 0px;
   margin-bottom: 0px;
+}
+
+.filter-summary-text {
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+.filter-summary-link {
+  font-size: 14px;
+  margin-left: 8px;
+  cursor: pointer;
+  color: #42A5F5;
+  text-decoration: none;
+}
+
+.filter-summary-link:hover {
+  text-decoration: underline;
 }
 </style>

@@ -7,7 +7,7 @@ SQLAlchemy select statements based on Vuetify 3 v-data-table-server parameters.
 from sqlalchemy import asc, desc, func, select
 
 
-MAX_ITEMS_PER_PAGE = 100
+MAX_ITEMS_PER_PAGE = 50
 
 
 def apply_pagination(stmt, sort_by, page, items_per_page, allowed_sort_keys):

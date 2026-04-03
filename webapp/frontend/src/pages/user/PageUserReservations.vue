@@ -45,24 +45,48 @@
     <v-row class="text-center">
       <v-col cols="12">
         <h2 class="m-0">Your Reservations</h2>
-        <p class="dim m-0">Listing reservations from past 3 months</p>
+        <p class="dim m-0">Your container reservations</p>
       </v-col>
     </v-row>
 
     <!-- Filters -->
-    <v-row class="text-center row-filters">
-      <v-row>
-        <v-col cols="3" style="margin: 0 auto;">
-          <v-select
-            :items="statusItems"
-            label="Status"
-            v-model="filters.status"
-            item-title="text"
-            item-value="value"
-            @update:model-value="onFilterChange"
-          ></v-select>
-        </v-col>
-      </v-row>
+    <v-row class="text-center row-filters justify-center">
+      <v-col cols="12" md="3">
+        <v-select
+          :items="statusItems"
+          label="Status"
+          v-model="filters.status"
+          item-title="text"
+          item-value="value"
+          @update:model-value="onFilterChange"
+        ></v-select>
+      </v-col>
+      <v-col cols="12" md="3">
+        <v-text-field
+          v-model="filters.dateFrom"
+          label="Date From"
+          type="date"
+          clearable
+          @update:model-value="onFilterChange"
+        ></v-text-field>
+      </v-col>
+      <v-col cols="12" md="3">
+        <v-text-field
+          v-model="filters.dateTo"
+          label="Date To"
+          type="date"
+          clearable
+          @update:model-value="onFilterChange"
+        ></v-text-field>
+      </v-col>
+    </v-row>
+
+    <!-- Filter summary -->
+    <v-row v-if="!initialLoading" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
+      <v-col cols="12" md="9" class="text-center">
+        <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
+        <a v-if="hasActiveFilters" class="filter-summary-link" @click="resetFilters">Reset Filters</a>
+      </v-col>
     </v-row>
 
     <!-- Data table -->
@@ -127,7 +151,11 @@
       CalendarReservations
     },
     data: () => ({
-      filters: { status: "All" },
+      filters: {
+        status: "All",
+        dateFrom: '',
+        dateTo: '',
+      },
       intervalFetchReservations: null,
       initialLoading: true,
       loading: false,
@@ -180,6 +208,14 @@
         this.tableOptions.page = 1;
         this.fetchReservations();
       },
+      /** Reset all filters to defaults. */
+      resetFilters() {
+        this.filters.status = 'All';
+        this.filters.dateFrom = '';
+        this.filters.dateTo = '';
+        this.tableOptions.page = 1;
+        this.fetchReservations();
+      },
       closeModalConnectionDetails() {
         this.modalConnectionDetailsVisible = false
       },
@@ -210,6 +246,8 @@
             sortBy: _this.tableOptions.sortBy,
             filters: {
               status: _this.filters.status === 'All' ? '' : (_this.filters.status || ''),
+              dateFrom: _this.filters.dateFrom || '',
+              dateTo: _this.filters.dateTo || '',
             }
           },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
@@ -510,7 +548,21 @@
       },
       maxActiveReservations() {
         return this.store.userMaxActiveReservations;
-      }
+      },
+      dateRangeDays() {
+        if (!this.filters.dateFrom || !this.filters.dateTo) return null;
+        const from = new Date(this.filters.dateFrom);
+        const to = new Date(this.filters.dateTo);
+        const diffMs = to - from;
+        if (diffMs < 0) return null;
+        return Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+      },
+      hasActiveFilters() {
+        return !!(
+          (this.filters.status && this.filters.status !== 'All') ||
+          this.filters.dateFrom || this.filters.dateTo
+        );
+      },
     },
     beforeUnmount() {
       clearInterval(this.intervalFetchReservations)
@@ -524,10 +576,25 @@
   }
 
   .row-filters {
-    .col-3 {
-      padding-top: 30px;
-      padding-bottom: 0px;
-    }
+    margin-top: 30px;
+    margin-bottom: 0px;
+  }
+
+  .filter-summary-text {
+    font-size: 14px;
+    opacity: 0.5;
+  }
+
+  .filter-summary-link {
+    font-size: 14px;
+    margin-left: 8px;
+    cursor: pointer;
+    color: #42A5F5;
+    text-decoration: none;
+  }
+
+  .filter-summary-link:hover {
+    text-decoration: underline;
   }
 </style>
 

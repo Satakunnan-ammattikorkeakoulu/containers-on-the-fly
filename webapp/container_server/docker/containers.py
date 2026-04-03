@@ -49,12 +49,13 @@ def start_container(pars):
             sshPublicKey (str): SSH public key to deploy into the container.
 
     Returns:
-        tuple: A 6-element tuple of (started, container_name, password,
-            error_message, non_critical_errors, container_id) where
-            started is a bool indicating success, container_name and
-            password are strings, error_message is a string or Exception
-            (empty on success), non_critical_errors is a string or None,
-            and container_id is the Docker container ID or None on failure.
+        dict: Result dictionary with keys:
+            started (bool): Whether the container started successfully.
+            containerName (str): Docker container name, empty on failure.
+            password (str): Container user password, empty on failure.
+            error (str): Error message, empty on success.
+            nonCriticalErrors (str or None): Warnings from config scripts.
+            containerId (str or None): Docker container ID, None on failure.
     """
     try:
         # Verify parameters first
@@ -182,7 +183,14 @@ def start_container(pars):
         if container_name:  # Only try to stop if we have a name
             log.info(f"Cleaning up partially-created container {container_name}")
             stop_container(container_name)
-        return False, "", "", e, None, None
+        return {
+            "started": False,
+            "containerName": "",
+            "password": "",
+            "error": str(e),
+            "nonCriticalErrors": None,
+            "containerId": None,
+        }
 
     # Deploy SSH public key if provided (non-critical — don't fail the container)
     if pars.get("sshPublicKey"):
@@ -213,7 +221,14 @@ def start_container(pars):
         except Exception as e:
             log.warning(f"Non-critical error running start script in container {container_name}: {e}")
 
-    return True, container_name, pars["password"], "", non_critical_errors, cont.id
+    return {
+        "started": True,
+        "containerName": container_name,
+        "password": pars["password"],
+        "error": "",
+        "nonCriticalErrors": non_critical_errors,
+        "containerId": cont.id,
+    }
 
 def stop_container(container_name):
     """Stop and remove a Docker container by name.

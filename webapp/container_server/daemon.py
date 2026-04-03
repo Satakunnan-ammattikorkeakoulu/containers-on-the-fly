@@ -465,20 +465,20 @@ def start_docker_container(res, tasks):
                 role_mounts.append(mount)
     details["roleMounts"] = role_mounts
 
-    cont_was_started, cont_name, cont_password, errors, non_critical_errors, container_docker_id = start_container(details)
+    result = start_container(details)
 
-    if cont_was_started:
-        log.info(f"Container started for reservation {reservation_id}, user={res.get('userId')}, image={image_name}, docker_name={cont_name}")
+    if result["started"]:
+        log.info(f"Container started for reservation {reservation_id}, user={res.get('userId')}, image={image_name}, docker_name={result['containerName']}")
         api.report_started(reservation_id, {
             "containerDockerName": container_name,
-            "sshPassword": cont_password,
-            "containerDockerId": container_docker_id or "",
+            "sshPassword": result["password"],
+            "containerDockerId": result["containerId"] or "",
             "ports": [{"containerPortId": p["containerPortId"], "outsidePort": p["outsidePort"]} for p in ports],
-            "nonCriticalErrors": non_critical_errors or "",
+            "nonCriticalErrors": result["nonCriticalErrors"] or "",
         })
     else:
-        log.error(f"Failed to start container for reservation {reservation_id}: {errors}")
-        api.report_start_failed(reservation_id, str(errors))
+        log.error(f"Failed to start container for reservation {reservation_id}: {result['error']}")
+        api.report_start_failed(reservation_id, result["error"])
 
 
 def stop_docker_container(res):

@@ -54,14 +54,13 @@ class TestStartContainer:
         mock_settings.get_setting.return_value = "localhost:5000"
 
         result = start_container(base_params)
-        started, name, password, error, non_crit, cont_id = result
 
-        assert started is True
-        assert name == "test-container"
-        assert isinstance(password, str)
-        assert len(password) > 0
-        assert error == ""
-        assert cont_id == "abc123"
+        assert result["started"] is True
+        assert result["containerName"] == "test-container"
+        assert isinstance(result["password"], str)
+        assert len(result["password"]) > 0
+        assert result["error"] == ""
+        assert result["containerId"] == "abc123"
         mock_docker.run.assert_called_once()
         mock_docker.execute.assert_called_once()  # password command
 
@@ -79,7 +78,7 @@ class TestStartContainer:
 
         base_params["password"] = "mypassword"
         result = start_container(base_params)
-        assert result[2] == "mypassword"
+        assert result["password"] == "mypassword"
 
     @patch("docker.containers.inject_host_keys")
     @patch("docker.containers.run_user_config_script", return_value=None)
@@ -99,7 +98,7 @@ class TestStartContainer:
 
         base_params["gpus"] = "device=0,1"
         result = start_container(base_params)
-        assert result[0] is True
+        assert result["started"] is True
         run_kwargs = mock_docker.run.call_args[1]
         assert "gpus" in run_kwargs
 
@@ -149,8 +148,8 @@ class TestStartContainer:
         mock_settings.get_setting.return_value = "localhost:5000"
         mock_docker.run.side_effect = RuntimeError("Docker daemon unreachable")
 
-        started, _, _, error, _, _ = start_container(base_params)
-        assert started is False
+        result = start_container(base_params)
+        assert result["started"] is False
         # Should attempt to stop the partially-created container
         mock_docker.stop.assert_called_once()
 
@@ -168,7 +167,7 @@ class TestStartContainer:
 
         base_params["sshPublicKey"] = "ssh-rsa AAAA... user@host"
         result = start_container(base_params)
-        assert result[0] is True
+        assert result["started"] is True
         # Password + SSH key = 2 execute calls
         assert mock_docker.execute.call_count == 2
 
@@ -239,7 +238,7 @@ class TestStartContainer:
 
         base_params["startScriptPath"] = "/opt/init.sh"
         result = start_container(base_params)
-        assert result[0] is True
+        assert result["started"] is True
         # password + start script = 2 execute calls
         assert mock_docker.execute.call_count == 2
 

@@ -25,6 +25,10 @@
               <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
               <v-list-item-title>Edit User</v-list-item-title>
             </v-list-item>
+            <v-list-item @click="emitAnonymizeUser(item.userId, item.email)">
+              <template v-slot:prepend><v-icon size="small" color="red">mdi-account-remove</v-icon></template>
+              <v-list-item-title>Remove User (Anonymize)</v-list-item-title>
+            </v-list-item>
           </v-list>
         </v-menu>
       </template>
@@ -101,6 +105,9 @@ export default {
   methods: {
     emitEditUser(userId) {
       this.$emit('emitEditUser', userId)
+    },
+    emitAnonymizeUser(userId, email) {
+      this.$emit('emitAnonymizeUser', { userId, email })
     },
     parseTime(timestamp) {
       if (!timestamp) return '-';

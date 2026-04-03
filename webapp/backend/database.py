@@ -44,6 +44,7 @@ class User(Base):
   sshPublicKey = Column(Text, nullable = True)
   startScriptPath = Column(Text, nullable = True)
   stopScriptPath = Column(Text, nullable = True)
+  removed = Column(Boolean, nullable = True)
 
   roles = relationship("Role", secondary = "UserRole", back_populates = "users", single_parent=True)
   reservations = relationship("Reservation", back_populates = "user")

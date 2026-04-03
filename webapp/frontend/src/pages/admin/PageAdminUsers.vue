@@ -61,6 +61,7 @@
       <v-col cols="12">
         <AdminUsersTable
           v-on:emitEditUser="editUser"
+          v-on:emitAnonymizeUser="anonymizeUser"
           @update:options="onTableOptionsUpdate"
           :propItems="users"
           :totalItems="totalItems"
@@ -84,6 +85,53 @@
       :propData="selectedItem"
       :key="dialogKey">
     </AdminManageUserModal>
+
+    <!-- Remove User Confirmation Dialog -->
+    <v-dialog v-model="anonymizeDialog.show" max-width="550px">
+      <v-card class="pa-4">
+        <v-card-title>Remove User</v-card-title>
+        <v-card-text>
+          <p class="mb-3">Are you sure you want to remove <strong>{{ anonymizeDialog.email }}</strong>{{ anonymizeDialog.name ? ` (${anonymizeDialog.name})` : '' }}?</p>
+
+          <v-alert v-if="anonymizeDialog.isAdmin" type="error" variant="tonal" density="compact" class="mb-3">
+            This user has the <strong>admin</strong> role. Proceed with caution.
+          </v-alert>
+
+          <v-alert v-if="anonymizeDialog.activeReservations > 0" type="warning" variant="tonal" density="compact" class="mb-3">
+            There {{ anonymizeDialog.activeReservations === 1 ? 'is' : 'are' }} <strong>{{ anonymizeDialog.activeReservations }}</strong> active reservation{{ anonymizeDialog.activeReservations !== 1 ? 's' : '' }} for this user.
+            Active reservations will continue until they end, but descriptions will be cleared.
+          </v-alert>
+
+          <p class="mb-2">
+            The user will be soft-deleted from the system. An anonymized record of the user will be kept
+            so that existing reservations and other references remain intact, but all personal data will
+            be permanently removed. The user will no longer appear in the user listing and will not be
+            able to log in.
+          </p>
+
+          <p class="mb-2">The following data will be cleared:</p>
+          <ul class="mb-3" style="padding-left: 20px;">
+            <li>Email, name, password, and SSH keys</li>
+            <li>Reservation descriptions</li>
+            <li>Audit log IP addresses and details</li>
+            <li>Role assignments</li>
+          </ul>
+
+          <p class="text-muted mb-6">This action cannot be undone.</p>
+
+          <v-text-field
+            v-model="anonymizeDialog.confirmEmail"
+            :label="`Type '${anonymizeDialog.email}' to confirm`"
+            density="compact"
+          ></v-text-field>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer></v-spacer>
+          <v-btn variant="text" @click="anonymizeDialog.show = false">Cancel</v-btn>
+          <v-btn color="red" variant="text" @click="confirmAnonymizeUser" :disabled="anonymizeDialog.confirmEmail !== anonymizeDialog.email">Remove</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
@@ -135,6 +183,16 @@ export default {
       sortBy: [{key: 'userId', order: 'desc'}],
     },
     debounceTimer: null,
+    anonymizeDialog: {
+      show: false,
+      userId: null,
+      email: '',
+      name: '',
+      activeReservations: 0,
+      auditLogEntries: 0,
+      isAdmin: false,
+      confirmEmail: '',
+    },
   }),
   computed: {
     /** Builds role filter dropdown items with user counts per role. */
@@ -192,6 +250,62 @@ export default {
         this.tableOptions.page = 1;
         this.fetch();
       }, 300);
+    },
+    /** Fetch anonymization info and show the confirmation dialog. */
+    anonymizeUser({ userId, email }) {
+      let _this = this;
+      let currentUser = this.store.user;
+      axios({
+        method: "get",
+        url: this.$appSettings.APIServer.admin.user_anonymize_info,
+        params: { userId },
+        headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+      })
+      .then(function (response) {
+        if (response.data.status == true) {
+          const info = response.data.data;
+          _this.anonymizeDialog = {
+            show: true,
+            userId: userId,
+            email: info.email,
+            name: info.name,
+            activeReservations: info.activeReservations,
+            auditLogEntries: info.auditLogEntries,
+            isAdmin: info.isAdmin,
+            confirmEmail: '',
+          };
+        } else {
+          _this.store.showMessage({ text: response.data.message, color: "red" });
+        }
+      })
+      .catch(function (error) {
+        console.log(error);
+        _this.store.showMessage({ text: "Error fetching anonymization info.", color: "red" });
+      });
+    },
+    /** Confirm and execute user anonymization. */
+    confirmAnonymizeUser() {
+      let _this = this;
+      let currentUser = this.store.user;
+      axios({
+        method: "post",
+        url: this.$appSettings.APIServer.admin.anonymize_user,
+        params: { userId: _this.anonymizeDialog.userId },
+        headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+      })
+      .then(function (response) {
+        if (response.data.status == true) {
+          _this.store.showMessage({ text: "User removed and data anonymized successfully.", color: "green" });
+          _this.anonymizeDialog.show = false;
+          _this.fetch();
+        } else {
+          _this.store.showMessage({ text: response.data.message, color: "red" });
+        }
+      })
+      .catch(function (error) {
+        console.log(error);
+        _this.store.showMessage({ text: "Error anonymizing user.", color: "red" });
+      });
     },
     fetch() {
       let _this = this;

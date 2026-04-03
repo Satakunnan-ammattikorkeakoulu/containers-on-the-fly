@@ -5,7 +5,7 @@ management, container and computer (server) CRUD, user management, role and
 permission management, server monitoring, and general application settings.
 """
 
-from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedContainerPort, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs, AuditLog
+from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedContainerPort, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs, AuditLog, UserWhitelist, UserBlacklist
 from dateutil import parser
 from dateutil.relativedelta import *
 from datetime import timezone, timedelta
@@ -24,7 +24,7 @@ import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
 from helpers.tables.role import get_roles, get_role_by_id, add_role as add_role_helper, edit_role as edit_role_helper, remove_role as remove_role_helper
-from sqlalchemy import select, delete, func, case
+from sqlalchemy import select, delete, update, func, case
 import re
 
 # Valid Linux username pattern
@@ -637,8 +637,8 @@ def get_users(request: AdminUsersRequest) -> object:
     }
 
     with Session() as session:
-        # Build base filtered query
-        base_stmt = select(User)
+        # Build base filtered query (exclude anonymized users)
+        base_stmt = select(User).where(User.removed.isnot(True))
         if role_filter:
             base_stmt = base_stmt.join(UserRole, User.userId == UserRole.userId)\
                 .join(Role, UserRole.roleId == Role.roleId)\
@@ -712,7 +712,7 @@ def get_user(userId: int) -> object:
         user = session.execute(
             select(User).options(joinedload(User.roles)).where(User.userId == userId)
         ).unique().scalar_one_or_none()
-        if user is None:
+        if user is None or user.removed is True:
             return api_response(False, "User not found")
 
         data = {
@@ -766,7 +766,9 @@ def save_user(userId: int, data: dict, actor_user_id: int = None) -> object:
             user = session.execute(select(User).where(User.userId == userId)).scalar_one_or_none()
             if user is None:
                 return api_response(False, "User not found")
-            
+            if user.removed is True:
+                return api_response(False, "Cannot edit an anonymized user.")
+
             user.email = data["email"]
             new_name = data.get("name", user.name)
             user.name = new_name[:200] if new_name else new_name
@@ -1993,3 +1995,130 @@ def get_analytics(request) -> object:
         "reservationsByComputer": reservations_by_computer,
         "retentionDays": retention_days,
     })
+
+def get_user_anonymize_info(user_id: int) -> object:
+    """Get information for the user anonymization confirmation dialog.
+
+    Returns the user's email, name, active reservation count, audit log
+    entry count, and whether the user has an admin role so the frontend
+    can show an informative confirmation dialog before anonymizing.
+
+    Args:
+        user_id: Database ID of the user to check.
+
+    Returns:
+        Response with email, name, activeReservations, auditLogEntries,
+        and isAdmin, or an error if the user is not found.
+    """
+    with Session() as session:
+        user = session.execute(
+            select(User).options(joinedload(User.roles)).where(User.userId == user_id)
+        ).unique().scalar_one_or_none()
+        if user is None:
+            return api_response(False, "User not found.")
+        if user.removed is True:
+            return api_response(False, "User is already anonymized.")
+
+        active_count = session.execute(
+            select(func.count()).select_from(Reservation).where(
+                Reservation.userId == user_id,
+                Reservation.status.in_(["reserved", "started"])
+            )
+        ).scalar() or 0
+
+        audit_count = session.execute(
+            select(func.count()).select_from(AuditLog).where(
+                AuditLog.userId == user_id
+            )
+        ).scalar() or 0
+
+        is_admin = any(role.name == "admin" for role in user.roles)
+
+        return api_response(True, "Anonymize info fetched.", {
+            "email": user.email,
+            "name": user.name,
+            "activeReservations": active_count,
+            "auditLogEntries": audit_count,
+            "isAdmin": is_admin,
+        })
+
+def anonymize_user(user_id: int, actor_user_id: int = None) -> object:
+    """Anonymize a user's personal data (GDPR soft-deletion).
+
+    Replaces all personally identifiable information with anonymous
+    placeholders while preserving referential integrity. Clears private
+    data from related tables (reservations, containers, audit logs).
+
+    Args:
+        user_id: The ID of the user to anonymize.
+        actor_user_id: The userId of the admin performing the action.
+
+    Returns:
+        Response indicating success or failure with an appropriate message.
+    """
+    if user_id == actor_user_id:
+        return api_response(False, "Cannot anonymize your own account.")
+
+    with Session() as session:
+        user = session.execute(
+            select(User).where(User.userId == user_id)
+        ).scalar_one_or_none()
+        if user is None:
+            return api_response(False, "User not found.")
+        if user.removed is True:
+            return api_response(False, "User is already anonymized.")
+
+        original_email = user.email
+
+        # Anonymize user record
+        user.removed = True
+        user.email = f"deleted_user_{user_id}@removed.local"
+        user.name = None
+        user.password = None
+        user.passwordSalt = None
+        user.loginToken = None
+        user.loginTokenCreatedAt = None
+        user.sshPublicKey = None
+        user.startScriptPath = None
+        user.stopScriptPath = None
+
+        # Clear reservation descriptions
+        session.execute(
+            update(Reservation).where(Reservation.userId == user_id)
+            .values(description=None)
+        )
+
+        # Clear SSH passwords on reserved containers linked to this user's reservations
+        user_reserved_container_ids = select(Reservation.reservedContainerId).where(
+            Reservation.userId == user_id
+        )
+        session.execute(
+            update(ReservedContainer).where(
+                ReservedContainer.reservedContainerId.in_(user_reserved_container_ids)
+            ).values(sshPassword=None)
+        )
+
+        # Scrub audit log entries (clear PII but keep the action record)
+        session.execute(
+            update(AuditLog).where(AuditLog.userId == user_id)
+            .values(ipAddress=None, details=None)
+        )
+
+        # Delete role assignments
+        session.execute(
+            delete(UserRole).where(UserRole.userId == user_id)
+        )
+
+        # Remove from whitelist and blacklist
+        session.execute(
+            delete(UserWhitelist).where(UserWhitelist.email == original_email)
+        )
+        session.execute(
+            delete(UserBlacklist).where(UserBlacklist.email == original_email)
+        )
+
+        session.commit()
+
+    log_action(actor_user_id, "USER_ANONYMIZE", "user", user_id,
+               {"userId": user_id})
+    return api_response(True, "User removed and data anonymized successfully.")

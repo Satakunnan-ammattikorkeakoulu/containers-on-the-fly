@@ -287,6 +287,35 @@ def save_user(userEdit: UserEdit, token: str = Depends(oauth2_scheme)):
     actor_user_id = force_authentication(token, "admin")
     return functionality.save_user(userEdit.userId, userEdit.data, actor_user_id)
 
+@router.get("/user_anonymize_info")
+def get_user_anonymize_info(userId: int, token: str = Depends(oauth2_scheme)):
+    """Get information needed for the user anonymization confirmation dialog.
+
+    Args:
+        userId: ID of the user to check.
+        token: OAuth2 bearer token (injected by Depends).
+
+    Returns:
+        API response with active reservation count, audit log entry count,
+        and admin status.
+    """
+    force_authentication(token, "admin")
+    return functionality.get_user_anonymize_info(userId)
+
+@router.post("/anonymize_user")
+def anonymize_user(userId: int, token: str = Depends(oauth2_scheme)):
+    """Anonymize a user's personal data (GDPR soft-deletion).
+
+    Args:
+        userId: ID of the user to anonymize.
+        token: OAuth2 bearer token (injected by Depends).
+
+    Returns:
+        Success or failure API response.
+    """
+    actor_user_id = force_authentication(token, "admin")
+    return functionality.anonymize_user(userId, actor_user_id)
+
 @router.get("/roles")
 def get_roles(token: str = Depends(oauth2_scheme)):
     """Retrieve all roles.

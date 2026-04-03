@@ -48,6 +48,11 @@ def login(username, password):
     # Look up user by email first for any auth type
     user = session.execute(select(User).where(User.email == username)).scalar_one_or_none()
 
+    # Block anonymized users from logging in
+    if user is not None and user.removed is True:
+      log_action(None, "LOGIN_FAILED", "user", details={"email": username, "reason": "anonymized"})
+      return api_response(False, "This account has been deactivated.")
+
     # Check blacklist first - this overrides whitelist and denies access immediately
     if use_blacklisting:
       blacklist_email = session.execute(select(UserBlacklist).where(UserBlacklist.email == username)).scalar_one_or_none()

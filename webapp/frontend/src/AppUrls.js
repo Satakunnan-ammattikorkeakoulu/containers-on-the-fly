@@ -50,6 +50,8 @@ function createUrls(baseAddress) {
     URLS.admin.edit_reservation = baseAdminUrl + "edit_reservation"
     URLS.admin.get_user = baseAdminUrl + "user"
     URLS.admin.save_user = baseAdminUrl + "save_user"
+    URLS.admin.user_anonymize_info = baseAdminUrl + "user_anonymize_info"
+    URLS.admin.anonymize_user = baseAdminUrl + "anonymize_user"
     // Fixed endpoints - match actual backend routes
     URLS.admin.get_general_settings = baseAdminUrl + "general-settings"
     URLS.admin.save_general_settings = baseAdminUrl + "general-settings"

@@ -114,7 +114,7 @@ def get_audit_logs(request):
         if parsed_from:
             query = query.where(AuditLog.createdAt >= parsed_from)
         if parsed_to:
-            query = query.where(AuditLog.createdAt <= parsed_to)
+            query = query.where(AuditLog.createdAt < parsed_to + timedelta(days=1))
         return query
 
     with Session() as session:

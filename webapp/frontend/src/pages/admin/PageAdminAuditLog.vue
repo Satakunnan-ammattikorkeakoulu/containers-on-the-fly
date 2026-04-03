@@ -4,11 +4,16 @@
       <v-col cols="12">
         <h4 class="m-0">Admin</h4>
         <h2 class="m-0">Audit Log</h2>
+        <p class="audit-log-description">
+          Records of all significant user and admin actions in the system.
+          The current retention is <strong>{{ retentionDays > 0 ? retentionDays + ' days' : 'forever' }}</strong>
+          <a class="retention-toggle-link" @click="showRetentionEditor = !showRetentionEditor">{{ showRetentionEditor ? '(hide)' : '(change)' }}</a>
+        </p>
       </v-col>
     </v-row>
 
-    <!-- Retention Setting -->
-    <v-row class="justify-center" style="margin-top: 20px">
+    <!-- Retention Setting (toggled) -->
+    <v-row v-if="showRetentionEditor" class="justify-center">
       <v-col cols="12" md="6" class="d-flex flex-column align-center" style="gap: 8px;">
         <div class="d-flex align-center" style="gap: 12px;">
           <v-text-field
@@ -77,7 +82,7 @@
       <v-col cols="12" md="2">
         <v-text-field
           v-model="filters.dateFrom"
-          label="Date From"
+          label="Date From (start of day)"
           type="date"
           @update:model-value="onFilterChange"
         ></v-text-field>
@@ -85,10 +90,19 @@
       <v-col cols="12" md="2">
         <v-text-field
           v-model="filters.dateTo"
-          label="Date To"
+          label="Date To (end of day)"
           type="date"
           @update:model-value="onFilterChange"
         ></v-text-field>
+      </v-col>
+      <v-col cols="auto" class="d-flex align-center">
+        <v-tooltip text="Refresh data" :open-delay="0">
+          <template v-slot:activator="{ props }">
+            <v-btn icon variant="text" v-bind="props" @click="fetch">
+              <v-icon>mdi-refresh</v-icon>
+            </v-btn>
+          </template>
+        </v-tooltip>
       </v-col>
     </v-row>
 
@@ -142,6 +156,7 @@ export default {
     loading: false,
     savingRetention: false,
     showRetentionDialog: false,
+    showRetentionEditor: false,
     logs: [],
     totalItems: 0,
     retentionDays: 180,
@@ -281,6 +296,23 @@ export default {
 <style scoped lang="scss">
 .loading {
   margin: 60px auto;
+}
+
+.audit-log-description {
+  margin-top: 8px;
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.retention-toggle-link {
+  cursor: pointer;
+  color: #2096f3;
+  text-decoration: none;
+  margin-left: 4px;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
 .row-filters {

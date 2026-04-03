@@ -102,8 +102,8 @@ export default {
       headers: [
         { title: 'Time', key: 'createdAt' },
         { title: 'User', key: 'userEmail', sortable: true },
-        { title: 'Action', key: 'action', sortable: true },
         { title: 'Resource', key: 'resourceType', sortable: true },
+        { title: 'Action', key: 'action', sortable: true },
         { title: 'Resource ID', key: 'resourceId', sortable: false },
         { title: 'Details', key: 'details', sortable: false },
         { title: 'IP', key: 'ipAddress', sortable: false },

@@ -21,7 +21,7 @@
           <v-card-text>
             <div class="name-section">
               <h3 class="subtitle-18">Display Name</h3>
-              <v-alert type="info" variant="tonal" density="compact" class="mb-8">
+              <v-alert v-if="ldapEnabled" type="info" variant="tonal" density="compact" class="mb-8">
                 If you log in through AD/LDAP, this name will be automatically overwritten on each login.
               </v-alert>
               <v-text-field
@@ -257,6 +257,7 @@ export default {
 
   data() {
     return {
+      ldapEnabled: false,
       hasPassword: false,
       currentPassword: '',
       newPassword: '',
@@ -319,6 +320,7 @@ export default {
           this.sshPublicKey = response.data.data.user.sshPublicKey || ''
           this.startScriptPath = response.data.data.user.startScriptPath || ''
           this.stopScriptPath = response.data.data.user.stopScriptPath || ''
+          this.ldapEnabled = response.data.data.user.ldapEnabled || false
         }
       } catch (error) {
         console.error('Error loading user profile:', error)

@@ -180,7 +180,7 @@ def profile(token):
 
   Returns:
       Response with user details including userId, email, createdAt,
-      role, and sshPublicKey, or an error if the user is not found.
+      role, sshPublicKey, and ldapEnabled, or an error if the user is not found.
   """
   with Session() as session:
     user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
@@ -195,6 +195,8 @@ def profile(token):
       user_details["sshPublicKey"] = user.sshPublicKey
       user_details["startScriptPath"] = user.startScriptPath
       user_details["stopScriptPath"] = user.stopScriptPath
+      login_type = get_setting("auth.loginType")
+      user_details["ldapEnabled"] = login_type in ("ldap", "hybrid")
       return api_response(True, "User details found", { "user": user_details })
 
 def has_password(token):

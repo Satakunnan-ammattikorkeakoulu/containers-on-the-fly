@@ -217,7 +217,7 @@ def get_reservations(request: AdminReservationRequest) -> object:
                     res["reservedHardwareSpecs"].append({
                         "type": spec.hardwareSpec.type,
                         "format": format,
-                        "internalId": spec.hardwareSpec.format,
+                        "internalId": spec.hardwareSpec.internalId,
                         "amount": spec.amount,
                     })
             reservations.append(res)

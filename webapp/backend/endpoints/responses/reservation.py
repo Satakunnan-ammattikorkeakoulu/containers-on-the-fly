@@ -291,7 +291,7 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
                     res["reservedHardwareSpecs"].append({
                         "type": spec.hardwareSpec.type,
                         "format": format,
-                        "internalId": spec.hardwareSpec.format,
+                        "internalId": spec.hardwareSpec.internalId,
                         "amount": spec.amount,
                     })
             reservations.append(res)

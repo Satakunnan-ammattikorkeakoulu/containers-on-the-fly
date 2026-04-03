@@ -681,7 +681,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
                 "description": description})
     return api_response(True, "Reservation created succesfully!", { "informByEmail": inform_by_email })
 
-def cancel_reservation(userId : int, reservationId: str):
+def cancel_reservation(userId : int, reservationId: int):
   """Cancel a reservation by setting its end date to now.
 
   The reservation's end date is set to the current UTC time, which
@@ -716,7 +716,7 @@ def cancel_reservation(userId : int, reservationId: str):
   log_action(userId, "RESERVATION_CANCEL", "reservation", int(reservationId))
   return api_response(True, "Reservation cancelled.")
 
-def update_reservation_description(userId: int, reservationId: str, description: str):
+def update_reservation_description(userId: int, reservationId: int, description: str):
   """Updates the description of a reservation owned by the user.
   Only allowed for reservations with status 'reserved' or 'started'.
   Admins can update any reservation's description.
@@ -746,7 +746,7 @@ def update_reservation_description(userId: int, reservationId: str, description:
   log_action(userId, "RESERVATION_UPDATE_DESCRIPTION", "reservation", int(reservationId))
   return api_response(True, "Description updated.")
 
-def extend_reservation(userId : int, reservationId: str, duration: int):
+def extend_reservation(userId : int, reservationId: int, duration: int):
   """Extend a running reservation by a specified number of hours.
 
   Checks GPU availability during the extension period to prevent
@@ -836,7 +836,7 @@ def extend_reservation(userId : int, reservationId: str, duration: int):
                {"duration": duration})
     return api_response(True, "Reservation was extended by " + str(duration) + " hours.")
 
-def restart_container(userId : int, reservationId: str):
+def restart_container(userId : int, reservationId: int):
   """Request a restart for a reservation's running container.
 
   Sets the reservation status to 'restart', which the Docker utility

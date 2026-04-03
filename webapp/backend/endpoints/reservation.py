@@ -215,7 +215,7 @@ async def get_current_reservations(token: str = Depends(oauth2_scheme)):
   return functionality.get_current_reservations()
 
 @router.post("/cancel_reservation")
-async def cancel_reservation(reservationId: str, token: str = Depends(oauth2_scheme)):
+async def cancel_reservation(reservationId: int, token: str = Depends(oauth2_scheme)):
   """Cancel a reservation owned by the authenticated user.
 
   Args:
@@ -229,7 +229,7 @@ async def cancel_reservation(reservationId: str, token: str = Depends(oauth2_sch
   return functionality.cancel_reservation(userId, reservationId)
 
 @router.post("/extend_reservation")
-async def extend_reservation(reservationId: str, duration : int, token: str = Depends(oauth2_scheme)):
+async def extend_reservation(reservationId: int, duration : int, token: str = Depends(oauth2_scheme)):
   """Extend the end time of an active reservation.
 
   Args:
@@ -244,7 +244,7 @@ async def extend_reservation(reservationId: str, duration : int, token: str = De
   return functionality.extend_reservation(userId, reservationId, duration)
 
 @router.post("/update_reservation_description")
-async def update_reservation_description(reservationId: str, description: str = "", token: str = Depends(oauth2_scheme)):
+async def update_reservation_description(reservationId: int, description: str = "", token: str = Depends(oauth2_scheme)):
   """Update the description of an existing reservation.
 
   Sanitizes the description by stripping whitespace and removing
@@ -269,7 +269,7 @@ async def update_reservation_description(reservationId: str, description: str = 
   return functionality.update_reservation_description(userId, reservationId, description)
 
 @router.post("/restart_container")
-async def restart_container(reservationId: str, token: str = Depends(oauth2_scheme)):
+async def restart_container(reservationId: int, token: str = Depends(oauth2_scheme)):
   """Restart the Docker container associated with a reservation.
 
   Args:

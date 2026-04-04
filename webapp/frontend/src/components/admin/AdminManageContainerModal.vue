@@ -150,9 +150,39 @@
               <!-- IMAGE BUILDER SECTION (only shown when NOT externally managed) -->
               <v-col cols="12" v-if="!isExternallyManaged">
                 <h2 style="margin-top: 10px; margin-bottom: 3px;">Image Builder</h2>
-                <p class="text-muted" style="margin-bottom: 30px; margin-top: 0px;">
+                <p class="text-muted" style="margin-bottom: 10px; margin-top: 0px;">
                   Define the Dockerfile to build this image automatically.
+                  <a v-if="templates.length" class="templates-toggle-link" @click.stop.prevent="showTemplates = !showTemplates">
+                    {{ showTemplates ? 'Hide Pre-Made Templates' : 'Show Pre-Made Templates' }}
+                  </a>
                 </p>
+                <div v-if="showTemplates && templates.length" class="mt-3 mb-6">
+                  <v-row>
+                    <v-col cols="12" md="4" v-for="template in templates" :key="template.id">
+                      <v-tooltip location="bottom" text="Click to populate all fields below with this template">
+                        <template v-slot:activator="{ props }">
+                          <v-card
+                            v-bind="props"
+                            variant="outlined"
+                            :color="selectedTemplateId === template.id ? 'primary' : undefined"
+                            class="template-card"
+                            @click="applyTemplate(template)"
+                            hover
+                          >
+                            <v-card-text class="text-center pa-4">
+                              <v-icon size="28" class="mb-2" :color="selectedTemplateId === template.id ? 'primary' : 'grey'">
+                                {{ template.icon }}
+                              </v-icon>
+                              <div class="font-weight-medium text-body-1">{{ template.name }}</div>
+                              <div class="text-body-2 text-medium-emphasis mt-1">{{ template.description }}</div>
+                            </v-card-text>
+                          </v-card>
+                        </template>
+                      </v-tooltip>
+                    </v-col>
+                  </v-row>
+                </div>
+                <div style="margin-bottom: 20px;"></div>
 
                 <!-- Build Status -->
                 <div v-if="!isCreatingNew && data.buildStatus" class="mb-4 d-flex align-center">
@@ -199,13 +229,13 @@
                 <v-text-field
                   v-model="data.baseImage"
                   label="Base Image*"
-                  placeholder="ubuntu:22.04"
+                  placeholder="ubuntu:24.04"
                   :rules="[rules.required]"
                   class="mb-10"
                   hint=" "
                 >
                   <template v-slot:message>
-                    <span>Docker image for the FROM line (e.g. ubuntu:22.04, ubuntu:24.04, nvidia/cuda:11.8.0-devel-ubuntu22.04). Pulled from Docker Hub or other registries.
+                    <span>Docker image for the FROM line (e.g. ubuntu:24.04).
                       <a class="reset-link" @click.stop.prevent="resetBaseImageToDefault">Reset</a>
                     </span>
                   </template>
@@ -288,6 +318,28 @@
                       </v-textarea>
                     </v-expansion-panel-text>
                   </v-expansion-panel>
+
+                  <!-- EXPORT TEMPLATE -->
+                  <v-expansion-panel v-if="data.dockerfileCommands && data.baseImage">
+                    <v-expansion-panel-title>
+                      <v-icon class="mr-2" size="small">mdi-download</v-icon>
+                      Export as Template
+                    </v-expansion-panel-title>
+                    <v-expansion-panel-text>
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                        prepend-icon="mdi-download"
+                        @click="exportTemplate"
+                      >
+                        Download Template JSON
+                      </v-btn>
+                      <p class="text-medium-emphasis mt-2" style="font-size: 12px;">
+                        Download the current Image Builder config as a JSON file you can share or drop into the container_templates/ folder on the main server. New templates are available immediately — no restart required. The template will appear under Show Pre-Made Templates for every new and editable container. In most cases this is not necessary — only useful if you are building many containers from the same base settings.
+                      </p>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
                 </v-expansion-panels>
               </v-col>
 
@@ -362,17 +414,20 @@
         data: {
           ports: [],
           managedExternally: false,
-          baseImage: 'ubuntu:22.04',
+          baseImage: '',
           dockerfileCommands: '',
           containerCmd: '',
           buildStatus: null,
           buildLog: '',
-          containerUsername: 'user',
+          containerUsername: '',
           passwordCommand: '',
           sshKeyDeployCommands: '',
         },
         defaults: null,
         originalImageFields: null,
+        templates: [],
+        selectedTemplateId: null,
+        showTemplates: false,
         isCreatingNew: false,
         isOpen: true,
         isFetching: true,
@@ -463,6 +518,7 @@
         this.isFetching = false;
         this.data.managedExternally = false;
         this.fetchDefaults();
+        this.fetchTemplates();
       }
       else {
         this.isFetching = true;
@@ -510,18 +566,68 @@
         .then(function (response) {
           if (response.data.status == true) {
             _this.defaults = response.data.data;
-            // Pre-fill if creating new and fields are empty
-            if (_this.isCreatingNew) {
-              if (!_this.data.dockerfileCommands) _this.data.dockerfileCommands = _this.defaults.dockerfileBody;
-              if (!_this.data.containerCmd) _this.data.containerCmd = _this.defaults.containerCmd;
-              if (!_this.data.passwordCommand) _this.data.passwordCommand = _this.defaults.passwordCommand;
-              if (!_this.data.sshKeyDeployCommands) _this.data.sshKeyDeployCommands = _this.defaults.sshKeyDeployCommands;
-            }
           }
         })
         .catch(function (error) {
           console.log("Error fetching container defaults:", error);
         });
+      },
+      /** Fetch pre-made templates from the backend. */
+      fetchTemplates() {
+        let _this = this;
+        let currentUser = this.store.user;
+
+        axios({
+          method: "get",
+          url: this.$appSettings.APIServer.admin.container_templates,
+          params: { username: this.data.containerUsername || 'user' },
+          headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            _this.templates = response.data.data.templates || [];
+          }
+        })
+        .catch(function (error) {
+          console.log("Error fetching container templates:", error);
+        });
+      },
+      /** Apply a pre-made template to all Image Builder fields. */
+      applyTemplate(template) {
+        this.selectedTemplateId = template.id;
+        this.data.baseImage = template.baseImage;
+        this.data.containerUsername = template.containerUsername || 'user';
+        this.data.dockerfileCommands = template.dockerfileBody;
+        this.data.containerCmd = template.containerCmd;
+        this.data.passwordCommand = template.passwordCommand;
+        this.data.sshKeyDeployCommands = template.sshKeyDeployCommands;
+        // Update defaults so Reset links use this template's values
+        this.defaults = {
+          dockerfileBody: template.dockerfileBody,
+          containerCmd: template.containerCmd,
+          passwordCommand: template.passwordCommand,
+          sshKeyDeployCommands: template.sshKeyDeployCommands,
+        };
+      },
+      /** Export the current Image Builder config as a downloadable JSON template file. */
+      exportTemplate() {
+        let template = {
+          name: this.data.name || "Exported Template",
+          description: this.data.description || "",
+          icon: "mdi-docker",
+          baseImage: this.data.baseImage,
+          dockerfileBody: this.data.dockerfileCommands,
+          containerCmd: this.data.containerCmd,
+          passwordCommand: this.data.passwordCommand,
+          sshKeyDeployCommands: this.data.sshKeyDeployCommands,
+        };
+        let blob = new Blob([JSON.stringify(template, null, 2)], { type: "application/json" });
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement("a");
+        a.href = url;
+        a.download = (this.data.imageName || "template").replace(/\//g, "-") + ".json";
+        a.click();
+        URL.revokeObjectURL(url);
       },
       /** Reset the Dockerfile body to defaults for the current username. */
       resetDockerfileToDefaults() {
@@ -542,13 +648,15 @@
           }
         });
       },
-      /** Reset username to default value. */
+      /** Reset username to default value (or selected template's value). */
       resetUsernameToDefault() {
-        this.data.containerUsername = 'user';
+        let selected = this.templates.find(t => t.id === this.selectedTemplateId);
+        this.data.containerUsername = selected ? selected.containerUsername || 'user' : 'user';
       },
-      /** Reset base image to default value. */
+      /** Reset base image to default value (or selected template's value). */
       resetBaseImageToDefault() {
-        this.data.baseImage = 'ubuntu:22.04';
+        let selected = this.templates.find(t => t.id === this.selectedTemplateId);
+        this.data.baseImage = selected ? selected.baseImage : 'ubuntu:24.04';
       },
       /** Reset CMD to default value. */
       resetCmdToDefaults() {
@@ -635,7 +743,7 @@
             if (response.data.status == true) {
               _this.data = response.data.data.data
               // Ensure defaults for fields
-              if (!_this.data.baseImage) _this.data.baseImage = 'ubuntu:22.04'
+              if (!_this.data.baseImage) _this.data.baseImage = 'ubuntu:24.04'
               if (!_this.data.containerUsername) _this.data.containerUsername = 'user'
               if (!_this.data.ports) _this.data.ports = []
               // Legacy containers (managedExternally is null) — treat as externally managed
@@ -649,9 +757,10 @@
                 containerUsername: _this.data.containerUsername,
                 containerCmd: _this.data.containerCmd,
               };
-              // Fetch defaults for reset buttons (only if using Image Builder)
+              // Fetch defaults and templates for reset buttons (only if using Image Builder)
               if (!_this.data.managedExternally) {
                 _this.fetchDefaults(_this.data.containerUsername);
+                _this.fetchTemplates();
               }
             }
             // Fail
@@ -693,10 +802,11 @@
           this.$emit("emitModalClose");
         }
       },
-      /** When switching from external to Image Builder, fetch defaults to pre-fill empty fields. */
+      /** When switching from external to Image Builder, fetch defaults and templates. */
       'data.managedExternally': function(newVal) {
-        if (newVal === false && !this.defaults) {
-          this.fetchDefaults(this.data.containerUsername);
+        if (newVal === false) {
+          if (!this.defaults) this.fetchDefaults(this.data.containerUsername);
+          if (!this.templates.length) this.fetchTemplates();
         }
       },
     }
@@ -712,6 +822,25 @@
   .dockerfile-textarea :deep(input) {
     font-family: monospace;
     font-size: 15px;
+  }
+
+  .templates-toggle-link {
+    color: #fb8c00;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 500;
+    font-size: 14px;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  .template-card {
+    cursor: pointer;
+    transition: border-color 0.2s;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
   }
 
   .reset-link {

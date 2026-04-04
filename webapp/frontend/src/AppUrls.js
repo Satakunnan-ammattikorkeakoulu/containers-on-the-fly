@@ -72,6 +72,7 @@ function createUrls(baseAddress) {
     URLS.admin.rebuild_container_image = baseAdminUrl + "rebuild_container_image"
     URLS.admin.container_build_status = baseAdminUrl + "container_build_status"
     URLS.admin.container_defaults = baseAdminUrl + "container_defaults"
+    URLS.admin.container_templates = baseAdminUrl + "container_templates"
     URLS.admin.get_audit_logs = baseAdminUrl + "audit-logs"
     URLS.admin.get_analytics = baseAdminUrl + "analytics"
 

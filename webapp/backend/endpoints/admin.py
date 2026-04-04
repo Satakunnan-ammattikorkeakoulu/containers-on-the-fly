@@ -209,6 +209,24 @@ def get_container_defaults(username: str = "user", token: str = Depends(oauth2_s
   force_authentication(token, "admin")
   return functionality.get_container_defaults(username)
 
+@router.get("/container_templates")
+def get_container_templates(username: str = "user", token: str = Depends(oauth2_scheme)):
+  """Get pre-made container image templates for the Image Builder.
+
+  Returns a list of template objects loaded from JSON files in the
+  ``container_templates/`` directory. Each template contains all Image
+  Builder fields needed to populate the creation form.
+
+  Args:
+      username: Linux username to interpolate into template Dockerfile bodies.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      API response with a list of template dicts.
+  """
+  force_authentication(token, "admin")
+  return functionality.get_container_templates(username)
+
 @router.post("/rebuild_container_image")
 def rebuild_container_image(containerId: int, token: str = Depends(oauth2_scheme)):
   """Queue a container image rebuild.

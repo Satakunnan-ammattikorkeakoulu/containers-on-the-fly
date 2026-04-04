@@ -1,0 +1,10 @@
+{
+  "name": "Ubuntu 24.04 + CUDA",
+  "description": "GPU-ready base with CUDA 12.6 toolkit for GPU workloads",
+  "icon": "mdi-expansion-card",
+  "baseImage": "nvidia/cuda:12.6.3-devel-ubuntu24.04",
+  "dockerfileBody": "# Update the package list and install necessary packages\nRUN apt-get update && \\\n    apt-get install -y \\\n    passwd \\\n    sudo \\\n    openssh-server \\\n    zip \\\n    htop \\\n    screen \\\n    libgl1 \\\n    python3-pip\n\n# Create containerfly group (GID 5620) \u2014 required for volume mount permissions.\n# The GID must match the host's containerfly group for mounted files to be accessible.\nRUN groupadd -g 5620 containerfly\n\n# Create user '{username}' with containerfly as primary group\nRUN userdel -r ubuntu\nRUN useradd -rm -d /home/{username} -s /bin/bash -g containerfly -G sudo -u 1000 {username}\nRUN echo '{username}:password' | chpasswd\n\n# Configure SSH server to listen on port 22 and allow root login\nRUN sed -i 's/#Port 22/Port 22/' /etc/ssh/sshd_config && \\\n    sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \\\n    mkdir /var/run/sshd\nRUN service ssh start\n\n# Set default user working directory\nUSER {username}\nWORKDIR /home/{username}\n\nUSER root\n\n# Open port 22 (SSH)\nEXPOSE 22",
+  "containerCmd": "[\"/bin/bash\",\"-c\", \"/usr/sbin/sshd -D ;\"]",
+  "passwordCommand": "/bin/echo '{username}:{password}' | /usr/sbin/chpasswd",
+  "sshKeyDeployCommands": "mkdir -p /home/{username}/.ssh && chmod 700 /home/{username}/.ssh\ncat <<'SSHEOF' > /home/{username}/.ssh/authorized_keys\n{ssh_key}\nSSHEOF\nchmod 600 /home/{username}/.ssh/authorized_keys && chown -R {username}:$(id -gn {username}) /home/{username}/.ssh"
+}

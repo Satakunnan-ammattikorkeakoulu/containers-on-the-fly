@@ -587,6 +587,31 @@ def get_container_defaults(username: str = "user") -> object:
     "containerUsername": username,
   })
 
+def get_container_templates(username: str = "user") -> object:
+  """Get pre-made container image templates.
+
+  Returns a list of template objects loaded from JSON files in the
+  ``container_templates/`` directory. Each template contains all Image
+  Builder fields needed to populate the creation form.
+
+  Args:
+      username: Linux username to interpolate into template Dockerfile bodies.
+
+  Returns:
+      Response with a list of template dicts.
+  """
+  # Validate username before interpolating into templates
+  if not _VALID_USERNAME_RE.match(username):
+    return api_response(False, "Invalid username.")
+  if username in _RESERVED_USERNAMES:
+    return api_response(False, f"Username '{username}' is reserved.")
+
+  from helpers.container_templates import get_container_templates as load_templates
+
+  return api_response(True, "Templates fetched.", {
+    "templates": load_templates(username),
+  })
+
 def get_container_build_status(container_id: int) -> object:
   """Get the current build status and log for a container image.
 

@@ -246,6 +246,7 @@
         const labels = {
           "reserved": "Reserved",
           "started": "Running",
+          "stopping": "Stopping",
           "stopped": "Stopped",
           "error": "Startup Error",
           "restart_error": "Error Restarting",
@@ -257,6 +258,7 @@
       getStatusColor(status) {
         if (status == "reserved") return "primary"
         else if (status == "started") return "green"
+        else if (status == "stopping") return "orange"
         else if (status == "stopped") return "red"
         else if (status == "restart_error") return "orange"
         else if (status == "paused") return "warning"

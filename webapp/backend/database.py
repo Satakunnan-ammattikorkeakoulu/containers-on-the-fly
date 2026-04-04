@@ -208,7 +208,7 @@ class Reservation(Base):
   description = Column(Text, nullable = True)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
-  status = Column(Text, nullable = False) # reserved, started, stopped, error, restart, restart_error, paused
+  status = Column(Text, nullable = False) # reserved, started, stopping, stopped, error, restart, restart_error, paused
   isLowPriority = Column(Boolean, nullable=False, default=False)
 
   user = relationship("User", back_populates = "reservations")

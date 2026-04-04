@@ -493,7 +493,7 @@ def stop_docker_container(res):
     status = res.get("status")
 
     try:
-        if status in ("started", "restart_error") and container_docker_name:
+        if status in ("started", "restart_error", "stopping") and container_docker_name:
             stop_script = rc.get("stopScriptPath")
             if stop_script:
                 container_data = res.get("container", {})

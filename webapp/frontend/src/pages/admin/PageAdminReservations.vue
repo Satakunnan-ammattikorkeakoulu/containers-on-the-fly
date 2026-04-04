@@ -311,7 +311,7 @@
     computed: {
       statusItems() {
         const items = [
-          { title: `All (${(this.statusCounts.reserved || 0) + (this.statusCounts.started || 0) + (this.statusCounts.stopped || 0) + (this.statusCounts.error || 0) + (this.statusCounts.paused || 0)})`, value: 'All' },
+          { title: `All (${(this.statusCounts.reserved || 0) + (this.statusCounts.started || 0) + (this.statusCounts.stopping || 0) + (this.statusCounts.stopped || 0) + (this.statusCounts.error || 0) + (this.statusCounts.paused || 0)})`, value: 'All' },
           { title: `Reserved (${this.statusCounts.reserved || 0})`, value: 'reserved' },
           { title: `Running (${this.statusCounts.started || 0})`, value: 'started' },
           { title: `Paused (${this.statusCounts.paused || 0})`, value: 'paused' },

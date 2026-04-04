@@ -220,7 +220,7 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
 
   with Session() as session:
     # Status counts (unfiltered by status, but scoped to date range if set)
-    status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0, "paused": 0}
+    status_counts = {"reserved": 0, "started": 0, "stopping": 0, "stopped": 0, "error": 0, "paused": 0}
     status_query = select(Reservation.status, func.count()).where(Reservation.userId == userId)
     if date_from_filter:
         try:
@@ -729,6 +729,8 @@ def cancel_reservation(userId : int, reservationId: int):
     )
     reservation = session.execute(query).scalar_one_or_none()
     if reservation is None: return api_response(False, "No reservation found.")
+    if reservation.status in ("stopped", "stopping", "error"):
+      return api_response(False, "Reservation cannot be cancelled in its current state.")
 
     owner_id = reservation.userId
     computer_name = reservation.computer.name if reservation.computer else None
@@ -737,6 +739,11 @@ def cancel_reservation(userId : int, reservationId: int):
 
     now = datetime.datetime.now(datetime.timezone.utc)
     reservation.endDate = now
+    # If the container was never started, go directly to stopped
+    if reservation.status == "reserved":
+      reservation.status = "stopped"
+    else:
+      reservation.status = "stopping"
     start_date = reservation.startDate.replace(tzinfo=datetime.timezone.utc) if reservation.startDate.tzinfo is None else reservation.startDate
     if start_date > now:
       reservation.startDate = now

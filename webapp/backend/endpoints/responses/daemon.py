@@ -240,7 +240,7 @@ def get_tasks(computer_id: int):
                     )
 
             # To stop: end date passed
-            if res.status in ("started", "reserved", "restart_error", "paused") and res.endDate < now:
+            if res.status in ("started", "reserved", "restart_error", "paused", "stopping") and res.endDate < now:
                 reservations_to_stop.append(
                     _serialize_reservation(res, include_container=True)
                 )
@@ -797,7 +797,7 @@ def get_orphan_check_data(computer_id: int):
             select(Reservation)
             .options(joinedload(Reservation.reservedContainer))
             .where(
-                Reservation.status == "started",
+                Reservation.status.in_(["started", "stopping"]),
                 Reservation.computerId == computer_id,
                 Reservation.startDate < _time_now(),
                 Reservation.endDate > _time_now(),

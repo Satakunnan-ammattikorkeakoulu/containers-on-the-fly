@@ -23,6 +23,7 @@
   const STATUS_COLORS = {
     reserved: '#42A5F5',
     started: '#66BB6A',
+    stopping: '#FFA726',
     stopped: '#BDBDBD',
     error: '#EF5350',
     restart_error: '#FF7043',

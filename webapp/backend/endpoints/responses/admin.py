@@ -95,7 +95,7 @@ def get_reservations(request: AdminReservationRequest) -> object:
 
   with Session() as session:
     # Status counts (unfiltered, 90-day scoped)
-    status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0, "paused": 0}
+    status_counts = {"reserved": 0, "started": 0, "stopping": 0, "stopped": 0, "error": 0, "paused": 0}
     count_rows = session.execute(
         select(Reservation.status, func.count())
         .where(time_scope)
@@ -417,7 +417,7 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
                 Reservation, Reservation.reservedContainerId == ReservedContainer.reservedContainerId
               ).where(
                 ReservedContainerPort.containerPortForeign == port_id,
-                Reservation.status.in_(["reserved", "started", "restart", "restart_error"])
+                Reservation.status.in_(["reserved", "started", "stopping", "restart", "restart_error"])
               )
             ).scalar() or 0
             if active_ref_count > 0:
@@ -485,7 +485,7 @@ def get_container_remove_info(container_id: int) -> object:
         ReservedContainer, Reservation.reservedContainerId == ReservedContainer.reservedContainerId
       ).where(
         ReservedContainer.containerId == container_id,
-        Reservation.status.in_(["reserved", "started"])
+        Reservation.status.in_(["reserved", "started", "stopping"])
       )
     ).scalar() or 0
 
@@ -2091,7 +2091,7 @@ def get_user_anonymize_info(user_id: int) -> object:
         active_count = session.execute(
             select(func.count()).select_from(Reservation).where(
                 Reservation.userId == user_id,
-                Reservation.status.in_(["reserved", "started"])
+                Reservation.status.in_(["reserved", "started", "stopping"])
             )
         ).scalar() or 0
 

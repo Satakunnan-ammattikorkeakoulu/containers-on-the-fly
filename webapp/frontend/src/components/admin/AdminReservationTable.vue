@@ -43,16 +43,21 @@
       </template>
       <!-- Start date -->
       <template v-slot:item.startDate="{item}">
-        <v-tooltip bottom>
+        <v-tooltip location="bottom">
           <template v-slot:activator="{ props }">
-            <span v-bind="props" class="resource-link">{{ parseTime(item.startDate) }}</span>
+            <span v-bind="props">{{ parseRelativeTime(item.startDate) }}</span>
           </template>
-          <span>Reserved: {{ parseTime(item.createdAt) }}</span>
+          <div>{{ parseTime(item.startDate) }}</div>
+          <div>Reserved: {{ parseTime(item.createdAt) }}</div>
         </v-tooltip>
       </template>
       <!-- End date -->
       <template v-slot:item.endDate="{item}">
-        {{ parseTime(item.endDate) }}
+        <v-tooltip location="bottom" :text="parseTime(item.endDate)">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.endDate) }}</span>
+          </template>
+        </v-tooltip>
       </template>
       <!-- Resources -->
       <template v-slot:item.resourcesInfo="{item}">
@@ -142,7 +147,7 @@
    * Emits pagination/sort changes and row actions to the parent.
    * Used in PageAdminReservations.
    */
-  import { DisplayTime } from '/src/helpers/time.js'
+  import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
   import { useMainStore } from '/src/store/store.js'
 
   export default {
@@ -258,6 +263,10 @@
       },
       parseTime(timestamp) {
         return DisplayTime(timestamp)
+      },
+      parseRelativeTime(timestamp) {
+        if (!timestamp) return '-'
+        return RelativeTime(timestamp)
       },
       /** Formats reserved hardware specs into a comma-separated summary string (e.g. "4 vCPUs, 16 GB RAM"). */
       getResources(specs) {

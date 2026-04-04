@@ -33,9 +33,14 @@
         </v-menu>
       </template>
 
-      <!-- Created At -->
+      <!-- Created -->
       <template v-slot:item.createdAt="{item}">
-        {{ item.createdAt ? parseTime(item.createdAt) : '-' }}
+        <v-tooltip v-if="item.createdAt" location="bottom" :text="parseTime(item.createdAt)">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.createdAt) }}</span>
+          </template>
+        </v-tooltip>
+        <span v-else>-</span>
       </template>
 
       <!-- Roles -->
@@ -59,7 +64,7 @@
  * Emits pagination/sort changes to the parent via @update:options.
  * Used in PageAdminUsers.
  */
-import { DisplayTime } from '/src/helpers/time.js'
+import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
 
 export default {
   name: 'AdminUsersTable',
@@ -97,7 +102,7 @@ export default {
         { title: 'Email', key: 'email' },
         { title: 'Roles', key: 'roles', sortable: false },
         { title: 'Password Set', key: 'hasPassword' },
-        { title: 'Created At', key: 'createdAt' },
+        { title: 'Created', key: 'createdAt' },
         { title: '', key: 'actions', sortable: false },
       ],
     }
@@ -112,6 +117,10 @@ export default {
     parseTime(timestamp) {
       if (!timestamp) return '-';
       return DisplayTime(timestamp);
+    },
+    parseRelativeTime(timestamp) {
+      if (!timestamp) return '-'
+      return RelativeTime(timestamp)
     },
     onOptionsUpdate(options) {
       this.$emit('update:options', options)

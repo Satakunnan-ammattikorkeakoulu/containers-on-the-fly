@@ -42,14 +42,22 @@
         </div>
       </template>
 
-      <!-- Created At -->
+      <!-- Created -->
       <template v-slot:item.createdAt="{item}">
-        {{ item.createdAt ? parseTime(item.createdAt) : '' }}
+        <v-tooltip v-if="item.createdAt" location="bottom" :text="parseTime(item.createdAt)">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.createdAt) }}</span>
+          </template>
+        </v-tooltip>
       </template>
 
-      <!-- Updated At -->
+      <!-- Updated -->
       <template v-slot:item.updatedAt="{item}">
-        {{ item.updatedAt ? parseTime(item.updatedAt) : '' }}
+        <v-tooltip v-if="item.updatedAt" location="bottom" :text="parseTime(item.updatedAt)">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.updatedAt) }}</span>
+          </template>
+        </v-tooltip>
       </template>
 
       <!-- Actions -->
@@ -396,7 +404,7 @@
    * Actions menu allows editing the computer, viewing monitoring, or removing the computer.
    * Used in PageAdminComputers.
    */
-  import { DisplayTime } from '/src/helpers/time.js'
+  import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
   import { useMainStore } from '@/store/store'
 
   export default {
@@ -438,8 +446,8 @@
           { title: 'Public', key: 'public' },
           { title: 'Name', key: 'name' },
           { title: 'IP', key: 'ip' },
-          { title: 'Created At', key: 'createdAt' },
-          { title: 'Updated At', key: 'updatedAt' },
+          { title: 'Created', key: 'createdAt' },
+          { title: 'Updated', key: 'updatedAt' },
           { title: '', key: 'actions', sortable: false },
         ],
       }
@@ -468,6 +476,10 @@
       },
       parseTime(timestamp) {
         return DisplayTime(timestamp)
+      },
+      parseRelativeTime(timestamp) {
+        if (!timestamp) return '-'
+        return RelativeTime(timestamp)
       },
       /** Toggles the expanded monitoring panel for a computer row (single-expand mode). */
       toggleExpand(item) {

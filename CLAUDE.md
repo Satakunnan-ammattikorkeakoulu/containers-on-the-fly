@@ -198,7 +198,7 @@ fix: Fix group removal logic to not break on empty usernames
 - **Session management**: Always use `with Session() as session:` context manager. Do NOT call `session.close()` inside a `with` block (it is redundant). Access ORM objects only within the session scope.
 - **Authentication patterns**: The codebase uses two auth patterns: `force_authentication(token)` raises HTTPException if not authenticated, and `force_authentication(token, "admin")` additionally checks for admin role. For admin endpoints always pass `"admin"` as the second argument.
 - **Response wrapper**: Always return via `Response(status, message, data)` from `helpers.server`. Never return raw dicts from endpoint response functions.
-- **Frontend date handling**: Always use Day.js via `helpers/time.js` utilities (`DisplayTime` and `TimestampToLocalTimeZone`). Never use raw `Date()` or `moment`.
+- **Frontend date handling**: Always use Day.js via `helpers/time.js` utilities (`DisplayTime`, `RelativeTime`, and `TimestampToLocalTimeZone`). Never use raw `Date()` or `moment`. Prefer displaying dates as **relative time** (`RelativeTime`) with the full absolute time (`DisplayTime`) shown in a `v-tooltip` on hover. Use a dashed underline style (`text-decoration: underline dashed`) to hint that the element is hoverable. See `AdminAuditLogTable.vue` and `UserReservationTable.vue` for the established pattern.
 - **Pydantic models for POST bodies**: POST endpoints that accept JSON bodies must define a Pydantic model in `endpoints/models/`. GET endpoints use query parameters directly.
 - **AppUrls.js**: All API URLs must be registered in `src/AppUrls.js`. Never hardcode API paths in components.
 

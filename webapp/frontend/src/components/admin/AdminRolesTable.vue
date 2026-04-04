@@ -56,7 +56,12 @@
 
       <!-- Format the timestamps -->
       <template v-slot:item.createdAt="{item}">
-        {{ isBuiltInRole(item.name) ? '-' : parseTime(item.createdAt) }}
+        <v-tooltip v-if="!isBuiltInRole(item.name) && item.createdAt" location="bottom" :text="parseTime(item.createdAt)">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.createdAt) }}</span>
+          </template>
+        </v-tooltip>
+        <span v-else>-</span>
       </template>
     </v-data-table>
   </div>
@@ -71,7 +76,7 @@
  * hardware limits, and deleting custom roles.
  * Used in PageAdminRoles.
  */
-import { DisplayTime } from '/src/helpers/time.js'
+import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
 
 export default {
   name: 'AdminRolesTable',
@@ -88,7 +93,7 @@ export default {
         { title: 'Role ID', key: 'roleId', sortable: true },
         { title: 'Name', key: 'name', sortable: true },
         { title: 'Mounts', key: 'mountCount', sortable: true },
-        { title: 'Created At', key: 'createdAt', sortable: true },
+        { title: 'Created', key: 'createdAt', sortable: true },
         { title: '', key: 'actions', sortable: false },
       ],
     }
@@ -125,6 +130,10 @@ export default {
     },
     parseTime(timestamp) {
       return DisplayTime(timestamp);
+    },
+    parseRelativeTime(timestamp) {
+      if (!timestamp) return '-'
+      return RelativeTime(timestamp)
     },
     emitManageMounts(role) {
       this.$emit('emitManageMounts', role);

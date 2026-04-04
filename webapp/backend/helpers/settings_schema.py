@@ -297,6 +297,20 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         description="LDAP attribute to map to user display name (e.g. displayName)"
     ),
 
+    # Analytics Settings
+    "analytics.rybbitUrl": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Rybbit analytics instance URL (e.g. https://app.rybbit.io)"
+    ),
+    "analytics.rybbitSiteId": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Rybbit site ID"
+    ),
+    "analytics.googleAnalyticsId": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Google Analytics 4 measurement ID (e.g. G-XXXXXXXXXX)"
+    ),
+
     # Legal Document Settings
     "legal.enabled": SettingSetting(
         SettingSource.DATABASE, SettingType.BOOLEAN, default=False,

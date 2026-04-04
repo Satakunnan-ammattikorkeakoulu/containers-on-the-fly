@@ -801,6 +801,85 @@
             </v-expansion-panel-text>
           </v-expansion-panel>
 
+          <!-- Analytics Section -->
+          <v-expansion-panel>
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-chart-line</v-icon>
+              <span class="font-weight-bold">Analytics</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-form ref="analyticsForm" v-model="forms.analytics.valid">
+
+                <p class="body-2 text-grey mb-6">
+                  Configure optional web analytics to track page views and user activity. Both services are independent and can be enabled separately.
+                </p>
+
+                <!-- Rybbit Analytics -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Rybbit Analytics</h3>
+                  <p class="body-2 text-grey mb-4">
+                    Privacy-friendly, open-source analytics. Provide your Rybbit instance URL and site ID to enable tracking.
+                  </p>
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.analytics.rybbitUrl"
+                        label="Rybbit Instance URL"
+                        placeholder="https://app.rybbit.io"
+                        hint="Your Rybbit instance URL (e.g. https://app.rybbit.io or self-hosted)"
+                        persistent-hint
+                        outlined
+                        hide-details="auto"
+                      ></v-text-field>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.analytics.rybbitSiteId"
+                        label="Rybbit Site ID"
+                        placeholder="1"
+                        hint="Your site ID from the Rybbit dashboard"
+                        persistent-hint
+                        outlined
+                        hide-details="auto"
+                      ></v-text-field>
+                    </v-col>
+                  </v-row>
+                </div>
+
+                <!-- Google Analytics -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Google Analytics</h3>
+                  <p class="body-2 text-grey mb-4">
+                    Google Analytics 4 integration. Provide your measurement ID to enable tracking.
+                  </p>
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.analytics.googleAnalyticsId"
+                        label="GA4 Measurement ID"
+                        placeholder="G-XXXXXXXXXX"
+                        hint="Your Google Analytics 4 measurement ID"
+                        persistent-hint
+                        outlined
+                        hide-details="auto"
+                      ></v-text-field>
+                    </v-col>
+                  </v-row>
+                </div>
+
+                <v-btn
+                  color="primary"
+                  @click="saveSection('analytics')"
+                  :loading="saving.analytics"
+                  class="mt-2"
+                >
+                  Save Analytics Settings
+                </v-btn>
+
+              </v-form>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
           <!-- Legal Documents Section -->
           <v-expansion-panel>
             <v-expansion-panel-title>
@@ -1029,6 +1108,7 @@ export default {
       contact: { valid: true },  // Add contact form state
       notifications: { valid: true },
       auth: { valid: true },
+      analytics: { valid: true },
       legal: { valid: true }
     },
 
@@ -1041,6 +1121,7 @@ export default {
       contact: false,  // Added contact saving state
       notifications: false,
       auth: false,
+      analytics: false,
       legal: false
     },
     
@@ -1207,6 +1288,11 @@ export default {
           nameField: ''
         }
       },
+      analytics: {
+        rybbitUrl: '',
+        rybbitSiteId: '',
+        googleAnalyticsId: ''
+      },
       legal: {
         enabled: false,
         organizationName: '',
@@ -1333,6 +1419,13 @@ export default {
               sendEmail: data.emailEnable?.sendEmail || false
             };
 
+            // Update analytics settings
+            _this.settings.analytics = {
+              rybbitUrl: data.analytics?.rybbitUrl || '',
+              rybbitSiteId: data.analytics?.rybbitSiteId || '',
+              googleAnalyticsId: data.analytics?.googleAnalyticsId || ''
+            };
+
             // Update legal settings
             _this.settings.legal = {
               enabled: data.legal?.enabled || false,
@@ -1456,7 +1549,7 @@ export default {
             });
             
             // Reload app config for sections that affect public settings
-            if (sectionName === 'general' || sectionName === 'contact' || sectionName === 'legal') {
+            if (sectionName === 'general' || sectionName === 'contact' || sectionName === 'legal' || sectionName === 'analytics') {
               try {
                 await _this.store.loadAppConfig();
                 //console.log('App configuration reloaded after saving', sectionName, 'settings');
@@ -1641,6 +1734,7 @@ export default {
         contact: 'Contact Information',
         notifications: 'System Notifications',
         auth: 'Authentication',
+        analytics: 'Analytics',
         legal: 'Legal Documents'
       };
       return names[sectionName] || sectionName;

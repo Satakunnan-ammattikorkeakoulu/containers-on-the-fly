@@ -32,6 +32,9 @@ def get_public_config() -> object:
             'instructions.passwordFieldLabel',
             'email.sendEmail',
             'email.contactEmail',
+            'analytics.rybbitUrl',
+            'analytics.rybbitSiteId',
+            'analytics.googleAnalyticsId',
             'legal.enabled'
         ]
         
@@ -59,6 +62,11 @@ def get_public_config() -> object:
             },
             "email": {
                 "enabled": settings_dict.get('email.sendEmail', False)
+            },
+            "analytics": {
+                "rybbitUrl": settings_dict.get('analytics.rybbitUrl', ''),
+                "rybbitSiteId": settings_dict.get('analytics.rybbitSiteId', ''),
+                "googleAnalyticsId": settings_dict.get('analytics.googleAnalyticsId', '')
             },
             "legal": {
                 "enabled": settings_dict.get('legal.enabled', False)

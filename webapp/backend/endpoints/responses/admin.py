@@ -1488,6 +1488,9 @@ def get_general_settings() -> object:
             'auth.ldap.accountField',
             'auth.ldap.emailField',
             'auth.ldap.nameField',
+            'analytics.rybbitUrl',
+            'analytics.rybbitSiteId',
+            'analytics.googleAnalyticsId',
             'legal.enabled',
             'legal.organizationName',
             'legal.contactEmail',
@@ -1558,6 +1561,11 @@ def get_general_settings() -> object:
                     "nameField": settings_dict.get('auth.ldap.nameField', '')
                 }
             },
+            "analytics": {
+                "rybbitUrl": settings_dict.get('analytics.rybbitUrl', ''),
+                "rybbitSiteId": settings_dict.get('analytics.rybbitSiteId', ''),
+                "googleAnalyticsId": settings_dict.get('analytics.googleAnalyticsId', '')
+            },
             "legal": {
                 "enabled": settings_dict.get('legal.enabled', False),
                 "organizationName": settings_dict.get('legal.organizationName', ''),
@@ -1578,7 +1586,7 @@ def save_general_settings(section: str, settings: dict, actor_user_id: int = Non
 
     Persists settings to the database for the given section. Supported
     sections: general, access, email, contact, emailEnable, notifications,
-    auth (including nested LDAP settings), and auditLog.
+    auth (including nested LDAP settings), auditLog, analytics, and legal.
 
     Args:
         section: The settings section name to save.
@@ -1687,6 +1695,14 @@ def save_general_settings(section: str, settings: dict, actor_user_id: int = Non
                 if settings['retentionDays'] == -1:
                     from helpers.tables.audit_log import purge_all_logs
                     purge_all_logs()
+
+        elif section == "analytics":
+            if 'rybbitUrl' in settings:
+                set_setting('analytics.rybbitUrl', settings['rybbitUrl'])
+            if 'rybbitSiteId' in settings:
+                set_setting('analytics.rybbitSiteId', settings['rybbitSiteId'])
+            if 'googleAnalyticsId' in settings:
+                set_setting('analytics.googleAnalyticsId', settings['googleAnalyticsId'])
 
         elif section == "legal":
             if 'enabled' in settings:

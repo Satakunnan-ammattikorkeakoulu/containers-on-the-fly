@@ -8,6 +8,7 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 import AppSettings from '/src/AppSettings.js'
+import { initAnalytics, identifyUser, clearUserIdentity } from '/src/plugins/analytics.js'
 
 /**
  * Main application store.
@@ -84,6 +85,11 @@ export const useMainStore = defineStore('main', {
       },
       email: {
         enabled: false
+      },
+      analytics: {
+        rybbitUrl: "",
+        rybbitSiteId: "",
+        googleAnalyticsId: ""
       },
       legal: {
         enabled: false
@@ -228,6 +234,7 @@ export const useMainStore = defineStore('main', {
             _this.user.startScriptPath = response.data.data.startScriptPath || ""
             _this.user.stopScriptPath = response.data.data.stopScriptPath || ""
             localStorage.setItem("user", JSON.stringify(_this.user))
+            identifyUser({ email: _this.user.email, name: _this.user.name })
             if (_this.initializing) _this.initializing = false
             return payload.callback({ success: true, message: "Login token OK!" });
           }
@@ -257,6 +264,7 @@ export const useMainStore = defineStore('main', {
 
     /** Clear all user state from the store and remove the session from localStorage. */
     logoutUser() {
+      clearUserIdentity()
       localStorage.removeItem("user")
       this.user.loginToken = ""
       this.user.email = ""
@@ -384,6 +392,7 @@ export const useMainStore = defineStore('main', {
         const response = await axios.get(AppSettings.APIServer.app.get_config);
         if (response.data.status) {
           this.setAppConfig(response.data.data);
+          initAnalytics(response.data.data.analytics);
         } else {
           console.error('Failed to load app config:', response.data.message);
           this.setConfigError(response.data.message || 'Failed to load application configuration');

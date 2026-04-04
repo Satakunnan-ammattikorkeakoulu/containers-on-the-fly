@@ -32,6 +32,13 @@ If the Service is connected to an organizational directory (LDAP/Active Director
 ### Session Data
 - **Authentication token** — a randomly generated session token stored in your browser's local storage to keep you logged in. No tracking cookies are used.
 
+### Analytics Data (if enabled)
+Your administrator may enable analytics services to understand how the platform is used. When enabled, the following data may be collected:
+- **Page view data** — pages you visit, navigation patterns, and timestamps
+- **Device and browser information** — browser type, operating system, and screen resolution (standard analytics metadata)
+- **Pseudonymous identifier** — if Google Analytics is enabled, a cryptographic hash of your email address is used to identify returning users. Your actual email address and name are never sent to Google.
+- **Rybbit analytics** — if enabled, may receive your email and display name for user-level insights. Rybbit is typically self-hosted, meaning this data remains on infrastructure operated by {{ORGANIZATION_NAME}}.
+
 ## 3. Why We Process Your Data
 
 | Data | Purpose | Legal Basis |
@@ -42,6 +49,7 @@ If the Service is connected to an organizational directory (LDAP/Active Director
 | IP address, audit logs | Security monitoring and abuse prevention | Legitimate interest |
 | Reservation records | Service delivery and resource management | Legitimate interest |
 | Session token | Maintaining your login session | Legitimate interest |
+| Analytics data (page views, device info) | Usage statistics and service improvement | Legitimate interest |
 
 ## 4. Data Retention
 
@@ -49,10 +57,18 @@ If the Service is connected to an organizational directory (LDAP/Active Director
 - **Account data**: Kept for the duration of your account. When your account is removed, all personal data is anonymized (see Section 6).
 - **Reservation records**: Kept for historical reporting. Personal details are cleared when your account is anonymized.
 - **Session tokens**: Cleared on logout or after the session timeout period.
+- **Analytics cookies**: If Google Analytics is enabled, Google sets cookies (e.g., \`_ga\`) to distinguish unique visitors. These cookies are managed by Google and are subject to Google's privacy policy.
 
 ## 5. Data Sharing
 
-This is a **self-hosted platform**. Your personal data is not shared with third parties, advertising networks, or analytics services. All data remains on infrastructure operated by {{ORGANIZATION_NAME}}.
+This is a **self-hosted platform**. By default, all data remains on infrastructure operated by {{ORGANIZATION_NAME}}. Your data is never shared with advertising networks.
+
+If your administrator has enabled optional analytics services, the following applies:
+
+- **Google Analytics**: If enabled, anonymized usage data (page views, device information, and a hashed user identifier) is sent to Google. No raw personal information such as your email address or name is transmitted. This data is subject to [Google's Privacy Policy](https://policies.google.com/privacy).
+- **Rybbit analytics**: If enabled, usage data is sent to the configured Rybbit instance. When self-hosted by {{ORGANIZATION_NAME}}, this data remains on organization infrastructure.
+
+If no analytics services are enabled, no data is shared with any third party.
 
 ## 6. Your Rights Under GDPR
 
@@ -126,7 +142,7 @@ The Service is provided on a best-effort basis. {{ORGANIZATION_NAME}} does not g
 
 ## 6. Privacy
 
-Your use of the Service is subject to our Privacy Policy, which describes what personal data is collected and how it is processed.
+Your use of the Service is subject to our Privacy Policy, which describes what personal data is collected and how it is processed. The Service may use analytics tools to collect anonymized usage statistics; details are described in the Privacy Policy.
 
 ## 7. Limitation of Liability
 

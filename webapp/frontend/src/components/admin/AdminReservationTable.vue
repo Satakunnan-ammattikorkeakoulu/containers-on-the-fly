@@ -115,9 +115,9 @@
             </a>
           </template>
           <v-list density="compact">
-            <v-list-item @click="emitChangeEndDate(item.reservationId)">
+            <v-list-item @click="emitChangeEndDate(item.reservationId, item.endDate)">
               <template v-slot:prepend><v-icon size="small">mdi-calendar-edit</v-icon></template>
-              <v-list-item-title>Change End Date</v-list-item-title>
+              <v-list-item-title>Adjust End Date</v-list-item-title>
             </v-list-item>
             <v-list-item v-if="item.status === 'started' || item.status === 'restart_error'" @click="emitRestartContainer(item.reservationId)">
               <template v-slot:prepend><v-icon size="small">mdi-restart</v-icon></template>
@@ -228,8 +228,8 @@
       emitCancelReservation(reservationId) {
         this.$emit('emitCancelReservation', reservationId)
       },
-      emitChangeEndDate(reservationId) {
-        this.$emit('emitChangeEndDate', reservationId)
+      emitChangeEndDate(reservationId, endDate) {
+        this.$emit('emitChangeEndDate', reservationId, endDate)
       },
       emitRestartContainer(reservationId) {
         this.$emit('emitRestartContainer', reservationId)

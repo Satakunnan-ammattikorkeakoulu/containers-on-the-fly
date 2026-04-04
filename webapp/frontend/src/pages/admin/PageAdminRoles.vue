@@ -139,8 +139,13 @@ export default {
         return;
       }
 
-      const confirm = window.confirm("Do you really want to remove this role? This action cannot be undone.");
-      if (!confirm) return;
+      const confirmed = await this.store.showConfirmDialog({
+        title: 'Remove Role',
+        message: 'Do you really want to remove this role? This action cannot be undone.',
+        confirmText: 'Remove',
+        confirmColor: 'red',
+      })
+      if (!confirmed) return;
 
       try {
         const currentUser = this.store.user;

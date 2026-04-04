@@ -319,8 +319,13 @@ export default {
 
     /** Confirms removal, removes the mount locally, and persists the updated list to the backend. */
     async removeMount(computerId, mountToRemove) {
-      const confirm = window.confirm("Are you sure you want to remove this mount?");
-      if (!confirm) return;
+      const confirmed = await this.store.showConfirmDialog({
+        title: 'Remove Mount',
+        message: 'Are you sure you want to remove this mount?',
+        confirmText: 'Remove',
+        confirmColor: 'red',
+      })
+      if (!confirmed) return;
 
       this.isSubmitting = true;
       try {

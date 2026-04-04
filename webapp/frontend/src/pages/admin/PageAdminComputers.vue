@@ -100,8 +100,13 @@
         this.selectedItem = computerId;
         this.dialog = true;
       },
-      removeComputer(computerId) {
-        let result = window.confirm("Do you really want to remove the computer? It will be marked as removed in the database and as not public anymore.")
+      async removeComputer(computerId) {
+        let result = await this.store.showConfirmDialog({
+          title: 'Remove Computer',
+          message: 'Do you really want to remove the computer? It will be marked as removed in the database and as not public anymore.',
+          confirmText: 'Remove',
+          confirmColor: 'red',
+        })
         if (!result) return
         let params = {
           "computerId": computerId,

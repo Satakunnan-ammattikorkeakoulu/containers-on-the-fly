@@ -299,8 +299,13 @@
             _this.initialLoading = false
         });
       },
-      cancelReservation(reservationId) {
-        let result = window.confirm("Do you really want to cancel this reservation?")
+      async cancelReservation(reservationId) {
+        let result = await this.store.showConfirmDialog({
+          title: 'Cancel Reservation',
+          message: 'Do you really want to cancel this reservation?',
+          confirmText: 'Cancel Reservation',
+          confirmColor: 'red',
+        })
         if (!result) return
         let params = {
           "reservationId": reservationId,
@@ -343,9 +348,17 @@
             _this.cancellingReservation = false
         });
       },
-      extendReservation(reservationId) {
-        let extraHours = prompt("How many hours do you want to extend for? (Max 24 hours). Type for example: 12", "");
-        if (extraHours == null|| extraHours == "") {
+      async extendReservation(reservationId) {
+        let extraHours = await this.store.showPromptDialog({
+          title: 'Extend Reservation',
+          message: 'How many hours do you want to extend for? (Max 24 hours)',
+          inputLabel: 'Hours',
+          inputType: 'number',
+          defaultValue: '1',
+          min: 1,
+          max: 24,
+        })
+        if (extraHours == null || extraHours == "") {
           return;
         }
 
@@ -394,8 +407,13 @@
             }
         });
       },
-      restartContainer(reservationId) {
-        let result = window.confirm("Do you really want to restart the docker container?")
+      async restartContainer(reservationId) {
+        let result = await this.store.showConfirmDialog({
+          title: 'Restart Container',
+          message: 'Do you really want to restart the docker container?',
+          confirmText: 'Restart',
+          confirmColor: 'orange',
+        })
         if (!result) return
         let params = {
           "reservationId": reservationId,
@@ -438,8 +456,13 @@
             _this.restartingContainer = false
         });
       },
-      editDescription(reservationId, currentDescription) {
-        let newDescription = prompt("Enter a new description (max 50 characters):", currentDescription || "");
+      async editDescription(reservationId, currentDescription) {
+        let newDescription = await this.store.showPromptDialog({
+          title: 'Edit Description',
+          message: 'Enter a new description (max 50 characters):',
+          inputLabel: 'Description',
+          defaultValue: currentDescription || '',
+        })
         if (newDescription === null) return;
 
         if (newDescription.length > 50) {

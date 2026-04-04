@@ -232,8 +232,13 @@
         });
       },
       /** Trigger a rebuild of a container's Docker image. */
-      rebuildContainer(containerId) {
-        let result = window.confirm("Rebuild the Docker image for this container? This will replace the existing image in the registry.")
+      async rebuildContainer(containerId) {
+        let result = await this.store.showConfirmDialog({
+          title: 'Rebuild Docker Image',
+          message: 'Rebuild the Docker image for this container? This will replace the existing image in the registry.',
+          confirmText: 'Rebuild',
+          confirmColor: 'orange',
+        })
         if (!result) return
 
         let _this = this

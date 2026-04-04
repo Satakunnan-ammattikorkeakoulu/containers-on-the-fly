@@ -102,6 +102,8 @@
       </v-dialog>
 
       <Snackbar></Snackbar>
+      <ConfirmDialog></ConfirmDialog>
+      <PromptDialog></PromptDialog>
     </v-app>
   </div>
 </template>
@@ -114,6 +116,8 @@
    * session is missing.
    */
   import Snackbar from '/src/components/global/Snackbar.vue';
+  import ConfirmDialog from '/src/components/global/ConfirmDialog.vue';
+  import PromptDialog from '/src/components/global/PromptDialog.vue';
   import { useMainStore } from '@/store/store'
   import frontBgImg from '/src/assets/images/front_bg.png'
   import axios from 'axios'
@@ -129,6 +133,8 @@
     },
     components: {
       Snackbar,
+      ConfirmDialog,
+      PromptDialog,
     },
     data: () => ({
       show: true,

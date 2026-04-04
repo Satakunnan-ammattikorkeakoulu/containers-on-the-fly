@@ -516,17 +516,36 @@
             _this.initialLoading = false
         });
       },
-      changeEndDate(reservationId, currentEndDate) {
-        let newEndDate = prompt("Enter new end date", currentEndDate);
-        if (newEndDate == null || newEndDate == currentEndDate || newEndDate == "") {
-          this.store.showMessage({ text: "Not changing end date.", color: "blue" })
+      async changeEndDate(reservationId, currentEndDate) {
+        // Format current end date for datetime-local input (YYYY-MM-DDTHH:MM)
+        let defaultValue = ''
+        if (currentEndDate) {
+          const utcStr = currentEndDate.endsWith('Z') ? currentEndDate : currentEndDate + 'Z'
+          const d = new Date(utcStr)
+          if (!isNaN(d.getTime())) {
+            const pad = (n) => String(n).padStart(2, '0')
+            defaultValue = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+          }
+        }
+        let newEndDate = await this.store.showPromptDialog({
+          title: 'Adjust End Date',
+          message: 'Select new end date and time:',
+          inputLabel: 'End Date',
+          inputType: 'datetime-local',
+          defaultValue: defaultValue,
+        })
+        if (newEndDate == null || newEndDate == "" || newEndDate == defaultValue) {
           return;
         }
         this.store.showMessage({ text: "Changing end date.", color: "green" })
 
+        // Convert local datetime to ISO string with timezone offset so the backend interprets it correctly
+        const selectedDate = new Date(newEndDate)
+        const endDateISO = selectedDate.toISOString()
+
         let params = {
           "reservationId": reservationId,
-          "endDate": newEndDate
+          "endDate": endDateISO
         }
 
         let _this = this
@@ -562,8 +581,13 @@
             }
         });
       },
-      cancelReservation(reservationId) {
-        let result = window.confirm("Do you really want to cancel this reservation?")
+      async cancelReservation(reservationId) {
+        let result = await this.store.showConfirmDialog({
+          title: 'Cancel Reservation',
+          message: 'Do you really want to cancel this reservation?',
+          confirmText: 'Cancel Reservation',
+          confirmColor: 'red',
+        })
         if (!result) return
         let params = {
           "reservationId": reservationId,
@@ -606,8 +630,13 @@
             _this.cancellingReservation = false
         });
       },
-      restartContainer(reservationId) {
-        let result = window.confirm("Do you really want to restart the docker container?")
+      async restartContainer(reservationId) {
+        let result = await this.store.showConfirmDialog({
+          title: 'Restart Container',
+          message: 'Do you really want to restart the docker container?',
+          confirmText: 'Restart',
+          confirmColor: 'orange',
+        })
         if (!result) return
         let params = {
           "reservationId": reservationId,

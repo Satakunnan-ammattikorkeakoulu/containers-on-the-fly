@@ -24,6 +24,29 @@ export const useMainStore = defineStore('main', {
       timeout: 7000,
       multiline: false,
     },
+    // Confirmation dialog state (global, promise-based)
+    confirmDialog: {
+      visible: false,
+      title: 'Confirm',
+      message: '',
+      confirmText: 'Yes',
+      cancelText: 'Cancel',
+      confirmColor: 'primary',
+      resolve: null,
+    },
+    // Prompt dialog state (global, promise-based)
+    promptDialog: {
+      visible: false,
+      title: 'Input',
+      message: '',
+      inputLabel: '',
+      inputType: 'text',
+      defaultValue: '',
+      min: undefined,
+      max: undefined,
+      rules: [],
+      resolve: null,
+    },
     initializing: true,
     // Information about the currently logged-in user
     user: {
@@ -236,6 +259,82 @@ export const useMainStore = defineStore('main', {
       this.user.role = ""
       this.user.roles = []
       this.user.loggedinAt = null
+    },
+
+    /**
+     * Show a confirmation dialog and return a Promise that resolves to true/false.
+     * @param {Object} options
+     * @param {string} options.title - Dialog title.
+     * @param {string} options.message - Dialog body text.
+     * @param {string} [options.confirmText='Yes'] - Confirm button label.
+     * @param {string} [options.cancelText='Cancel'] - Cancel button label.
+     * @param {string} [options.confirmColor='primary'] - Confirm button color.
+     * @returns {Promise<boolean>} true if confirmed, false if cancelled.
+     */
+    showConfirmDialog(options) {
+      return new Promise((resolve) => {
+        this.confirmDialog = {
+          visible: true,
+          title: options.title || 'Confirm',
+          message: options.message || '',
+          confirmText: options.confirmText || 'Yes',
+          cancelText: options.cancelText || 'Cancel',
+          confirmColor: options.confirmColor || 'primary',
+          resolve,
+        }
+      })
+    },
+
+    /**
+     * Resolve the confirm dialog Promise and close it.
+     * @param {boolean} result - Whether the user confirmed.
+     */
+    resolveConfirmDialog(result) {
+      if (this.confirmDialog.resolve) {
+        this.confirmDialog.resolve(result)
+      }
+      this.confirmDialog.visible = false
+      this.confirmDialog.resolve = null
+    },
+
+    /**
+     * Show a prompt dialog and return a Promise that resolves to the input string or null.
+     * @param {Object} options
+     * @param {string} options.title - Dialog title.
+     * @param {string} [options.message] - Optional instructional text.
+     * @param {string} [options.inputLabel] - Text field label.
+     * @param {string} [options.inputType='text'] - Input type (text, number).
+     * @param {string} [options.defaultValue=''] - Pre-filled value.
+     * @param {Array} [options.rules=[]] - Vuetify validation rules for the text field.
+     * @returns {Promise<string|null>} The input string, or null if cancelled.
+     */
+    showPromptDialog(options) {
+      return new Promise((resolve) => {
+        this.promptDialog = {
+          visible: true,
+          title: options.title || 'Input',
+          message: options.message || '',
+          inputLabel: options.inputLabel || '',
+          inputType: options.inputType || 'text',
+          defaultValue: options.defaultValue != null ? options.defaultValue : '',
+          min: options.min,
+          max: options.max,
+          rules: options.rules || [],
+          resolve,
+        }
+      })
+    },
+
+    /**
+     * Resolve the prompt dialog Promise and close it.
+     * @param {string|null} result - The entered text, or null if cancelled.
+     */
+    resolvePromptDialog(result) {
+      if (this.promptDialog.resolve) {
+        this.promptDialog.resolve(result)
+      }
+      this.promptDialog.visible = false
+      this.promptDialog.resolve = null
     },
 
     /**

@@ -199,7 +199,7 @@
           }
         })
         // Refetch after 6 seconds so the new reservation's status has time to update
-        setTimeout(() => this.fetchReservations(), 6000);
+        setTimeout(() => this.fetchReservations(), 5000);
       }
       this.fetchReservations()
       // Keep updating reservations every 15 seconds

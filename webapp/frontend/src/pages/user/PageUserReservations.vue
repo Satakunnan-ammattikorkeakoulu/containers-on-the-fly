@@ -35,7 +35,7 @@
         <v-alert type="info" :icon="false" closable v-model="justReserved" class="text-center reservation-success-alert">
           <h3 style="margin-bottom: 15px;">Reservation created succesfully</h3>
           <p>Your server has been reserved. You can view the details on how to access the server from this page after the container has been started.</p>
-          <p v-if="informByEmail">You will also be emailed the connection details after the container starts.</p>
+          <p v-if="store.emailEnabled">You will also be emailed the connection details after the container starts.</p>
         </v-alert>
       </v-col>
       <v-col cols="1"></v-col>
@@ -177,7 +177,6 @@
       statusCounts: {},
       activeReservationCount: 0,
       justReserved: false,
-      informByEmail: false,
       modalConnectionDetailsVisible: false,
       modalConnectionDetailsReservationId: null,
       showCalendar: false,
@@ -202,11 +201,6 @@
         // Refetch after 6 seconds so the new reservation's status has time to update
         setTimeout(() => this.fetchReservations(), 6000);
       }
-      if (localStorage.getItem("justReservedInformEmail") === "true") {
-        this.informByEmail = true;
-        localStorage.removeItem("justReservedInformEmail");
-      }
-
       this.fetchReservations()
       // Keep updating reservations every 15 seconds
       this.intervalFetchReservations = setInterval(() => { this.fetchReservations()}, 15000)

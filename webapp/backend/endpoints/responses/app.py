@@ -30,6 +30,7 @@ def get_public_config() -> object:
             'instructions.email',
             'instructions.usernameFieldLabel',
             'instructions.passwordFieldLabel',
+            'email.sendEmail',
             'email.contactEmail',
             'legal.enabled'
         ]
@@ -55,6 +56,9 @@ def get_public_config() -> object:
                 "loginText": "Login with your credentials.",
                 "usernameField": "Username",
                 "passwordField": "Password"
+            },
+            "email": {
+                "enabled": settings_dict.get('email.sendEmail', False)
             },
             "legal": {
                 "enabled": settings_dict.get('legal.enabled', False)

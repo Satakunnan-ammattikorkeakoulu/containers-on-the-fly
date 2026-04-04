@@ -82,6 +82,9 @@ export const useMainStore = defineStore('main', {
         usernameFieldLabel: "",
         passwordFieldLabel: ""
       },
+      email: {
+        enabled: false
+      },
       legal: {
         enabled: false
       }
@@ -117,6 +120,8 @@ export const useMainStore = defineStore('main', {
     usernameField: (state) => state.appConfig.instructions.usernameFieldLabel,
     /** @returns {string} Custom label for the password input field. */
     passwordField: (state) => state.appConfig.instructions.passwordFieldLabel,
+    /** @returns {boolean} Whether email notifications are enabled. */
+    emailEnabled: (state) => state.appConfig.email?.enabled || false,
     /** @returns {boolean} Whether legal documents (privacy policy, ToS) are enabled. */
     legalEnabled: (state) => state.appConfig.legal?.enabled || false,
     /** @returns {Object} The current user's reservation limit settings. */

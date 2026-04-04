@@ -29,7 +29,7 @@
       </v-col>
     </v-row>
 
-    <v-row class="text-center" v-if="justReserved">
+    <v-row class="text-center" v-if="justReserved" ref="reservationSuccessAlert">
       <v-col cols="1"></v-col>
       <v-col cols="10">
         <v-alert type="info" :icon="false" closable v-model="justReserved" class="text-center reservation-success-alert">
@@ -193,6 +193,12 @@
       if (localStorage.getItem("justReserved") === "true") {
         this.justReserved = true;
         localStorage.removeItem("justReserved");
+        // Scroll to the success alert after it renders
+        this.$nextTick(() => {
+          if (this.$refs.reservationSuccessAlert) {
+            this.$refs.reservationSuccessAlert.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          }
+        })
         // Refetch after 6 seconds so the new reservation's status has time to update
         setTimeout(() => this.fetchReservations(), 6000);
       }

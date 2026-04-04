@@ -51,8 +51,14 @@ def get_container_templates(username="user"):
         log.warning("Container templates directory not found: %s", _TEMPLATES_DIR)
         return []
 
+    # Collect JSON files from the root and the custom/ subfolder
+    json_files = sorted(_TEMPLATES_DIR.glob("*.json"))
+    custom_dir = _TEMPLATES_DIR / "custom"
+    if custom_dir.is_dir():
+        json_files += sorted(custom_dir.glob("*.json"))
+
     templates = []
-    for filepath in sorted(_TEMPLATES_DIR.glob("*.json")):
+    for filepath in json_files:
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)

@@ -336,7 +336,7 @@
                         Download Template JSON
                       </v-btn>
                       <p class="text-medium-emphasis mt-2" style="font-size: 12px;">
-                        Download the current Image Builder config as a JSON file you can share or drop into the container_templates/ folder on the main server. New templates are available immediately — no restart required. The template will appear under Show Pre-Made Templates for every new and editable container. In most cases this is not necessary — only useful if you are building many containers from the same base settings.
+                        Download the current Image Builder config as a JSON file you can share or drop into the container_templates/custom/ folder on the main server. The custom/ folder is excluded from the repository so your templates won't be overwritten on updates. New templates are available immediately — no restart required. The template will appear under Show Pre-Made Templates for every new and editable container. In most cases this is not necessary — only useful if you are building many containers from the same base settings.
                       </p>
                     </v-expansion-panel-text>
                   </v-expansion-panel>

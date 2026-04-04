@@ -21,6 +21,10 @@ webapp/container_server/settings.json
 .settings_just_created
 .server_type
 
+# Custom container templates (user-created, excluded from repo)
+container_templates/custom/*
+!container_templates/custom/.gitkeep
+
 # Test artifacts — generated credentials and environments
 tests/.test_credentials.json
 tests/api/environments/test.bru

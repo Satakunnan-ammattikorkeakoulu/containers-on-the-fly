@@ -1487,7 +1487,13 @@ def get_general_settings() -> object:
             'auth.ldap.searchMethod',
             'auth.ldap.accountField',
             'auth.ldap.emailField',
-            'auth.ldap.nameField'
+            'auth.ldap.nameField',
+            'legal.enabled',
+            'legal.organizationName',
+            'legal.contactEmail',
+            'legal.privacyPolicyContent',
+            'legal.termsOfServiceContent',
+            'legal.lastUpdated'
         ]
         
         # Get all settings
@@ -1551,6 +1557,14 @@ def get_general_settings() -> object:
                     "emailField": settings_dict.get('auth.ldap.emailField', ''),
                     "nameField": settings_dict.get('auth.ldap.nameField', '')
                 }
+            },
+            "legal": {
+                "enabled": settings_dict.get('legal.enabled', False),
+                "organizationName": settings_dict.get('legal.organizationName', ''),
+                "contactEmail": settings_dict.get('legal.contactEmail', ''),
+                "privacyPolicyContent": settings_dict.get('legal.privacyPolicyContent', ''),
+                "termsOfServiceContent": settings_dict.get('legal.termsOfServiceContent', ''),
+                "lastUpdated": settings_dict.get('legal.lastUpdated', '')
             }
         }
         
@@ -1673,6 +1687,20 @@ def save_general_settings(section: str, settings: dict, actor_user_id: int = Non
                 if settings['retentionDays'] == -1:
                     from helpers.tables.audit_log import purge_all_logs
                     purge_all_logs()
+
+        elif section == "legal":
+            if 'enabled' in settings:
+                set_setting('legal.enabled', settings['enabled'])
+            if 'organizationName' in settings:
+                set_setting('legal.organizationName', settings['organizationName'])
+            if 'contactEmail' in settings:
+                set_setting('legal.contactEmail', settings['contactEmail'])
+            if 'privacyPolicyContent' in settings:
+                set_setting('legal.privacyPolicyContent', settings['privacyPolicyContent'])
+            if 'termsOfServiceContent' in settings:
+                set_setting('legal.termsOfServiceContent', settings['termsOfServiceContent'])
+            from datetime import datetime, timezone
+            set_setting('legal.lastUpdated', datetime.now(timezone.utc).isoformat())
 
         else:
             return api_response(False, f"Unknown section: {section}")

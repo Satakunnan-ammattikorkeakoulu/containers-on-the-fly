@@ -73,6 +73,34 @@
         </v-container>
       </v-main>
 
+      <footer v-if="legalEnabled" class="app-legal-footer">
+        <a href="#" @click.prevent="openLegalModal('privacy-policy')">Privacy Policy</a>
+        <span class="mx-2">|</span>
+        <a href="#" @click.prevent="openLegalModal('terms-of-service')">Terms of Service</a>
+      </footer>
+
+      <!-- Legal Document Modal -->
+      <v-dialog v-model="legalModal.visible" max-width="900" scrollable>
+        <v-card>
+          <v-card-title class="d-flex align-center">
+            <span>{{ legalModal.title }}</span>
+            <v-spacer></v-spacer>
+            <v-btn icon variant="text" @click="legalModal.visible = false">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-card-title>
+          <v-divider></v-divider>
+          <v-card-text class="pa-6">
+            <v-progress-linear v-if="legalModal.loading" indeterminate color="primary" class="mb-4"></v-progress-linear>
+            <v-alert v-if="legalModal.error" type="warning" variant="outlined">{{ legalModal.errorMessage }}</v-alert>
+            <div v-if="legalModal.renderedContent" class="legal-modal-content" v-html="legalModal.renderedContent"></div>
+            <div v-if="!legalModal.loading && !legalModal.error && !legalModal.renderedContent" class="text-grey text-center pa-4">
+              No content has been configured yet.
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-dialog>
+
       <Snackbar></Snackbar>
     </v-app>
   </div>
@@ -88,6 +116,10 @@
   import Snackbar from '/src/components/global/Snackbar.vue';
   import { useMainStore } from '@/store/store'
   import frontBgImg from '/src/assets/images/front_bg.png'
+  import axios from 'axios'
+  import { marked } from 'marked'
+  import DOMPurify from 'dompurify'
+  import { fillTemplate } from '/src/helpers/legalTemplates'
 
   export default {
     name: 'LayoutApp',
@@ -102,6 +134,14 @@
       show: true,
       frontBgImg,
       scrolled: false,
+      legalModal: {
+        visible: false,
+        loading: false,
+        title: '',
+        renderedContent: '',
+        error: false,
+        errorMessage: ''
+      }
     }),
     mounted() {
       if (!this.isInitializing) {
@@ -127,6 +167,45 @@
       },
       profile() {
         this.$router.push("/user/profile")
+      },
+      /**
+       * Open the legal document modal and fetch content from the API.
+       * @param {string} type - Either 'privacy-policy' or 'terms-of-service'.
+       */
+      openLegalModal(type) {
+        this.legalModal.visible = true
+        this.legalModal.loading = true
+        this.legalModal.error = false
+        this.legalModal.renderedContent = ''
+        this.legalModal.title = type === 'privacy-policy' ? 'Privacy Policy' : 'Terms of Service'
+
+        const url = type === 'privacy-policy'
+          ? this.$appSettings.APIServer.legal.get_privacy_policy
+          : this.$appSettings.APIServer.legal.get_terms_of_service
+
+        axios.get(url)
+          .then((response) => {
+            if (response.data && response.data.status) {
+              const raw = response.data.data.content || ''
+              const orgName = response.data.data.organizationName || ''
+              const email = response.data.data.contactEmail || ''
+              const lastUpdated = response.data.data.lastUpdated || ''
+              if (raw) {
+                const filled = fillTemplate(raw, orgName, email, lastUpdated)
+                this.legalModal.renderedContent = DOMPurify.sanitize(marked.parse(filled))
+              }
+            } else {
+              this.legalModal.error = true
+              this.legalModal.errorMessage = response.data?.message || 'Could not load document.'
+            }
+          })
+          .catch(() => {
+            this.legalModal.error = true
+            this.legalModal.errorMessage = 'Could not load document.'
+          })
+          .finally(() => {
+            this.legalModal.loading = false
+          })
       }
     },
     computed: {
@@ -155,6 +234,9 @@
       },
       appName() {
         return this.store.appName
+      },
+      legalEnabled() {
+        return this.store.legalEnabled
       },
     },
     beforeRouteUpdate(to, from, next) {
@@ -307,5 +389,39 @@
   .admin-dropdown {
     display: block;
   }
+}
+
+.app-legal-footer {
+  text-align: center;
+  margin-top: 80px;
+  padding: 16px 0;
+  font-size: 12px;
+  opacity: 0.6;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+
+  a {
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.legal-modal-content {
+  text-align: left;
+  line-height: 1.7;
+
+  :deep(h1) { font-size: 1.5rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+  :deep(h2) { font-size: 1.25rem; margin-top: 1.25rem; margin-bottom: 0.5rem; }
+  :deep(h3) { font-size: 1.1rem; margin-top: 1rem; margin-bottom: 0.5rem; }
+  :deep(p) { margin-bottom: 0.75rem; }
+  :deep(ul), :deep(ol) { margin-bottom: 0.75rem; padding-left: 1.5rem; }
+  :deep(li) { margin-bottom: 0.25rem; }
+  :deep(table) { border-collapse: collapse; margin-bottom: 1rem; width: 100%; }
+  :deep(th), :deep(td) { border: 1px solid rgba(255, 255, 255, 0.15); padding: 8px 12px; text-align: left; }
+  :deep(th) { font-weight: 600; }
 }
 </style>

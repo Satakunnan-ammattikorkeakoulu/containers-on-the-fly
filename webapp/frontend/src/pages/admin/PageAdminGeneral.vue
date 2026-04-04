@@ -801,6 +801,161 @@
             </v-expansion-panel-text>
           </v-expansion-panel>
 
+          <!-- Legal Documents Section -->
+          <v-expansion-panel>
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-file-document-outline</v-icon>
+              <span class="font-weight-bold">Legal Documents</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-form ref="legalForm" v-model="forms.legal.valid">
+
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Privacy Policy & Terms of Service</h3>
+                  <p class="body-2 text-grey mb-4">
+                    Configure legal documents displayed to users. When enabled, links appear on the login page and in the application footer.
+                    Content supports Markdown formatting.
+                  </p>
+
+                  <v-switch
+                    v-model="settings.legal.enabled"
+                    label="Enable privacy policy and terms of service pages"
+                    color="primary"
+                    class="mt-0 mb-4"
+                  ></v-switch>
+                </div>
+
+                <div v-if="settings.legal.enabled">
+                  <!-- Organization Info -->
+                  <div class="mb-6">
+                    <h3 class="text-h3 mb-2">Organization Information</h3>
+                    <p class="body-2 text-grey mb-3">
+                      Organization name and data protection contact email used in the legal documents.
+                    </p>
+                    <v-row>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="settings.legal.organizationName"
+                          label="Organization Name"
+                          placeholder="e.g. University of Example"
+                          outlined
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="settings.legal.contactEmail"
+                          label="Data Protection Contact Email"
+                          placeholder="dpo@example.com"
+                          outlined
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                    </v-row>
+                  </div>
+
+                  <!-- Privacy Policy -->
+                  <div class="mb-6">
+                    <h3 class="text-h3 mb-2">Privacy Policy</h3>
+                    <p class="body-2 text-grey mb-3">
+                      Content displayed on the public privacy policy page. Supports Markdown formatting.<br>
+                      Available variables: <code v-pre>{{ORGANIZATION_NAME}}</code>, <code v-pre>{{CONTACT_EMAIL}}</code>, <code v-pre>{{DATE}}</code> (last saved date).
+                    </p>
+                    <div class="d-flex mb-3">
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                        prepend-icon="mdi-file-document-edit-outline"
+                        @click="confirmLoadTemplate('privacyPolicy')"
+                      >Load Template</v-btn>
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        :color="legalPreview.privacyPolicy ? 'grey' : 'primary'"
+                        :prepend-icon="legalPreview.privacyPolicy ? 'mdi-pencil' : 'mdi-eye'"
+                        class="ml-2"
+                        @click="legalPreview.privacyPolicy = !legalPreview.privacyPolicy"
+                      >{{ legalPreview.privacyPolicy ? 'Edit' : 'Preview' }}</v-btn>
+                    </div>
+                    <div v-if="legalPreview.privacyPolicy" class="legal-preview pa-4 rounded" v-html="renderedPrivacyPolicy"></div>
+                    <v-textarea
+                      v-else
+                      v-model="settings.legal.privacyPolicyContent"
+                      placeholder="Enter privacy policy content in Markdown format..."
+                      rows="12"
+                      outlined
+                      hide-details
+                    ></v-textarea>
+                  </div>
+
+                  <!-- Terms of Service -->
+                  <div class="mb-6">
+                    <h3 class="text-h3 mb-2">Terms of Service</h3>
+                    <p class="body-2 text-grey mb-3">
+                      Content displayed on the public terms of service page. Supports Markdown formatting.<br>
+                      Available variables: <code v-pre>{{ORGANIZATION_NAME}}</code>, <code v-pre>{{CONTACT_EMAIL}}</code>, <code v-pre>{{DATE}}</code> (last saved date).
+                    </p>
+                    <div class="d-flex mb-3">
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                        prepend-icon="mdi-file-document-edit-outline"
+                        @click="confirmLoadTemplate('termsOfService')"
+                      >Load Template</v-btn>
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        :color="legalPreview.termsOfService ? 'grey' : 'primary'"
+                        :prepend-icon="legalPreview.termsOfService ? 'mdi-pencil' : 'mdi-eye'"
+                        class="ml-2"
+                        @click="legalPreview.termsOfService = !legalPreview.termsOfService"
+                      >{{ legalPreview.termsOfService ? 'Edit' : 'Preview' }}</v-btn>
+                    </div>
+                    <div v-if="legalPreview.termsOfService" class="legal-preview pa-4 rounded" v-html="renderedTermsOfService"></div>
+                    <v-textarea
+                      v-else
+                      v-model="settings.legal.termsOfServiceContent"
+                      placeholder="Enter terms of service content in Markdown format..."
+                      rows="12"
+                      outlined
+                      hide-details
+                    ></v-textarea>
+                  </div>
+
+                  <!-- Load Template Confirmation Dialog -->
+                  <v-dialog v-model="legalTemplateDialog.visible" max-width="450">
+                    <v-card>
+                      <v-card-title>Load Template</v-card-title>
+                      <v-card-text>
+                        This will replace the current {{ legalTemplateDialog.type === 'privacyPolicy' ? 'privacy policy' : 'terms of service' }} content with the default template. Are you sure?
+                      </v-card-text>
+                      <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="text" @click="legalTemplateDialog.visible = false">Cancel</v-btn>
+                        <v-btn color="primary" variant="flat" @click="loadTemplate(legalTemplateDialog.type)">Replace</v-btn>
+                      </v-card-actions>
+                    </v-card>
+                  </v-dialog>
+                </div>
+
+                <v-row>
+                  <v-col cols="12">
+                    <v-btn
+                      color="primary"
+                      :loading="saving.legal"
+                      @click="saveSection('legal')"
+                    >
+                      <v-icon left>mdi-content-save</v-icon>
+                      Save Legal Settings
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-form>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
         </v-expansion-panels>
       </v-col>
     </v-row>
@@ -818,6 +973,9 @@
  */
 import axios from 'axios';
 import { useMainStore } from '@/store/store'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import { privacyPolicyTemplate, termsOfServiceTemplate, fillTemplate } from '/src/helpers/legalTemplates'
 
 export default {
   name: 'PageAdminGeneral',
@@ -836,8 +994,17 @@ export default {
       whitelistEnabled: false,
       containerAlertsEnabled: false,
       sendEmail: false,
-      loginType: false
+      loginType: false,
+      legalEnabled: false
     }, // Track which settings have been initialized from backend
+    legalPreview: {
+      privacyPolicy: false,
+      termsOfService: false
+    },
+    legalTemplateDialog: {
+      visible: false,
+      type: ''
+    },
     testEmail: '',
     sendingTest: false,
     testAdUsername: '',
@@ -861,9 +1028,10 @@ export default {
       emailEnable: { valid: true },  // Add emailEnable form state
       contact: { valid: true },  // Add contact form state
       notifications: { valid: true },
-      auth: { valid: true }
+      auth: { valid: true },
+      legal: { valid: true }
     },
-    
+
     // Saving states for each section
     saving: {
       general: false,
@@ -872,7 +1040,8 @@ export default {
       emailEnable: false,  // Added emailEnable saving state
       contact: false,  // Added contact saving state
       notifications: false,
-      auth: false
+      auth: false,
+      legal: false
     },
     
     // Form validation rules
@@ -1037,6 +1206,14 @@ export default {
           emailField: '',
           nameField: ''
         }
+      },
+      legal: {
+        enabled: false,
+        organizationName: '',
+        contactEmail: '',
+        privacyPolicyContent: '',
+        termsOfServiceContent: '',
+        lastUpdated: ''
       }
     }
   }),
@@ -1155,7 +1332,17 @@ export default {
             _this.settings.emailEnable = {
               sendEmail: data.emailEnable?.sendEmail || false
             };
-            
+
+            // Update legal settings
+            _this.settings.legal = {
+              enabled: data.legal?.enabled || false,
+              organizationName: data.legal?.organizationName || '',
+              contactEmail: data.legal?.contactEmail || '',
+              privacyPolicyContent: data.legal?.privacyPolicyContent || '',
+              termsOfServiceContent: data.legal?.termsOfServiceContent || '',
+              lastUpdated: data.legal?.lastUpdated || ''
+            };
+
             // Mark settings as initialized after a small delay to ensure watchers don't fire during load
             setTimeout(() => {
               _this.settingsInitialized.blacklistEnabled = true;
@@ -1163,6 +1350,7 @@ export default {
               _this.settingsInitialized.containerAlertsEnabled = true;
               _this.settingsInitialized.sendEmail = true;
               _this.settingsInitialized.loginType = true;
+              _this.settingsInitialized.legalEnabled = true;
             }, 200);
             
             // Update email lists
@@ -1268,7 +1456,7 @@ export default {
             });
             
             // Reload app config for sections that affect public settings
-            if (sectionName === 'general' || sectionName === 'contact') {
+            if (sectionName === 'general' || sectionName === 'contact' || sectionName === 'legal') {
               try {
                 await _this.store.loadAppConfig();
                 //console.log('App configuration reloaded after saving', sectionName, 'settings');
@@ -1449,12 +1637,45 @@ export default {
         general: 'General Information',
         access: 'Access Control',
         email: 'Email Configuration',
-        emailEnable: 'Email System',  // Added emailEnable
-        contact: 'Contact Information',  // Added contact
+        emailEnable: 'Email System',
+        contact: 'Contact Information',
         notifications: 'System Notifications',
-        auth: 'Authentication'
+        auth: 'Authentication',
+        legal: 'Legal Documents'
       };
       return names[sectionName] || sectionName;
+    },
+
+    /**
+     * Show confirmation dialog before loading a template, or load directly if the field is empty.
+     * @param {string} type - Either 'privacyPolicy' or 'termsOfService'.
+     */
+    confirmLoadTemplate(type) {
+      const hasContent = type === 'privacyPolicy'
+        ? this.settings.legal.privacyPolicyContent
+        : this.settings.legal.termsOfServiceContent
+
+      if (hasContent) {
+        this.legalTemplateDialog.type = type
+        this.legalTemplateDialog.visible = true
+      } else {
+        this.loadTemplate(type)
+      }
+    },
+
+    /**
+     * Load a default template into the privacy policy or terms of service textarea.
+     * Replaces {{ORGANIZATION_NAME}} and {{CONTACT_EMAIL}} placeholders with
+     * values from the organization info fields.
+     * @param {string} type - Either 'privacyPolicy' or 'termsOfService'.
+     */
+    loadTemplate(type) {
+      if (type === 'privacyPolicy') {
+        this.settings.legal.privacyPolicyContent = privacyPolicyTemplate
+      } else if (type === 'termsOfService') {
+        this.settings.legal.termsOfServiceContent = termsOfServiceTemplate
+      }
+      this.legalTemplateDialog.visible = false
     },
 
     // Updated email list management methods to auto-save
@@ -1474,6 +1695,21 @@ export default {
       }
       // Save notification settings including alert emails
       await this.saveSection('notifications');
+    }
+  },
+
+  computed: {
+    /** @returns {string} Rendered HTML of the privacy policy Markdown content with placeholders filled. */
+    renderedPrivacyPolicy() {
+      if (!this.settings.legal.privacyPolicyContent) return ''
+      const filled = fillTemplate(this.settings.legal.privacyPolicyContent, this.settings.legal.organizationName, this.settings.legal.contactEmail, this.settings.legal.lastUpdated)
+      return DOMPurify.sanitize(marked.parse(filled))
+    },
+    /** @returns {string} Rendered HTML of the terms of service Markdown content with placeholders filled. */
+    renderedTermsOfService() {
+      if (!this.settings.legal.termsOfServiceContent) return ''
+      const filled = fillTemplate(this.settings.legal.termsOfServiceContent, this.settings.legal.organizationName, this.settings.legal.contactEmail, this.settings.legal.lastUpdated)
+      return DOMPurify.sanitize(marked.parse(filled))
     }
   },
 
@@ -1509,6 +1745,13 @@ export default {
     'settings.auth.loginType': function(newValue, oldValue) {
       if (this.settingsInitialized.loginType && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
         this.saveSection('auth');
+      }
+    },
+
+    // Auto-save when legal enabled toggle is changed
+    'settings.legal.enabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.legalEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveSection('legal');
       }
     }
   }
@@ -1610,4 +1853,23 @@ export default {
 .v-chip {
   margin: 2px !important;
 }
-</style> 
+
+// Legal document Markdown preview
+.legal-preview {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  max-height: 500px;
+  overflow-y: auto;
+  text-align: left;
+  line-height: 1.7;
+
+  :deep(h1) { font-size: 1.5rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+  :deep(h2) { font-size: 1.25rem; margin-top: 1.25rem; margin-bottom: 0.5rem; }
+  :deep(h3) { font-size: 1.1rem; margin-top: 1rem; margin-bottom: 0.5rem; }
+  :deep(p) { margin-bottom: 0.75rem; }
+  :deep(ul), :deep(ol) { margin-bottom: 0.75rem; padding-left: 1.5rem; }
+  :deep(li) { margin-bottom: 0.25rem; }
+  :deep(table) { border-collapse: collapse; margin-bottom: 1rem; width: 100%; }
+  :deep(th), :deep(td) { border: 1px solid rgba(255, 255, 255, 0.15); padding: 8px 12px; text-align: left; }
+  :deep(th) { font-weight: 600; }
+}
+</style>

@@ -6,7 +6,7 @@ is imported: ensures required roles exist ("everyone", "admin").
 """
 
 from fastapi import APIRouter
-from endpoints import user, reservation, admin, app, daemon
+from endpoints import user, reservation, admin, app, daemon, legal
 from helpers.settings_handler import settings_handler
 from helpers.logger import log
 from database import Session, Role
@@ -18,6 +18,7 @@ router.include_router(reservation.router)
 router.include_router(admin.router)
 router.include_router(app.router)
 router.include_router(daemon.router)
+router.include_router(legal.router)
 
 
 # Run code here when server starts

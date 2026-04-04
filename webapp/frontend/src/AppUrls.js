@@ -78,6 +78,11 @@ function createUrls(baseAddress) {
     let baseAppUrl = baseUrl + "app/"
     URLS.app.get_config = baseAppUrl + "config"
 
+    URLS.legal = {}
+    let baseLegalUrl = baseUrl + "legal/"
+    URLS.legal.get_privacy_policy = baseLegalUrl + "privacy-policy"
+    URLS.legal.get_terms_of_service = baseLegalUrl + "terms-of-service"
+
     return URLS;
 }
 

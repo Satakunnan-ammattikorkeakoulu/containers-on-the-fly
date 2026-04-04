@@ -22,6 +22,11 @@
           <v-text-field v-on:keyup.enter="submitLoginForm" type="password" style="max-width: 300px; margin: 0 auto; margin-top: 15px;" :label="passwordField" v-model="form['password']" :rules="validation['password']" required></v-text-field>
           <v-btn :disabled="!form['valid'] || isLoggingIn" color="success" @click="submitLoginForm" label="Login" class="btn-login">Login</v-btn>
         </v-form>
+        <div v-if="legalEnabled" class="legal-links mt-4">
+          <router-link to="/privacy-policy">Privacy Policy</router-link>
+          <span class="mx-2">|</span>
+          <router-link to="/terms-of-service">Terms of Service</router-link>
+        </div>
       </v-col>
     </v-row>
   </v-container>
@@ -84,6 +89,9 @@
       },
       loginPageInfo() {
         return this.store.loginPageInfo
+      },
+      legalEnabled() {
+        return this.store.legalEnabled
       }
     },
     methods: {
@@ -155,5 +163,20 @@
     height: 45px !important;
     text-transform: uppercase;
     letter-spacing: 0.5px;
+  }
+
+  .legal-links {
+    margin-top: 80px;
+    font-size: 13px;
+    opacity: 0.7;
+  }
+
+  .legal-links a {
+    color: #047093;
+    text-decoration: none;
+  }
+
+  .legal-links a:hover {
+    text-decoration: underline;
   }
 </style>

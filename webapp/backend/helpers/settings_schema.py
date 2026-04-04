@@ -296,6 +296,32 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.DATABASE, SettingType.TEXT, default="",
         description="LDAP attribute to map to user display name (e.g. displayName)"
     ),
+
+    # Legal Document Settings
+    "legal.enabled": SettingSetting(
+        SettingSource.DATABASE, SettingType.BOOLEAN, default=False,
+        description="Enable privacy policy and terms of service pages"
+    ),
+    "legal.organizationName": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Organization name for legal documents (e.g. university name)"
+    ),
+    "legal.contactEmail": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Data protection contact email for legal documents"
+    ),
+    "legal.privacyPolicyContent": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Privacy policy content in Markdown format"
+    ),
+    "legal.termsOfServiceContent": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Terms of service content in Markdown format"
+    ),
+    "legal.lastUpdated": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Timestamp of last legal document save (ISO format)"
+    ),
 }
 
 # Helper functions for schema access

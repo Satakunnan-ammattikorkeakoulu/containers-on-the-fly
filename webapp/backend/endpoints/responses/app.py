@@ -26,11 +26,12 @@ def get_public_config() -> object:
             'general.applicationName',
             'general.timezone',
             'instructions.login',
-            'instructions.reservation', 
+            'instructions.reservation',
             'instructions.email',
             'instructions.usernameFieldLabel',
             'instructions.passwordFieldLabel',
-            'email.contactEmail'
+            'email.contactEmail',
+            'legal.enabled'
         ]
         
         # Get settings from database
@@ -52,8 +53,11 @@ def get_public_config() -> object:
             },
             "login": {
                 "loginText": "Login with your credentials.",
-                "usernameField": "Username", 
+                "usernameField": "Username",
                 "passwordField": "Password"
+            },
+            "legal": {
+                "enabled": settings_dict.get('legal.enabled', False)
             }
         }
         

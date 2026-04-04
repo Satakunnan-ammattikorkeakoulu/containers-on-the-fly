@@ -115,6 +115,15 @@ make start-container-server
 
 #### Updating the Software
 
+> [!IMPORTANT]
+> Before updating, take backups of both the **application directory** and the **database**:
+> 1. **Application directory** — copy the entire project folder to a safe location (e.g. `cp -r /path/to/containers-on-the-fly ~/containers_on_the_fly_backup`)
+> 2. **Database** — on the **main server**, run:
+>    ```
+>    make backup-database
+>    ```
+>    This saves a timestamped database dump (e.g. `backup_containers_fly_2026_04_04_12_30_00.sql`) to `~/` by default. To specify a custom directory or file path: `make backup-database DEST=/path/to/backups/`
+
 To update the software to latest version:
 
 - Run ``git pull`` to pull latest changes to the application codebase

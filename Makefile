@@ -800,6 +800,31 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			;; \
 	esac
 
+backup-database: verify-config-file-exists ## Create a database backup using mysqldump. Optionally specify path: make backup-database DEST=~/backups/
+	@DB_HOST=$$(grep "^MARIADB_SERVER_ADDRESS=" user_config/settings | cut -d'"' -f2); \
+	DB_NAME=$$(grep "^MARIADB_DB_NAME=" user_config/settings | cut -d'"' -f2); \
+	DB_USER=$$(grep "^MARIADB_DB_USER=" user_config/settings | cut -d'"' -f2); \
+	DB_PASS=$$(grep "^MARIADB_DB_USER_PASSWORD=" user_config/settings | cut -d'"' -f2); \
+	BACKUP_DEST=$${DEST:-~}; \
+	BACKUP_DEST=$$(eval echo "$$BACKUP_DEST"); \
+	if [ -d "$$BACKUP_DEST" ]; then \
+		TIMESTAMP=$$(date +%Y_%m_%d_%H_%M_%S); \
+		BACKUP_PATH="$$BACKUP_DEST/backup_containers_fly_$$TIMESTAMP.sql"; \
+	else \
+		BACKUP_PATH="$$BACKUP_DEST"; \
+	fi; \
+	echo ""; \
+	echo "$(GREEN)$(BOLD)Backing up database '$$DB_NAME' to $$BACKUP_PATH...$(RESET)"; \
+	echo ""; \
+	mysqldump -h "$$DB_HOST" -u "$$DB_USER" -p"$$DB_PASS" "$$DB_NAME" > "$$BACKUP_PATH"; \
+	if [ $$? -eq 0 ]; then \
+		echo "$(GREEN)Database backup saved to $$BACKUP_PATH$(RESET)"; \
+	else \
+		echo "$(RED)Database backup failed$(RESET)"; \
+		rm -f "$$BACKUP_PATH"; \
+		exit 1; \
+	fi
+
 init-database: ## Initialize database (for both new and existing environments)
 	@echo ""
 	@echo "Initializing database..."

@@ -44,6 +44,9 @@ make stop-servers               # Stop all pm2 services
 make init-database                    # Initialize/update database schema
 make migrate-database                 # Apply pending migrations
 make create-migration MESSAGE="..."   # Create new migration
+make backup-database                  # Backup database to ~/ (timestamped filename)
+make backup-database DEST=/backups/   # Backup database to custom directory (timestamped filename)
+make backup-database DEST=/path.sql   # Backup database to exact file path
 ```
 
 ### Frontend Commands

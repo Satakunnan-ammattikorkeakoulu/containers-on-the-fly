@@ -387,6 +387,21 @@
   align-items: center;
 }
 
+@media (min-width: 1151px) and (max-width: 1545px) {
+  .navbar a {
+    font-size: 14px;
+    margin: 0 10px !important;
+  }
+
+  .admin-block p {
+    font-size: 14px;
+  }
+
+  .admin-block > a {
+    font-size: 14px;
+  }
+}
+
 @media (max-width: 1150px) {
   .admin-inline {
     display: none !important;

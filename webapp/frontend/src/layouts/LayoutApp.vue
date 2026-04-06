@@ -407,6 +407,12 @@
   .main-content :deep(.v-container) {
     max-width: 95% !important;
   }
+
+  .navbar-inner {
+    max-width: 95% !important;
+    padding-left: 65px !important;
+    padding-right: 65px !important;
+  }
 }
 
 @media (min-width: 840px) and (max-width: 1144px) {

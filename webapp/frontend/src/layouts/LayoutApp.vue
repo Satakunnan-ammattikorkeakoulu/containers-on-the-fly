@@ -68,7 +68,7 @@
       <div class="navbar-spacer"></div>
 
       <v-main>
-        <v-container>
+        <v-container class="main-content">
           <slot></slot>
         </v-container>
       </v-main>
@@ -282,6 +282,8 @@
   height: 68px;
   transition: height 0.25s ease;
   flex-wrap: nowrap;
+  padding-left: 30px !important;
+  padding-right: 30px !important;
 }
 
 .app-logo-img {
@@ -387,7 +389,7 @@
   align-items: center;
 }
 
-@media (min-width: 1151px) and (max-width: 1545px) {
+@media (min-width: 1145px) and (max-width: 1545px) {
   .navbar a {
     font-size: 14px;
     margin: 0 10px !important;
@@ -399,6 +401,28 @@
 
   .admin-block > a {
     font-size: 14px;
+  }
+
+  .main-content,
+  .main-content :deep(.v-container) {
+    max-width: 95% !important;
+  }
+}
+
+@media (min-width: 840px) and (max-width: 1144px) {
+  .main-content,
+  .main-content :deep(.v-container) {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+
+  .navbar-inner {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding-left: 47px !important;
+    padding-right: 47px !important;
   }
 }
 

@@ -195,7 +195,8 @@
         // Scroll to the success alert after it renders
         this.$nextTick(() => {
           if (this.$refs.reservationSuccessAlert) {
-            this.$refs.reservationSuccessAlert.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            const el = this.$refs.reservationSuccessAlert.$el || this.$refs.reservationSuccessAlert
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' })
           }
         })
         // Refetch after 6 seconds so the new reservation's status has time to update

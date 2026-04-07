@@ -74,7 +74,10 @@
           :interval-format="intervalFormat"
         >
           <template #event="event">
-            <div v-if="event.eventParsed.input.type === 'availability'" class="availability-event-content">
+            <div v-if="event.eventParsed.input.isNowIndicator" class="now-indicator-event">
+              <strong>► Now</strong>
+            </div>
+            <div v-else-if="event.eventParsed.input.type === 'availability'" class="availability-event-content">
               <div class="server-header">
                 <strong>{{event.eventParsed.input.computerName}}</strong>
               </div>
@@ -172,10 +175,20 @@
                'light-blue', 'cyan', 'teal', 'green', 'light-green darken-1',
                'lime darken-2', 'yellow darken-3', 'amber darken-2', 'orange darken-3', 'deep-orange', 'brown', 'grey', 'blue-grey'],
       reservationColorMap: {},
+      nowIndicatorInterval: null,
     }),
     mounted () {
       if (this.$refs.calendar) {
         this.$refs.calendar.checkChange()
+      }
+      // Update the "now" indicator event every minute
+      this.nowIndicatorInterval = setInterval(() => {
+        this.updateDisplayedEvents()
+      }, 60000)
+    },
+    beforeUnmount() {
+      if (this.nowIndicatorInterval) {
+        clearInterval(this.nowIndicatorInterval)
       }
     },
     methods: {
@@ -418,11 +431,28 @@
           this.store.showMessage({ text: "Error refreshing reservations.", color: "red" })
         }
       },
+      /**
+       * Creates a "now" indicator event for the calendar.
+       * @returns {Object} A calendar event marking the current time
+       */
+      createNowEvent() {
+        const now = new Date()
+        return {
+          id: 'now-indicator',
+          name: 'Now',
+          start: now,
+          end: new Date(now.getTime() + 15 * 60 * 1000), // 15-minute bar for visibility
+          color: '#F44336',
+          timed: true,
+          isNowIndicator: true,
+        }
+      },
       /** Switches the calendar events array between reservation and availability data based on viewMode. */
       updateDisplayedEvents() {
-        
+        const nowEvent = this.createNowEvent()
+
         if (this.viewMode === 'availability') {
-          this.events = this.availabilityEvents
+          this.events = [...this.availabilityEvents, nowEvent]
         } else {
           // Show reservation events
           let events = []
@@ -432,11 +462,11 @@
               this.reservationColorMap[res.reservationId] = this.colors[res.reservationId % this.colors.length]
             }
             let color = this.reservationColorMap[res.reservationId]
-            
+
             const startDate = dayjs(TimestampToLocalTimeZone(res.startDate))
             const endDate = dayjs(TimestampToLocalTimeZone(res.endDate))
-            
-            
+
+
             const eventData = {
               id: `reservation-${res.reservationId}`,
               name: res.isLowPriority ? "Reservation #" + res.reservationId + " (LP)" : "Reservation #" + res.reservationId,
@@ -448,6 +478,7 @@
             }
             events.push(eventData)
           })
+          events.push(nowEvent)
           this.events = events
         }
       },
@@ -572,6 +603,14 @@
       }
     }
   }
+}
+
+.now-indicator-event {
+  padding: 1px 4px;
+  font-size: 11px;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  white-space: nowrap;
 }
 
 .reservation-event-content {

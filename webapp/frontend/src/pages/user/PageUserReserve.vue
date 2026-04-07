@@ -1,471 +1,541 @@
 <template>
-  <v-container class="text-center">
+  <v-container class="text-center reserve-page">
 
-  <v-stepper v-model="step">
-    <v-stepper-header>
-      <v-stepper-item :complete="step > 1" :value="1" title="Time"></v-stepper-item>
-      <v-divider></v-divider>
-      <v-stepper-item :complete="step > 2" :value="2" title="Duration"></v-stepper-item>
-      <v-divider></v-divider>
-      <v-stepper-item :value="3" title="Hardware"></v-stepper-item>
-    </v-stepper-header>
+    <h1 style="margin-bottom: 10px;">Reserve Server</h1>
 
-    <v-stepper-window>
-      <!-- STEP 1: CALENDAR -->
-      <v-stepper-window-item :value="1">
-        <v-row>
-          <v-col>
-            <h1 style="margin-bottom: 10px;">Reserve Server</h1>
-            <p>When do you want to start the reservation?</p>
-            
-            <!-- Reservation Page Instructions -->
-            <v-col cols="12" v-if="reservationPageInstructions && reservationPageInstructions.trim()" class="mb-4">
-              <v-alert 
-                type="info" 
-                outlined
-                class="mx-auto text-left"
-                style="max-width: 800px;"
-              >
-                <div v-html="reservationPageInstructions.replace(/\n/g, '<br>')"></div>
-              </v-alert>
+    <!-- Reservation Page Instructions -->
+    <v-row v-if="reservationPageInstructions && reservationPageInstructions.trim()">
+      <v-col cols="12" class="mb-4">
+        <v-alert
+          type="info"
+          outlined
+          class="mx-auto text-left"
+          style="max-width: 800px;"
+        >
+          <div v-html="reservationPageInstructions.replace(/\n/g, '<br>')"></div>
+        </v-alert>
+      </v-col>
+    </v-row>
+
+    <v-expansion-panels v-model="activePanel" class="mb-6">
+
+      <!-- PANEL 0: DURATION -->
+      <v-expansion-panel>
+        <v-expansion-panel-title>
+          <div class="d-flex align-center panel-title-content">
+            <v-avatar size="28" color="primary" class="mr-3 flex-shrink-0">
+              <span class="text-white text-body-2 font-weight-bold">1</span>
+            </v-avatar>
+            <v-icon class="mr-2">mdi-timer-outline</v-icon>
+            <span class="font-weight-bold">Duration</span>
+            <v-chip
+              v-if="completedSections.duration && activePanel !== 0"
+              color="success" variant="tonal" size="small" class="ml-3"
+            >
+              <v-icon start size="x-small">mdi-check</v-icon>
+              {{ durationSummary }}
+            </v-chip>
+          </div>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <v-alert
+            v-if="hardwareFetched"
+            type="info" variant="tonal" density="compact" class="mb-4 mx-auto text-left" style="max-width: 500px;"
+          >
+            Changing the duration will require re-checking hardware availability.
+          </v-alert>
+          <v-row justify="center">
+            <v-col cols="12" sm="6" md="4" lg="3" style="min-width: 320px">
+              <h2>Reservation Duration</h2>
+              <p class="panel-description">Select how long you need the server. Minimum is <b>{{ formatDuration(minimumDuration) }}</b>, maximum is <b>{{ formatDuration(maximumDuration) }}</b>.</p>
+              <v-row>
+                <v-col cols="6">
+                  <v-select v-model="reserveDurationDays" :items="reservableDays" item-title="text" item-value="value" label="Days"></v-select>
+                </v-col>
+                <v-col cols="6">
+                  <v-select v-model="reserveDurationHours" :items="reservableHours" item-title="text" item-value="value" label="Hours"></v-select>
+                </v-col>
+              </v-row>
+              <v-btn color="primary" @click="confirmDuration" :disabled="reserveDurationDays === null && reserveDurationHours === null" class="mt-2">
+                Continue
+              </v-btn>
             </v-col>
-            
-            <v-btn large @click="reserveNow" style="margin-bottom: 20px; margin-top: 30px;" color="green">Reserve Now</v-btn>
-            <p class="dim" style="font-weight: 17px;">OR</p>
-            <p class="dim">To reserve into future, click on the time in the calendar.</p>
-          </v-col>
-        </v-row>
-        <v-row>
-          <v-col class="section">
-            <div style="text-align: left">
-              <p style="margin-bottom: 10px;"><small>All times are in timezone <strong>{{globalTimezone}}</strong></small></p>
-            </div>
-            <div style="text-align: center;">
-              <CalendarReservations 
-                v-if="allReservations" 
-                :propReservations="allReservations" 
-                :readOnly="false" 
-                @slotSelected="slotSelected" 
-                @reservationsRefreshed="handleReservationsRefreshed"
-                ref="calendarComponent"
-              />
-            </div>
-          </v-col>
-        </v-row>
-      </v-stepper-window-item>
+          </v-row>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
 
-      <!-- STEP 2: DURATION -->
-      <v-stepper-window-item :value="2">
-        <v-row v-if="reserveDate != null" class="section">
-          <v-col cols="12" style="margin: 0 auto">
-            <h2>Reservation Time</h2>
-            <p>{{parsedTime}}</p>
-          </v-col>
-          <v-col cols="12" sm="6" md="4" lg="3" style="margin: 0 auto; min-width: 320px">
-            <h2>Reservation duration</h2>
-            <p style="color: gray;">Minimum duration is <b>{{ minimumDuration }}</b> hours.</p>
-            <v-row>
-              <v-col cols="6">
-                <v-select v-model="reserveDurationDays" :items="reservableDays" item-title="text" item-value="value" label="Days"></v-select>
-              </v-col>
-              <v-col cols="6">
-                <v-select v-model="reserveDurationHours" :items="reservableHours" item-title="text" item-value="value" label="Hours"></v-select>
-              </v-col>
-            </v-row>
-          </v-col>
-        </v-row>
+      <!-- PANEL 1: START TIME -->
+      <v-expansion-panel :disabled="!completedSections.duration">
+        <v-expansion-panel-title>
+          <div class="d-flex align-center panel-title-content">
+            <v-avatar size="28" :color="completedSections.duration ? 'primary' : 'grey-darken-1'" class="mr-3 flex-shrink-0">
+              <span class="text-white text-body-2 font-weight-bold">2</span>
+            </v-avatar>
+            <v-icon class="mr-2">mdi-calendar-clock</v-icon>
+            <span class="font-weight-bold">Start Time</span>
+            <v-chip
+              v-if="completedSections.time && activePanel !== 1"
+              color="success" variant="tonal" size="small" class="ml-3"
+            >
+              <v-icon start size="x-small">mdi-check</v-icon>
+              {{ parsedTimeSummary }}
+            </v-chip>
+          </div>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <v-row>
+            <v-col>
+              <h2>Start Time</h2>
+              <p class="panel-description">Start immediately or pick a time from the calendar below. Use the <strong>Availability</strong> toggle to check server resources.</p>
+              <v-btn large @click="reserveNow" color="green" :loading="fetchingComputers && reserveType === 'now'" :disabled="fetchingComputers" class="mt-4">
+                Start Immediately
+              </v-btn>
+            </v-col>
+          </v-row>
+          <v-row>
+            <v-col class="section">
+              <div style="text-align: left">
+                <p style="margin-bottom: 10px;"><small>All times are in timezone <strong>{{globalTimezone}}</strong></small></p>
+              </div>
+              <div style="text-align: center;">
+                <CalendarReservations
+                  v-if="allReservations"
+                  :propReservations="allReservations"
+                  :readOnly="false"
+                  @slotSelected="slotSelected"
+                  @reservationsRefreshed="handleReservationsRefreshed"
+                  ref="calendarComponent"
+                />
+              </div>
+            </v-col>
+          </v-row>
+          <Loading v-if="fetchingComputers && reserveType !== 'now'" />
+          <v-alert v-if="hardwareFetchError" type="error" variant="tonal" class="mt-3 mx-auto" style="max-width: 600px;">
+            {{ hardwareFetchError }}
+          </v-alert>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
 
-        <v-btn variant="text" @click="prevStep()" style="margin-right: 7px">Back</v-btn>
-
-        <v-btn color="primary" @click="fetchAvailableHardware" :disabled="!reserveDurationDays && !reserveDurationHours && !fetchingComputers">Continue</v-btn>
-        <Loading v-if="fetchingComputers" />
-      </v-stepper-window-item>
-
-      <!-- STEP 3: HARDWARE -->
-      <v-stepper-window-item :value="3">
-        <v-btn @click="prevStep()">&larr; Back</v-btn>
-        <br>
-        <br>
-
-        <!-- Select container -->
-        <v-row v-if="reserveDate != null && reserveDurationDays !== null && reserveDurationHours !== null && !fetchingComputers && allComputers">
-          <v-col cols="12">
-            <h2>Select Container</h2>
-            <v-row justify="center">
-              <v-col cols="10">
-                <v-row style="justify-content: center !important;">
-                  <v-col 
-                    v-for="containerItem in containers" 
-                    :key="containerItem.value" 
-                    cols="12" 
-                    sm="6" 
-                    md="4"
+      <!-- PANEL 2: CONTAINER -->
+      <v-expansion-panel :disabled="!hardwareFetched">
+        <v-expansion-panel-title>
+          <div class="d-flex align-center panel-title-content">
+            <v-avatar size="28" :color="hardwareFetched ? 'primary' : 'grey-darken-1'" class="mr-3 flex-shrink-0">
+              <span class="text-white text-body-2 font-weight-bold">3</span>
+            </v-avatar>
+            <v-icon class="mr-2">mdi-docker</v-icon>
+            <span class="font-weight-bold">Container</span>
+            <v-chip
+              v-if="completedSections.container && activePanel !== 2"
+              color="success" variant="tonal" size="small" class="ml-3"
+            >
+              <v-icon start size="x-small">mdi-check</v-icon>
+              {{ containerSummary }}
+            </v-chip>
+          </div>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <h2>Container Image</h2>
+          <p class="panel-description">Select the operating system and software environment for your reservation.</p>
+          <v-row justify="center" v-if="containers && containers.length">
+            <v-col cols="10">
+              <v-row style="justify-content: center !important;">
+                <v-col
+                  v-for="containerItem in containers"
+                  :key="containerItem.value"
+                  cols="12"
+                  sm="6"
+                  md="4"
+                >
+                  <v-card
+                    :class="{ 'selected-card': container === containerItem.value }"
+                    @click="selectContainer(containerItem.value)"
+                    hover
+                    style="cursor: pointer; min-height: 260px;"
+                    :outlined="container !== containerItem.value"
+                    :color="container === containerItem.value ? 'primary' : ''"
                   >
-                    <v-card 
-                      :class="{ 'selected-card': container === containerItem.value }"
-                      @click="selectContainer(containerItem.value)"
-                      hover
-                      style="cursor: pointer; min-height: 260px;"
-                      :outlined="container !== containerItem.value"
-                      :color="container === containerItem.value ? 'primary' : ''"
-                    >
-                      <v-card-body class="pa-4" style="height: 100%;">
-                        <div class="d-flex flex-column h-100" style="padding: 15px;">
-                          <div class="text-center mb-3">
-                            <v-icon 
-                              size="32" 
-                              class="mb-2"
-                              :color="container === containerItem.value ? 'white' : 'primary'"
-                            >
-                              mdi-docker
-                            </v-icon>
-                            <div 
-                              class="font-weight-medium text-h6"
-                              :style="{ color: container === containerItem.value ? 'white' : '' }"
-                            >
-                              {{ containerItem.text }}
-                            </div>
-                            <div 
-                              class="text-body-2 mt-1"
-                              :style="{ 
-                                color: container === containerItem.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.7)',
-                                fontSize: '12px',
-                                fontFamily: 'monospace'
-                              }"
-                            >
-                              {{ getContainerImageById(containerItem.value) || 'No image specified' }}
-                            </div>
-                            <div 
-                              v-if="!getContainerPublicById(containerItem.value) && isAdmin()"
-                              class="text-body-2 mt-1"
-                              :style="{ 
-                                color: container === containerItem.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,165,0,0.9)',
-                                fontSize: '11px',
-                                fontWeight: '500'
-                              }"
-                            >
-                              Private
-                            </div>
-                          </div>
-                          <div class="flex-grow-1">
-                            <div 
-                              class="text-body-2"
-                              :style="{ 
-                                color: container === containerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
-                                fontSize: '13px',
-                                lineHeight: '1.3'
-                              }"
-                            >
-                              {{ getContainerDescriptionById(containerItem.value) || 'No description available' }}
-                            </div>
-                          </div>
-                        </div>
-                      </v-card-body>
-                    </v-card>
-                  </v-col>
-                </v-row>
-              </v-col>
-            </v-row>
-          </v-col>
-        </v-row>
-
-
-        <!-- Select computer, hardware specs & submit -->
-        <v-row v-if="reserveDate != null && reserveDurationDays !== null && reserveDurationHours !== null && !fetchingComputers && allComputers && container" class="section">      
-          <v-col cols="12">
-            <h2 id="select-computer-section">Select Computer</h2>
-            <v-row justify="center">
-              <v-col cols="10">
-                <v-row style="justify-content: center !important;">
-                  <v-col 
-                    v-for="computerItem in computers" 
-                    :key="computerItem.value" 
-                    cols="12" 
-                    sm="6" 
-                    md="4"
-                  >
-                    <v-card 
-                      :class="{ 'selected-card': computer === computerItem.value }"
-                      @click="computer = computerItem.value; computerChanged()"
-                      hover
-                      style="cursor: pointer; min-height: 260px;"
-                      :outlined="computer !== computerItem.value"
-                      :color="computer === computerItem.value ? 'primary' : ''"
-                    >
-                      <v-card-body class="pa-4" style="height: 100%;">
-                        <div class="d-flex flex-column h-100" style="padding: 15px;">
-                          <div class="text-center mb-3">
-                            <v-icon 
-                              size="32" 
-                              class="mb-2"
-                              :color="computer === computerItem.value ? 'white' : 'primary'"
-                            >
-                              mdi-server
-                            </v-icon>
-                            <div 
-                              class="font-weight-medium text-h6"
-                              :style="{ color: computer === computerItem.value ? 'white' : '' }"
-                            >
-                              {{ computerItem.text }}
-                            </div>
-                          </div>
-                          <div class="flex-grow-1">
-                            <div 
-                              class="text-body-2 font-weight-medium mb-2"
-                              :style="{ 
-                                color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
-                                fontSize: '12px'
-                              }"
-                            >
-                              Available Hardware
-                            </div>
-                            <div 
-                              v-for="spec in getComputerHardwareList(computerItem.value)" 
-                              :key="spec.id"
-                              class="text-body-2"
-                              :style="{ 
-                                color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
-                                fontSize: '11px',
-                                lineHeight: '1.4'
-                              }"
-                            >
-                              • {{ spec.text }}
-                            </div>
-                          </div>
-                        </div>
-                      </v-card-body>
-                    </v-card>
-                  </v-col>
-                </v-row>
-              </v-col>
-            </v-row>
-          </v-col>
-
-          <v-row v-if="computer && hardwareData">
-            <v-col cols="12">
-              <h2 id="select-hardware-section" style="margin-top: 15px;">Select Hardware</h2>
-
-              <v-col cols="12">
-                <h3 class="text-center">
-                  <v-icon class="mr-1" size="small">mdi-expansion-card</v-icon>
-                  GPUs
-                </h3>
-                <p class="text-center text-medium-emphasis" style="font-size: 13px; margin-bottom: 5px;">
-                  {{ hardwareDataOnlyGPUs().length }} available — select up to {{ getMaxGpus() }}
-                </p>
-                <div style="margin-bottom: 30px; margin-top: 15px;" v-if="hardwareDataOnlyGPUs().length === 0" class="text-center text-medium-emphasis">
-                  No GPUs Available
-                </div>
-                <v-row v-else justify="center" style="margin-top: 15px; margin-bottom: 20px;">
-                  <v-col
-                    v-for="gpu in hardwareDataOnlyGPUs()"
-                    :key="gpu.value"
-                    cols="4"
-                    sm="3"
-                    md="2"
-                  >
-                    <v-card
-                      :class="{ 'selected-card': selectedgpus.includes(gpu.value) }"
-                      @click="toggleGpu(gpu.value)"
-                      hover
-                      style="cursor: pointer; min-height: 90px;"
-                      :outlined="!selectedgpus.includes(gpu.value)"
-                    >
-                      <v-card-text style="height: 100%;">
-                        <div class="d-flex flex-column align-center justify-center h-100 text-center" style="padding: 10px;">
+                    <v-card-body class="pa-4" style="height: 100%;">
+                      <div class="d-flex flex-column h-100" style="padding: 15px;">
+                        <div class="text-center mb-3">
                           <v-icon
-                            size="28"
+                            size="32"
                             class="mb-2"
-                            :color="selectedgpus.includes(gpu.value) ? 'primary' : 'grey'"
-                          >mdi-expansion-card</v-icon>
-                          <div class="font-weight-medium" style="font-size: 14px;">{{ gpu.text.split(': ').slice(1).join(': ') || gpu.text }}</div>
-                          <div class="text-medium-emphasis" style="font-size: 12px;">GPU {{ gpu.text.split(':')[0] }}</div>
+                            :color="container === containerItem.value ? 'white' : 'primary'"
+                          >
+                            mdi-docker
+                          </v-icon>
+                          <div
+                            class="font-weight-medium text-h6"
+                            :style="{ color: container === containerItem.value ? 'white' : '' }"
+                          >
+                            {{ containerItem.text }}
+                          </div>
+                          <div
+                            class="text-body-2 mt-1"
+                            :style="{
+                              color: container === containerItem.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.7)',
+                              fontSize: '12px',
+                              fontFamily: 'monospace'
+                            }"
+                          >
+                            {{ getContainerImageById(containerItem.value) || 'No image specified' }}
+                          </div>
+                          <div
+                            v-if="!getContainerPublicById(containerItem.value) && isAdmin()"
+                            class="text-body-2 mt-1"
+                            :style="{
+                              color: container === containerItem.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,165,0,0.9)',
+                              fontSize: '11px',
+                              fontWeight: '500'
+                            }"
+                          >
+                            Private
+                          </div>
                         </div>
-                      </v-card-text>
-                    </v-card>
-                  </v-col>
-                </v-row>
-              </v-col>
+                        <div class="flex-grow-1">
+                          <div
+                            class="text-body-2"
+                            :style="{
+                              color: container === containerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
+                              fontSize: '13px',
+                              lineHeight: '1.3'
+                            }"
+                          >
+                            {{ getContainerDescriptionById(containerItem.value) || 'No description available' }}
+                          </div>
+                        </div>
+                      </div>
+                    </v-card-body>
+                  </v-card>
+                </v-col>
+              </v-row>
+            </v-col>
+          </v-row>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
 
-              <v-row v-for="spec in hardwareDataNoGPUs()" :key="spec.hardwareSpecId" justify="center">
-                <v-col cols="12" md="6" style="padding: 0 60px;">
-                  <h3 class="text-center">
-                    <v-icon v-if="spec.type.toLowerCase() === 'cpus'" class="mr-1" size="small">mdi-cpu-64-bit</v-icon>
-                    <v-icon v-else-if="spec.type.toLowerCase() === 'ram'" class="mr-1" size="small">mdi-memory</v-icon>
-                    {{ formatSpecType(spec.type) }}
-                  </h3>
-                  <p class="text-center text-medium-emphasis" style="font-size: 13px; margin-bottom: 15px;">
-                    <span v-if="spec.type.toLowerCase() === 'cpus'">Number of CPU cores to dedicate</span>
-                    <span v-else-if="spec.type.toLowerCase() === 'ram'">Amount of RAM to allocate</span>
-                    <span v-else>Amount to allocate</span>
-                  </p>
-                  <v-slider
-                    :min="spec.minimumAmount"
-                    show-ticks="always"
-                    v-model="selectedHardwareSpecs[spec.hardwareSpecId]"
-                    :max="spec.maximumAmountForUser"
-                    thumb-label="always"
-                    :step="1"
-                    color="primary"
-                    track-color="grey-darken-2"
+      <!-- PANEL 3: SERVER & HARDWARE -->
+      <v-expansion-panel :disabled="!completedSections.container">
+        <v-expansion-panel-title>
+          <div class="d-flex align-center panel-title-content">
+            <v-avatar size="28" :color="completedSections.container ? 'primary' : 'grey-darken-1'" class="mr-3 flex-shrink-0">
+              <span class="text-white text-body-2 font-weight-bold">4</span>
+            </v-avatar>
+            <v-icon class="mr-2">mdi-server</v-icon>
+            <span class="font-weight-bold">Server & Hardware</span>
+            <v-chip
+              v-if="completedSections.hardware && activePanel !== 3"
+              color="success" variant="tonal" size="small" class="ml-3"
+            >
+              <v-icon start size="x-small">mdi-check</v-icon>
+              {{ hardwareSummary }}
+            </v-chip>
+          </div>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <!-- Select computer -->
+          <h2 id="select-computer-section">Select Server</h2>
+          <p class="panel-description">Choose which server to run your container on. Hardware shown is what's available for your selected time slot.</p>
+          <v-row justify="center" v-if="computers && computers.length">
+            <v-col cols="10">
+              <v-row style="justify-content: center !important;">
+                <v-col
+                  v-for="computerItem in computers"
+                  :key="computerItem.value"
+                  cols="12"
+                  sm="6"
+                  md="4"
+                >
+                  <v-card
+                    :class="{ 'selected-card': computer === computerItem.value }"
+                    @click="computer = computerItem.value; computerChanged()"
+                    hover
+                    style="cursor: pointer; min-height: 260px;"
+                    :outlined="computer !== computerItem.value"
+                    :color="computer === computerItem.value ? 'primary' : ''"
                   >
-                    <template v-slot:thumb-label="{ modelValue }">
-                      <span style="font-size: 15px;">{{ (modelValue ?? 0) }} / {{ spec.maximumAmountForUser }} {{ spec.format }}</span>
-                    </template>
-                  </v-slider>
+                    <v-card-body class="pa-4" style="height: 100%;">
+                      <div class="d-flex flex-column h-100" style="padding: 15px;">
+                        <div class="text-center mb-3">
+                          <v-icon
+                            size="32"
+                            class="mb-2"
+                            :color="computer === computerItem.value ? 'white' : 'primary'"
+                          >
+                            mdi-server
+                          </v-icon>
+                          <div
+                            class="font-weight-medium text-h6"
+                            :style="{ color: computer === computerItem.value ? 'white' : '' }"
+                          >
+                            {{ computerItem.text }}
+                          </div>
+                        </div>
+                        <div class="flex-grow-1">
+                          <div
+                            class="font-weight-medium mb-2"
+                            :style="{
+                              color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
+                              fontSize: '14px'
+                            }"
+                          >
+                            Available Hardware
+                          </div>
+                          <div
+                            v-for="spec in getComputerHardwareList(computerItem.value)"
+                            :key="spec.id"
+                            :style="{
+                              color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
+                              fontSize: '14px',
+                              lineHeight: '1.6'
+                            }"
+                          >
+                            • {{ spec.text }}
+                          </div>
+                        </div>
+                      </div>
+                    </v-card-body>
+                  </v-card>
                 </v-col>
               </v-row>
             </v-col>
           </v-row>
 
-          <!-- Advanced Settings -->
-          <v-col cols="12" v-if="computer && hardwareData" style="margin-top: 30px;">
-            <div class="text-center">
-              <h3 style="margin-bottom: 8px;">Advanced Settings</h3>
-              <a style="cursor: pointer; color: #2196f3; font-size: 14px;" @click="showAdvancedSettings = !showAdvancedSettings">
-                {{ showAdvancedSettings ? 'Hide Advanced Settings' : 'Show Advanced Settings' }}
-              </a>
-            </div>
+          <!-- Hardware selection (shown after computer is selected) -->
+          <div v-if="computer && hardwareData">
+            <h2 id="select-hardware-section" style="margin-top: 15px;">Configure Hardware</h2>
 
-            <div v-if="showAdvancedSettings" style="margin-top: 25px;">
-              <!-- Admin reserve + Description side by side -->
-              <v-row style="margin-bottom: 20px;">
-                <v-col cols="12" :md="isAdmin() ? 6 : 6" :style="isAdmin() ? 'padding: 0 40px;' : 'margin: 0 auto; padding: 0 40px;'" v-if="isAdmin()">
-                  <h3 class="text-center">Reserve for another user</h3>
-                  <p class="text-center"><span style="color: gray; font-size: 15px;">Admin only!</span> Write email address of another user, or leave empty to reserve for yourself.</p>
-                  <v-text-field v-model="adminReserveUserEmail" label="" placeholder="Email"></v-text-field>
-                </v-col>
-                <v-col cols="12" :md="isAdmin() ? 6 : 6" :style="isAdmin() ? 'padding: 0 40px;' : 'margin: 0 auto; padding: 0 40px;'">
-                  <h3 class="text-center">Reservation Description</h3>
-                  <p class="text-center" style="color: gray; font-size: 15px;">Optional description for your reservation. (max 50 characters)</p>
-                  <v-text-field
-                    v-model="reservationDescription"
-                    label="Description (optional)"
-                    placeholder="Enter description..."
-                    counter="50"
-                    :rules="[rules.maxLength50]"
-                    maxlength="50">
-                  </v-text-field>
-                </v-col>
-              </v-row>
-
-              <!-- Low-Priority Reservation -->
-              <v-row style="margin-bottom: 20px;">
-                <v-col cols="12" md="6" style="margin: 0 auto; padding: 0 40px;">
-                  <h3 class="text-center">Low-Priority Reservation</h3>
-                  <p class="text-center" style="color: gray; font-size: 15px;">
-                    Low-priority reservations may be paused when resources are needed by other users,
-                    and automatically resumed when resources become available. Save your work to mounted volumes.
-                  </p>
-                  <div class="d-flex justify-center">
-                    <v-switch
-                      v-model="isLowPriority"
-                      color="warning"
-                      label="Make reservation low-priority"
-                    ></v-switch>
-                  </div>
+            <v-col cols="12">
+              <h3 class="text-center">
+                <v-icon class="mr-1" size="small">mdi-expansion-card</v-icon>
+                GPUs
+              </h3>
+              <p class="text-center text-medium-emphasis" style="font-size: 13px; margin-bottom: 5px;">
+                {{ hardwareDataOnlyGPUs().length }} available — select up to {{ getMaxGpus() }}
+              </p>
+              <div style="margin-bottom: 30px; margin-top: 15px;" v-if="hardwareDataOnlyGPUs().length === 0" class="text-center text-medium-emphasis">
+                No GPUs Available
+              </div>
+              <v-row v-else justify="center" style="margin-top: 15px; margin-bottom: 20px;">
+                <v-col
+                  v-for="gpu in hardwareDataOnlyGPUs()"
+                  :key="gpu.value"
+                  cols="4"
+                  sm="3"
+                  md="2"
+                >
+                  <v-card
+                    :class="{ 'selected-card': selectedgpus.includes(gpu.value) }"
+                    @click="toggleGpu(gpu.value)"
+                    hover
+                    style="cursor: pointer; min-height: 90px;"
+                    :outlined="!selectedgpus.includes(gpu.value)"
+                  >
+                    <v-card-text style="height: 100%;">
+                      <div class="d-flex flex-column align-center justify-center h-100 text-center" style="padding: 10px;">
+                        <v-icon
+                          size="28"
+                          class="mb-2"
+                          :color="selectedgpus.includes(gpu.value) ? 'primary' : 'grey'"
+                        >mdi-expansion-card</v-icon>
+                        <div class="font-weight-medium" style="font-size: 14px;">{{ gpu.text.split(': ').slice(1).join(': ') || gpu.text }}</div>
+                        <div class="text-medium-emphasis" style="font-size: 12px;">GPU {{ gpu.text.split(':')[0] }}</div>
+                      </div>
+                    </v-card-text>
+                  </v-card>
                 </v-col>
               </v-row>
+            </v-col>
 
-              <!-- SHM + RAM Disk side by side -->
-              <v-row>
-                <v-col cols="12" md="6" style="padding: 0 60px;">
-                  <h3 class="text-center">Shared Memory (SHM) Size</h3>
-                  <p style="color: gray; font-size: 15px;">Shared memory for inter-process communication. Required for applications like PyTorch, databases, and parallel computing. Default: 50%</p>
-                  <v-slider
-                    v-model="shmSizePercent"
-                    :min="10"
-                    :max="90"
-                    show-ticks="always"
-                    thumb-label="always"
-                    :step="5">
-                    <template v-slot:thumb-label="{ modelValue }">
-                      <span style="font-size: 15px;">{{ modelValue }}%</span>
-                    </template>
-                  </v-slider>
-                  <p style="text-align: center; margin-top: 10px;">
-                    SHM Size: {{ shmSizePercent }}% of allocated memory
-                    <span v-if="selectedHardwareSpecs && getMemorySpecId()">
-                      (≈ {{ calculateShmSizeGB() }} GB)
-                    </span>
-                  </p>
-                </v-col>
+            <v-row v-for="spec in hardwareDataNoGPUs()" :key="spec.hardwareSpecId" justify="center">
+              <v-col cols="12" md="6" style="padding: 0 60px;">
+                <h3 class="text-center">
+                  <v-icon v-if="spec.type.toLowerCase() === 'cpus'" class="mr-1" size="small">mdi-cpu-64-bit</v-icon>
+                  <v-icon v-else-if="spec.type.toLowerCase() === 'ram'" class="mr-1" size="small">mdi-memory</v-icon>
+                  {{ formatSpecType(spec.type) }}
+                </h3>
+                <p class="text-center text-medium-emphasis" style="font-size: 13px; margin-bottom: 15px;">
+                  <span v-if="spec.type.toLowerCase() === 'cpus'">Number of CPU cores to dedicate</span>
+                  <span v-else-if="spec.type.toLowerCase() === 'ram'">Amount of RAM to allocate</span>
+                  <span v-else>Amount to allocate</span>
+                </p>
+                <v-slider
+                  :min="spec.minimumAmount"
+                  show-ticks="always"
+                  v-model="selectedHardwareSpecs[spec.hardwareSpecId]"
+                  :max="spec.maximumAmountForUser"
+                  thumb-label="always"
+                  :step="1"
+                  color="primary"
+                  track-color="grey-darken-2"
+                >
+                  <template v-slot:thumb-label="{ modelValue }">
+                    <span style="font-size: 15px;">{{ (modelValue ?? 0) }} / {{ spec.maximumAmountForUser }} {{ spec.format }}</span>
+                  </template>
+                </v-slider>
+              </v-col>
+            </v-row>
+          </div>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
 
-                <v-col cols="12" md="6" style="padding: 0 60px;">
-                  <h3 class="text-center">RAM Disk Size</h3>
-                  <p style="color: gray; font-size: 15px;">Mounts a high-speed RAM-based folder to your home directory. Ideal for caching, temp files, and I/O intensive operations. Default: 0%</p>
-                  <v-slider
-                    v-model="ramDiskSizePercent"
-                    :min="0"
-                    :max="60"
-                    show-ticks="always"
-                    thumb-label="always"
-                    :step="5">
-                    <template v-slot:thumb-label="{ modelValue }">
-                      <span style="font-size: 15px;">{{ modelValue }}%</span>
-                    </template>
-                  </v-slider>
-                  <p style="text-align: center; margin-top: 10px;">
-                    RAM Disk Size: {{ ramDiskSizePercent }}% of allocated memory
-                    <span v-if="selectedHardwareSpecs && getMemorySpecId()">
-                      (≈ {{ calculateRamDiskSizeGB() }} GB)
-                    </span>
-                  </p>
-                </v-col>
-              </v-row>
+      <!-- PANEL 4: ADVANCED SETTINGS -->
+      <v-expansion-panel :disabled="!completedSections.hardware">
+        <v-expansion-panel-title>
+          <div class="d-flex align-center panel-title-content">
+            <v-avatar size="28" :color="completedSections.hardware ? 'primary' : 'grey-darken-1'" class="mr-3 flex-shrink-0">
+              <span class="text-white text-body-2 font-weight-bold">5</span>
+            </v-avatar>
+            <v-icon class="mr-2">mdi-cog-outline</v-icon>
+            <span class="font-weight-bold">Advanced Settings</span>
+            <v-chip color="grey" variant="tonal" size="small" class="ml-3">
+              {{ advancedSettingsSummary || 'Optional' }}
+            </v-chip>
+          </div>
+        </v-expansion-panel-title>
+        <v-expansion-panel-text>
+          <!-- Admin reserve + Description side by side -->
+          <v-row style="margin-bottom: 20px;">
+            <v-col cols="12" :md="isAdmin() ? 6 : 6" :style="isAdmin() ? 'padding: 0 40px;' : 'margin: 0 auto; padding: 0 40px;'" v-if="isAdmin()">
+              <h3 class="text-center">Reserve for another user</h3>
+              <p class="text-center"><span style="color: gray; font-size: 15px;">Admin only!</span> Write email address of another user, or leave empty to reserve for yourself.</p>
+              <v-text-field v-model="adminReserveUserEmail" label="" placeholder="Email"></v-text-field>
+            </v-col>
+            <v-col cols="12" :md="isAdmin() ? 6 : 6" :style="isAdmin() ? 'padding: 0 40px;' : 'margin: 0 auto; padding: 0 40px;'">
+              <h3 class="text-center">Reservation Description</h3>
+              <p class="text-center" style="color: gray; font-size: 15px;">Optional description for your reservation. (max 50 characters)</p>
+              <v-text-field
+                v-model="reservationDescription"
+                label="Description (optional)"
+                placeholder="Enter description..."
+                counter="50"
+                :rules="[rules.maxLength50]"
+                maxlength="50">
+              </v-text-field>
+            </v-col>
+          </v-row>
 
-              <!-- Start/Stop Script Paths -->
-              <v-row style="margin-top: 20px;">
-                <v-col cols="12" md="6" style="padding: 0 60px;">
-                  <h3 class="text-center">Start Script Path</h3>
-                  <p style="color: gray; font-size: 15px;">Absolute path to a script inside the container to run on start. Pre-filled from your profile.</p>
-                  <v-text-field
-                    v-model="reservationStartScriptPath"
-                    label="Start Script (optional)"
-                    placeholder=""
-                    :rules="[rules.scriptPath]"
-                  ></v-text-field>
-                </v-col>
-                <v-col cols="12" md="6" style="padding: 0 60px;">
-                  <h3 class="text-center">Stop Script Path</h3>
-                  <p style="color: gray; font-size: 15px;">Absolute path to a script inside the container to run before stop. Pre-filled from your profile.</p>
-                  <v-text-field
-                    v-model="reservationStopScriptPath"
-                    label="Stop Script (optional)"
-                    placeholder=""
-                    :rules="[rules.scriptPath]"
-                  ></v-text-field>
-                </v-col>
-              </v-row>
-            </div>
-          </v-col>
+          <!-- Low-Priority Reservation -->
+          <v-row style="margin-bottom: 20px;">
+            <v-col cols="12" md="6" style="margin: 0 auto; padding: 0 40px;">
+              <h3 class="text-center">Low-Priority Reservation</h3>
+              <p class="text-center" style="color: gray; font-size: 15px;">
+                Low-priority reservations may be paused when resources are needed by other users,
+                and automatically resumed when resources become available. Save your work to mounted volumes.
+              </p>
+              <div class="d-flex justify-center">
+                <v-switch
+                  v-model="isLowPriority"
+                  color="warning"
+                  label="Make reservation low-priority"
+                ></v-switch>
+              </div>
+            </v-col>
+          </v-row>
 
-        </v-row>
+          <!-- SHM + RAM Disk side by side -->
+          <v-row>
+            <v-col cols="12" md="6" style="padding: 0 60px;">
+              <h3 class="text-center">Shared Memory (SHM) Size</h3>
+              <p style="color: gray; font-size: 15px;">Shared memory for inter-process communication. Required for applications like PyTorch, databases, and parallel computing. Default: 50%</p>
+              <v-slider
+                v-model="shmSizePercent"
+                :min="10"
+                :max="90"
+                show-ticks="always"
+                thumb-label="always"
+                :step="5">
+                <template v-slot:thumb-label="{ modelValue }">
+                  <span style="font-size: 15px;">{{ modelValue }}%</span>
+                </template>
+              </v-slider>
+              <p style="text-align: center; margin-top: 10px;">
+                SHM Size: {{ shmSizePercent }}% of allocated memory
+                <span v-if="selectedHardwareSpecs && getMemorySpecId()">
+                  (≈ {{ calculateShmSizeGB() }} GB)
+                </span>
+              </p>
+            </v-col>
 
+            <v-col cols="12" md="6" style="padding: 0 60px;">
+              <h3 class="text-center">RAM Disk Size</h3>
+              <p style="color: gray; font-size: 15px;">Mounts a high-speed RAM-based folder to your home directory. Ideal for caching, temp files, and I/O intensive operations. Default: 0%</p>
+              <v-slider
+                v-model="ramDiskSizePercent"
+                :min="0"
+                :max="60"
+                show-ticks="always"
+                thumb-label="always"
+                :step="5">
+                <template v-slot:thumb-label="{ modelValue }">
+                  <span style="font-size: 15px;">{{ modelValue }}%</span>
+                </template>
+              </v-slider>
+              <p style="text-align: center; margin-top: 10px;">
+                RAM Disk Size: {{ ramDiskSizePercent }}% of allocated memory
+                <span v-if="selectedHardwareSpecs && getMemorySpecId()">
+                  (≈ {{ calculateRamDiskSizeGB() }} GB)
+                </span>
+              </p>
+            </v-col>
+          </v-row>
+
+          <!-- Start/Stop Script Paths -->
+          <v-row style="margin-top: 20px;">
+            <v-col cols="12" md="6" style="padding: 0 60px;">
+              <h3 class="text-center">Start Script Path</h3>
+              <p style="color: gray; font-size: 15px;">Absolute path to a script inside the container to run on start. Pre-filled from your profile.</p>
+              <v-text-field
+                v-model="reservationStartScriptPath"
+                label="Start Script (optional)"
+                placeholder=""
+                :rules="[rules.scriptPath]"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" md="6" style="padding: 0 60px;">
+              <h3 class="text-center">Stop Script Path</h3>
+              <p style="color: gray; font-size: 15px;">Absolute path to a script inside the container to run before stop. Pre-filled from your profile.</p>
+              <v-text-field
+                v-model="reservationStopScriptPath"
+                label="Stop Script (optional)"
+                placeholder=""
+                :rules="[rules.scriptPath]"
+              ></v-text-field>
+            </v-col>
+          </v-row>
+        </v-expansion-panel-text>
+      </v-expansion-panel>
+
+    </v-expansion-panels>
+
+    <!-- Create Reservation Section -->
+    <v-row>
+      <v-col cols="12">
         <!-- Notification of depleted resources -->
-        <v-row v-if="refreshTip">
-          <v-col cols="6" style="margin: 0 auto;">
+        <v-row v-if="refreshTip" justify="center">
+          <v-col cols="12" sm="8" md="6">
             <v-alert class="refresh-tip" color="info" title="Information">
               <v-btn style="margin-bottom: 10px;" @click="refreshHardware">Refresh Hardware Data</v-btn>
-              <p>If there were not enough resources for reservation, then click the button above to refresh the hardware data.</p>
+              <p>If there were not enough resources for reservation, click the button above to refresh the hardware data.</p>
             </v-alert>
           </v-col>
         </v-row>
 
-        <!-- Create reservation button -->
-        <v-row v-if="computer && hardwareData" style="margin-top: 40px;">
-          <v-col cols="12">
-            <v-btn color="primary" @click="submitReservation" :disabled="isSubmittingReservation">Create Reservation</v-btn>
-          </v-col>
-        </v-row>
-
+        <v-btn
+          color="primary"
+          size="large"
+          @click="submitReservation"
+          :disabled="!canCreateReservation || isSubmittingReservation"
+        >
+          Create Reservation
+        </v-btn>
         <Loading v-if="isSubmittingReservation" />
-      </v-stepper-window-item>
-
-    </v-stepper-window>
-  </v-stepper>
-
-
+        <p v-if="!canCreateReservation && !isSubmittingReservation" class="text-medium-emphasis mt-2" style="font-size: 14px;">
+          {{ reservationIncompleteMessage }}
+        </p>
+      </v-col>
+    </v-row>
 
   </v-container>
 </template>
@@ -476,58 +546,27 @@
   import utc from 'dayjs/plugin/utc'
   import timezone from 'dayjs/plugin/timezone'
   import customParseFormat from 'dayjs/plugin/customParseFormat'
+  import relativeTime from 'dayjs/plugin/relativeTime'
   import CalendarReservations from '/src/components/user/CalendarReservations.vue';
   import Loading from '/src/components/global/Loading.vue';
-  import AppSettings from '/src/AppSettings.js'
+
   import { useMainStore } from '@/store/store'
 
   dayjs.extend(utc)
   dayjs.extend(timezone)
   dayjs.extend(customParseFormat)
+  dayjs.extend(relativeTime)
 
   /**
-   * Pre-flight check that verifies hardware resources are available for the given date and duration.
-   * @param {string} date - ISO date string for the reservation start
-   * @param {number} duration - Duration in hours
-   * @param {string} loginToken - Auth token
-   * @returns {Promise<string|null>} Error message string, or null if resources are available
-   */
-  async function checkHardwareAvailability(date, duration, loginToken) {
-    let returnData = null;
-    let dateParsed = dayjs(date).utc().toISOString()
-    await axios({
-      method: "get",
-      url: AppSettings.APIServer.reservation.get_available_hardware,
-      params: { "date": dateParsed, "duration": duration },
-      headers: {"Authorization" : `Bearer ${loginToken}`}
-    })
-    .then(function (response) {
-      //console.log(response)
-        // Success
-        if (response.data.status == true) {
-          returnData = null
-        }
-        else {
-          returnData = response.data.message
-          //return response.data.message
-        }
-    })
-    .catch(function (error) {
-        console.log(error)
-        returnData = "An error occurred while checking hardware availability. Please try again later."
-        //return "An error occurred while checking hardware availability. Please try again later."
-    });
-    return returnData
-  }
-
-  /**
-   * Multi-step reservation wizard for creating new container reservations.
-   * Step 1: Select start time via calendar or "Reserve Now" button.
-   * Step 2: Choose reservation duration (days/hours) within role-based limits.
-   * Step 3: Select container image, target server, hardware resources (GPUs, CPUs,
-   *         memory, storage), and advanced settings (SHM size, RAM disk, description,
-   *         admin-only reserve-for-another-user).
-   * Validates hardware availability at each step before proceeding.
+   * Accordion-based reservation wizard for creating new container reservations.
+   * Panel 1: Choose reservation duration (days/hours) within role-based limits.
+   * Panel 2: Select start time via calendar or "Start Immediately" button.
+   *          Triggers hardware availability check using the actual selected duration.
+   * Panel 3: Select container image.
+   * Panel 4: Select target server and hardware resources (GPUs, CPUs, memory, storage).
+   * Panel 5: Advanced settings (SHM size, RAM disk, description, low-priority,
+   *          admin-only reserve-for-another-user, start/stop scripts).
+   * Collapsed panels show a summary of selections. Panels lock until prerequisites are met.
    */
   export default {
     name: 'PageUserReserve',
@@ -542,99 +581,139 @@
       Loading
     },
     data: () => ({
+      activePanel: 0,
+      completedSections: {
+        duration: false,
+        time: false,
+        container: false,
+        hardware: false,
+      },
+      hardwareFetched: false,
+      hardwareFetchError: null,
+      confirmedDuration: null, // Last confirmed total duration in hours
       reserveDate: null,
-      step: 1,
       reserveType: "",
-      pickedDate: (new Date(Date.now() - (new Date()).getTimezoneOffset() * 60000)).toISOString().substr(0, 10),
-      pickedHour: {},
       reservableHours: [],
       reservableDays: [],
       adminReserveUserEmail: null,
-      reservationDescription: "", // Description for the reservation
-      hours: [],
-      refreshTip: false, // True if there were not enough resources for reservation, shows a tip to refresh hardware data
+      reservationDescription: "",
+      refreshTip: false,
       reserveDurationDays: null,
       reserveDurationHours: null,
-      initializingDefaults: false, // Flag to prevent watchers from interfering during initialization
-      isLowPriority: false, // Low-priority reservations can be paused when resources are needed
-      shmSizePercent: 50, // Default SHM size to 50% of memory
-      ramDiskSizePercent: 0, // Default RAM disk size to 0% of memory
-      fetchingReservations: false, // True if we are fetching all current and upcoming reservations
-      allReservations: null, // Contains all current reservations
-      fetchingComputers: false, // True if we are fetching computers and their hardware data from the server
-      allComputers: null, // Contains all computers from server and their hardware data
-      allContainers: null, // Contains all containers from server and their hardware data
-      computer: null, // Model for the currently selected computer dropdown
-      computers: null, // Contains a list of all computer items for the computer dropdown
-      container: null, // Model for the currently selected container dropdown
-      containers: null, // Contains a list of all container items for the container dropdown
-      selectedgpus: [], // Contains a list of all selected gpus
-      hardwareData: null, // Contains hardware data for the currently selected computer
-      selectedHardwareSpecs: {}, // Selected hardware specs for the current computer
-      showAdvancedSettings: false,
-      reservationStartScriptPath: '', // Start script path override for this reservation
-      reservationStopScriptPath: '', // Stop script path override for this reservation
-      isSubmittingReservation: false, // Set to true when user is submitting the reservation
+      initializingDefaults: false,
+      isLowPriority: false,
+      shmSizePercent: 50,
+      ramDiskSizePercent: 0,
+      fetchingReservations: false,
+      allReservations: null,
+      fetchingComputers: false,
+      allComputers: null,
+      allContainers: null,
+      computer: null,
+      computers: null,
+      container: null,
+      containers: null,
+      selectedgpus: [],
+      hardwareData: null,
+      selectedHardwareSpecs: {},
+      reservationStartScriptPath: '',
+      reservationStopScriptPath: '',
+      timeTick: Date.now(),
+      timeTickInterval: null,
+      isSubmittingReservation: false,
       rules: {
         maxLength50: value => !value || value.length <= 50 || "Description must be 50 characters or less",
         scriptPath: v => !v || !v.trim() || v.trim().startsWith('/') || 'Must be an absolute path (starting with /)'
       }
     }),
     mounted() {
-      let d = new Date()
-
       // Initialize duration defaults if store config is already loaded
       if (this.store.configLoaded) {
         this.initializeDurationDefaults()
       }
       // Otherwise, the watcher will handle initialization when config loads
 
-      let dayHours = []
-      for (let i = 0; i < 24; i++) {
-        let current = i < 10 ? "0" + i : i
-        dayHours.push( { "text": i + ":00", "value": current } )
-      }
-      this.hours = dayHours
-      this.pickedHour = d.getHours() < 10 ? "0"+d.getHours() : d.getHours().toString()
-
       this.fetchReservations()
       // Pre-fill script paths from user profile (synced via store)
       this.reservationStartScriptPath = this.store.user.startScriptPath || ''
       this.reservationStopScriptPath = this.store.user.stopScriptPath || ''
+      // Update relative time display every 60 seconds
+      this.timeTickInterval = setInterval(() => { this.timeTick = Date.now() }, 60000)
+    },
+    beforeUnmount() {
+      if (this.timeTickInterval) {
+        clearInterval(this.timeTickInterval)
+      }
     },
     methods: {
       /**
-       * Refreshes the hardware data.
+       * Validates the selected duration and advances to the Time panel.
+       * If the duration changed from a previously confirmed value, invalidates downstream data.
        */
-      refreshHardware() {
-        this.fetchAvailableHardware();
-        this.refreshTip = false;
+      confirmDuration() {
+        let duration = this.reserveDurationDays * 24 + this.reserveDurationHours
+        if (duration < this.minimumDuration) {
+          return this.store.showMessage({ text: "Minimum duration is " + this.minimumDuration + " hours.", color: "red" })
+        }
+        if (duration > this.maximumDuration) {
+          return this.store.showMessage({ text: "Maximum duration is " + this.maximumDuration + " hours.", color: "red" })
+        }
+
+        // If duration changed from previously confirmed value, invalidate downstream
+        if (this.hardwareFetched && this.confirmedDuration !== null && this.confirmedDuration !== duration) {
+          this.invalidateFromDuration()
+        }
+
+        this.confirmedDuration = duration
+        this.completedSections.duration = true
+        this.advanceToPanel(1)
       },
       /**
-       * Handles container selection and auto-scroll to computer selection.
+       * Opens the specified expansion panel after the current tick completes.
+       * @param {number} index - The panel index to open (0-based)
+       */
+      advanceToPanel(index) {
+        this.$nextTick(() => {
+          this.activePanel = index
+        })
+      },
+      /**
+       * Clears all hardware-dependent state when duration or time changes.
+       * Called when the user confirms a changed duration or re-selects a time.
+       */
+      invalidateFromDuration() {
+        this.hardwareFetched = false
+        this.hardwareFetchError = null
+        this.completedSections.time = false
+        this.completedSections.container = false
+        this.completedSections.hardware = false
+        this.allComputers = null
+        this.allContainers = null
+        this.computers = null
+        this.containers = null
+        this.container = null
+        this.computer = null
+        this.hardwareData = null
+        this.selectedHardwareSpecs = {}
+        this.selectedgpus = []
+      },
+      /**
+       * Refreshes the hardware data for the current date and duration.
+       */
+      refreshHardware() {
+        if (this.reserveDate && this.completedSections.duration) {
+          this.fetchAvailableHardware()
+        }
+        this.refreshTip = false
+      },
+      /**
+       * Handles container selection and advances to the Server & Hardware panel.
        * @param {number} containerValue - The selected container ID
        */
       selectContainer(containerValue) {
-        this.container = containerValue;
-        
-        // Auto-scroll to the "Select Computer" section after a short delay
-        // to allow Vue to render the computer selection section
-        try {
-          this.$nextTick(() => {
-            setTimeout(() => {
-              const element = document.getElementById('select-computer-section');
-              if (element) {
-                element.scrollIntoView({ 
-                  behavior: 'smooth', 
-                  block: 'start' 
-                });
-              }
-            }, 100);
-          });
-        } catch (error) {
-          // Silently handle any scrolling errors
-          console.debug('Auto-scroll error:', error);
-        }
+        this.container = containerValue
+        this.completedSections.container = true
+        this.advanceToPanel(3)
       },
       /**
        * Checks if user is admin.
@@ -648,9 +727,6 @@
         if (currentUser.roles && currentUser.roles.includes("admin")) return true
         return false
       },
-      /**
-       * Limits the amount of selected GPUs to the maximum amount allowed.
-       */
       /** Get the maximum number of GPUs the user can select. */
       getMaxGpus() {
         if (this.isAdmin()) return this.hardwareDataOnlyGPUs().length;
@@ -672,6 +748,9 @@
         }
         this.gpuLimit();
       },
+      /**
+       * Limits the amount of selected GPUs to the maximum amount allowed.
+       */
       gpuLimit() {
         // Allow admins to select unlimited GPUs
         if (this.isAdmin()) {
@@ -679,10 +758,10 @@
         }
 
         let max = 1; // Default fallback
-        
+
         // Look for the "gpus" summary spec which contains the computer-specific maximum
         let gpusSummarySpec = null
-        
+
         this.hardwareData.forEach((spec) => {
           if (spec.type === "gpus") {
             gpusSummarySpec = spec
@@ -701,14 +780,27 @@
         }
       },
       /**
-       * Returns a list of all hardware specs except GPUs in the hardware data.
-       * @returns {Array} Array of all hardware specs except GPUs
-      */
-      /** Format hardware spec type for display (e.g. "cpus" → "CPUs", "ram" → "RAM"). */
+       * Formats a duration in hours as a human-readable string with days and hours.
+       * @param {number} totalHours - Duration in hours
+       * @returns {string} Formatted string, e.g. "1 hour", "2 days", "60 days"
+       */
+      formatDuration(totalHours) {
+        const days = Math.floor(totalHours / 24)
+        const hours = totalHours % 24
+        let parts = []
+        if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`)
+        if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`)
+        return parts.join(' and ') || '0 hours'
+      },
+      /** Format hardware spec type for display (e.g. "cpus" -> "CPUs", "ram" -> "RAM"). */
       formatSpecType(type) {
         const labels = { 'cpus': 'CPUs', 'ram': 'RAM', 'cpu': 'CPU' };
         return labels[type.toLowerCase()] || type;
       },
+      /**
+       * Returns a list of all hardware specs except GPUs in the hardware data.
+       * @returns {Array} Array of all hardware specs except GPUs
+       */
       hardwareDataNoGPUs() {
         let data = []
         this.hardwareData.forEach((spec) => {
@@ -719,7 +811,7 @@
       /**
        * Returns a list of all GPUs in the hardware data.
        * @returns {Array} Array of all GPUs
-      */
+       */
       hardwareDataOnlyGPUs() {
         let data = []
         this.hardwareData.forEach((spec) => {
@@ -734,69 +826,25 @@
         return data.sort((a, b) => a.text.localeCompare(b.text))
       },
       /**
-       * Goes to the next step in the reservation process.
+       * Called when the user clicks "Start Immediately".
+       * Sets the reservation date to now and fetches available hardware.
        */
-      nextStep() {
-        if (this.step == 3) return
-
-        let duration = this.reserveDurationDays * 24 + this.reserveDurationHours
-        if (this.step == 2 && duration < this.minimumDuration) {
-          return this.store.showMessage({ text: "Minimum duration is "+this.minimumDuration+" hours.", color: "red" })
-        }
-        // Skip maximum duration check for admins
-        if (this.step == 2 && duration > this.maximumDuration) {
-          return this.store.showMessage({ text: "Maximum duration is "+this.maximumDuration+" hours.", color: "red" })
-        }
-
-        this.step = this.step + 1
-      },
-      /**
-       * Goes to the previous step in the reservation process.
-       */
-      prevStep() {
-        if (this.step == 1) return
-        this.step = this.step - 1
-
-        // If going back to step 2 (select reservation duration), reset all selected containers, computers and hardware specs
-        if (this.step == 2) {
-          // Initialize duration defaults when step 2 becomes active
-          this.initializeDurationDefaultsIfNeeded()
-      
-          this.container = null
-          this.computer = null
-        }
-      },
-      /**
-       * Called when the user clicks the "Reserve now" button.
-       * Checks if there is enough hardware resources from current time + minimumHours
-       */
-       reserveNow() {
-        checkHardwareAvailability(dayjs().toISOString(), this.minimumDuration, this.store.user.loginToken).then(res => {
-          if (res !== null) {
-            return this.store.showMessage({ text: res, color: "red" })
-          }
-          this.reserveDate = dayjs().toISOString()
-          this.reserveType = "now"
-          this.reserveDurationDays = this.minimumDurationDays
-          this.reserveDurationHours = this.minimumDurationHours
-          this.nextStep()
-        })
+      reserveNow() {
+        if (this.fetchingComputers) return
+        this.reserveDate = dayjs().toISOString()
+        this.reserveType = "now"
+        this.fetchAvailableHardware()
       },
       /**
        * Called when a time slot is selected on the calendar.
-       * Checks if there is enough hardware resources in the selected time + minimumHours
+       * Sets the reservation date and fetches available hardware.
        * @param {Date} time The selected time slot
        */
       slotSelected(time) {
-        checkHardwareAvailability(time, this.minimumDuration, this.store.user.loginToken).then(res => {
-          if (res !== null) {
-            return this.store.showMessage({ text: res, color: "red" })
-          }
-          this.reserveDate = dayjs(time).toISOString()
-          this.reserveDurationDays = this.minimumDurationDays
-          this.reserveDurationHours = this.minimumDurationHours
-          this.nextStep()
-        })
+        if (this.fetchingComputers) return
+        this.reserveDate = dayjs(time).toISOString()
+        this.reserveType = "calendar"
+        this.fetchAvailableHardware()
       },
       /**
        * Called when the computer dropdown is changed.
@@ -809,7 +857,7 @@
           if (comp.computerId == currentComputerId) data = comp.hardwareSpecs
         })
         this.hardwareData = data
-        
+
         // Set default values for hardware specs
         let selectedHardwareSpecs = {}
         this.hardwareData.forEach((spec) => {
@@ -820,25 +868,26 @@
         // Set default values for selected GPUs
         this.selectedgpus = []
 
-        // Auto-scroll to the "Select Hardware" section
+        this.completedSections.hardware = true
+
+        // Auto-scroll to the "Configure Hardware" section
         try {
           this.$nextTick(() => {
             setTimeout(() => {
               const element = document.getElementById('select-hardware-section');
               if (element) {
-                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 48
+                const rect = element.getBoundingClientRect()
+                window.scrollTo({
+                  top: window.scrollY + rect.top - navbarHeight - 10,
+                  behavior: 'smooth'
+                })
               }
             }, 100);
           });
         } catch (error) {
           console.debug('Auto-scroll error:', error);
         }
-      },
-      /**
-       * Toggles the reservation calendar.
-       */
-      toggleReservationCalendar() {
-        this.showReservationCalendar = !this.showReservationCalendar
       },
       /**
        * Fetches all current and upcoming reservations from the server.
@@ -854,39 +903,44 @@
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
-          //console.log(response)
             // Success
             if (response.data.status == true) {
               _this.allReservations = response.data.data.reservations
             }
-            // Fail
             else {
               console.log("Failed getting reservations...")
-              //_this.store.showMessage({ text: "There was an error getting the reservations.", color: "red" })
             }
             _this.fetchingReservations = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              //_this.store.showMessage({ text: error.response.data.detail, color: "red" })
+              // Silently handle auth errors on reservation fetch
             }
             else {
               console.log(error)
-              //_this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.fetchingReservations = false
         });
       },
       /**
-       * Fetches all available hardware from the server.
+       * Fetches all available hardware from the server for the selected date and duration.
+       * On success, populates computers/containers and advances to the Container panel.
        */
       fetchAvailableHardware() {
         this.fetchingComputers = true
-        let _this = this
+        this.hardwareFetchError = null
+        // Clear downstream selections
+        this.container = null
         this.computer = null
-        let currentUser = this.store.user
+        this.hardwareData = null
+        this.selectedHardwareSpecs = {}
+        this.selectedgpus = []
+        this.completedSections.container = false
+        this.completedSections.hardware = false
 
+        let _this = this
+        let currentUser = this.store.user
         let duration = this.reserveDurationDays * 24 + this.reserveDurationHours
 
         axios({
@@ -896,45 +950,44 @@
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
-          //console.log(response)
             // Success
             if (response.data.status == true) {
               _this.allComputers = response.data.data.computers
               _this.allContainers = response.data.data.containers
-        
+
               let computers = []
               _this.allComputers.forEach((computer) => {
                 computers.push({ "value": computer.computerId, "text": computer.name })
               });
               _this.computers = computers
-              
+
               let containers = []
               _this.allContainers.forEach((container) => {
                 if (container.removed == true) return
                 if (!_this.isAdmin() && container.public == false) return
-                containers.push({ 
-                  "value": container.containerId, 
+                containers.push({
+                  "value": container.containerId,
                   "text": container.name,
-                  "isPublic": container.public 
+                  "isPublic": container.public
                 })
               });
-              
+
               // Sort containers: public first (alphabetically), then private (alphabetically)
               containers.sort((a, b) => {
                 if (a.isPublic === b.isPublic) {
-                  // Same visibility, sort by name
                   return a.text.localeCompare(b.text)
                 }
-                // Different visibility, public containers first
                 return b.isPublic - a.isPublic
               })
-              
+
               _this.containers = containers
-              _this.nextStep()
+              _this.hardwareFetched = true
+              _this.completedSections.time = true
+              _this.advanceToPanel(2) // Advance to Container panel
             }
             // Fail
             else {
-              //console.log("Failed getting hardware data...")
+              _this.hardwareFetchError = response.data.message
               _this.store.showMessage({ text: response.data.message, color: "red" })
             }
             _this.fetchingComputers = false
@@ -942,10 +995,12 @@
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+              _this.hardwareFetchError = error.response.data.detail
               _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
+              _this.hardwareFetchError = "Unknown error."
               _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.fetchingComputers = false
@@ -959,18 +1014,11 @@
         let _this = this
         let currentUser = this.store.user
         let computerId = this.computer
-        /*console.log("selected computerId: ", this.computer)
-        console.log("selected containerId: ", this.container)
-        console.log("Selected hardware specs", {...this.selectedHardwareSpecs})
-        console.log("Duration:", this.reserveDuration)*/
-        
+
         // Add GPUs to reservation
         this.selectedgpus.forEach((gpu) => {
           this.selectedHardwareSpecs[gpu] = 1
         })
-        
-        //console.log({...this.selectedHardwareSpecs})
-        //console.log({...this.selectedgpus})
 
         let duration = this.reserveDurationDays * 24 + this.reserveDurationHours
 
@@ -999,7 +1047,6 @@
             }
         })
         .then(function (response) {
-          //console.log(response)
             // Success
             if (response.data.status == true) {
               localStorage.setItem("justReserved", true)
@@ -1009,7 +1056,7 @@
             }
             // Fail
             else {
-              let msg = response && response.data && response.data.message ? response.data.message + " Please select less resources or go back and select another time." : "There was an error getting the hardware specs."
+              let msg = response && response.data && response.data.message ? response.data.message + " Try selecting fewer resources or a different time." : "There was an error creating the reservation."
               _this.store.showMessage({ text: msg, color: "red" })
               _this.refreshTip = true;
             }
@@ -1036,28 +1083,28 @@
         let hours = []
         let minHours = 0
         let maxHours = 23
-        
+
         // If at minimum days, start from minimum hours
         if (selectedDays === this.minimumDurationDays) {
           minHours = this.minimumDurationHours
         }
-        
+
         // If at maximum days, limit to maximum hours
         if (selectedDays === this.maximumDurationDays) {
           maxHours = this.maximumDurationHours
         }
-        
+
         // Special case: if we're at max days and max hours is 0, only allow 0 hours
         if (selectedDays === this.maximumDurationDays && this.maximumDurationHours === 0) {
           maxHours = 0
         }
-        
+
         for (let i = minHours; i <= maxHours; i++) {
           hours.push( { "text": i + " hours", "value": i } )
         }
-        
+
         this.reservableHours = hours
-        
+
         // Reset hour selection if current value is not in the new range or is null
         if (this.reserveDurationHours === null || this.reserveDurationHours < minHours || this.reserveDurationHours > maxHours) {
           this.reserveDurationHours = minHours
@@ -1068,11 +1115,11 @@
        */
       initializeDurationDefaults() {
         this.initializingDefaults = true
-        
+
         // Generate days dropdown from minimum to maximum
         let maxDays = this.maximumDurationDays
         let minDays = this.minimumDurationDays
-        
+
         let days = []
         for (let i = minDays; i <= maxDays; i++) {
           let text = i === 1 ? i + " day" : i + " days"
@@ -1082,28 +1129,15 @@
 
         // Generate initial hours dropdown first
         this.updateHoursDropdown(minDays)
-        
+
         // Then set initial default values to minimum allowed (this will trigger the watcher)
         this.reserveDurationDays = minDays
         this.reserveDurationHours = this.minimumDurationHours
-        
+
         // Use nextTick to ensure watchers complete before clearing the flag
         this.$nextTick(() => {
           this.initializingDefaults = false
         })
-      },
-      /**
-       * Initialize duration defaults only if they haven't been set yet and config is loaded
-       */
-      initializeDurationDefaultsIfNeeded() {
-        if (!this.store.configLoaded) {
-          return
-        }
-        
-        // Only set defaults if no values are currently selected
-        if (this.reserveDurationDays === null || this.reserveDurationHours === null) {
-          this.initializeDurationDefaults()
-        }
       },
       /**
        * Gets the container description for a specific container ID
@@ -1161,27 +1195,25 @@
       getFormattedHardwareSpecs(computerId) {
         let specs = this.getComputerHardwareById(computerId)
         if (!specs || specs.length === 0) return "No hardware specs available"
-        
+
         let formattedSpecs = []
-        
+
         // Group specs by type
         let gpuSpecs = specs.filter(spec => spec.type === "gpu")
         let otherSpecs = specs.filter(spec => spec.type !== "gpus" && spec.type !== "gpu").sort((a, b) => a.type.localeCompare(b.type))
-        
+
         // Add GPU info
         if (gpuSpecs.length > 0) {
-          // Count actual GPUs (number of GPU specs), not total reservable slots
           let gpuCount = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
           if (gpuCount > 0) {
             formattedSpecs.push(`${gpuCount} GPU${gpuCount > 1 ? 's' : ''}`)
           }
         }
-        
+
         // Add other specs (limit to first 2-3 most important ones)
         let prioritySpecs = otherSpecs.slice(0, 2)
         prioritySpecs.forEach(spec => {
           if (spec.maximumAmountForUser > 0) {
-            // Clean up the display format
             let displayName
             if (spec.type === "cpus") displayName = "CPUs"
             else if (spec.type === "memory") displayName = "RAM"
@@ -1191,7 +1223,7 @@
             formattedSpecs.push(`${spec.maximumAmountForUser} ${spec.format} ${displayName}`)
           }
         })
-        
+
         return formattedSpecs.length > 0 ? formattedSpecs.join(" • ") : "No resources available"
       },
       /**
@@ -1202,23 +1234,23 @@
       getComputerHardwareList(computerId) {
         let specs = this.getComputerHardwareById(computerId)
         if (!specs || specs.length === 0) return [{ id: 'none', text: 'No hardware specs available' }]
-        
+
         let hardwareList = []
-        
-        // Group specs by type - GPUs first, then others alphabetically (matching hardware selection order)
+
+        // Group specs by type - GPUs first, then others alphabetically
         let gpuSpecs = specs.filter(spec => spec.type === "gpu")
         let otherSpecs = specs.filter(spec => spec.type !== "gpus" && spec.type !== "gpu")
-        
-        // Always add GPUs first (matching the order in hardware selection)
+
+        // Always add GPUs first
         let gpuCount = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
-        hardwareList.push({ 
-          id: 'gpu', 
+        hardwareList.push({
+          id: 'gpu',
           text: `${gpuCount} GPU${gpuCount !== 1 ? 's' : ''}`
         })
-        
-        // Add other specs sorted alphabetically (matching hardwareDataNoGPUs method)
+
+        // Add other specs sorted alphabetically
         let sortedOtherSpecs = [...otherSpecs].sort((a, b) => a.type.localeCompare(b.type))
-        
+
         sortedOtherSpecs.forEach(spec => {
           let displayName
           let text
@@ -1236,20 +1268,27 @@
             displayName = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
             text = `${spec.maximumAmountForUser} ${spec.format} ${displayName}`
           }
-          
-          hardwareList.push({ 
-            id: spec.hardwareSpecId || spec.type, 
+
+          hardwareList.push({
+            id: spec.hardwareSpecId || spec.type,
             text: text
           })
         })
-        
+
         return hardwareList.length > 0 ? hardwareList : [{ id: 'none', text: 'No resources available' }]
       },
+      /**
+       * Refreshes the calendar reservations data.
+       */
       async refreshCalendarReservations() {
         if (this.$refs.calendarComponent) {
           await this.$refs.calendarComponent.refreshCalendarData();
         }
       },
+      /**
+       * Handles refreshed reservations from the calendar component.
+       * @param {Array} reservations Updated reservations array
+       */
       handleReservationsRefreshed(reservations) {
         this.allReservations = reservations;
       },
@@ -1269,7 +1308,7 @@
       calculateShmSizeGB() {
         const memorySpecId = this.getMemorySpecId();
         if (!memorySpecId || !this.selectedHardwareSpecs[memorySpecId]) return "0";
-        
+
         const memoryGB = this.selectedHardwareSpecs[memorySpecId];
         const shmGB = (memoryGB * this.shmSizePercent / 100).toFixed(1);
         return shmGB;
@@ -1281,33 +1320,92 @@
       calculateRamDiskSizeGB() {
         const memorySpecId = this.getMemorySpecId();
         if (!memorySpecId || !this.selectedHardwareSpecs[memorySpecId]) return "0";
-        
+
         const memoryGB = this.selectedHardwareSpecs[memorySpecId];
         const ramDiskGB = (memoryGB * this.ramDiskSizePercent / 100).toFixed(1);
         return ramDiskGB;
       }
     },
     computed: {
-      getContainerDescription() {
-        if (this.container) {
-          let container = this.allContainers.find(x => x.containerId == this.container)
-          if (container) return container.description
-          else return ""
-        }
-        else return ""
+      /** Summary text for the Duration panel when collapsed. */
+      durationSummary() {
+        if (this.reserveDurationDays === null && this.reserveDurationHours === null) return ''
+        let parts = []
+        if (this.reserveDurationDays > 0) parts.push(`${this.reserveDurationDays} day${this.reserveDurationDays !== 1 ? 's' : ''}`)
+        if (this.reserveDurationHours > 0) parts.push(`${this.reserveDurationHours} hour${this.reserveDurationHours !== 1 ? 's' : ''}`)
+        return parts.join(', ') || `${this.minimumDuration} hours`
       },
-      parsedTime() {
-        return dayjs(this.reserveDate).format("DD.MM.YYYY HH:mm")
+      /** Summary text for the Start Time panel when collapsed. Shows relative time + full date. */
+      parsedTimeSummary() {
+        if (!this.reserveDate) return ''
+        if (this.reserveType === 'now') return 'Immediately'
+        // Reference timeTick to force recomputation every 60 seconds
+        void this.timeTick
+        const relative = dayjs(this.reserveDate).fromNow()
+        const full = dayjs(this.reserveDate).format("DD.MM.YYYY HH:mm")
+        return `Starts ${relative} (${full})`
+      },
+      /** Summary text for the Container panel when collapsed. */
+      containerSummary() {
+        if (!this.container || !this.allContainers) return ''
+        let c = this.allContainers.find(x => x.containerId == this.container)
+        return c ? c.name : ''
+      },
+      /** Summary text for the Server & Hardware panel when collapsed. */
+      hardwareSummary() {
+        if (!this.computer || !this.hardwareData) return ''
+        let compName = ''
+        if (this.computers) {
+          let comp = this.computers.find(x => x.value === this.computer)
+          if (comp) compName = comp.text
+        }
+        let parts = []
+        if (this.selectedgpus.length > 0) {
+          parts.push(`${this.selectedgpus.length} GPU${this.selectedgpus.length !== 1 ? 's' : ''}`)
+        }
+        this.hardwareDataNoGPUs().forEach(spec => {
+          let val = this.selectedHardwareSpecs[spec.hardwareSpecId]
+          if (val !== undefined && val !== null) {
+            parts.push(`${val} ${spec.format} ${this.formatSpecType(spec.type)}`)
+          }
+        })
+        let hwPart = parts.join(', ')
+        return compName + (hwPart ? ' \u2022 ' + hwPart : '')
+      },
+      /** Summary text for the Advanced Settings panel when collapsed. */
+      advancedSettingsSummary() {
+        let parts = []
+        if (this.isLowPriority) parts.push('Low-priority')
+        if (this.reservationDescription && this.reservationDescription.trim()) parts.push(`"${this.reservationDescription.trim()}"`)
+        if (this.shmSizePercent !== 50) parts.push(`SHM ${this.shmSizePercent}%`)
+        if (this.ramDiskSizePercent > 0) parts.push(`RAM Disk ${this.ramDiskSizePercent}%`)
+        if (this.adminReserveUserEmail && this.adminReserveUserEmail.trim()) parts.push(`For: ${this.adminReserveUserEmail.trim()}`)
+        return parts.length > 0 ? parts.join(', ') : ''
+      },
+      /** Whether all required fields are filled to create a reservation. */
+      canCreateReservation() {
+        return this.completedSections.duration
+          && this.completedSections.time
+          && this.hardwareFetched
+          && this.container !== null
+          && this.computer !== null
+          && Object.keys(this.selectedHardwareSpecs).length > 0
+      },
+      /** Message explaining what the user still needs to complete. */
+      reservationIncompleteMessage() {
+        if (!this.completedSections.duration) return 'Select a duration to begin.'
+        if (!this.completedSections.time || !this.hardwareFetched) return 'Choose a start time and check availability.'
+        if (!this.container) return 'Select a container image.'
+        if (!this.computer) return 'Select a server and configure hardware.'
+        return ''
       },
       globalTimezone() {
         return this.store.appTimezone
       },
       minimumDuration() {
-        // Get minimum duration from user's role-based limits in store
         return this.store.userMinDuration || 1
       },
       maximumDuration() {
-        // Get maximum duration from user's role-based limits in store
         return this.store.userMaxDuration || 48
       },
       minimumDurationDays() {
@@ -1335,7 +1433,7 @@
         if (this.initializingDefaults) {
           return
         }
-        
+
         if (newDays !== null && newDays !== undefined) {
           this.updateHoursDropdown(newDays)
         }
@@ -1349,22 +1447,40 @@
         }
       },
       /**
-       * Watch for step changes to initialize defaults when step 2 becomes active
+       * Scroll newly opened panel into view
        */
-      step(newStep) {
-        if (newStep === 2) {
-          this.initializeDurationDefaultsIfNeeded()
+      activePanel(newPanel) {
+        if (newPanel !== undefined && newPanel !== null) {
+          // Wait for the expansion panel open/close animation to fully complete
+          setTimeout(() => {
+            const panels = this.$el.querySelectorAll('.v-expansion-panel')
+            if (panels[newPanel]) {
+              // Account for the fixed navbar height (68px) plus a small margin
+              const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 68
+              const rect = panels[newPanel].getBoundingClientRect()
+              window.scrollTo({
+                top: window.scrollY + rect.top - navbarHeight + 10,
+                behavior: 'smooth'
+              })
+            }
+          }, 400)
         }
-      },
+      }
     }
   }
 </script>
 
 <style scoped lang="scss">
   h2 {
-    margin-bottom: 10px;
+    margin-bottom: 7px;
   }
-  
+
+  .panel-description {
+    margin-top: 0px;
+    margin-bottom: 30px;
+    color: gray;
+  }
+
   .spec-row {
     margin-bottom: 10px;
   }
@@ -1407,5 +1523,26 @@
 
   .v-expansion-panel::before {
     box-shadow: none !important;
+  }
+
+  /* Expansion panel title styling */
+  :deep(.v-expansion-panel-title) {
+    padding: 18px 24px !important;
+    font-size: 16px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+
+  :deep(.v-expansion-panel-text__wrapper) {
+    padding: 16px 24px 24px !important;
+  }
+
+  :deep(.v-expansion-panel--disabled) {
+    opacity: 0.5;
+  }
+
+  .panel-title-content {
+    flex: 1;
+    text-align: left;
   }
 </style>

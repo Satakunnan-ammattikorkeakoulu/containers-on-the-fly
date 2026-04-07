@@ -42,7 +42,7 @@
             v-if="hardwareFetched"
             type="info" variant="tonal" density="compact" class="mb-4 mx-auto text-left" style="max-width: 500px;"
           >
-            Changing the duration will require re-checking hardware availability.
+            Changing the duration will reset your selections and require re-checking hardware availability.
           </v-alert>
           <v-row justify="center">
             <v-col cols="12" sm="6" md="4" lg="3" style="min-width: 320px">
@@ -376,6 +376,14 @@
                 </v-slider>
               </v-col>
             </v-row>
+            <!-- Review & Create button -->
+            <v-row class="mt-6 mb-2" justify="center">
+              <v-col cols="12" class="text-center">
+                <v-btn color="primary" size="large" @click="reviewReservation">
+                  Review Reservation
+                </v-btn>
+              </v-col>
+            </v-row>
           </div>
         </v-expansion-panel-text>
       </v-expansion-panel>
@@ -413,24 +421,6 @@
                 :rules="[rules.maxLength50]"
                 maxlength="50">
               </v-text-field>
-            </v-col>
-          </v-row>
-
-          <!-- Low-Priority Reservation -->
-          <v-row style="margin-bottom: 20px;">
-            <v-col cols="12" md="6" style="margin: 0 auto; padding: 0 40px;">
-              <h3 class="text-center">Low-Priority Reservation</h3>
-              <p class="text-center" style="color: gray; font-size: 15px;">
-                Low-priority reservations may be paused when resources are needed by other users,
-                and automatically resumed when resources become available. Save your work to mounted volumes.
-              </p>
-              <div class="d-flex justify-center">
-                <v-switch
-                  v-model="isLowPriority"
-                  color="warning"
-                  label="Make reservation low-priority"
-                ></v-switch>
-              </div>
             </v-col>
           </v-row>
 
@@ -504,36 +494,52 @@
               ></v-text-field>
             </v-col>
           </v-row>
+
+          <!-- Low-Priority Reservation -->
+          <v-row style="margin-top: 20px;">
+            <v-col cols="12" md="6" style="padding: 0 40px;">
+              <h3>Low-Priority Reservation</h3>
+              <p style="color: gray; font-size: 15px;">
+                Low-priority reservations may be paused when resources are needed by other users,
+                and automatically resumed when resources become available. Save your work to mounted volumes.
+              </p>
+              <div class="d-flex justify-center">
+                <v-switch
+                  v-model="isLowPriority"
+                  color="warning"
+                  label="Make reservation low-priority"
+                ></v-switch>
+              </div>
+            </v-col>
+          </v-row>
         </v-expansion-panel-text>
       </v-expansion-panel>
 
     </v-expansion-panels>
 
-    <!-- Create Reservation Section -->
-    <v-row>
-      <v-col cols="12">
+    <!-- Review & Create Card (visible when all steps complete and panels collapsed) -->
+    <v-row v-if="readyToCreate && (activePanel == null || activePanel === 4)" justify="center" class="mt-4">
+      <v-col cols="12" sm="10" md="8" lg="6">
         <!-- Notification of depleted resources -->
-        <v-row v-if="refreshTip" justify="center">
-          <v-col cols="12" sm="8" md="6">
-            <v-alert class="refresh-tip" color="info" title="Information">
-              <v-btn style="margin-bottom: 10px;" @click="refreshHardware">Refresh Hardware Data</v-btn>
-              <p>If there were not enough resources for reservation, click the button above to refresh the hardware data.</p>
-            </v-alert>
-          </v-col>
-        </v-row>
+        <v-alert v-if="refreshTip" color="info" title="Information" class="mb-4">
+          <v-btn style="margin-bottom: 10px;" @click="refreshHardware">Refresh Hardware Data</v-btn>
+          <p>If there were not enough resources for reservation, click the button above to refresh the hardware data.</p>
+        </v-alert>
 
-        <v-btn
-          color="primary"
-          size="large"
-          @click="submitReservation"
-          :disabled="!canCreateReservation || isSubmittingReservation"
-        >
-          Create Reservation
-        </v-btn>
-        <Loading v-if="isSubmittingReservation" />
-        <p v-if="!canCreateReservation && !isSubmittingReservation" class="text-medium-emphasis mt-2" style="font-size: 14px;">
-          {{ reservationIncompleteMessage }}
-        </p>
+        <v-card class="pa-6 text-center">
+          <p class="text-medium-emphasis mb-4" style="font-size: 14px;">
+            Review your selections above. Expand any section to make changes, or adjust <strong>Advanced Settings</strong>. When ready, click below to create your reservation.
+          </p>
+          <v-btn
+            color="primary"
+            size="large"
+            @click="submitReservation"
+            :disabled="isSubmittingReservation"
+          >
+            Create Reservation
+          </v-btn>
+          <Loading v-if="isSubmittingReservation" />
+        </v-card>
       </v-col>
     </v-row>
 
@@ -678,6 +684,24 @@
         })
       },
       /**
+       * Collapses all panels and scrolls to the top so the user can review
+       * their selections via the summary chips before creating the reservation.
+       */
+      reviewReservation() {
+        this.activePanel = null
+        this.$nextTick(() => {
+          const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 48
+          const target = this.$el.querySelector('.v-expansion-panels')
+          if (target) {
+            const rect = target.getBoundingClientRect()
+            window.scrollTo({
+              top: window.scrollY + rect.top - navbarHeight + 10,
+              behavior: 'smooth'
+            })
+          }
+        })
+      },
+      /**
        * Clears all hardware-dependent state when duration or time changes.
        * Called when the user confirms a changed duration or re-selects a time.
        */
@@ -713,7 +737,12 @@
       selectContainer(containerValue) {
         this.container = containerValue
         this.completedSections.container = true
-        this.advanceToPanel(3)
+        if (!this.completedSections.hardware) {
+          this.advanceToPanel(3)
+        } else {
+          // Hardware already configured — collapse panels and scroll to review card
+          this.reviewReservation()
+        }
       },
       /**
        * Checks if user is admin.
@@ -1391,14 +1420,11 @@
           && this.computer !== null
           && Object.keys(this.selectedHardwareSpecs).length > 0
       },
-      /** Message explaining what the user still needs to complete. */
-      reservationIncompleteMessage() {
-        if (!this.completedSections.duration) return 'Select a duration to begin.'
-        if (!this.completedSections.time || !this.hardwareFetched) return 'Choose a start time and check availability.'
-        if (!this.container) return 'Select a container image.'
-        if (!this.computer) return 'Select a server and configure hardware.'
-        return ''
+      /** Whether the review card should be visible (all steps done). */
+      readyToCreate() {
+        return this.canCreateReservation
       },
+      /** Message explaining what the user still needs to complete. */
       globalTimezone() {
         return this.store.appTimezone
       },

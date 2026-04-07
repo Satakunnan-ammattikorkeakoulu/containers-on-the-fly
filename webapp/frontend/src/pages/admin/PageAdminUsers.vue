@@ -117,6 +117,8 @@
             <li>Role assignments</li>
           </ul>
 
+          <p class="mb-3"><strong>Note:</strong> Files stored in the user's mounts (if any) are <strong>not</strong> automatically removed and must be deleted manually.</p>
+
           <p class="text-muted mb-6">This action cannot be undone.</p>
 
           <v-text-field

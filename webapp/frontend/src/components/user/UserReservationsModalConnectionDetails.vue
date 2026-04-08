@@ -10,65 +10,79 @@
 
           <!-- SSH Connection -->
           <div v-if="details.sshPort">
-            <div class="d-flex align-center mb-5 mt-2">
-              <v-icon class="mr-2" size="small">mdi-console</v-icon>
-              <span class="text-subtitle-1 font-weight-medium">SSH Connection</span>
+
+            <!-- Connection method toggle -->
+            <div class="text-body-2 text-medium-emphasis mb-2 mt-2">How do you want to connect?</div>
+            <div class="d-flex mb-4">
+              <v-btn
+                :variant="connectionMethod === 'vscode' ? 'flat' : 'outlined'"
+                :color="connectionMethod === 'vscode' ? 'primary' : undefined"
+                density="compact"
+                class="flex-grow-1"
+                @click="connectionMethod = 'vscode'"
+              >
+                <v-icon start size="small">mdi-microsoft-visual-studio-code</v-icon>
+                VS Code
+              </v-btn>
+              <v-btn
+                :variant="connectionMethod === 'terminal' ? 'flat' : 'outlined'"
+                :color="connectionMethod === 'terminal' ? 'primary' : undefined"
+                density="compact"
+                class="flex-grow-1 ml-2"
+                @click="connectionMethod = 'terminal'"
+              >
+                <v-icon start size="small">mdi-console</v-icon>
+                Terminal
+              </v-btn>
             </div>
 
-            <v-text-field
-              :model-value="vscodeConnectionString"
-              label="VS Code (Remote SSH)"
-              prepend-inner-icon="mdi-microsoft-visual-studio-code"
-              readonly
-              variant="outlined"
-              density="compact"
-              class="mb-2"
-            >
-              <template v-slot:append-inner>
-                <v-icon size="small" class="copy-icon" @click="copyToClipboard(vscodeConnectionString, 'VS Code connection string')">mdi-content-copy</v-icon>
-              </template>
-            </v-text-field>
-
-            <v-text-field
-              :model-value="sshCommand"
-              label="Terminal Command"
-              prepend-inner-icon="mdi-console"
-              readonly
-              variant="outlined"
-              density="compact"
-              class="mb-2"
-            >
-              <template v-slot:append-inner>
-                <v-icon size="small" class="copy-icon" @click="copyToClipboard(sshCommand, 'SSH command')">mdi-content-copy</v-icon>
-              </template>
-            </v-text-field>
-
-            <v-text-field
-              :model-value="details.sshPassword"
-              label="SSH Password"
-              prepend-inner-icon="mdi-key-variant"
-              readonly
-              variant="outlined"
-              density="compact"
-              class="mb-2"
-            >
-              <template v-slot:append-inner>
-                <v-icon size="small" class="copy-icon" @click="copyToClipboard(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
-              </template>
-            </v-text-field>
-
-            <v-alert v-if="details.hasSshPublicKey" type="info" variant="tonal" density="compact" class="mt-1" style="margin-bottom: 30px;">
-              Your SSH public key has been deployed to this container. You can also connect without a password.
-            </v-alert>
-            <p v-else class="text-medium-emphasis" style="margin-top: -4px; margin-bottom: 30px; font-size: 13px;">
-              <v-icon size="x-small" class="mr-1">mdi-information-outline</v-icon>
-              <v-tooltip location="bottom" max-width="300">
-                <template v-slot:activator="{ props }">
-                  <a v-bind="props" class="text-caption" style="cursor: pointer; color: inherit;">Enable passwordless SSH login?</a>
+            <!-- Connection string card -->
+            <v-card variant="tonal" color="surface-variant" class="pa-4 mb-5">
+              <div class="text-body-2 text-medium-emphasis mb-3">
+                <template v-if="connectionMethod === 'vscode'">
+                  Open the <strong>Remote SSH</strong> extension and connect to
                 </template>
-                <span>You can add public SSH key in your user profile to connect to containers without entering a password. The key will be automatically deployed to all future reservations.</span>
-              </v-tooltip>
-            </p>
+                <template v-else>
+                  Run this command in your terminal
+                </template>
+              </div>
+              <div class="d-flex align-center justify-space-between connection-string-box pa-3 rounded">
+                <code class="text-body-1">{{ connectionMethod === 'vscode' ? vscodeConnectionString : sshCommand }}</code>
+                <v-icon
+                  size="small"
+                  class="copy-icon ml-3"
+                  @click="copyToClipboard(
+                    connectionMethod === 'vscode' ? vscodeConnectionString : sshCommand,
+                    connectionMethod === 'vscode' ? 'VS Code connection string' : 'SSH command'
+                  )"
+                >mdi-content-copy</v-icon>
+              </div>
+
+              <v-divider class="my-4"></v-divider>
+
+              <!-- Password -->
+              <div class="text-body-2 text-medium-emphasis mb-3">
+                <v-icon size="small" class="mr-1">mdi-key-variant</v-icon>
+                When prompted, enter this password
+              </div>
+              <div class="d-flex align-center justify-space-between connection-string-box pa-3 rounded">
+                <code class="text-body-1">{{ details.sshPassword }}</code>
+                <v-icon size="small" class="copy-icon ml-3" @click="copyToClipboard(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
+              </div>
+
+              <v-alert v-if="details.hasSshPublicKey" type="info" variant="tonal" density="compact" class="mt-4">
+                Your SSH public key has been deployed to this container. You can also connect without a password.
+              </v-alert>
+              <p v-else class="text-medium-emphasis" style="margin-top: 12px; font-size: 13px;">
+                <v-icon size="x-small" class="mr-1">mdi-information-outline</v-icon>
+                <v-tooltip location="bottom" max-width="300">
+                  <template v-slot:activator="{ props }">
+                    <a v-bind="props" class="text-caption" style="cursor: pointer; color: inherit;">Enable passwordless SSH login?</a>
+                  </template>
+                  <span>You can add public SSH key in your user profile to connect to containers without entering a password. The key will be automatically deployed to all future reservations.</span>
+                </v-tooltip>
+              </p>
+            </v-card>
           </div>
 
           <!-- Collapsible sections -->
@@ -257,6 +271,7 @@
       details: null,
       connectionText: "",
       isLoading: true,
+      connectionMethod: "vscode",
     }),
     computed: {
       containerUsername() {
@@ -326,5 +341,10 @@
     &:hover {
       opacity: 1;
     }
+  }
+  .connection-string-box {
+    background: rgba(var(--v-theme-on-surface), 0.05);
+    border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+    font-family: monospace;
   }
 </style>

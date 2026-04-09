@@ -12,7 +12,30 @@ from helpers.settings_handler import get_setting
 from helpers.logger import log
 
 
-def generate_connection_text(image, ip, ports, password, include_email_details, non_critical_errors, end_date=None, username="user"):
+def _render_port_url(port_type, ip, outside_port):
+    """Render a connection URL based on the port type.
+
+    Args:
+        port_type: Port type string ("HTTP", "HTTPS", "VNC", or None/other for plain TCP).
+        ip: IP address of the host machine.
+        outside_port: External port number.
+
+    Returns:
+        str: Formatted URL or address string.
+    """
+    if port_type == "HTTP":
+        return f"http://{ip}:{outside_port}"
+    elif port_type == "HTTPS":
+        return f"https://{ip}:{outside_port}"
+    elif port_type == "VNC":
+        return f"vnc://{ip}:{outside_port}"
+    else:
+        return f"{ip}:{outside_port}"
+
+
+def generate_connection_text(image, ip, ports, password, include_email_details,
+                             non_critical_errors, end_date=None, username="user",
+                             ssh_methods=None, primary_connection_port_id=None):
     """Generate connection details text for a started container.
 
     Builds a formatted text block containing SSH connection instructions,
@@ -24,8 +47,8 @@ def generate_connection_text(image, ip, ports, password, include_email_details, 
         image: Name of the Docker image used to start the container.
         ip: IP address of the host machine running the container.
         ports: List of port dictionaries, each containing serviceName,
-            localPort, and outsidePort keys. The SSH port entry is
-            extracted and formatted specially.
+            localPort, outsidePort, and optionally portType keys. The
+            SSH port entry is extracted and formatted specially.
         password: Password for the container's user account.
         include_email_details: Whether to include email-specific text
             such as contact info and no-reply notice.
@@ -34,6 +57,10 @@ def generate_connection_text(image, ip, ports, password, include_email_details, 
         end_date: Optional datetime when the reservation ends. Converted
             to the configured timezone for display.
         username: Container username for SSH connection strings.
+        ssh_methods: Optional list of SSH connection method dicts. If None,
+            fetched from system settings.
+        primary_connection_port_id: Optional ContainerPort ID of the primary
+            connection method. None means SSH is primary.
 
     Returns:
         str: Formatted connection details text.
@@ -45,34 +72,60 @@ def generate_connection_text(image, ip, ports, password, include_email_details, 
 
     linesep = os.linesep
 
+    # Load SSH methods from settings if not provided
+    if ssh_methods is None:
+        try:
+            ssh_methods = get_setting('connection.sshMethods')
+        except Exception:
+            ssh_methods = None
+    if not isinstance(ssh_methods, list) or len(ssh_methods) == 0:
+        ssh_methods = [
+            {"id": "vscode", "name": "VS Code", "template": "{username}@{ip}:{port}", "helpText": "Open the Remote SSH extension and connect to"},
+            {"id": "terminal", "name": "Terminal", "template": "ssh {username}@{ip} -p {port}", "helpText": "Run this command in your terminal"}
+        ]
+
     help_text = ""
     if include_email_details:
         contact_email = get_setting('email.contactEmail')
         if contact_email:
             help_text = f"If you need help, contact: {contact_email}{linesep}{linesep}"
 
+    # Find and extract SSH port
     help_text_ssh = ""
     found_item = None
     for port in ports:
-        if (port["serviceName"] == "SSH"):
+        if port.get("portType") == "SSH":
             found_item = port
-            help_text_ssh += f"Connecting with Visual Studio Code (SSH):{linesep}"
-            help_text_ssh += f"{username}@{ip}:{port['outsidePort']}"
-            help_text_ssh += linesep + linesep
-            help_text_ssh += f"Connecting from the terminal (SSH):{linesep}"
-            help_text_ssh += f"ssh {username}@{ip} -p {port['outsidePort']}"
-            help_text_ssh += linesep + linesep
-            help_text_ssh += f"Password for the SSH connection:" + linesep
+            for method in ssh_methods:
+                rendered = method["template"].replace("{username}", username).replace("{ip}", ip).replace("{port}", str(port['outsidePort']))
+                help_text_ssh += f"{method['name']}{linesep}"
+                help_text_ssh += f"{method['helpText']}{linesep}"
+                help_text_ssh += f"{rendered}"
+                help_text_ssh += linesep + linesep
+            help_text_ssh += f"Password for the SSH connection:{linesep}"
             help_text_ssh += f"{password}"
             help_text_ssh += linesep
     if found_item is not None:
         ports.remove(found_item)
 
+    # Find primary non-SSH port if set
+    help_text_primary = ""
+    if primary_connection_port_id is not None:
+        for port in list(ports):
+            if port.get("containerPortId") == primary_connection_port_id:
+                url = _render_port_url(port.get("portType"), ip, port["outsidePort"])
+                help_text_primary += f"Primary service — {port['serviceName']}:{linesep}"
+                help_text_primary += f"{url}{linesep}{linesep}"
+                ports.remove(port)
+                break
+
+    # Render remaining other ports
     help_text_other = ""
     if len(ports) > 0:
         help_text_other += f"{linesep}"
         for port in ports:
-            help_text_other += f"Service {port['serviceName']} is available through: {ip}:{port['outsidePort']} {linesep}"
+            url = _render_port_url(port.get("portType"), ip, port["outsidePort"])
+            help_text_other += f"Service {port['serviceName']} (local port {port['localPort']}): {url}{linesep}"
         help_text_other += f"{linesep}-----{linesep}"
 
     general_text = ""
@@ -104,15 +157,20 @@ def generate_connection_text(image, ip, ports, password, include_email_details, 
     if include_email_details:
         no_reply = f"This is a noreply email account. Please do not reply to this email.{linesep}{linesep}"
 
-    # Body text
+    # Add separator before instructions if there are any
+    general_text_block = ""
+    if general_text:
+        general_text_block = f"-----{linesep}{linesep}{general_text}"
+
+    # Build body — primary service first (if non-SSH), then SSH, then other services
     body = f"""
 {start_message}
-{help_text_ssh}
+{help_text_primary}{help_text_ssh}
 -----
 {help_text_other}
-IP address of the machine: {ip}
+Address of the machine: {ip}
 
-{general_text}
+{general_text_block}
 
 {no_reply}{help_text}{non_critical_errors}
 """
@@ -120,7 +178,9 @@ IP address of the machine: {ip}
     return body
 
 
-def send_container_started_email(user_email, image_name, computer_ip, ports, password, non_critical_errors, end_date, username="user"):
+def send_container_started_email(user_email, image_name, computer_ip, ports, password,
+                                 non_critical_errors, end_date, username="user",
+                                 ssh_methods=None, primary_connection_port_id=None):
     """Send an email notification when a container starts successfully.
 
     Generates connection details text and emails it to the user. Does
@@ -131,18 +191,22 @@ def send_container_started_email(user_email, image_name, computer_ip, ports, pas
         image_name: Name of the Docker image that was started.
         computer_ip: IP address of the host machine.
         ports: List of port dictionaries with serviceName, localPort,
-            and outsidePort.
+            outsidePort, and optionally portType.
         password: SSH password for the container.
         non_critical_errors: Any non-critical error messages to include.
         end_date: Datetime when the reservation ends.
         username: Container username for SSH connection strings.
+        ssh_methods: Optional list of SSH method dicts from system settings.
+        primary_connection_port_id: Optional primary ContainerPort ID.
     """
     if not get_setting('email.sendEmail'):
         return
 
     body = generate_connection_text(
         image_name, computer_ip, ports, password,
-        True, non_critical_errors, end_date, username
+        True, non_critical_errors, end_date, username,
+        ssh_methods=ssh_methods,
+        primary_connection_port_id=primary_connection_port_id
     )
     send_email(user_email, "AI Server is ready to use!", body)
 
@@ -194,7 +258,9 @@ def send_container_paused_email(user_email, image_name, computer_name, reservati
     send_email(user_email, "Low-priority container paused", body)
 
 
-def send_container_resumed_email(user_email, image_name, computer_ip, ports, password, end_date, username="user"):
+def send_container_resumed_email(user_email, image_name, computer_ip, ports, password,
+                                 end_date, username="user",
+                                 ssh_methods=None, primary_connection_port_id=None):
     """Send an email notification when a paused low-priority container resumes.
 
     Notifies the user that their container has been restarted with new
@@ -205,17 +271,21 @@ def send_container_resumed_email(user_email, image_name, computer_ip, ports, pas
         image_name: Name of the Docker image that was resumed.
         computer_ip: IP address of the host machine.
         ports: List of port dictionaries with serviceName, localPort,
-            and outsidePort.
+            outsidePort, and optionally portType.
         password: New SSH password for the container.
         end_date: Datetime when the reservation ends.
         username: Container username for SSH connection strings.
+        ssh_methods: Optional list of SSH method dicts from system settings.
+        primary_connection_port_id: Optional primary ContainerPort ID.
     """
     if not get_setting('email.sendEmail'):
         return
 
     body = generate_connection_text(
         image_name, computer_ip, ports, password,
-        True, "Your low-priority container has been resumed.", end_date, username
+        True, "Your low-priority container has been resumed.", end_date, username,
+        ssh_methods=ssh_methods,
+        primary_connection_port_id=primary_connection_port_id
     )
     send_email(user_email, "Low-priority container resumed", body)
 

@@ -419,26 +419,35 @@ def report_started(reservation_id: int, data, computer_id: int):
         email_username = container_obj.containerUsername or "user"
         log_user_id = reservation.userId
 
-        # Build port list for email
+        # Build port list for email (include portType for type-aware rendering)
         email_ports = []
         for port in data.ports:
-            # Find the service name from the container's port definitions
+            # Find the service name, local port, and port type from the container's port definitions
             service_name = "Unknown"
+            local_port = None
+            port_type = None
             for cp in container_obj.containerPorts:
                 if cp.containerPortId == port.containerPortId:
                     service_name = cp.serviceName
+                    local_port = cp.port
+                    port_type = cp.portType
                     break
             email_ports.append({
                 "serviceName": service_name,
-                "localPort": None,
+                "localPort": local_port,
                 "outsidePort": port.outsidePort,
+                "portType": port_type,
+                "containerPortId": port.containerPortId,
             })
+
+        email_primary_port_id = container_obj.primaryConnectionPortId
 
     # Send notification email outside session to avoid holding DB connection during SMTP I/O
     send_container_started_email(
         email_recipient, email_image_name, email_computer_ip,
         email_ports, data.sshPassword, data.nonCriticalErrors,
         email_end_date, email_username,
+        primary_connection_port_id=email_primary_port_id,
     )
 
     log.info(f"Container started for reservation {reservation_id}, user={log_user_id}, docker_name={data.containerDockerName}")

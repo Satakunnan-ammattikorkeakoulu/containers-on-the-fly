@@ -14,8 +14,8 @@ class TestGenerateConnectionText:
 
     def _make_ports(self):
         return [
-            {"serviceName": "SSH", "localPort": 22, "outsidePort": 2001},
-            {"serviceName": "Jupyter", "localPort": 8888, "outsidePort": 2002},
+            {"serviceName": "SSH", "localPort": 22, "outsidePort": 2001, "portType": "SSH"},
+            {"serviceName": "Jupyter", "localPort": 8888, "outsidePort": 2002, "portType": None},
         ]
 
     @patch("helpers.email_notifications.get_setting", return_value=None)
@@ -34,32 +34,32 @@ class TestGenerateConnectionText:
 
     @patch("helpers.email_notifications.get_setting", return_value=None)
     def test_password_included(self, mock_setting):
-        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001}]
+        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001, "portType": "SSH"}]
         text = generate_connection_text("ubuntu", "10.0.0.1", ports, "s3cret", False, "")
         assert "s3cret" in text
 
     @patch("helpers.email_notifications.get_setting", return_value="admin@test.com")
     def test_email_details_included(self, mock_setting):
-        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001}]
+        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001, "portType": "SSH"}]
         text = generate_connection_text("ubuntu", "10.0.0.1", ports, "pass", True, "")
         assert "ready to use" in text
         assert "noreply" in text
 
     @patch("helpers.email_notifications.get_setting", return_value=None)
     def test_email_details_excluded(self, mock_setting):
-        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001}]
+        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001, "portType": "SSH"}]
         text = generate_connection_text("ubuntu", "10.0.0.1", ports, "pass", False, "")
         assert "noreply" not in text
 
     @patch("helpers.email_notifications.get_setting", return_value=None)
     def test_non_critical_errors_appended(self, mock_setting):
-        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001}]
+        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001, "portType": "SSH"}]
         text = generate_connection_text("ubuntu", "10.0.0.1", ports, "pass", False, "Warning: something")
         assert "Warning: something" in text
 
     @patch("helpers.email_notifications.get_setting", return_value=None)
     def test_custom_username(self, mock_setting):
-        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001}]
+        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001, "portType": "SSH"}]
         text = generate_connection_text("ubuntu", "10.0.0.1", ports, "pass", False, "", username="student")
         assert "student@10.0.0.1" in text
 
@@ -76,7 +76,7 @@ class TestSendContainerStartedEmail:
     @patch("helpers.email_notifications.get_setting")
     def test_sends_when_enabled(self, mock_setting, mock_send):
         mock_setting.return_value = True
-        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001}]
+        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001, "portType": "SSH"}]
         send_container_started_email("user@test.com", "ubuntu", "10.0.0.1", ports, "pass", "", None)
         mock_send.assert_called_once()
         assert mock_send.call_args[0][0] == "user@test.com"

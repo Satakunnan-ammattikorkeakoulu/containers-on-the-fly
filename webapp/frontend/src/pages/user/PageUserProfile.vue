@@ -202,29 +202,41 @@
       <v-card class="pa-4">
         <v-card-title class="text-h6">SSH Configuration Guide</v-card-title>
         <v-card-text>
-          <p class="mb-4">Add the following to your <code>~/.ssh/config</code> file to enable key-based authentication with reservations:</p>
+          <p class="mb-4">Add the following to your <code>~/.ssh/config</code> file to enable key-based authentication with reservations</p>
 
-          <div class="ssh-config-block mb-2">
-            <pre class="ssh-config-pre">Host aiserver
+          <div v-if="sshConfigComputers.length > 0" class="ssh-config-block mb-2">
+            <pre class="ssh-config-pre">{{ generatedSshConfig }}</pre>
+            <v-tooltip text="Copy to clipboard" location="top">
+              <template v-slot:activator="{ props }">
+                <v-btn
+                  v-bind="props"
+                  icon
+                  size="x-small"
+                  variant="text"
+                  class="copy-btn"
+                  @click="copySshConfig"
+                >
+                  <v-icon size="small">mdi-content-copy</v-icon>
+                </v-btn>
+              </template>
+            </v-tooltip>
+          </div>
+          <div v-else-if="sshConfigLoading" class="text-center my-4">
+            <v-progress-circular indeterminate size="24" class="mr-2"></v-progress-circular>
+            Loading servers...
+          </div>
+          <div v-else class="ssh-config-block mb-2">
+            <pre class="ssh-config-pre">Host myserver
     HostName SERVER_ADDRESS
     IdentityFile ~/.ssh/id_rsa</pre>
-            <v-btn
-              icon
-              size="x-small"
-              variant="text"
-              class="copy-btn"
-              @click="copySshConfig"
-            >
-              <v-icon size="small">mdi-content-copy</v-icon>
-            </v-btn>
           </div>
 
           <v-alert type="info" variant="tonal" density="compact" class="mb-4">
-            <div class="mb-1"><strong>Host</strong> — a nickname you choose for this connection (e.g. "aiserver")</div>
-            <div class="mb-1"><strong>HostName</strong> — the server address, shown in your reservation connection details</div>
+            <div class="mb-1"><strong>Host</strong> — a nickname you choose for this connection</div>
+            <div class="mb-1"><strong>HostName</strong> — the server address</div>
             <div class="mb-1"><strong>IdentityFile</strong> — path to your private key (matches the public key you added above)</div>
+            <div class="mt-2">If servers are added or their addresses change, you will need to update this configuration.</div>
           </v-alert>
-
 
         </v-card-text>
         <v-card-actions>
@@ -272,6 +284,8 @@ export default {
       sshPublicKey: '',
       sshKeyLoading: false,
       sshConfigDialog: false,
+      sshConfigComputers: [],
+      sshConfigLoading: false,
       startScriptPath: '',
       stopScriptPath: '',
       scriptPathLoading: false,
@@ -294,6 +308,21 @@ export default {
     },
     userRoles() {
       return this.store.user?.roles || []
+    },
+    /** Generates a complete SSH config with a Host block per server. */
+    generatedSshConfig() {
+      if (this.sshConfigComputers.length === 0) return ''
+      return '# Containers on the Fly — SSH passwordless connections\n' +
+        this.sshConfigComputers.map(c =>
+          `Host ${c.name}\n    HostName ${c.ip}\n    IdentityFile ~/.ssh/id_rsa`
+        ).join('\n\n')
+    }
+  },
+  watch: {
+    sshConfigDialog(open) {
+      if (open && this.sshConfigComputers.length === 0) {
+        this.loadSshConfigComputers()
+      }
     }
   },
   mounted() {
@@ -549,9 +578,26 @@ export default {
       await this.updateScriptPaths()
     },
     copySshConfig() {
-      const config = `Host aiserver\n    HostName SERVER_ADDRESS\n    IdentityFile ~/.ssh/id_rsa`;
-      navigator.clipboard.writeText(config);
+      navigator.clipboard.writeText(this.generatedSshConfig);
       this.store.showMessage({ text: 'SSH config copied to clipboard', color: 'green' });
+    },
+    async loadSshConfigComputers() {
+      const currentUser = this.store.user
+      if (!currentUser || !currentUser.loginToken) return
+
+      this.sshConfigLoading = true
+      try {
+        const response = await axios.get(this.$appSettings.APIServer.reservation.get_public_computers, {
+          headers: { 'Authorization': `Bearer ${currentUser.loginToken}` }
+        })
+        if (response.data.status) {
+          this.sshConfigComputers = response.data.data
+        }
+      } catch (error) {
+        console.error('Error loading computers:', error)
+      } finally {
+        this.sshConfigLoading = false
+      }
     }
   }
 }
@@ -564,15 +610,17 @@ export default {
 
 .ssh-config-block {
   position: relative;
-  background: #1e1e1e;
-  border-radius: 4px;
-  padding: 16px;
+  background: #0d1117;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  padding: 20px;
 }
 
 .ssh-config-pre {
-  font-family: monospace;
-  font-size: 14px;
-  color: #fff;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e6edf3;
   margin: 0;
   white-space: pre;
 }

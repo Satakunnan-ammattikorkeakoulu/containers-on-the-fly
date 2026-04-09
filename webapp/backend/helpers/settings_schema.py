@@ -244,6 +244,18 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         description="Email addresses for alerts (JSON array)"
     ),
     
+    # Connection Method Settings
+    "connection.sshMethods": SettingSetting(
+        SettingSource.DATABASE, SettingType.JSON,
+        default=[
+            {"id": "vscode", "name": "VS Code", "icon": "mdi-microsoft-visual-studio-code",
+             "template": "{username}@{ip}:{port}", "helpText": "Open the Remote SSH extension and connect to"},
+            {"id": "terminal", "name": "Terminal", "icon": "mdi-console",
+             "template": "ssh {username}@{ip} -p {port}", "helpText": "Run this command in your terminal"}
+        ],
+        description="SSH connection methods shown to users. Each has id, name, icon, template ({username}/{ip}/{port}), helpText."
+    ),
+
     # Audit Log Settings
     "auditLog.retentionDays": SettingSetting(
         SettingSource.DATABASE, SettingType.INTEGER, default=180,

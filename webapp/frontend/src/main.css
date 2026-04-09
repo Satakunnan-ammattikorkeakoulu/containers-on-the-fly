@@ -173,6 +173,17 @@ a,
   margin-right: 7px;
 }
 
+/* Vuetify 4: fix icon-only button alignment — global .v-btn padding/margin
+   overrides Vuetify's defaults, so we restore them for icon buttons */
+.v-btn--icon {
+  padding: 0;
+  margin: 0;
+}
+
+.v-btn--icon .v-btn__content > .v-icon {
+  margin-right: 0;
+}
+
 .v-application a {
     color: #2196f3;
     transition: 0.3s all ease;

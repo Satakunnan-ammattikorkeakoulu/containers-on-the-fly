@@ -34,6 +34,7 @@ function createUrls(baseAddress) {
     URLS.reservation.restart_container = baseReservationUrl + "restart_container"
     URLS.reservation.extend_reservation = baseReservationUrl + "extend_reservation"
     URLS.reservation.update_reservation_description = baseReservationUrl + "update_reservation_description"
+    URLS.reservation.get_public_computers = baseReservationUrl + "get_public_computers"
 
     let baseAdminUrl = baseUrl + "admin/"
     URLS.admin.get_reservations = baseAdminUrl + "reservations"

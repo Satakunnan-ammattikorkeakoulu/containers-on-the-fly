@@ -113,6 +113,7 @@ class Container(Base):
   managedExternally = Column(Boolean, nullable = True)  # True = pre-built image, False = Image Builder, null = legacy (treated as True)
   imageSize = Column(BigInteger, nullable = True)  # Image size in bytes, updated by daemon after build or on startup
   lastBuiltAt = Column(DateTime(timezone=True), nullable = True)  # When the image was last successfully built
+  primaryConnectionPortId = Column(Integer, nullable=True)  # ContainerPort ID shown prominently, null = first SSH-typed port
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -132,6 +133,7 @@ class ContainerPort(Base):
   containerId = Column(ForeignKey("Container.containerId"), nullable = False)
   serviceName = Column(Text, nullable = False)
   port = Column(Integer, nullable = False)
+  portType = Column(Text, nullable=True)  # "SSH" | "HTTP" | "HTTPS" | "VNC" | null (= Other/TCP)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
 

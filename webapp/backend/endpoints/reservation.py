@@ -82,6 +82,19 @@ def get_own_reservations(request: UserReservationRequest, token: str = Depends(o
   userId = get_authenticated_user_id(token)
   return functionality.get_own_reservations(userId, request)
 
+@router.get("/get_public_computers")
+def get_public_computers(token: str = Depends(oauth2_scheme)):
+  """Return names and IP addresses of all public computers.
+
+  Args:
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      API response with a list of public computers (name and IP only).
+  """
+  force_authentication(token)
+  return functionality.get_public_computers()
+
 @router.get("/get_own_reservation_details")
 def get_own_reservation_details(reservationId: int, token: str = Depends(oauth2_scheme)):
   """Retrieve detailed information for one of the user's own reservations.

@@ -801,6 +801,122 @@
             </v-expansion-panel-text>
           </v-expansion-panel>
 
+          <!-- Connection Methods Section -->
+          <v-expansion-panel>
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-connection</v-icon>
+              <span class="font-weight-bold">SSH Connection Methods</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-form ref="connectionForm" v-model="forms.connection.valid">
+
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">SSH Connection Methods</h3>
+                  <p class="body-2 text-grey mb-4">
+                    Define which connection methods are shown to users when connecting to containers via SSH.
+                    These appear as toggle options in the connection details modal.
+                    Icons use Material Design Icons — <a href="https://pictogrammers.com/library/mdi/" target="_blank" rel="noopener noreferrer">browse available icons</a>.
+                    <a href="#" @click.prevent="confirmResetSshMethods">Reset to defaults</a>
+                  </p>
+
+                  <v-card
+                    v-for="(method, index) in settings.connection.sshMethods"
+                    :key="index"
+                    variant="outlined"
+                    class="pa-4 mb-3"
+                  >
+                    <v-row dense>
+                      <v-col cols="12" md="5" class="d-flex align-center">
+                        <v-icon size="large" class="mr-2">{{ method.icon || 'mdi-help-circle-outline' }}</v-icon>
+                        <v-text-field
+                          v-model="method.icon"
+                          label="Icon"
+                          placeholder="mdi-console"
+                          density="compact"
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="5">
+                        <v-text-field
+                          v-model="method.name"
+                          label="Name"
+                          placeholder="Terminal"
+                          :rules="[rules.required]"
+                          density="compact"
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="2" class="d-flex align-center justify-end" style="gap: 12px;">
+                        <v-tooltip v-if="index !== 0" location="top" text="Move up">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small" style="cursor: pointer;" @click="moveSshMethod(index, -1)">mdi-arrow-up</v-icon>
+                          </template>
+                        </v-tooltip>
+                        <v-icon v-else size="small" style="opacity: 0.3;">mdi-arrow-up</v-icon>
+
+                        <v-tooltip v-if="index !== settings.connection.sshMethods.length - 1" location="top" text="Move down">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small" style="cursor: pointer;" @click="moveSshMethod(index, 1)">mdi-arrow-down</v-icon>
+                          </template>
+                        </v-tooltip>
+                        <v-icon v-else size="small" style="opacity: 0.3;">mdi-arrow-down</v-icon>
+
+                        <v-tooltip v-if="settings.connection.sshMethods.length > 1" location="top" text="Remove this method">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small" color="red" style="cursor: pointer;" @click="removeSshMethod(index)">mdi-close</v-icon>
+                          </template>
+                        </v-tooltip>
+                        <v-icon v-else size="small" color="red" style="opacity: 0.3;">mdi-close</v-icon>
+                      </v-col>
+                    </v-row>
+                    <v-row dense class="mt-2">
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="method.template"
+                          label="Connection string template"
+                          placeholder="ssh {username}@{ip} -p {port}"
+                          :rules="[rules.required]"
+                          density="compact"
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="method.helpText"
+                          label="Help text shown above connection string"
+                          placeholder="Run this command in your terminal"
+                          density="compact"
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                    </v-row>
+                  </v-card>
+
+                  <v-btn color="primary" variant="text" class="mt-2" @click="addSshMethod">
+                    <v-icon start>mdi-plus</v-icon>
+                    Add Method
+                  </v-btn>
+
+                  <p class="text-medium-emphasis mt-4" style="font-size: 12px;">
+                    Available template variables: <code>{username}</code>, <code>{ip}</code>, <code>{port}</code>
+                  </p>
+                </div>
+
+                <div class="mt-4">
+                  <v-btn
+                    color="primary"
+                    :loading="saving.connection"
+                    @click="saveSection('connection')"
+                  >
+                    <v-icon left>mdi-content-save</v-icon>
+                    Save Connection Settings
+                  </v-btn>
+                </div>
+
+              </v-form>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
           <!-- Analytics Section -->
           <v-expansion-panel>
             <v-expansion-panel-title>
@@ -873,6 +989,7 @@
                   :loading="saving.analytics"
                   class="mt-2"
                 >
+                  <v-icon left>mdi-content-save</v-icon>
                   Save Analytics Settings
                 </v-btn>
 
@@ -1109,7 +1226,8 @@ export default {
       notifications: { valid: true },
       auth: { valid: true },
       analytics: { valid: true },
-      legal: { valid: true }
+      legal: { valid: true },
+      connection: { valid: true }
     },
 
     // Saving states for each section
@@ -1122,7 +1240,8 @@ export default {
       notifications: false,
       auth: false,
       analytics: false,
-      legal: false
+      legal: false,
+      connection: false
     },
     
     // Form validation rules
@@ -1300,6 +1419,12 @@ export default {
         privacyPolicyContent: '',
         termsOfServiceContent: '',
         lastUpdated: ''
+      },
+      connection: {
+        sshMethods: [
+          { id: "vscode", name: "VS Code", icon: "mdi-microsoft-visual-studio-code", template: "{username}@{ip}:{port}", helpText: "Open the Remote SSH extension and connect to" },
+          { id: "terminal", name: "Terminal", icon: "mdi-console", template: "ssh {username}@{ip} -p {port}", helpText: "Run this command in your terminal" }
+        ]
       }
     }
   }),
@@ -1348,7 +1473,41 @@ export default {
       this.alertEmailsList.splice(index, 1);
       this.saveAlertEmails(); // Auto-save to backend
     },
-    
+
+    /** Reset SSH connection methods to defaults after user confirmation. */
+    confirmResetSshMethods() {
+      if (confirm('Reset SSH connection methods to defaults (VS Code and Terminal)? This will discard your current configuration.')) {
+        this.settings.connection.sshMethods = [
+          { id: "vscode", name: "VS Code", icon: "mdi-microsoft-visual-studio-code", template: "{username}@{ip}:{port}", helpText: "Open the Remote SSH extension and connect to" },
+          { id: "terminal", name: "Terminal", icon: "mdi-console", template: "ssh {username}@{ip} -p {port}", helpText: "Run this command in your terminal" }
+        ];
+      }
+    },
+
+    /** Add a new empty SSH connection method to the list. */
+    addSshMethod() {
+      const id = 'method-' + Date.now();
+      this.settings.connection.sshMethods.push({
+        id: id, name: '', icon: 'mdi-application', template: '', helpText: ''
+      });
+    },
+
+    /** Remove an SSH connection method by index. */
+    removeSshMethod(index) {
+      if (this.settings.connection.sshMethods.length > 1) {
+        this.settings.connection.sshMethods.splice(index, 1);
+      }
+    },
+
+    /** Move an SSH connection method up or down in the list. */
+    moveSshMethod(index, direction) {
+      const methods = this.settings.connection.sshMethods;
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= methods.length) return;
+      const item = methods.splice(index, 1)[0];
+      methods.splice(newIndex, 0, item);
+    },
+
     /**
      * Loads all settings sections from the backend and populates local state.
      * Uses settingsInitialized flags and isLoading to prevent watchers from
@@ -1435,6 +1594,11 @@ export default {
               termsOfServiceContent: data.legal?.termsOfServiceContent || '',
               lastUpdated: data.legal?.lastUpdated || ''
             };
+
+            // Update connection settings
+            if (data.connection?.sshMethods && Array.isArray(data.connection.sshMethods) && data.connection.sshMethods.length > 0) {
+              _this.settings.connection.sshMethods = data.connection.sshMethods;
+            }
 
             // Mark settings as initialized after a small delay to ensure watchers don't fire during load
             setTimeout(() => {
@@ -1735,7 +1899,8 @@ export default {
         notifications: 'System Notifications',
         auth: 'Authentication',
         analytics: 'Analytics',
-        legal: 'Legal Documents'
+        legal: 'Legal Documents',
+        connection: 'Connection Methods'
       };
       return names[sectionName] || sectionName;
     },

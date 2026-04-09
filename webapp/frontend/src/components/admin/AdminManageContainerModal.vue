@@ -85,36 +85,50 @@
               <!-- PORTS -->
               <v-col cols="12">
                 <h2 style="margin-top: 20px; margin-bottom: 3px;">Ports</h2>
-                <p class="text-muted" style="margin-bottom: 20px; margin-top: 0px;">Define which container ports are exposed to users. Each local port gets a random external port assigned when a reservation starts. Add any ports your container services will listen on — they don't need to be running at container creation time.</p>
-                <!-- Built-in SSH port (always present, read-only) -->
-                <v-row>
-                  <v-col cols="12">
-                    <v-row>
-                      <v-col cols="12" md="4">
-                        <v-text-field model-value="SSH" label="Service name" readonly variant="outlined" bg-color="grey-darken-3"></v-text-field>
+                <p class="text-muted" style="margin-bottom: 20px; margin-top: 0px;">Define which container ports are exposed to users. Each local port gets a random external port assigned when a reservation starts. Set the port type to control how connection details are displayed.</p>
+                <v-row style="--v-col-gap-y: 0px;">
+                  <!-- Loop through all ports -->
+                  <v-col cols="12" v-for="(port, index) in data.ports" :key="index" style="padding-top: 0; padding-bottom: 0;">
+                    <v-row align="center" style="--v-col-gap-y: 0px;">
+                      <v-col cols="auto" class="d-flex align-center" style="padding-right: 0; margin-bottom: 12px;">
+                        <v-tooltip location="top" :text="isPrimaryPort(index) ? 'Primary connection method — shown prominently in connection details' : 'Set as primary connection method'">
+                          <template v-slot:activator="{ props }">
+                            <v-icon
+                              v-bind="props"
+                              :color="isPrimaryPort(index) ? 'amber-darken-2' : 'grey'"
+                              style="cursor: pointer;"
+                              @click="setPrimaryPort(index)"
+                            >{{ isPrimaryPort(index) ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+                          </template>
+                        </v-tooltip>
                       </v-col>
-                      <v-col cols="12" md="4">
-                        <v-text-field model-value="22" label="Local port" readonly variant="outlined" bg-color="grey-darken-3"></v-text-field>
-                      </v-col>
-                      <v-col cols="12" md="4" class="d-flex align-center">
-                        <v-chip color="info" size="small">Always included</v-chip>
-                      </v-col>
-                    </v-row>
-                    <p class="text-medium-emphasis" style="margin-top: -8px; font-size: 11px;">SSH is the primary way users connect to their reserved container. It is always included automatically.</p>
-                  </v-col>
-                </v-row>
-                <v-row>
-                  <!-- Loop through all ports and add them here one by one -->
-                  <v-col cols="12" v-for="(port, index) in data.ports" :key="index">
-                    <v-row>
-                      <v-col cols="12" md="4">
+                      <v-col cols="12" md="3">
                         <v-text-field type="text" v-model="port.serviceName" :rules="[rules.required]" label="Service name"></v-text-field>
                       </v-col>
-                      <v-col cols="12" md="4">
+                      <v-col cols="12" md="2">
                         <v-text-field type="number" v-model="port.port" :rules="[rules.required, rules.port, v => duplicatePortRule(v, index)]" label="Local port"></v-text-field>
                       </v-col>
-                      <v-col cols="12" md="4">
-                        <v-btn color="red" variant="text" @click="removePort(index)">Remove</v-btn>
+                      <v-col cols="12" md="3">
+                        <v-select
+                          v-model="port.portType"
+                          :items="portTypeOptions"
+                          item-title="title"
+                          item-value="value"
+                          label="Type"
+                          density="default"
+                        ></v-select>
+                      </v-col>
+                      <v-col cols="auto" class="d-flex align-center" style="margin-bottom: 12px;">
+                        <v-tooltip location="top" text="Remove this port">
+                          <template v-slot:activator="{ props }">
+                            <v-icon
+                              v-bind="props"
+                              color="red"
+                              style="cursor: pointer;"
+                              @click="removePort(index)"
+                            >mdi-close</v-icon>
+                          </template>
+                        </v-tooltip>
                       </v-col>
                     </v-row>
                   </v-col>
@@ -413,6 +427,7 @@
         item: this.propData,
         data: {
           ports: [],
+          primaryConnectionPortId: null,
           managedExternally: false,
           baseImage: '',
           dockerfileCommands: '',
@@ -423,6 +438,13 @@
           passwordCommand: '',
           sshKeyDeployCommands: '',
         },
+        portTypeOptions: [
+          { title: "SSH", value: "SSH" },
+          { title: "HTTP", value: "HTTP" },
+          { title: "HTTPS", value: "HTTPS" },
+          { title: "VNC", value: "VNC" },
+          { title: "Other (TCP)", value: null },
+        ],
         defaults: null,
         originalImageFields: null,
         templates: [],
@@ -433,6 +455,7 @@
         isFetching: true,
         isSubmitting: false,
         modalKey: new Date().toString(),
+        primaryPortIndex: 0,
         removedPorts: [],
         dataName: "container",
         showBuildLogDialog: false,
@@ -517,6 +540,8 @@
         this.isCreatingNew = true;
         this.isFetching = false;
         this.data.managedExternally = false;
+        // Pre-fill with default SSH port for new containers
+        this.data.ports = [{ serviceName: "SSH", port: "22", portType: "SSH" }];
         this.fetchDefaults();
         this.fetchTemplates();
       }
@@ -528,24 +553,38 @@
     mounted() {
     },
     methods: {
-      /** Validates that a port number is not used by another entry or the built-in SSH port. */
+      /** Check if a port at the given index is the primary connection method. */
+      isPrimaryPort(index) {
+        return this.primaryPortIndex === index;
+      },
+      /** Set the port at the given index as the primary connection method. */
+      setPrimaryPort(index) {
+        this.primaryPortIndex = index;
+      },
+      /** Validates that a port number is not used by another entry. */
       duplicatePortRule(value, currentIndex) {
         if (!value) return true;
         let port = String(value).trim();
-        if (port === '22') return 'Port 22 is reserved for SSH (always included).';
         let duplicates = this.data.ports.filter((p, i) => i !== currentIndex && String(p.port).trim() === port);
         if (duplicates.length > 0) return 'This port is already in use.';
         return true;
       },
       addPort() {
-        this.data.ports.push({ serviceName: "", port: "" });
+        this.data.ports.push({ serviceName: "", port: "", portType: null });
       },
       /** Removes a port entry and tracks its ID for backend deletion if it was already persisted. */
       removePort(index) {
-        if (this.data.ports[index].containerPortId) {
-          this.removedPorts.push(this.data.ports[index].containerPortId);
+        const port = this.data.ports[index];
+        if (port.containerPortId) {
+          this.removedPorts.push(port.containerPortId);
         }
         this.data.ports.splice(index, 1);
+        // Adjust primary index after removal
+        if (this.primaryPortIndex === index) {
+          this.primaryPortIndex = 0;
+        } else if (this.primaryPortIndex > index) {
+          this.primaryPortIndex--;
+        }
       },
       closeDialog() {
         this.isOpen = false;
@@ -682,6 +721,10 @@
         let containerId = this.item == "new" ? -1 : this.item;
         let data = this.data;
         data.removedPorts = this.removedPorts;
+        // Resolve primary port index to containerPortId for the backend
+        const primaryPort = this.data.ports[this.primaryPortIndex];
+        data.primaryConnectionPortId = (primaryPort && primaryPort.containerPortId && this.primaryPortIndex !== 0)
+          ? primaryPort.containerPortId : null;
 
         let _this = this
         let currentUser = this.store.user
@@ -746,6 +789,13 @@
               if (!_this.data.baseImage) _this.data.baseImage = 'ubuntu:24.04'
               if (!_this.data.containerUsername) _this.data.containerUsername = 'user'
               if (!_this.data.ports) _this.data.ports = []
+              // Resolve primaryConnectionPortId to an index
+              if (_this.data.primaryConnectionPortId != null) {
+                const idx = _this.data.ports.findIndex(p => p.containerPortId === _this.data.primaryConnectionPortId);
+                _this.primaryPortIndex = idx !== -1 ? idx : 0;
+              } else {
+                _this.primaryPortIndex = 0;
+              }
               // Legacy containers (managedExternally is null) — treat as externally managed
               if (_this.data.managedExternally === null || _this.data.managedExternally === undefined) {
                 _this.data.managedExternally = true;

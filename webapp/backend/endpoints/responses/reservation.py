@@ -22,6 +22,21 @@ from sqlalchemy.orm import joinedload
 from helpers.pagination import apply_pagination, get_total_count
 from helpers.settings_handler import get_setting
 
+def get_public_computers() -> object:
+  """Return names and IP addresses of all public, non-removed computers.
+
+  Returns:
+      Response with a list of dicts, each containing ``name`` and ``ip``.
+  """
+  with Session() as session:
+    computers = session.execute(
+      select(Computer)
+      .where(Computer.removed.isnot(True), Computer.public.is_(True))
+    ).scalars().all()
+
+    result = [{"name": c.name, "ip": c.ip} for c in computers]
+    return api_response(True, "Public computers retrieved", result)
+
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
 # TODO: Should also be able to only fail there is not enough resources any computer. Right now it fails if any of the computers are out of resources for the given time period.
 def get_available_hardware(date : str, duration : int, reducable_specs : dict = None, is_admin = False, ignored_reservation_id : int = None, user_id : int = None) -> object:
@@ -352,13 +367,20 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
       service_name = port.containerPort.serviceName
       outside_port = port.outsidePort
       local_port = port.containerPort.port
-      ports_for_email.append({ "serviceName": service_name, "localPort": local_port, "outsidePort": outside_port })
+      port_type = port.containerPort.portType
+      container_port_id = port.containerPort.containerPortId
+      ports_for_email.append({
+        "serviceName": service_name, "localPort": local_port,
+        "outsidePort": outside_port, "portType": port_type,
+        "containerPortId": container_port_id
+      })
 
     container_username = reservation.reservedContainer.container.containerUsername or "user"
+    container = reservation.reservedContainer.container
 
     # Pass a copy of ports list — generate_connection_text mutates it by removing the SSH entry
     connection_text = generate_connection_text(
-      reservation.reservedContainer.container.imageName,
+      container.imageName,
       reservation.computer.ip,
       list(ports_for_email),
       reservation.reservedContainer.sshPassword,
@@ -372,12 +394,31 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
 
     # Build structured connection details for the frontend
     ssh_port = None
+    ssh_password = reservation.reservedContainer.sshPassword
     other_ports = []
     for port in ports_for_email:
-      if port["serviceName"] == "SSH":
+      if port["portType"] == "SSH":
         ssh_port = port["outsidePort"]
       else:
-        other_ports.append({ "serviceName": port["serviceName"], "outsidePort": port["outsidePort"], "localPort": port["localPort"] })
+        other_ports.append({
+          "serviceName": port["serviceName"],
+          "outsidePort": port["outsidePort"],
+          "localPort": port["localPort"],
+          "portType": port["portType"],
+          "containerPortId": port["containerPortId"],
+        })
+
+    # Resolve effective primary port: use configured value, or fallback for
+    # old containers that have no favorite set.
+    # If SSH was already detected by portType, no fallback needed — the frontend
+    # shows SSH as primary automatically. Otherwise pick the best port:
+    # local port 22 → service named "SSH" → first port available.
+    effective_primary_port_id = container.primaryConnectionPortId
+    if effective_primary_port_id is None and not ssh_port and ports_for_email:
+      port_on_22 = next((p for p in ports_for_email if p["localPort"] == 22), None)
+      port_named_ssh = next((p for p in ports_for_email if p["serviceName"].upper() == "SSH"), None)
+      fallback_port = port_on_22 or port_named_ssh or ports_for_email[0]
+      effective_primary_port_id = fallback_port["containerPortId"]
 
     instructions = ""
     try:
@@ -385,12 +426,20 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
     except Exception:
       pass
 
-    container = reservation.reservedContainer.container
+    # Fetch system-wide SSH connection methods
+    ssh_methods = None
+    try:
+      ssh_methods = get_setting('connection.sshMethods')
+    except Exception:
+      pass
+
     connection_details = {
       "ip": reservation.computer.ip,
-      "sshPassword": reservation.reservedContainer.sshPassword,
+      "sshPassword": ssh_password,
       "sshPort": ssh_port,
+      "sshMethods": ssh_methods,
       "otherPorts": other_ports,
+      "primaryConnectionPortId": effective_primary_port_id,
       "endDate": reservation.endDate.isoformat() if reservation.endDate else None,
       "instructions": instructions,
       "containerName": container.name,

@@ -34,28 +34,21 @@ _RESERVED_USERNAMES = {"root", "daemon", "bin", "sys", "nobody", "www-data", "ma
 # Valid Docker image name pattern (lowercase, digits, dots, hyphens, underscores, slashes)
 _VALID_IMAGE_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9._/\-]{0,127}$')
 
-# Built-in SSH port — always present on every container
-_SSH_SERVICE_NAME = "SSH"
-_SSH_PORT = 22
+# Valid port types for the portType column on ContainerPort
+_VALID_PORT_TYPES = {"SSH", "HTTP", "HTTPS", "VNC"}
 
-def _ensure_ssh_port(session, container):
-  """Ensure container has an SSH port 22 ContainerPort. Idempotent.
+def _add_default_ssh_port(container):
+  """Add a default SSH port for newly created containers.
 
-  If no ContainerPort with serviceName="SSH" and port=22 exists for this
-  container, one is created. Safe to call on both new and existing containers.
+  Pre-fills the container with an SSH port on port 22. This is a convenience
+  default — admins can remove it if the container doesn't need SSH.
 
   Args:
-      session: Active SQLAlchemy session.
-      container: Container ORM object to check/fix.
+      container: Container ORM object to add the default port to.
   """
-  has_ssh = any(
-    p.serviceName == _SSH_SERVICE_NAME and p.port == _SSH_PORT
-    for p in container.containerPorts
+  container.containerPorts.append(
+    ContainerPort(serviceName="SSH", port=22, portType="SSH")
   )
-  if not has_ssh:
-    container.containerPorts.append(
-      ContainerPort(serviceName=_SSH_SERVICE_NAME, port=_SSH_PORT)
-    )
 
 def get_reservations(request: AdminReservationRequest) -> object:
   """Retrieve paginated reservations with server-side filtering and sorting.
@@ -329,9 +322,9 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
     else:
       new_username = None  # Will default to "user" at runtime
 
-    # Validate ports (integers 1-65535, no duplicates, port 22 reserved for SSH)
+    # Validate ports (integers 1-65535, no duplicates)
     new_ports = containerEdit.data.get("ports", [])
-    port_numbers = [_SSH_PORT]  # SSH is always reserved
+    port_numbers = []
     for port in new_ports:
       try:
         port_num = int(port.get("port", 0))
@@ -339,11 +332,13 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
         return api_response(False, "Port must be an integer.")
       if port_num < 1 or port_num > 65535:
         return api_response(False, f"Port {port_num} is out of range. Must be between 1 and 65535.")
-      if port_num == _SSH_PORT:
-        return api_response(False, "Port 22 is reserved for SSH and is always included automatically.")
       if port_num in port_numbers:
         return api_response(False, f"Duplicate port {port_num}. Each port can only be used once.")
       port_numbers.append(port_num)
+      # Validate portType
+      port_type = port.get("portType")
+      if port_type is not None and port_type not in _VALID_PORT_TYPES:
+        return api_response(False, f"Invalid port type '{port_type}'. Must be one of: {', '.join(sorted(_VALID_PORT_TYPES))}, or empty.")
 
     # If new, create a new container
     if containerEdit.containerId == -1:
@@ -365,9 +360,18 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
         container.buildLog = ""
       # Add ports
       for port in containerEdit.data.get("ports", []):
-        container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
+        container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"], portType=port.get("portType")))
+      # Add default SSH port if no ports were provided (new container convenience default)
+      if not containerEdit.data.get("ports"):
+        _add_default_ssh_port(container)
       session.add(container)
-      _ensure_ssh_port(session, container)
+      session.flush()
+      # Set primary connection port
+      primary_port_id = containerEdit.data.get("primaryConnectionPortId")
+      if primary_port_id is not None:
+        valid_port_ids = [p.containerPortId for p in container.containerPorts]
+        if primary_port_id in valid_port_ids:
+          container.primaryConnectionPortId = primary_port_id
       session.commit()
       saved_container_id = container.containerId
     # Otherwise, edit container
@@ -403,12 +407,13 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
         if new_managed_externally:
           container.buildStatus = None
           container.buildLog = None
-        # Remove all removable ports (protect built-in SSH port from deletion)
-        for port_id in containerEdit.data.get("removedPorts", []):
+        # Remove ports
+        removed_port_ids = containerEdit.data.get("removedPorts", [])
+        for port_id in removed_port_ids:
           port_to_remove = session.execute(
             select(ContainerPort).where(ContainerPort.containerPortId == port_id)
           ).scalar_one_or_none()
-          if port_to_remove and not (port_to_remove.serviceName == _SSH_SERVICE_NAME and port_to_remove.port == _SSH_PORT):
+          if port_to_remove:
             # Block removal if any active reservation references this port
             active_ref_count = session.execute(
               select(func.count()).select_from(ReservedContainerPort).join(
@@ -432,22 +437,36 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
               delete(ReservedContainerPort).where(ReservedContainerPort.containerPortForeign == port_id)
             )
             session.execute(delete(ContainerPort).where(ContainerPort.containerPortId == port_id))
+        # Nullify primaryConnectionPortId if the primary port was removed
+        if container.primaryConnectionPortId in removed_port_ids:
+          container.primaryConnectionPortId = None
         # Add all new ports
         for port in containerEdit.data.get("ports", []):
           if "containerPortId" not in port:
-            container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
+            container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"], portType=port.get("portType")))
         # Edit changed ports
         for port in containerEdit.data.get("ports", []):
           if "containerPortId" in port:
             old_port = session.execute(select(ContainerPort).where(ContainerPort.containerPortId == port["containerPortId"])).scalar_one_or_none()
-            if old_port.port != port["port"] or old_port.serviceName != port["serviceName"]:
-              old_port.port = port["port"]
-              old_port.serviceName = port["serviceName"]
-              old_port.updatedAt = datetime.datetime.now(datetime.timezone.utc)
-
-        #for port in containerEdit.data.get("ports", []):
-        #  container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
-        _ensure_ssh_port(session, container)
+            if old_port:
+              changed = False
+              if old_port.port != port["port"] or old_port.serviceName != port["serviceName"]:
+                old_port.port = port["port"]
+                old_port.serviceName = port["serviceName"]
+                changed = True
+              new_port_type = port.get("portType")
+              if old_port.portType != new_port_type:
+                old_port.portType = new_port_type
+                changed = True
+              if changed:
+                old_port.updatedAt = datetime.datetime.now(datetime.timezone.utc)
+        # Set primary connection port
+        primary_port_id = containerEdit.data.get("primaryConnectionPortId")
+        if primary_port_id is not None:
+          valid_port_ids = [p.containerPortId for p in container.containerPorts]
+          container.primaryConnectionPortId = primary_port_id if primary_port_id in valid_port_ids else None
+        else:
+          container.primaryConnectionPortId = None
         session.commit()
         saved_container_id = container.containerId
   is_new = containerEdit.containerId == -1
@@ -873,15 +892,15 @@ def get_containers() -> object:
       addable.pop("buildLog", None)
       addable["ports"] = []
       for port in container.containerPorts:
-        if port.serviceName == _SSH_SERVICE_NAME and port.port == _SSH_PORT:
-          continue
         addable["ports"].append({
           "containerPortId": port.containerPortId,
           "port": port.port,
           "serviceName": port.serviceName,
+          "portType": port.portType,
         })
+      addable["primaryConnectionPortId"] = container.primaryConnectionPortId
       data.append(addable)
-  
+
   return api_response(True, "Data fetched.", { "containers": data })
 
 def get_container(containerId : int) -> object:
@@ -903,14 +922,14 @@ def get_container(containerId : int) -> object:
       addable = orm_to_dict(container)
       addable["ports"] = []
       for port in container.containerPorts:
-        if port.serviceName == _SSH_SERVICE_NAME and port.port == _SSH_PORT:
-          continue
         addable["ports"].append({
           "containerPortId": port.containerPortId,
           "port": port.port,
           "serviceName": port.serviceName,
+          "portType": port.portType,
         })
-  
+      addable["primaryConnectionPortId"] = container.primaryConnectionPortId
+
   return api_response(True, "Data fetched.", { "data": addable })
 
 def get_computers() -> object:
@@ -1521,7 +1540,8 @@ def get_general_settings() -> object:
             'legal.contactEmail',
             'legal.privacyPolicyContent',
             'legal.termsOfServiceContent',
-            'legal.lastUpdated'
+            'legal.lastUpdated',
+            'connection.sshMethods'
         ]
         
         # Get all settings
@@ -1598,6 +1618,14 @@ def get_general_settings() -> object:
                 "privacyPolicyContent": settings_dict.get('legal.privacyPolicyContent', ''),
                 "termsOfServiceContent": settings_dict.get('legal.termsOfServiceContent', ''),
                 "lastUpdated": settings_dict.get('legal.lastUpdated', '')
+            },
+            "connection": {
+                "sshMethods": settings_dict.get('connection.sshMethods', [
+                    {"id": "vscode", "name": "VS Code", "icon": "mdi-microsoft-visual-studio-code",
+                     "template": "{username}@{ip}:{port}", "helpText": "Open the Remote SSH extension and connect to"},
+                    {"id": "terminal", "name": "Terminal", "icon": "mdi-console",
+                     "template": "ssh {username}@{ip} -p {port}", "helpText": "Run this command in your terminal"}
+                ])
             }
         }
         
@@ -1742,6 +1770,30 @@ def save_general_settings(section: str, settings: dict, actor_user_id: int = Non
                 set_setting('legal.termsOfServiceContent', settings['termsOfServiceContent'])
             from datetime import datetime, timezone
             set_setting('legal.lastUpdated', datetime.now(timezone.utc).isoformat())
+
+        elif section == "connection":
+            if 'sshMethods' in settings:
+                methods = settings['sshMethods']
+                if not isinstance(methods, list) or len(methods) == 0:
+                    return api_response(False, "At least one SSH connection method is required.")
+                required_keys = {"id", "name", "icon", "template", "helpText"}
+                seen_ids = set()
+                sanitized = []
+                for method in methods:
+                    if not isinstance(method, dict) or not required_keys.issubset(method.keys()):
+                        return api_response(False, f"Each SSH method must have: {', '.join(sorted(required_keys))}.")
+                    for field in required_keys:
+                        if not isinstance(method[field], str):
+                            return api_response(False, f"SSH method field '{field}' must be a string.")
+                        if len(method[field]) > 500:
+                            return api_response(False, f"SSH method field '{field}' is too long (max 500 characters).")
+                    if not method["id"].strip():
+                        return api_response(False, "Each SSH method must have a non-empty id.")
+                    if method["id"] in seen_ids:
+                        return api_response(False, f"Duplicate SSH method id: {method['id']}.")
+                    seen_ids.add(method["id"])
+                    sanitized.append({k: method[k] for k in required_keys})
+                set_setting('connection.sshMethods', sanitized)
 
         else:
             return api_response(False, f"Unknown section: {section}")

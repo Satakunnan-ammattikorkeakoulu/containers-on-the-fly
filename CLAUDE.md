@@ -204,6 +204,7 @@ fix: Fix group removal logic to not break on empty usernames
 - **Frontend date handling**: Always use Day.js via `helpers/time.js` utilities (`DisplayTime`, `RelativeTime`, and `TimestampToLocalTimeZone`). Never use raw `Date()` or `moment`. Prefer displaying dates as **relative time** (`RelativeTime`) with the full absolute time (`DisplayTime`) shown in a `v-tooltip` on hover. Use a dashed underline style (`text-decoration: underline dashed`) to hint that the element is hoverable. See `AdminAuditLogTable.vue` and `UserReservationTable.vue` for the established pattern.
 - **Pydantic models for POST bodies**: POST endpoints that accept JSON bodies must define a Pydantic model in `endpoints/models/`. GET endpoints use query parameters directly.
 - **AppUrls.js**: All API URLs must be registered in `src/AppUrls.js`. Never hardcode API paths in components.
+- **Icon-only buttons must have tooltips**: Every button that contains only an icon (no visible text) must be wrapped in a `v-tooltip` describing what the action does. Users should always be able to hover to understand an icon button's purpose.
 
 ### Documentation Standards
 

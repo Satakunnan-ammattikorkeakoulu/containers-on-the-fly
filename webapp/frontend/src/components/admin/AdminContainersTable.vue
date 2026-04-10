@@ -18,7 +18,7 @@
                 class="mr-2"
               >
                 {{ item.public ? 'Public' : 'Private' }}
-              </v-chip><span class="name-link">{{ item.name }}</span>
+              </v-chip><span class="link-hint">{{ item.name }}</span>
             </span>
           </template>
           <div style="max-width: 350px;">
@@ -103,7 +103,7 @@
       <template v-slot:item.actions="{item}">
         <v-menu>
           <template v-slot:activator="{ props }">
-            <a class="actions-link" v-bind="props">
+            <a v-bind="props">
               Actions <v-icon size="small">mdi-chevron-down</v-icon>
             </a>
           </template>
@@ -204,26 +204,8 @@
 </script>
 
 <style scoped lang="scss">
-  .actions-link {
-    color: #2196f3;
-    cursor: pointer;
-    text-decoration: none;
-    white-space: nowrap;
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
   .destructive-action .v-list-item-title,
   .destructive-action .v-icon {
     color: #ef5350;
-  }
-
-  .name-link {
-    cursor: pointer;
-    white-space: nowrap;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-    text-underline-offset: 3px;
   }
 </style>

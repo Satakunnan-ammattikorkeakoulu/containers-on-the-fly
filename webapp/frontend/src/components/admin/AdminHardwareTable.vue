@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
+    <a v-if="hasLongItems" class="read-all-toggle" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
     <v-data-table
       :headers="table.headers"
       :items="data"
@@ -74,13 +74,7 @@
 </script>
 
 <style scoped lang="scss">
-  .link-action {
-    display: block;
-    min-width: 150px;
-    margin: 10px 0px;
-  }
-
-  .link-toggle-read-all {
+  .read-all-toggle {
     margin-bottom: 20px;
     font-size: 14px;
     display: inline-block;

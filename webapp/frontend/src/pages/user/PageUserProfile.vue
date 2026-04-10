@@ -115,7 +115,7 @@
           <v-card-text>
             <div class="ssh-key-section">
               <h3 class="subtitle-1 mb-1">SSH Public Key</h3>
-              <a class="text-caption" style="cursor: pointer; color: #2196f3;" @click="sshConfigDialog = true">
+              <a class="text-caption" @click="sshConfigDialog = true">
                 <v-icon size="x-small" class="mr-1">mdi-information-outline</v-icon>
                 How to configure SSH
               </a>

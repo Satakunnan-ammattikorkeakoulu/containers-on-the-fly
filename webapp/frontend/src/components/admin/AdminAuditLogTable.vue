@@ -26,7 +26,7 @@
       <template v-slot:item.userEmail="{item}">
         <v-tooltip v-if="item.userEmail" location="bottom" text="Click to filter by this user">
           <template v-slot:activator="{ props }">
-            <span v-bind="props" class="filterable" @click="emitFilter('user', item.userEmail)">
+            <span v-bind="props" class="link-hint" @click="emitFilter('user', item.userEmail)">
               {{ item.userEmail }}
               <span v-if="item.userName" class="text-grey"> ({{ item.userName }})</span>
             </span>
@@ -39,7 +39,7 @@
       <template v-slot:item.resourceType="{item}">
         <v-tooltip v-if="item.resourceType" location="bottom" text="Click to filter by this resource type">
           <template v-slot:activator="{ props }">
-            <span v-bind="props" class="filterable d-inline-flex align-center" style="gap: 6px;" @click="emitFilter('resourceType', item.resourceType)">
+            <span v-bind="props" class="link-hint d-inline-flex align-center" style="gap: 6px;" @click="emitFilter('resourceType', item.resourceType)">
               <v-icon size="small">{{ getResourceTypeIcon(item.resourceType) }}</v-icon>
               {{ item.resourceType }}
             </span>
@@ -52,7 +52,7 @@
       <template v-slot:item.action="{item}">
         <v-tooltip location="bottom" text="Click to filter by this action">
           <template v-slot:activator="{ props }">
-            <v-chip v-bind="props" :color="getActionColor(item.action)" size="small" variant="tonal" class="filterable" @click="emitFilter('action', item.action)">
+            <v-chip v-bind="props" :color="getActionColor(item.action)" size="small" variant="tonal" style="cursor: pointer;" @click="emitFilter('action', item.action)">
               {{ item.action }}
             </v-chip>
           </template>
@@ -63,7 +63,7 @@
       <template v-slot:item.ipAddress="{item}">
         <v-tooltip v-if="item.ipAddress" location="bottom" text="Click to filter by this IP">
           <template v-slot:activator="{ props }">
-            <span v-bind="props" class="filterable" @click="emitFilter('ipAddress', item.ipAddress)">
+            <span v-bind="props" class="link-hint" @click="emitFilter('ipAddress', item.ipAddress)">
               {{ item.ipAddress }}
             </span>
           </template>
@@ -181,16 +181,6 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.filterable {
-  cursor: pointer;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 3px;
-  &:hover {
-    text-decoration-style: solid;
-  }
-}
-
 .details-text {
   cursor: help;
   max-width: 200px;

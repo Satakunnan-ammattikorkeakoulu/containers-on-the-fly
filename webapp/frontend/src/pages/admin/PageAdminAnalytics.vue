@@ -37,7 +37,7 @@
         <span class="date-range-info" v-html="dateRangeText"></span>
         <v-menu v-if="dateRangeText" location="bottom center" :close-on-content-click="true">
           <template v-slot:activator="{ props }">
-            <span class="refresh-link" v-bind="props">Quick Filters</span>
+            <a class="filter-summary-action" v-bind="props">Quick Filters</a>
           </template>
           <v-list density="compact">
             <v-list-item v-for="preset in quickPresets" :key="preset.label" @click="applyPreset(preset.days)">
@@ -45,7 +45,7 @@
             </v-list-item>
           </v-list>
         </v-menu>
-        <span v-if="dateRangeText" class="refresh-link" @click="fetch">Refresh Data</span>
+        <a v-if="dateRangeText" class="filter-summary-action" @click="fetch">Refresh Data</a>
       </v-col>
     </v-row>
 
@@ -270,16 +270,9 @@
   opacity: 0.5;
 }
 
-.refresh-link {
+.filter-summary-action {
   font-size: 14px;
   margin-left: 8px;
-  cursor: pointer;
-  color: #42A5F5;
-  text-decoration: none;
-}
-
-.refresh-link:hover {
-  text-decoration: underline;
 }
 
 .analytics-description {

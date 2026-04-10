@@ -94,7 +94,7 @@
 
     <v-row v-if="!initialLoading && !showFilters" class="text-center" style="margin-top: 0px; margin-bottom: 24px;">
       <v-col cols="12">
-        <a class="show-filters-link" @click="showFilters = true">Show Filters</a>
+        <a style="font-size: 14px;" @click="showFilters = true">Show Filters</a>
       </v-col>
     </v-row>
 
@@ -189,7 +189,7 @@
         <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
         <v-menu location="bottom center" :close-on-content-click="true">
           <template v-slot:activator="{ props }">
-            <a class="filter-summary-link" v-bind="props">Quick Filters</a>
+            <a class="filter-summary-action" v-bind="props">Quick Filters</a>
           </template>
           <v-list density="compact">
             <v-list-item v-for="preset in quickPresets" :key="preset.label" @click="applyPreset(preset.days)">
@@ -197,8 +197,8 @@
             </v-list-item>
           </v-list>
         </v-menu>
-        <a v-if="hasActiveFilters" class="filter-summary-link" @click="resetFilters">Reset Filters</a>
-        <a class="filter-summary-link" @click="fetchReservations">Refresh Data</a>
+        <a v-if="hasActiveFilters" class="filter-summary-action" @click="resetFilters">Reset Filters</a>
+        <a class="filter-summary-action" @click="fetchReservations">Refresh Data</a>
       </v-col>
     </v-row>
 
@@ -696,16 +696,6 @@
     margin: 60px auto;
   }
 
-  .show-filters-link {
-    font-size: 14px;
-    cursor: pointer;
-    color: #42A5F5;
-    text-decoration: none;
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
   .row-filters {
     margin-top: 30px;
     margin-bottom: 0px;
@@ -726,15 +716,8 @@
     opacity: 0.5;
   }
 
-  .filter-summary-link {
+  .filter-summary-action {
     font-size: 14px;
     margin-left: 8px;
-    cursor: pointer;
-    color: #42A5F5;
-    text-decoration: none;
-  }
-
-  .filter-summary-link:hover {
-    text-decoration: underline;
   }
 </style>

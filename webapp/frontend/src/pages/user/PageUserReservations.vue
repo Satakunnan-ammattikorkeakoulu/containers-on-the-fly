@@ -45,7 +45,7 @@
     <v-row class="text-center">
       <v-col cols="12">
         <h2 class="m-0">Your Reservations</h2>
-        <a v-if="!showFilters" class="show-filters-link" @click="showFilters = true">Show Filters</a>
+        <a v-if="!showFilters" style="font-size: 14px;" @click="showFilters = true">Show Filters</a>
       </v-col>
     </v-row>
 
@@ -96,7 +96,7 @@
     <v-row v-if="!initialLoading && showFilters" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
       <v-col cols="12" md="9" class="text-center">
         <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
-        <a v-if="hasActiveFilters" class="filter-summary-link" @click="resetFilters">Reset Filters</a>
+        <a v-if="hasActiveFilters" class="filter-summary-action" @click="resetFilters">Reset Filters</a>
       </v-col>
     </v-row>
 
@@ -618,16 +618,6 @@
     margin: 60px auto;
   }
 
-  .show-filters-link {
-    font-size: 14px;
-    cursor: pointer;
-    color: #42A5F5;
-    text-decoration: none;
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
   .row-filters {
     margin-top: 30px;
     margin-bottom: 0px;
@@ -638,16 +628,9 @@
     opacity: 0.5;
   }
 
-  .filter-summary-link {
+  .filter-summary-action {
     font-size: 14px;
     margin-left: 8px;
-    cursor: pointer;
-    color: #42A5F5;
-    text-decoration: none;
-  }
-
-  .filter-summary-link:hover {
-    text-decoration: underline;
   }
 </style>
 

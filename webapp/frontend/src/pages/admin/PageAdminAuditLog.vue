@@ -7,7 +7,7 @@
         <p class="audit-log-description">
           Records of all significant user and admin actions in the system.
           The current retention is <strong>{{ retentionDays === -1 ? 'disabled' : (retentionDays > 0 ? retentionDays + ' days' : 'forever') }}</strong>
-          <a class="retention-toggle-link" @click="showRetentionEditor = !showRetentionEditor">{{ showRetentionEditor ? '(hide)' : '(change)' }}</a>
+          <a style="margin-left: 4px;" @click="showRetentionEditor = !showRetentionEditor">{{ showRetentionEditor ? '(hide)' : '(change)' }}</a>
         </p>
       </v-col>
     </v-row>
@@ -129,7 +129,7 @@
         <span class="filter-summary-text">Showing <strong>{{ logs.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
         <v-menu location="bottom center" :close-on-content-click="true">
           <template v-slot:activator="{ props }">
-            <a class="filter-summary-link" v-bind="props">Quick Filters</a>
+            <a class="filter-summary-action" v-bind="props">Quick Filters</a>
           </template>
           <v-list density="compact">
             <v-list-item v-for="preset in quickPresets" :key="preset.label" @click="applyPreset(preset.days)">
@@ -137,8 +137,8 @@
             </v-list-item>
           </v-list>
         </v-menu>
-        <a v-if="hasActiveFilters" class="filter-summary-link" @click="resetFilters">Reset Filters</a>
-        <a class="filter-summary-link" @click="fetch">Refresh Data</a>
+        <a v-if="hasActiveFilters" class="filter-summary-action" @click="resetFilters">Reset Filters</a>
+        <a class="filter-summary-action" @click="fetch">Refresh Data</a>
       </v-col>
     </v-row>
 
@@ -461,17 +461,6 @@ export default {
   opacity: 0.7;
 }
 
-.retention-toggle-link {
-  cursor: pointer;
-  color: #2096f3;
-  text-decoration: none;
-  margin-left: 4px;
-
-  &:hover {
-    text-decoration: underline;
-  }
-}
-
 .row-filters {
   margin-top: 30px;
   margin-bottom: 0px;
@@ -487,15 +476,8 @@ export default {
   opacity: 0.5;
 }
 
-.filter-summary-link {
+.filter-summary-action {
   font-size: 14px;
   margin-left: 8px;
-  cursor: pointer;
-  color: #42A5F5;
-  text-decoration: none;
-}
-
-.filter-summary-link:hover {
-  text-decoration: underline;
 }
 </style>

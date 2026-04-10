@@ -166,9 +166,9 @@
                 <h2 style="margin-top: 10px; margin-bottom: 3px;">Image Builder</h2>
                 <p class="text-muted" style="margin-bottom: 10px; margin-top: 0px;">
                   Define the Dockerfile to build this image automatically.
-                  <a v-if="templates.length" class="templates-toggle-link" @click.stop.prevent="showTemplates = !showTemplates">
+                  <v-btn v-if="templates.length" variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="showTemplates = !showTemplates">
                     {{ showTemplates ? 'Hide Pre-Made Templates' : 'Show Pre-Made Templates' }}
-                  </a>
+                  </v-btn>
                 </p>
                 <div v-if="showTemplates && templates.length" class="mt-3 mb-6">
                   <v-row>
@@ -234,7 +234,7 @@
                 >
                   <template v-slot:message>
                     <span>Linux username inside the container that users will SSH into. Default is: user.
-                      <a class="reset-link" @click.stop.prevent="resetUsernameToDefault">Reset</a>
+                      <v-btn variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetUsernameToDefault">Reset</v-btn>
                     </span>
                   </template>
                 </v-text-field>
@@ -250,7 +250,7 @@
                 >
                   <template v-slot:message>
                     <span>Docker image for the FROM line (e.g. ubuntu:24.04).
-                      <a class="reset-link" @click.stop.prevent="resetBaseImageToDefault">Reset</a>
+                      <v-btn variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetBaseImageToDefault">Reset</v-btn>
                     </span>
                   </template>
                 </v-text-field>
@@ -267,7 +267,7 @@
                 >
                   <template v-slot:message>
                     <span>Full Dockerfile instructions between FROM and CMD. Edit freely to customize packages, user setup, SSH config, etc.
-                      <a v-if="data.dockerfileCommands" class="reset-link" @click.stop.prevent="resetDockerfileToDefaults">Reset</a>
+                      <v-btn v-if="data.dockerfileCommands" variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetDockerfileToDefaults">Reset</v-btn>
                     </span>
                   </template>
                 </v-textarea>
@@ -282,7 +282,7 @@
                 >
                   <template v-slot:message>
                     <span>The container start command (last Dockerfile line). Default starts SSH daemon.
-                      <a class="reset-link" @click.stop.prevent="resetCmdToDefaults">Reset</a>
+                      <v-btn variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetCmdToDefaults">Reset</v-btn>
                     </span>
                   </template>
                 </v-text-field>
@@ -311,7 +311,7 @@
                       >
                         <template v-slot:message>
                           <span>Executed to set the SSH password. Variables: {username}, {password}.
-                            <a class="reset-link" @click.stop.prevent="resetPasswordCommandToDefaults">Reset</a>
+                            <v-btn variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetPasswordCommandToDefaults">Reset</v-btn>
                           </span>
                         </template>
                       </v-text-field>
@@ -326,7 +326,7 @@
                       >
                         <template v-slot:message>
                           <span>Executed if user has an SSH public key. Variables: {username}, {ssh_key}.
-                            <a class="reset-link" @click.stop.prevent="resetSshKeyCommandsToDefaults">Reset</a>
+                            <v-btn variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetSshKeyCommandsToDefaults">Reset</v-btn>
                           </span>
                         </template>
                       </v-textarea>
@@ -874,17 +874,6 @@
     font-size: 15px;
   }
 
-  .templates-toggle-link {
-    color: #fb8c00;
-    cursor: pointer;
-    text-decoration: none;
-    font-weight: 500;
-    font-size: 14px;
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
   .template-card {
     cursor: pointer;
     transition: border-color 0.2s;
@@ -893,13 +882,17 @@
     align-items: center;
   }
 
-  .reset-link {
-    color: #fb8c00;
-    cursor: pointer;
-    text-decoration: none;
-    margin-left: 4px;
-    &:hover {
-      text-decoration: underline;
-    }
+  // Compact text button used inline within field hint messages
+  // (Reset / Show Templates). Strips Vuetify's default min-width and
+  // global .v-btn padding/margin so the button sits naturally in the text flow.
+  .inline-action-btn {
+    min-width: 0 !important;
+    padding: 0 4px !important;
+    height: auto !important;
+    margin: 0 0 0 4px !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
   }
 </style>

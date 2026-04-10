@@ -34,7 +34,7 @@
       <template v-slot:item.userEmail="{item}">
         <v-tooltip location="bottom" text="Click to filter by this user">
           <template v-slot:activator="{ props }">
-            <span v-bind="props" class="filterable" @click="$emit('filterByUser', item.userEmail)">
+            <span v-bind="props" class="link-hint" @click="$emit('filterByUser', item.userEmail)">
               {{ item.userEmail }}<span v-if="item.userName"> ({{ item.userName }})</span>
             </span>
           </template>
@@ -63,7 +63,7 @@
       <template v-slot:item.resourcesInfo="{item}">
         <v-tooltip bottom>
           <template v-slot:activator="{ props }">
-            <span v-bind="props" class="resource-link">{{ item.computerName }}</span>
+            <span v-bind="props" class="link-hint">{{ item.computerName }}</span>
           </template>
           <div style="max-width: 300px;">
             <div><strong>Server:</strong> {{ item.computerName }}</div>
@@ -82,7 +82,7 @@
           <template v-slot:activator="{ props }">
             <span
               v-bind="props"
-              :class="{ 'docker-name-copyable': item.reservedContainer.containerDockerId }"
+              :class="{ 'link-hint': item.reservedContainer.containerDockerId }"
               @click="copyContainerId(item.reservedContainer.containerDockerId)"
             >{{ item.reservedContainer.containerDockerName }}</span>
           </template>
@@ -97,17 +97,17 @@
       <template v-slot:item.containerStatus="{item}">
         <span v-if="(item.status == 'error' || item.status == 'restart_error') && item.reservedContainer.containerDockerErrorMessage">
           <span v-if="!readAll">{{ item.reservedContainer.containerDockerErrorMessage.slice(0, 10) }}...
-            <a class="issue-action-link" @click="readAll = true">Expand</a>
+            <a class="issue-action" @click="readAll = true">Expand</a>
           </span>
           <span v-else>{{ item.reservedContainer.containerDockerErrorMessage }}
-            <a class="issue-action-link" @click="copyIssueText(item.reservedContainer.containerDockerErrorMessage)">Copy</a>
-            <a class="issue-action-link" @click="readAll = false">Collapse</a>
+            <a class="issue-action" @click="copyIssueText(item.reservedContainer.containerDockerErrorMessage)">Copy</a>
+            <a class="issue-action" @click="readAll = false">Collapse</a>
           </span>
         </span>
       </template>
       <!-- Details link -->
       <template v-slot:item.details="{item}">
-        <a v-if="item.status === 'started'" class="actions-link" @click="emitShowReservationDetails(item.reservationId)">
+        <a v-if="item.status === 'started'" @click="emitShowReservationDetails(item.reservationId)">
           Show Details
         </a>
       </template>
@@ -115,7 +115,7 @@
       <template v-slot:item.actions="{item}">
         <v-menu v-if="item.status === 'reserved' || item.status === 'started' || item.status === 'restart_error' || item.status === 'paused'">
           <template v-slot:activator="{ props }">
-            <a class="actions-link" v-bind="props">
+            <a v-bind="props">
               Actions <v-icon size="small">mdi-chevron-down</v-icon>
             </a>
           </template>
@@ -290,55 +290,14 @@
 </script>
 
 <style scoped lang="scss">
-  .filterable {
-    cursor: pointer;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-    text-underline-offset: 3px;
-    &:hover {
-      text-decoration-style: solid;
-    }
-  }
-
-  .actions-link {
-    color: #2196f3;
-    cursor: pointer;
-    text-decoration: none;
-    white-space: nowrap;
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
   .cancel-action .v-list-item-title,
   .cancel-action .v-icon {
     color: #ef5350;
   }
 
-  .issue-action-link {
+  .issue-action {
     font-size: 12px;
     margin-left: 4px;
-    cursor: pointer;
-    color: #42A5F5;
-    text-decoration: none;
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
-  .resource-link {
-    cursor: help;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-  }
-
-  .docker-name-copyable {
-    cursor: pointer;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-    &:hover {
-      text-decoration-style: solid;
-    }
   }
 
   // Deep selector for tooltip styling

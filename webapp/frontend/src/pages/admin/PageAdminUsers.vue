@@ -11,7 +11,7 @@
       <v-col cols="12">
         <v-btn color="green" @click="addUser">Create New User</v-btn>
         <br>
-        <a v-if="!showFilters" class="show-filters-link" style="margin-top: 12px; margin-bottom: 24px; display: inline-block;" @click="showFilters = true">Show Filters</a>
+        <a v-if="!showFilters" style="margin-top: 12px; margin-bottom: 24px; display: inline-block; font-size: 14px;" @click="showFilters = true">Show Filters</a>
       </v-col>
     </v-row>
 
@@ -365,16 +365,6 @@ export default {
 <style scoped lang="scss">
 .loading {
   margin: 60px auto;
-}
-
-.show-filters-link {
-  font-size: 14px;
-  cursor: pointer;
-  color: #42A5F5;
-  text-decoration: none;
-  &:hover {
-    text-decoration: underline;
-  }
 }
 
 .row-filters {

@@ -193,6 +193,17 @@ a,
     color: #007cd6;
 }
 
+/* Hoverable info hint — for <span> tooltip triggers and other non-anchor
+   elements that should look interactive. Inherits color from parent. */
+.link-hint {
+    cursor: pointer;
+    text-decoration: underline dashed;
+    text-underline-offset: 3px;
+}
+.link-hint:hover {
+    text-decoration-style: solid;
+}
+
 .v-card {
     background-color: #1e1e1e;
     color: #fff;

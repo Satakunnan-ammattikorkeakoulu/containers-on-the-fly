@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
+    <a v-if="hasLongItems" class="read-all-toggle" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
     <v-data-table
       :headers="table.headers"
       :items="data"
@@ -64,7 +64,7 @@
       <template v-slot:item.actions="{item}">
         <v-menu>
           <template v-slot:activator="{ props }">
-            <a class="actions-link" v-bind="props">
+            <a v-bind="props">
               Actions <v-icon size="small">mdi-chevron-down</v-icon>
             </a>
           </template>
@@ -595,22 +595,12 @@
 </script>
 
 <style scoped lang="scss">
-  .actions-link {
-    color: #2196f3;
-    cursor: pointer;
-    text-decoration: none;
-    white-space: nowrap;
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
   .destructive-action .v-list-item-title,
   .destructive-action .v-icon {
     color: #ef5350;
   }
 
-  .link-toggle-read-all {
+  .read-all-toggle {
     margin-bottom: 20px;
     font-size: 14px;
     display: inline-block;

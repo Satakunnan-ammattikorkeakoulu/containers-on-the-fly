@@ -16,7 +16,7 @@
       <template v-slot:item.actions="{item}">
         <v-menu>
           <template v-slot:activator="{ props }">
-            <a class="actions-link" v-bind="props">
+            <a v-bind="props">
               Actions <v-icon size="small">mdi-chevron-down</v-icon>
             </a>
           </template>
@@ -129,14 +129,3 @@ export default {
 }
 </script>
 
-<style scoped lang="scss">
-.actions-link {
-  color: #2196f3;
-  cursor: pointer;
-  text-decoration: none;
-  white-space: nowrap;
-  &:hover {
-    text-decoration: underline;
-  }
-}
-</style>

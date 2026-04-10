@@ -15,7 +15,7 @@
                 {{ primaryPortTypeConfig.helpText || 'Connect to:' }}
               </div>
               <div class="d-flex align-center justify-space-between connection-string-box pa-3 rounded">
-                <a v-if="primaryPortTypeConfig.clickable" :href="primaryPortUrl" target="_blank" style="color: inherit;">
+                <a v-if="primaryPortTypeConfig.clickable" :href="primaryPortUrl" target="_blank" rel="noopener noreferrer" class="primary-port-link">
                   <code class="text-body-1">{{ primaryPortUrl }}</code>
                 </a>
                 <code v-else class="text-body-1">{{ primaryPortUrl }}</code>
@@ -80,7 +80,7 @@
                 <v-icon size="x-small" class="mr-1">mdi-information-outline</v-icon>
                 <v-tooltip location="bottom" max-width="300">
                   <template v-slot:activator="{ props }">
-                    <a v-bind="props" class="text-caption" style="cursor: pointer; color: inherit;">Enable passwordless SSH login?</a>
+                    <span v-bind="props" class="text-caption link-hint">Enable passwordless SSH login?</span>
                   </template>
                   <span>You can add public SSH key in your user profile to connect to containers without entering a password. The key will be automatically deployed to all future reservations.</span>
                 </v-tooltip>
@@ -451,5 +451,16 @@
     background: rgba(var(--v-theme-on-surface), 0.05);
     border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
     font-family: monospace;
+  }
+  // Wraps the <code> primary-port URL inside .connection-string-box.
+  // Uses inherit color so the link blends with the surrounding code styling
+  // instead of taking on the global blue link color.
+  .primary-port-link {
+    color: inherit;
+    text-decoration: none;
+    &:hover {
+      color: inherit;
+      text-decoration: underline;
+    }
   }
 </style>

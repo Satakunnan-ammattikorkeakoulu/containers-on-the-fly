@@ -727,6 +727,233 @@
             </v-expansion-panel-text>
           </v-expansion-panel>
 
+          <!-- Email Templates Section -->
+          <v-expansion-panel>
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-email-edit-outline</v-icon>
+              <span class="font-weight-bold">Email Templates</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-form ref="emailTemplatesForm" v-model="forms.emailTemplates.valid">
+                <p class="body-2 text-grey mb-4">
+                  Customize the subject lines and introductory text for emails sent to users
+                  during container lifecycle events. Leave body intro fields empty to use the default text.
+                </p>
+
+                <!-- Container Started Email -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Container Started</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Sent when a user's container reservation starts successfully.
+                  </p>
+                  <v-checkbox
+                    v-model="settings.emailTemplates.enableContainerStarted"
+                    label="Enable this email"
+                    color="primary"
+                    class="mt-0 mb-2"
+                    hide-details
+                  ></v-checkbox>
+                  <v-text-field
+                    v-model="settings.emailTemplates.subjectContainerStarted"
+                    label="Subject Line"
+                    placeholder="Server is ready to use!"
+                    :rules="[rules.required]"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerStarted"
+                    class="mb-3"
+                  ></v-text-field>
+                  <v-textarea
+                    v-model="settings.emailTemplates.bodyIntroContainerStarted"
+                    label="Optional Body Intro Text"
+                    placeholder=""
+                    rows="2"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerStarted"
+                  ></v-textarea>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <!-- Container Error Email -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Container Error</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Sent when a user's container fails to start.
+                  </p>
+                  <v-checkbox
+                    v-model="settings.emailTemplates.enableContainerError"
+                    label="Enable this email"
+                    color="primary"
+                    class="mt-0 mb-2"
+                    hide-details
+                  ></v-checkbox>
+                  <v-text-field
+                    v-model="settings.emailTemplates.subjectContainerError"
+                    label="Subject Line"
+                    placeholder="Server did not start"
+                    :rules="[rules.required]"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerError"
+                    class="mb-3"
+                  ></v-text-field>
+                  <v-textarea
+                    v-model="settings.emailTemplates.bodyIntroContainerError"
+                    label="Optional Body Intro Text"
+                    placeholder=""
+                    rows="2"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerError"
+                  ></v-textarea>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <!-- Container Paused Email -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Container Paused</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Sent when a low-priority container is paused for a higher-priority reservation.
+                  </p>
+                  <v-checkbox
+                    v-model="settings.emailTemplates.enableContainerPaused"
+                    label="Enable this email"
+                    color="primary"
+                    class="mt-0 mb-2"
+                    hide-details
+                  ></v-checkbox>
+                  <v-text-field
+                    v-model="settings.emailTemplates.subjectContainerPaused"
+                    label="Subject Line"
+                    placeholder="Low-priority container paused"
+                    :rules="[rules.required]"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerPaused"
+                    class="mb-3"
+                  ></v-text-field>
+                  <v-textarea
+                    v-model="settings.emailTemplates.bodyIntroContainerPaused"
+                    label="Optional Body Intro Text"
+                    placeholder=""
+                    rows="2"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerPaused"
+                  ></v-textarea>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <!-- Container Resumed Email -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Container Resumed</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Sent when a paused low-priority container is resumed.
+                  </p>
+                  <v-checkbox
+                    v-model="settings.emailTemplates.enableContainerResumed"
+                    label="Enable this email"
+                    color="primary"
+                    class="mt-0 mb-2"
+                    hide-details
+                  ></v-checkbox>
+                  <v-text-field
+                    v-model="settings.emailTemplates.subjectContainerResumed"
+                    label="Subject Line"
+                    placeholder="Low-priority container resumed"
+                    :rules="[rules.required]"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerResumed"
+                    class="mb-3"
+                  ></v-text-field>
+                  <v-textarea
+                    v-model="settings.emailTemplates.bodyIntroContainerResumed"
+                    label="Optional Body Intro Text"
+                    placeholder=""
+                    rows="2"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerResumed"
+                  ></v-textarea>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <!-- Container Resume Failed Email -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Container Resume Failed</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Sent when a paused low-priority container fails to resume. The reservation reaches a terminal error state and the user must create a new reservation to recover their work.
+                  </p>
+                  <v-checkbox
+                    v-model="settings.emailTemplates.enableContainerResumeFailed"
+                    label="Enable this email"
+                    color="primary"
+                    class="mt-0 mb-2"
+                    hide-details
+                  ></v-checkbox>
+                  <v-text-field
+                    v-model="settings.emailTemplates.subjectContainerResumeFailed"
+                    label="Subject Line"
+                    placeholder="Low-priority container failed to resume"
+                    :rules="[rules.required]"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerResumeFailed"
+                    class="mb-3"
+                  ></v-text-field>
+                  <v-textarea
+                    v-model="settings.emailTemplates.bodyIntroContainerResumeFailed"
+                    label="Optional Body Intro Text"
+                    placeholder=""
+                    rows="2"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerResumeFailed"
+                  ></v-textarea>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <!-- Low-Priority Notice -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Low-Priority Reservation Notice</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Notice text added to the container started and resumed emails when the user's reservation is low-priority.
+                    Warns the user that their container may be paused if a higher-priority reservation needs the resources.
+                  </p>
+                  <v-textarea
+                    v-model="settings.emailTemplates.lowPriorityNotice"
+                    label="Low-Priority Notice Text"
+                    placeholder=""
+                    rows="3"
+                    variant="outlined"
+                    hide-details="auto"
+                  ></v-textarea>
+                </div>
+
+                <!-- Save Button -->
+                <v-row>
+                  <v-col cols="12">
+                    <v-btn
+                      color="primary"
+                      :loading="saving.emailTemplates"
+                      @click="saveSection('emailTemplates')"
+                    >
+                      <v-icon start>mdi-content-save</v-icon>
+                      Save Email Templates
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-form>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
           <!-- System Notifications Section -->
           <v-expansion-panel>
             <v-expansion-panel-title>
@@ -1227,7 +1454,8 @@ export default {
       auth: { valid: true },
       analytics: { valid: true },
       legal: { valid: true },
-      connection: { valid: true }
+      connection: { valid: true },
+      emailTemplates: { valid: true }
     },
 
     // Saving states for each section
@@ -1241,7 +1469,8 @@ export default {
       auth: false,
       analytics: false,
       legal: false,
-      connection: false
+      connection: false,
+      emailTemplates: false
     },
     
     // Form validation rules
@@ -1425,6 +1654,24 @@ export default {
           { id: "vscode", name: "VS Code", icon: "mdi-microsoft-visual-studio-code", template: "{username}@{ip}:{port}", helpText: "Open the Remote SSH extension and connect to" },
           { id: "terminal", name: "Terminal", icon: "mdi-console", template: "ssh {username}@{ip} -p {port}", helpText: "Run this command in your terminal" }
         ]
+      },
+      emailTemplates: {
+        enableContainerStarted: true,
+        enableContainerError: true,
+        enableContainerPaused: true,
+        enableContainerResumed: true,
+        enableContainerResumeFailed: true,
+        subjectContainerStarted: '',
+        subjectContainerError: '',
+        subjectContainerPaused: '',
+        subjectContainerResumed: '',
+        subjectContainerResumeFailed: '',
+        bodyIntroContainerStarted: '',
+        bodyIntroContainerError: '',
+        bodyIntroContainerPaused: '',
+        bodyIntroContainerResumed: '',
+        bodyIntroContainerResumeFailed: '',
+        lowPriorityNotice: ''
       }
     }
   }),
@@ -1599,6 +1846,26 @@ export default {
             if (data.connection?.sshMethods && Array.isArray(data.connection.sshMethods) && data.connection.sshMethods.length > 0) {
               _this.settings.connection.sshMethods = data.connection.sshMethods;
             }
+
+            // Update email template settings
+            _this.settings.emailTemplates = {
+              enableContainerStarted: data.emailTemplates?.enableContainerStarted !== false,
+              enableContainerError: data.emailTemplates?.enableContainerError !== false,
+              enableContainerPaused: data.emailTemplates?.enableContainerPaused !== false,
+              enableContainerResumed: data.emailTemplates?.enableContainerResumed !== false,
+              enableContainerResumeFailed: data.emailTemplates?.enableContainerResumeFailed !== false,
+              subjectContainerStarted: data.emailTemplates?.subjectContainerStarted || '',
+              subjectContainerError: data.emailTemplates?.subjectContainerError || '',
+              subjectContainerPaused: data.emailTemplates?.subjectContainerPaused || '',
+              subjectContainerResumed: data.emailTemplates?.subjectContainerResumed || '',
+              subjectContainerResumeFailed: data.emailTemplates?.subjectContainerResumeFailed || '',
+              bodyIntroContainerStarted: data.emailTemplates?.bodyIntroContainerStarted || '',
+              bodyIntroContainerError: data.emailTemplates?.bodyIntroContainerError || '',
+              bodyIntroContainerPaused: data.emailTemplates?.bodyIntroContainerPaused || '',
+              bodyIntroContainerResumed: data.emailTemplates?.bodyIntroContainerResumed || '',
+              bodyIntroContainerResumeFailed: data.emailTemplates?.bodyIntroContainerResumeFailed || '',
+              lowPriorityNotice: data.emailTemplates?.lowPriorityNotice || ''
+            };
 
             // Mark settings as initialized after a small delay to ensure watchers don't fire during load
             setTimeout(() => {
@@ -1900,7 +2167,8 @@ export default {
         auth: 'Authentication',
         analytics: 'Analytics',
         legal: 'Legal Documents',
-        connection: 'Connection Methods'
+        connection: 'Connection Methods',
+        emailTemplates: 'Email Templates'
       };
       return names[sectionName] || sectionName;
     },

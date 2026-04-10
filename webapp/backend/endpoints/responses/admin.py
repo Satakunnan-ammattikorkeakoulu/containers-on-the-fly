@@ -1541,7 +1541,23 @@ def get_general_settings() -> object:
             'legal.privacyPolicyContent',
             'legal.termsOfServiceContent',
             'legal.lastUpdated',
-            'connection.sshMethods'
+            'connection.sshMethods',
+            'email.enableContainerStarted',
+            'email.enableContainerError',
+            'email.enableContainerPaused',
+            'email.enableContainerResumed',
+            'email.enableContainerResumeFailed',
+            'email.subjectContainerStarted',
+            'email.subjectContainerError',
+            'email.subjectContainerPaused',
+            'email.subjectContainerResumed',
+            'email.subjectContainerResumeFailed',
+            'email.bodyIntroContainerStarted',
+            'email.bodyIntroContainerError',
+            'email.bodyIntroContainerPaused',
+            'email.bodyIntroContainerResumed',
+            'email.bodyIntroContainerResumeFailed',
+            'email.lowPriorityNotice'
         ]
         
         # Get all settings
@@ -1626,6 +1642,24 @@ def get_general_settings() -> object:
                     {"id": "terminal", "name": "Terminal", "icon": "mdi-console",
                      "template": "ssh {username}@{ip} -p {port}", "helpText": "Run this command in your terminal"}
                 ])
+            },
+            "emailTemplates": {
+                "enableContainerStarted": settings_dict.get('email.enableContainerStarted', True),
+                "enableContainerError": settings_dict.get('email.enableContainerError', True),
+                "enableContainerPaused": settings_dict.get('email.enableContainerPaused', True),
+                "enableContainerResumed": settings_dict.get('email.enableContainerResumed', True),
+                "enableContainerResumeFailed": settings_dict.get('email.enableContainerResumeFailed', True),
+                "subjectContainerStarted": settings_dict.get('email.subjectContainerStarted', 'Server is ready to use!'),
+                "subjectContainerError": settings_dict.get('email.subjectContainerError', 'Server did not start'),
+                "subjectContainerPaused": settings_dict.get('email.subjectContainerPaused', 'Low-priority container paused'),
+                "subjectContainerResumed": settings_dict.get('email.subjectContainerResumed', 'Low-priority container resumed'),
+                "subjectContainerResumeFailed": settings_dict.get('email.subjectContainerResumeFailed', 'Low-priority container failed to resume'),
+                "bodyIntroContainerStarted": settings_dict.get('email.bodyIntroContainerStarted', ''),
+                "bodyIntroContainerError": settings_dict.get('email.bodyIntroContainerError', ''),
+                "bodyIntroContainerPaused": settings_dict.get('email.bodyIntroContainerPaused', ''),
+                "bodyIntroContainerResumed": settings_dict.get('email.bodyIntroContainerResumed', ''),
+                "bodyIntroContainerResumeFailed": settings_dict.get('email.bodyIntroContainerResumeFailed', ''),
+                "lowPriorityNotice": settings_dict.get('email.lowPriorityNotice', '')
             }
         }
         
@@ -1639,7 +1673,8 @@ def save_general_settings(section: str, settings: dict, actor_user_id: int = Non
 
     Persists settings to the database for the given section. Supported
     sections: general, access, email, contact, emailEnable, notifications,
-    auth (including nested LDAP settings), auditLog, analytics, and legal.
+    auth (including nested LDAP settings), auditLog, analytics, legal,
+    connection, and emailTemplates.
 
     Args:
         section: The settings section name to save.
@@ -1794,6 +1829,52 @@ def save_general_settings(section: str, settings: dict, actor_user_id: int = Non
                     seen_ids.add(method["id"])
                     sanitized.append({k: method[k] for k in required_keys})
                 set_setting('connection.sshMethods', sanitized)
+
+        elif section == "emailTemplates":
+            # Validate subject lines are not empty
+            subject_fields = [
+                'subjectContainerStarted', 'subjectContainerError',
+                'subjectContainerPaused', 'subjectContainerResumed',
+                'subjectContainerResumeFailed'
+            ]
+            for field in subject_fields:
+                if field in settings and not isinstance(settings[field], str):
+                    return api_response(False, "Subject lines must be text.")
+                if field in settings and not settings[field].strip():
+                    return api_response(False, "Subject lines cannot be empty.")
+
+            if 'enableContainerStarted' in settings:
+                set_setting('email.enableContainerStarted', settings['enableContainerStarted'])
+            if 'enableContainerError' in settings:
+                set_setting('email.enableContainerError', settings['enableContainerError'])
+            if 'enableContainerPaused' in settings:
+                set_setting('email.enableContainerPaused', settings['enableContainerPaused'])
+            if 'enableContainerResumed' in settings:
+                set_setting('email.enableContainerResumed', settings['enableContainerResumed'])
+            if 'enableContainerResumeFailed' in settings:
+                set_setting('email.enableContainerResumeFailed', settings['enableContainerResumeFailed'])
+            if 'subjectContainerStarted' in settings:
+                set_setting('email.subjectContainerStarted', settings['subjectContainerStarted'])
+            if 'subjectContainerError' in settings:
+                set_setting('email.subjectContainerError', settings['subjectContainerError'])
+            if 'subjectContainerPaused' in settings:
+                set_setting('email.subjectContainerPaused', settings['subjectContainerPaused'])
+            if 'subjectContainerResumed' in settings:
+                set_setting('email.subjectContainerResumed', settings['subjectContainerResumed'])
+            if 'subjectContainerResumeFailed' in settings:
+                set_setting('email.subjectContainerResumeFailed', settings['subjectContainerResumeFailed'])
+            if 'bodyIntroContainerStarted' in settings:
+                set_setting('email.bodyIntroContainerStarted', settings['bodyIntroContainerStarted'])
+            if 'bodyIntroContainerError' in settings:
+                set_setting('email.bodyIntroContainerError', settings['bodyIntroContainerError'])
+            if 'bodyIntroContainerPaused' in settings:
+                set_setting('email.bodyIntroContainerPaused', settings['bodyIntroContainerPaused'])
+            if 'bodyIntroContainerResumed' in settings:
+                set_setting('email.bodyIntroContainerResumed', settings['bodyIntroContainerResumed'])
+            if 'bodyIntroContainerResumeFailed' in settings:
+                set_setting('email.bodyIntroContainerResumeFailed', settings['bodyIntroContainerResumeFailed'])
+            if 'lowPriorityNotice' in settings:
+                set_setting('email.lowPriorityNotice', settings['lowPriorityNotice'])
 
         else:
             return api_response(False, f"Unknown section: {section}")

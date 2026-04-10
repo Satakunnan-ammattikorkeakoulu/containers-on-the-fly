@@ -35,7 +35,8 @@ def _render_port_url(port_type, ip, outside_port):
 
 def generate_connection_text(image, ip, ports, password, include_email_details,
                              non_critical_errors, end_date=None, username="user",
-                             ssh_methods=None, primary_connection_port_id=None):
+                             ssh_methods=None, primary_connection_port_id=None,
+                             body_intro=None, is_low_priority=False):
     """Generate connection details text for a started container.
 
     Builds a formatted text block containing SSH connection instructions,
@@ -61,6 +62,10 @@ def generate_connection_text(image, ip, ports, password, include_email_details,
             fetched from system settings.
         primary_connection_port_id: Optional ContainerPort ID of the primary
             connection method. None means SSH is primary.
+        body_intro: Optional additional intro text prepended before the
+            default intro message. Ignored if empty or None.
+        is_low_priority: Whether the reservation is low-priority. When True,
+            adds a notice block warning the user the container may be paused.
 
     Returns:
         str: Formatted connection details text.
@@ -151,7 +156,19 @@ def generate_connection_text(image, ip, ports, password, include_email_details,
 
     start_message = ""
     if include_email_details:
-        start_message = f"Container with image {image} is ready to use.{linesep}{linesep}-----{linesep}"
+        start_message = ""
+        if body_intro:
+            start_message += f"{body_intro}{linesep}{linesep}"
+        start_message += f"Container with image {image} is ready to use.{linesep}{linesep}"
+        if is_low_priority:
+            low_priority_notice = ""
+            try:
+                low_priority_notice = get_setting('email.lowPriorityNotice')
+            except Exception:
+                pass
+            if low_priority_notice:
+                start_message += f"{low_priority_notice}{linesep}{linesep}"
+        start_message += f"-----{linesep}"
 
     no_reply = ""
     if include_email_details:
@@ -180,7 +197,8 @@ Address of the machine: {ip}
 
 def send_container_started_email(user_email, image_name, computer_ip, ports, password,
                                  non_critical_errors, end_date, username="user",
-                                 ssh_methods=None, primary_connection_port_id=None):
+                                 ssh_methods=None, primary_connection_port_id=None,
+                                 is_low_priority=False):
     """Send an email notification when a container starts successfully.
 
     Generates connection details text and emails it to the user. Does
@@ -198,24 +216,33 @@ def send_container_started_email(user_email, image_name, computer_ip, ports, pas
         username: Container username for SSH connection strings.
         ssh_methods: Optional list of SSH method dicts from system settings.
         primary_connection_port_id: Optional primary ContainerPort ID.
+        is_low_priority: Whether the reservation is low-priority. When True,
+            adds a notice about possible pauses to the email body.
     """
     if not get_setting('email.sendEmail'):
         return
+    if not get_setting('email.enableContainerStarted'):
+        return
 
+    subject = get_setting('email.subjectContainerStarted')
+    body_intro = get_setting('email.bodyIntroContainerStarted')
     body = generate_connection_text(
         image_name, computer_ip, ports, password,
         True, non_critical_errors, end_date, username,
         ssh_methods=ssh_methods,
-        primary_connection_port_id=primary_connection_port_id
+        primary_connection_port_id=primary_connection_port_id,
+        body_intro=body_intro,
+        is_low_priority=is_low_priority
     )
-    send_email(user_email, "AI Server is ready to use!", body)
+    send_email(user_email, subject, body)
 
 
 def send_container_error_email(user_email, errors):
     """Send an email notification when a container fails to start.
 
     Notifies the user that their reservation encountered an error and
-    includes the error details. Does nothing if email sending is disabled.
+    includes the error details. Does nothing if email sending is disabled
+    or if this email type is disabled.
 
     Args:
         user_email: Recipient email address.
@@ -223,12 +250,57 @@ def send_container_error_email(user_email, errors):
     """
     if not get_setting('email.sendEmail'):
         return
+    if not get_setting('email.enableContainerError'):
+        return
 
     linesep = os.linesep
-    body = f"Your AI server reservation did not start as there was an error. {linesep}{linesep}"
+    subject = get_setting('email.subjectContainerError')
+    custom_intro = get_setting('email.bodyIntroContainerError')
+    body = ""
+    if custom_intro:
+        body += f"{custom_intro}{linesep}{linesep}"
+    body += f"Your server reservation did not start as there was an error. {linesep}{linesep}"
     body += f"The error was: {linesep}{linesep}{errors}{linesep}{linesep}"
     body += "Please do not reply to this email, this email is sent from a noreply email address."
-    send_email(user_email, "AI Server did not start", body)
+    send_email(user_email, subject, body)
+
+
+def send_container_resume_failed_email(user_email, image_name, computer_name, reservation_id, errors):
+    """Send an email notification when a low-priority container fails to resume.
+
+    Notifies the user that their previously-running, paused container could
+    not be restarted. The reservation has reached the terminal "error" state
+    and will not be retried automatically. Data on mounted volumes is
+    preserved, but the user must create a new reservation to access it.
+    Does nothing if email sending is disabled or if this email type is
+    disabled.
+
+    Args:
+        user_email: Recipient email address.
+        image_name: Name of the Docker image that failed to resume.
+        computer_name: Name of the server where the container ran.
+        reservation_id: Database ID of the failed reservation.
+        errors: Error message or exception describing what went wrong.
+    """
+    if not get_setting('email.sendEmail'):
+        return
+    if not get_setting('email.enableContainerResumeFailed'):
+        return
+
+    linesep = os.linesep
+    subject = get_setting('email.subjectContainerResumeFailed')
+    custom_intro = get_setting('email.bodyIntroContainerResumeFailed')
+    body = ""
+    if custom_intro:
+        body += f"{custom_intro}{linesep}{linesep}"
+    body += f"Your low-priority container (reservation #{reservation_id}) was paused earlier and could not be resumed due to an error.{linesep}{linesep}"
+    body += f"Container image: {image_name}{linesep}"
+    body += f"Server: {computer_name}{linesep}{linesep}"
+    body += f"The error was: {linesep}{linesep}{errors}{linesep}{linesep}"
+    body += f"This reservation has been marked as errored and will NOT be retried automatically.{linesep}{linesep}"
+    body += f"Your data on mounted volumes (e.g. the persistent folder) is preserved. To continue your work, please create a new reservation — it can be attached to the same persistent volume.{linesep}{linesep}"
+    body += "Please do not reply to this email, this email is sent from a noreply email address."
+    send_email(user_email, subject, body)
 
 
 def send_container_paused_email(user_email, image_name, computer_name, reservation_id):
@@ -236,7 +308,8 @@ def send_container_paused_email(user_email, image_name, computer_name, reservati
 
     Notifies the user that their container was paused to free resources
     for a higher-priority reservation, and that it will restart
-    automatically when resources become available.
+    automatically when resources become available. Does nothing if email
+    sending is disabled or if this email type is disabled.
 
     Args:
         user_email: Recipient email address.
@@ -246,16 +319,23 @@ def send_container_paused_email(user_email, image_name, computer_name, reservati
     """
     if not get_setting('email.sendEmail'):
         return
+    if not get_setting('email.enableContainerPaused'):
+        return
 
     linesep = os.linesep
-    body = f"Your low-priority container (reservation #{reservation_id}) has been paused.{linesep}{linesep}"
+    subject = get_setting('email.subjectContainerPaused')
+    custom_intro = get_setting('email.bodyIntroContainerPaused')
+    body = ""
+    if custom_intro:
+        body += f"{custom_intro}{linesep}{linesep}"
+    body += f"Your low-priority container (reservation #{reservation_id}) has been paused.{linesep}{linesep}"
     body += f"Container image: {image_name}{linesep}"
     body += f"Server: {computer_name}{linesep}{linesep}"
     body += f"The container was paused because resources are needed by a higher-priority reservation.{linesep}"
-    body += f"It will restart automatically when resources become available.{linesep}{linesep}"
+    body += f"It will resume automatically when resources become available.{linesep}{linesep}"
     body += f"Data on mounted volumes is preserved. No action is needed from you.{linesep}{linesep}"
     body += "Please do not reply to this email, this email is sent from a noreply email address."
-    send_email(user_email, "Low-priority container paused", body)
+    send_email(user_email, subject, body)
 
 
 def send_container_resumed_email(user_email, image_name, computer_ip, ports, password,
@@ -264,7 +344,8 @@ def send_container_resumed_email(user_email, image_name, computer_ip, ports, pas
     """Send an email notification when a paused low-priority container resumes.
 
     Notifies the user that their container has been restarted with new
-    connection details (ports and password may have changed).
+    connection details (ports and password may have changed). Does nothing
+    if email sending is disabled or if this email type is disabled.
 
     Args:
         user_email: Recipient email address.
@@ -280,14 +361,20 @@ def send_container_resumed_email(user_email, image_name, computer_ip, ports, pas
     """
     if not get_setting('email.sendEmail'):
         return
+    if not get_setting('email.enableContainerResumed'):
+        return
 
+    subject = get_setting('email.subjectContainerResumed')
+    body_intro = get_setting('email.bodyIntroContainerResumed')
     body = generate_connection_text(
         image_name, computer_ip, ports, password,
         True, "Your low-priority container has been resumed.", end_date, username,
         ssh_methods=ssh_methods,
-        primary_connection_port_id=primary_connection_port_id
+        primary_connection_port_id=primary_connection_port_id,
+        body_intro=body_intro,
+        is_low_priority=True
     )
-    send_email(user_email, "Low-priority container resumed", body)
+    send_email(user_email, subject, body)
 
 
 def send_admin_failure_alert(user_email, reservation_id, image_name, server_name, errors):

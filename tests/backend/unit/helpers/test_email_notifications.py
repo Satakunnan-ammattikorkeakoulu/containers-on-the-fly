@@ -5,6 +5,7 @@ from helpers.email_notifications import (
     generate_connection_text,
     send_container_started_email,
     send_container_error_email,
+    send_container_resume_failed_email,
     send_container_paused_email,
     send_admin_failure_alert,
 )
@@ -72,10 +73,21 @@ class TestGenerateConnectionText:
 
 class TestSendContainerStartedEmail:
 
+    @staticmethod
+    def _started_settings(key):
+        """Return appropriate values for each setting key used by send_container_started_email."""
+        return {
+            "email.sendEmail": True,
+            "email.enableContainerStarted": True,
+            "email.subjectContainerStarted": "Server is ready to use!",
+            "email.bodyIntroContainerStarted": "",
+            "email.lowPriorityNotice": "Note: low-priority test notice.",
+        }.get(key, None)
+
     @patch("helpers.email_notifications.send_email")
     @patch("helpers.email_notifications.get_setting")
     def test_sends_when_enabled(self, mock_setting, mock_send):
-        mock_setting.return_value = True
+        mock_setting.side_effect = self._started_settings
         ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001, "portType": "SSH"}]
         send_container_started_email("user@test.com", "ubuntu", "10.0.0.1", ports, "pass", "", None)
         mock_send.assert_called_once()
@@ -87,12 +99,44 @@ class TestSendContainerStartedEmail:
         send_container_started_email("user@test.com", "ubuntu", "10.0.0.1", [], "pass", "", None)
         mock_send.assert_not_called()
 
+    @patch("helpers.email_notifications.send_email")
+    @patch("helpers.email_notifications.get_setting")
+    def test_low_priority_notice_included(self, mock_setting, mock_send):
+        mock_setting.side_effect = self._started_settings
+        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001, "portType": "SSH"}]
+        send_container_started_email("user@test.com", "ubuntu", "10.0.0.1", ports, "pass", "", None,
+                                     is_low_priority=True)
+        mock_send.assert_called_once()
+        body = mock_send.call_args[0][2]
+        assert "low-priority test notice" in body
+
+    @patch("helpers.email_notifications.send_email")
+    @patch("helpers.email_notifications.get_setting")
+    def test_low_priority_notice_omitted_for_normal(self, mock_setting, mock_send):
+        mock_setting.side_effect = self._started_settings
+        ports = [{"serviceName": "SSH", "localPort": 22, "outsidePort": 2001, "portType": "SSH"}]
+        send_container_started_email("user@test.com", "ubuntu", "10.0.0.1", ports, "pass", "", None)
+        mock_send.assert_called_once()
+        body = mock_send.call_args[0][2]
+        assert "low-priority test notice" not in body
+
 
 class TestSendContainerErrorEmail:
 
+    @staticmethod
+    def _error_settings(key):
+        """Return appropriate values for each setting key used by send_container_error_email."""
+        return {
+            "email.sendEmail": True,
+            "email.enableContainerError": True,
+            "email.subjectContainerError": "Server did not start",
+            "email.bodyIntroContainerError": "",
+        }.get(key, None)
+
     @patch("helpers.email_notifications.send_email")
-    @patch("helpers.email_notifications.get_setting", return_value=True)
+    @patch("helpers.email_notifications.get_setting")
     def test_sends_error_body(self, mock_setting, mock_send):
+        mock_setting.side_effect = self._error_settings
         send_container_error_email("user@test.com", "GPU not available")
         mock_send.assert_called_once()
         body = mock_send.call_args[0][2]
@@ -105,11 +149,59 @@ class TestSendContainerErrorEmail:
         mock_send.assert_not_called()
 
 
-class TestSendContainerPausedEmail:
+class TestSendContainerResumeFailedEmail:
+
+    @staticmethod
+    def _resume_failed_settings(key):
+        """Return appropriate values for each setting key used by send_container_resume_failed_email."""
+        return {
+            "email.sendEmail": True,
+            "email.enableContainerResumeFailed": True,
+            "email.subjectContainerResumeFailed": "Low-priority container failed to resume",
+            "email.bodyIntroContainerResumeFailed": "",
+        }.get(key, None)
 
     @patch("helpers.email_notifications.send_email")
-    @patch("helpers.email_notifications.get_setting", return_value=True)
+    @patch("helpers.email_notifications.get_setting")
+    def test_sends_resume_failure_body(self, mock_setting, mock_send):
+        mock_setting.side_effect = self._resume_failed_settings
+        send_container_resume_failed_email("user@test.com", "ubuntu", "server1", 42, "OOM killed")
+        mock_send.assert_called_once()
+        subject = mock_send.call_args[0][1]
+        body = mock_send.call_args[0][2]
+        assert subject == "Low-priority container failed to resume"
+        assert "ubuntu" in body
+        assert "server1" in body
+        assert "42" in body
+        assert "OOM killed" in body
+        # Should explain it won't be retried automatically
+        assert "NOT be retried" in body or "not be retried" in body
+        # Should explain data preservation
+        assert "preserved" in body
+
+    @patch("helpers.email_notifications.send_email")
+    @patch("helpers.email_notifications.get_setting", return_value=False)
+    def test_skips_when_disabled(self, mock_setting, mock_send):
+        send_container_resume_failed_email("user@test.com", "ubuntu", "server1", 42, "error")
+        mock_send.assert_not_called()
+
+
+class TestSendContainerPausedEmail:
+
+    @staticmethod
+    def _paused_settings(key):
+        """Return appropriate values for each setting key used by send_container_paused_email."""
+        return {
+            "email.sendEmail": True,
+            "email.enableContainerPaused": True,
+            "email.subjectContainerPaused": "Low-priority container paused",
+            "email.bodyIntroContainerPaused": "",
+        }.get(key, None)
+
+    @patch("helpers.email_notifications.send_email")
+    @patch("helpers.email_notifications.get_setting")
     def test_sends_pause_notification(self, mock_setting, mock_send):
+        mock_setting.side_effect = self._paused_settings
         send_container_paused_email("user@test.com", "ubuntu", "server1", 42)
         mock_send.assert_called_once()
         body = mock_send.call_args[0][2]

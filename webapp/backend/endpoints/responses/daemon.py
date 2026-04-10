@@ -18,7 +18,7 @@ from helpers.server import api_response, orm_to_dict
 from helpers.email_notifications import (
     send_container_started_email, send_container_error_email,
     send_container_paused_email, send_container_resumed_email,
-    send_admin_failure_alert,
+    send_container_resume_failed_email, send_admin_failure_alert,
 )
 from helpers.logger import log
 
@@ -393,6 +393,10 @@ def report_started(reservation_id: int, data, computer_id: int):
 
         rc = reservation.reservedContainer
 
+        # Detect if this is a resume of a previously-paused low-priority container
+        # (must be checked before overwriting containerStatus below)
+        is_resume = rc.containerStatus == "paused"
+
         # Update reservation status
         reservation.status = "started"
         rc.containerDockerName = data.containerDockerName
@@ -417,6 +421,7 @@ def report_started(reservation_id: int, data, computer_id: int):
         email_computer_ip = reservation.computer.ip
         email_end_date = reservation.endDate
         email_username = container_obj.containerUsername or "user"
+        email_is_low_priority = reservation.isLowPriority
         log_user_id = reservation.userId
 
         # Build port list for email (include portType for type-aware rendering)
@@ -443,19 +448,33 @@ def report_started(reservation_id: int, data, computer_id: int):
         email_primary_port_id = container_obj.primaryConnectionPortId
 
     # Send notification email outside session to avoid holding DB connection during SMTP I/O
-    send_container_started_email(
-        email_recipient, email_image_name, email_computer_ip,
-        email_ports, data.sshPassword, data.nonCriticalErrors,
-        email_end_date, email_username,
-        primary_connection_port_id=email_primary_port_id,
-    )
+    if is_resume:
+        send_container_resumed_email(
+            email_recipient, email_image_name, email_computer_ip,
+            email_ports, data.sshPassword,
+            email_end_date, email_username,
+            primary_connection_port_id=email_primary_port_id,
+        )
+    else:
+        send_container_started_email(
+            email_recipient, email_image_name, email_computer_ip,
+            email_ports, data.sshPassword, data.nonCriticalErrors,
+            email_end_date, email_username,
+            primary_connection_port_id=email_primary_port_id,
+            is_low_priority=email_is_low_priority,
+        )
 
-    log.info(f"Container started for reservation {reservation_id}, user={log_user_id}, docker_name={data.containerDockerName}")
+    log.info(f"Container started for reservation {reservation_id}, user={log_user_id}, docker_name={data.containerDockerName}, resume={is_resume}")
     return api_response(True, "Reservation marked as started")
 
 
 def report_start_failed(reservation_id: int, data, computer_id: int):
     """Record that a container failed to start and send error notifications.
+
+    Detects whether this is a fresh start failure or a failed resume of a
+    previously-paused low-priority container (by checking if containerStatus
+    was "paused" prior to this call). Sends a tailored email accordingly.
+    The reservation is marked as "error" — a terminal state with no retry.
 
     Args:
         reservation_id: Database ID of the reservation.
@@ -482,6 +501,10 @@ def report_start_failed(reservation_id: int, data, computer_id: int):
         if not reservation:
             return api_response(False, "Reservation not found")
 
+        # Detect if this is a failed resume of a previously-paused low-priority container
+        # (must be checked before overwriting containerStatus below)
+        is_resume_failure = reservation.reservedContainer.containerStatus == "paused"
+
         reservation.status = "error"
         reservation.reservedContainer.containerDockerErrorMessage = data.errorMessage
         reservation.reservedContainer.containerStatus = "error"
@@ -494,13 +517,19 @@ def report_start_failed(reservation_id: int, data, computer_id: int):
         computer_name = reservation.computer.name
 
     # Send notification emails outside session to avoid holding DB connection during SMTP I/O
-    send_container_error_email(email_recipient, data.errorMessage)
+    if is_resume_failure:
+        send_container_resume_failed_email(
+            email_recipient, image_name, computer_name,
+            reservation_id, data.errorMessage,
+        )
+    else:
+        send_container_error_email(email_recipient, data.errorMessage)
     send_admin_failure_alert(
         email_recipient, reservation_id,
         image_name, computer_name, data.errorMessage,
     )
 
-    log.error(f"Container start failed for reservation {reservation_id}: {data.errorMessage}")
+    log.error(f"Container start failed for reservation {reservation_id}: {data.errorMessage}, resume_failure={is_resume_failure}")
     return api_response(True, "Reservation marked as error")
 
 
@@ -585,8 +614,9 @@ def report_resumed(reservation_id: int, computer_id: int):
     """Record that a paused container is ready to resume.
 
     Sets status back to "reserved" so the daemon picks it up for start
-    on the next polling cycle. Sends resumed email after the container
-    actually starts (via report_started).
+    on the next polling cycle. The resumed email is sent later from
+    report_started, which detects the resume case via containerStatus
+    being "paused" prior to the start.
 
     Args:
         reservation_id: Database ID of the reservation.

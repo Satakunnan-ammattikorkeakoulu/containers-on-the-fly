@@ -233,7 +233,78 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.DATABASE, SettingType.EMAIL, default="",
         description="Admin contact email address"
     ),
-    
+
+    # Per-Email Enable/Disable
+    "email.enableContainerStarted": SettingSetting(
+        SettingSource.DATABASE, SettingType.BOOLEAN, default=True,
+        description="Enable sending email when a container starts successfully"
+    ),
+    "email.enableContainerError": SettingSetting(
+        SettingSource.DATABASE, SettingType.BOOLEAN, default=True,
+        description="Enable sending email when a container fails to start"
+    ),
+    "email.enableContainerPaused": SettingSetting(
+        SettingSource.DATABASE, SettingType.BOOLEAN, default=True,
+        description="Enable sending email when a low-priority container is paused"
+    ),
+    "email.enableContainerResumed": SettingSetting(
+        SettingSource.DATABASE, SettingType.BOOLEAN, default=True,
+        description="Enable sending email when a low-priority container is resumed"
+    ),
+    "email.enableContainerResumeFailed": SettingSetting(
+        SettingSource.DATABASE, SettingType.BOOLEAN, default=True,
+        description="Enable sending email when a low-priority container fails to resume after being paused"
+    ),
+
+    # Email Subject Customization
+    "email.subjectContainerStarted": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="Server is ready to use!",
+        description="Subject line for the email sent when a container starts successfully"
+    ),
+    "email.subjectContainerError": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="Server did not start",
+        description="Subject line for the email sent when a container fails to start"
+    ),
+    "email.subjectContainerPaused": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="Low-priority container paused",
+        description="Subject line for the email sent when a low-priority container is paused"
+    ),
+    "email.subjectContainerResumed": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="Low-priority container resumed",
+        description="Subject line for the email sent when a low-priority container is resumed"
+    ),
+    "email.subjectContainerResumeFailed": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="Low-priority container failed to resume",
+        description="Subject line for the email sent when a low-priority container fails to resume after being paused"
+    ),
+
+    # Email Body Intro Customization
+    "email.bodyIntroContainerStarted": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Additional intro text prepended before the default container started email intro"
+    ),
+    "email.bodyIntroContainerError": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Additional intro text prepended before the default container error email intro"
+    ),
+    "email.bodyIntroContainerPaused": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Additional intro text prepended before the default container paused email intro"
+    ),
+    "email.bodyIntroContainerResumed": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Additional intro text prepended before the default container resumed email intro"
+    ),
+    "email.bodyIntroContainerResumeFailed": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT, default="",
+        description="Additional intro text prepended before the default container resume failed email intro"
+    ),
+    "email.lowPriorityNotice": SettingSetting(
+        SettingSource.DATABASE, SettingType.TEXT,
+        default="Note: This is a low-priority reservation. Your container may be temporarily paused if a higher-priority reservation needs the resources. Data on mounted volumes will be preserved during pauses.",
+        description="Notice text shown in the container started email when the reservation is low-priority"
+    ),
+
     # Notification Settings
     "notifications.containerAlertsEnabled": SettingSetting(
         SettingSource.DATABASE, SettingType.BOOLEAN, default=False,

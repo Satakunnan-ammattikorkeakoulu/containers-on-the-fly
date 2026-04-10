@@ -657,8 +657,8 @@
 
     .v-alert__close {
       position: absolute !important;
-      top: 0 !important;
-      right: 0 !important;
+      top: 10px !important;
+      right: 10px !important;
       margin: 0 !important;
       padding: 0 !important;
       flex: none !important;

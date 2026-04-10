@@ -10,10 +10,11 @@
 
     <v-row>
       <v-col cols="12">
-        <v-expansion-panels multiple v-model="expandedPanels">
-          
+        <h2 class="settings-group-header settings-group-header--first">General</h2>
+        <v-expansion-panels v-model="openPanel">
+
           <!-- General Information & Instructions Section -->
-          <v-expansion-panel>
+          <v-expansion-panel id="panel-general" value="general">
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-information-outline</v-icon>
               <span class="font-weight-bold">General Information & Instructions</span>
@@ -149,8 +150,168 @@
             </v-expansion-panel-text>
           </v-expansion-panel>
 
+          <!-- Legal Documents Section -->
+          <v-expansion-panel id="panel-legal" value="legal">
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-file-document-outline</v-icon>
+              <span class="font-weight-bold">Legal Documents</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-form ref="legalForm" v-model="forms.legal.valid">
+
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Privacy Policy & Terms of Service</h3>
+                  <p class="body-2 text-grey mb-4">
+                    Configure legal documents displayed to users. When enabled, links appear on the login page and in the application footer.
+                    Content supports Markdown formatting.
+                  </p>
+
+                  <v-switch
+                    v-model="settings.legal.enabled"
+                    label="Enable privacy policy and terms of service pages"
+                    color="primary"
+                    class="mt-0 mb-4"
+                  ></v-switch>
+                </div>
+
+                <div v-if="settings.legal.enabled">
+                  <!-- Organization Info -->
+                  <div class="mb-6">
+                    <h3 class="text-h3 mb-2">Organization Information</h3>
+                    <p class="body-2 text-grey mb-3">
+                      Organization name and data protection contact email used in the legal documents.
+                    </p>
+                    <v-row>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="settings.legal.organizationName"
+                          label="Organization Name"
+                          placeholder="e.g. University of Example"
+                          outlined
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="settings.legal.contactEmail"
+                          label="Data Protection Contact Email"
+                          placeholder="dpo@example.com"
+                          outlined
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                    </v-row>
+                  </div>
+
+                  <!-- Privacy Policy -->
+                  <div class="mb-6">
+                    <h3 class="text-h3 mb-2">Privacy Policy</h3>
+                    <p class="body-2 text-grey mb-3">
+                      Content displayed on the public privacy policy page. Supports Markdown formatting.<br>
+                      Available variables: <code v-pre>{{ORGANIZATION_NAME}}</code>, <code v-pre>{{CONTACT_EMAIL}}</code>, <code v-pre>{{DATE}}</code> (last saved date).
+                    </p>
+                    <div class="d-flex mb-3">
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                        prepend-icon="mdi-file-document-edit-outline"
+                        @click="confirmLoadTemplate('privacyPolicy')"
+                      >Load Template</v-btn>
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        :color="legalPreview.privacyPolicy ? 'grey' : 'primary'"
+                        :prepend-icon="legalPreview.privacyPolicy ? 'mdi-pencil' : 'mdi-eye'"
+                        class="ml-2"
+                        @click="legalPreview.privacyPolicy = !legalPreview.privacyPolicy"
+                      >{{ legalPreview.privacyPolicy ? 'Edit' : 'Preview' }}</v-btn>
+                    </div>
+                    <div v-if="legalPreview.privacyPolicy" class="legal-preview pa-4 rounded" v-html="renderedPrivacyPolicy"></div>
+                    <v-textarea
+                      v-else
+                      v-model="settings.legal.privacyPolicyContent"
+                      placeholder="Enter privacy policy content in Markdown format..."
+                      rows="12"
+                      outlined
+                      hide-details
+                    ></v-textarea>
+                  </div>
+
+                  <!-- Terms of Service -->
+                  <div class="mb-6">
+                    <h3 class="text-h3 mb-2">Terms of Service</h3>
+                    <p class="body-2 text-grey mb-3">
+                      Content displayed on the public terms of service page. Supports Markdown formatting.<br>
+                      Available variables: <code v-pre>{{ORGANIZATION_NAME}}</code>, <code v-pre>{{CONTACT_EMAIL}}</code>, <code v-pre>{{DATE}}</code> (last saved date).
+                    </p>
+                    <div class="d-flex mb-3">
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                        prepend-icon="mdi-file-document-edit-outline"
+                        @click="confirmLoadTemplate('termsOfService')"
+                      >Load Template</v-btn>
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        :color="legalPreview.termsOfService ? 'grey' : 'primary'"
+                        :prepend-icon="legalPreview.termsOfService ? 'mdi-pencil' : 'mdi-eye'"
+                        class="ml-2"
+                        @click="legalPreview.termsOfService = !legalPreview.termsOfService"
+                      >{{ legalPreview.termsOfService ? 'Edit' : 'Preview' }}</v-btn>
+                    </div>
+                    <div v-if="legalPreview.termsOfService" class="legal-preview pa-4 rounded" v-html="renderedTermsOfService"></div>
+                    <v-textarea
+                      v-else
+                      v-model="settings.legal.termsOfServiceContent"
+                      placeholder="Enter terms of service content in Markdown format..."
+                      rows="12"
+                      outlined
+                      hide-details
+                    ></v-textarea>
+                  </div>
+
+                  <!-- Load Template Confirmation Dialog -->
+                  <v-dialog v-model="legalTemplateDialog.visible" max-width="450">
+                    <v-card>
+                      <v-card-title>Load Template</v-card-title>
+                      <v-card-text>
+                        This will replace the current {{ legalTemplateDialog.type === 'privacyPolicy' ? 'privacy policy' : 'terms of service' }} content with the default template. Are you sure?
+                      </v-card-text>
+                      <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="text" @click="legalTemplateDialog.visible = false">Cancel</v-btn>
+                        <v-btn color="primary" variant="flat" @click="loadTemplate(legalTemplateDialog.type)">Replace</v-btn>
+                      </v-card-actions>
+                    </v-card>
+                  </v-dialog>
+                </div>
+
+                <v-row>
+                  <v-col cols="12">
+                    <v-btn
+                      color="primary"
+                      :loading="saving.legal"
+                      @click="saveSection('legal')"
+                    >
+                      <v-icon left>mdi-content-save</v-icon>
+                      Save Legal Settings
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-form>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
+        </v-expansion-panels>
+
+        <h2 class="settings-group-header">Access &amp; Security</h2>
+        <v-expansion-panels v-model="openPanel">
+
           <!-- Authentication Section -->
-          <v-expansion-panel>
+          <v-expansion-panel id="panel-auth" value="auth">
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-account-key</v-icon>
               <span class="font-weight-bold">Authentication</span>
@@ -388,7 +549,7 @@
           </v-expansion-panel>
 
           <!-- User Access Control Section -->
-          <v-expansion-panel>
+          <v-expansion-panel id="panel-access" value="access">
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-shield-account</v-icon>
               <span class="font-weight-bold">User Access Control</span>
@@ -544,8 +705,13 @@
             </v-expansion-panel-text>
           </v-expansion-panel>
 
+        </v-expansion-panels>
+
+        <h2 class="settings-group-header">Email &amp; Notifications</h2>
+        <v-expansion-panels v-model="openPanel">
+
           <!-- Email Configuration Section -->
-          <v-expansion-panel>
+          <v-expansion-panel id="panel-email" value="email">
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-email-outline</v-icon>
               <span class="font-weight-bold">Email Configuration</span>
@@ -728,7 +894,7 @@
           </v-expansion-panel>
 
           <!-- Email Templates Section -->
-          <v-expansion-panel>
+          <v-expansion-panel id="panel-emailTemplates" value="emailTemplates">
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-email-edit-outline</v-icon>
               <span class="font-weight-bold">Email Templates</span>
@@ -955,7 +1121,7 @@
           </v-expansion-panel>
 
           <!-- System Notifications Section -->
-          <v-expansion-panel>
+          <v-expansion-panel id="panel-notifications" value="notifications">
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-bell-alert</v-icon>
               <span class="font-weight-bold">System Notifications</span>
@@ -1028,8 +1194,13 @@
             </v-expansion-panel-text>
           </v-expansion-panel>
 
+        </v-expansion-panels>
+
+        <h2 class="settings-group-header">Integrations &amp; Connections</h2>
+        <v-expansion-panels v-model="openPanel">
+
           <!-- Connection Methods Section -->
-          <v-expansion-panel>
+          <v-expansion-panel id="panel-connection" value="connection">
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-connection</v-icon>
               <span class="font-weight-bold">SSH Connection Methods</span>
@@ -1145,7 +1316,7 @@
           </v-expansion-panel>
 
           <!-- Analytics Section -->
-          <v-expansion-panel>
+          <v-expansion-panel id="panel-analytics" value="analytics">
             <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-chart-line</v-icon>
               <span class="font-weight-bold">Analytics</span>
@@ -1224,161 +1395,6 @@
             </v-expansion-panel-text>
           </v-expansion-panel>
 
-          <!-- Legal Documents Section -->
-          <v-expansion-panel>
-            <v-expansion-panel-title>
-              <v-icon class="mr-3">mdi-file-document-outline</v-icon>
-              <span class="font-weight-bold">Legal Documents</span>
-            </v-expansion-panel-title>
-            <v-expansion-panel-text>
-              <v-form ref="legalForm" v-model="forms.legal.valid">
-
-                <div class="mb-6">
-                  <h3 class="text-h3 mb-2">Privacy Policy & Terms of Service</h3>
-                  <p class="body-2 text-grey mb-4">
-                    Configure legal documents displayed to users. When enabled, links appear on the login page and in the application footer.
-                    Content supports Markdown formatting.
-                  </p>
-
-                  <v-switch
-                    v-model="settings.legal.enabled"
-                    label="Enable privacy policy and terms of service pages"
-                    color="primary"
-                    class="mt-0 mb-4"
-                  ></v-switch>
-                </div>
-
-                <div v-if="settings.legal.enabled">
-                  <!-- Organization Info -->
-                  <div class="mb-6">
-                    <h3 class="text-h3 mb-2">Organization Information</h3>
-                    <p class="body-2 text-grey mb-3">
-                      Organization name and data protection contact email used in the legal documents.
-                    </p>
-                    <v-row>
-                      <v-col cols="12" md="6">
-                        <v-text-field
-                          v-model="settings.legal.organizationName"
-                          label="Organization Name"
-                          placeholder="e.g. University of Example"
-                          outlined
-                          hide-details
-                        ></v-text-field>
-                      </v-col>
-                      <v-col cols="12" md="6">
-                        <v-text-field
-                          v-model="settings.legal.contactEmail"
-                          label="Data Protection Contact Email"
-                          placeholder="dpo@example.com"
-                          outlined
-                          hide-details
-                        ></v-text-field>
-                      </v-col>
-                    </v-row>
-                  </div>
-
-                  <!-- Privacy Policy -->
-                  <div class="mb-6">
-                    <h3 class="text-h3 mb-2">Privacy Policy</h3>
-                    <p class="body-2 text-grey mb-3">
-                      Content displayed on the public privacy policy page. Supports Markdown formatting.<br>
-                      Available variables: <code v-pre>{{ORGANIZATION_NAME}}</code>, <code v-pre>{{CONTACT_EMAIL}}</code>, <code v-pre>{{DATE}}</code> (last saved date).
-                    </p>
-                    <div class="d-flex mb-3">
-                      <v-btn
-                        variant="outlined"
-                        size="small"
-                        color="primary"
-                        prepend-icon="mdi-file-document-edit-outline"
-                        @click="confirmLoadTemplate('privacyPolicy')"
-                      >Load Template</v-btn>
-                      <v-btn
-                        variant="outlined"
-                        size="small"
-                        :color="legalPreview.privacyPolicy ? 'grey' : 'primary'"
-                        :prepend-icon="legalPreview.privacyPolicy ? 'mdi-pencil' : 'mdi-eye'"
-                        class="ml-2"
-                        @click="legalPreview.privacyPolicy = !legalPreview.privacyPolicy"
-                      >{{ legalPreview.privacyPolicy ? 'Edit' : 'Preview' }}</v-btn>
-                    </div>
-                    <div v-if="legalPreview.privacyPolicy" class="legal-preview pa-4 rounded" v-html="renderedPrivacyPolicy"></div>
-                    <v-textarea
-                      v-else
-                      v-model="settings.legal.privacyPolicyContent"
-                      placeholder="Enter privacy policy content in Markdown format..."
-                      rows="12"
-                      outlined
-                      hide-details
-                    ></v-textarea>
-                  </div>
-
-                  <!-- Terms of Service -->
-                  <div class="mb-6">
-                    <h3 class="text-h3 mb-2">Terms of Service</h3>
-                    <p class="body-2 text-grey mb-3">
-                      Content displayed on the public terms of service page. Supports Markdown formatting.<br>
-                      Available variables: <code v-pre>{{ORGANIZATION_NAME}}</code>, <code v-pre>{{CONTACT_EMAIL}}</code>, <code v-pre>{{DATE}}</code> (last saved date).
-                    </p>
-                    <div class="d-flex mb-3">
-                      <v-btn
-                        variant="outlined"
-                        size="small"
-                        color="primary"
-                        prepend-icon="mdi-file-document-edit-outline"
-                        @click="confirmLoadTemplate('termsOfService')"
-                      >Load Template</v-btn>
-                      <v-btn
-                        variant="outlined"
-                        size="small"
-                        :color="legalPreview.termsOfService ? 'grey' : 'primary'"
-                        :prepend-icon="legalPreview.termsOfService ? 'mdi-pencil' : 'mdi-eye'"
-                        class="ml-2"
-                        @click="legalPreview.termsOfService = !legalPreview.termsOfService"
-                      >{{ legalPreview.termsOfService ? 'Edit' : 'Preview' }}</v-btn>
-                    </div>
-                    <div v-if="legalPreview.termsOfService" class="legal-preview pa-4 rounded" v-html="renderedTermsOfService"></div>
-                    <v-textarea
-                      v-else
-                      v-model="settings.legal.termsOfServiceContent"
-                      placeholder="Enter terms of service content in Markdown format..."
-                      rows="12"
-                      outlined
-                      hide-details
-                    ></v-textarea>
-                  </div>
-
-                  <!-- Load Template Confirmation Dialog -->
-                  <v-dialog v-model="legalTemplateDialog.visible" max-width="450">
-                    <v-card>
-                      <v-card-title>Load Template</v-card-title>
-                      <v-card-text>
-                        This will replace the current {{ legalTemplateDialog.type === 'privacyPolicy' ? 'privacy policy' : 'terms of service' }} content with the default template. Are you sure?
-                      </v-card-text>
-                      <v-card-actions>
-                        <v-spacer></v-spacer>
-                        <v-btn variant="text" @click="legalTemplateDialog.visible = false">Cancel</v-btn>
-                        <v-btn color="primary" variant="flat" @click="loadTemplate(legalTemplateDialog.type)">Replace</v-btn>
-                      </v-card-actions>
-                    </v-card>
-                  </v-dialog>
-                </div>
-
-                <v-row>
-                  <v-col cols="12">
-                    <v-btn
-                      color="primary"
-                      :loading="saving.legal"
-                      @click="saveSection('legal')"
-                    >
-                      <v-icon left>mdi-content-save</v-icon>
-                      Save Legal Settings
-                    </v-btn>
-                  </v-col>
-                </v-row>
-              </v-form>
-            </v-expansion-panel-text>
-          </v-expansion-panel>
-
         </v-expansion-panels>
       </v-col>
     </v-row>
@@ -1388,9 +1404,12 @@
 <script>
 /**
  * Admin page for managing system-wide settings.
- * Organized into collapsible sections: general info/instructions, authentication
- * (password/LDAP), user access control (blacklist/whitelist), email configuration
- * (SMTP, contact, test delivery), and system notifications (container failure alerts).
+ * Sections are clustered under four group headers:
+ *   - General: general info/instructions, legal documents (privacy policy, terms of service).
+ *   - Access & Security: authentication (password/LDAP), user access control (blacklist/whitelist).
+ *   - Email & Notifications: email configuration (SMTP, contact, test delivery), email templates,
+ *     system notifications (container failure alerts).
+ *   - Integrations & Connections: SSH connection methods, analytics.
  * Toggle-type settings (checkboxes, radio buttons) auto-save via watchers;
  * text fields require explicit save button clicks per section.
  */
@@ -1409,7 +1428,10 @@ export default {
   },
 
   data: () => ({
-    expandedPanels: [], // All panels collapsed by default
+    // Currently expanded panel id, shared across all four group containers so
+    // that opening a panel in one group automatically collapses any panel open
+    // in another group (single-open accordion behavior).
+    openPanel: null,
     initialLoadComplete: false, // Flag to prevent auto-save during initial load
     isLoading: false, // Flag to indicate we're currently loading data
     settingsInitialized: {
@@ -2280,12 +2302,44 @@ export default {
       if (this.settingsInitialized.legalEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
         this.saveSection('legal');
       }
+    },
+
+    // Smooth-scroll the newly opened panel into position right under the
+    // 48px sticky top nav. The 300ms delay lets Vuetify's expand/collapse
+    // transitions finish so we measure the panel's final resting position
+    // (otherwise closing the previously open panel would shift the target).
+    openPanel(newValue) {
+      if (!newValue) return;
+      setTimeout(() => {
+        const el = document.getElementById(`panel-${newValue}`);
+        if (!el) return;
+        const STICKY_NAV_OFFSET = 48 + 16;
+        const top = el.getBoundingClientRect().top + window.scrollY - STICKY_NAV_OFFSET;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }, 300);
     }
   }
 }
 </script>
 
 <style scoped lang="scss">
+// Group headers that label clusters of related expansion panels
+.settings-group-header {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.65);
+  text-align: left;
+  margin: 32px 4px 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+
+  &--first {
+    margin-top: 8px;
+  }
+}
+
 // Override Vuetify's expansion panel header styles
 :deep(.v-expansion-panel-title) {
   justify-content: space-between !important;

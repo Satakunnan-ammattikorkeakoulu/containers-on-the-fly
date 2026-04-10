@@ -289,6 +289,34 @@ class TestCreateReservation:
         assert data["status"] is True
         assert "Reservation created" in data["message"]
 
+    def test_create_reservation_max_out_resources(self, test_client, admin_token):
+        """A reservation that consumes all available CPUs and RAM must succeed.
+
+        Regression for the bug where get_available_hardware compared the
+        post-subtraction leftover against minimumAmount and rejected the
+        last slice of a resource.
+        """
+        resp = test_client.get(
+            f"/api/reservation/get_available_hardware?date={_future_date()}&duration=2",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        data = resp.json()["data"]
+        computer = data["computers"][0]
+        computer_id = computer["computerId"]
+        container_id = data["containers"][0]["containerId"]
+
+        hw_specs = {}
+        for spec in computer["hardwareSpecs"]:
+            if spec["type"] in ("cpus", "ram"):
+                hw_specs[str(spec["hardwareSpecId"])] = spec["maximumAmountForUser"]
+
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] is True, body["message"]
+
     def test_create_reservation_creates_db_record(self, test_client, admin_token):
         """Verify reservation record exists in the database after creation."""
         computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)

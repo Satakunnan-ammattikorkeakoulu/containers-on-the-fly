@@ -166,15 +166,21 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
       if spec["hardwareSpecId"] in removable_hardware_specs:
         spec["maximumAmount"] -= removable_hardware_specs[spec["hardwareSpecId"]]
 
-        # Prevent any resource going below 0
-        if (spec["maximumAmount"] < 0):
-          spec["maximumAmount"] = 0
+        # Two semantically different callers share this function:
+        #   - Listing mode (reducable_specs is None): the leftover represents
+        #     what is still bookable; a slot smaller than minimumAmount is not
+        #     useful to anyone, so reject it.
+        #   - Validation mode (reducable_specs was passed): the leftover is
+        #     "what remains after the user's request lands", so the request
+        #     fits iff the leftover is >= 0. Comparing against minimumAmount
+        #     here would forbid users from taking the last slice of a resource.
+        if reducable_specs is not None:
+          over_allocated = spec["maximumAmount"] < 0
+        else:
+          over_allocated = spec["maximumAmount"] < spec["minimumAmount"]
 
-        if spec["maximumAmountForUser"] > spec["maximumAmount"]:
-          spec["maximumAmountForUser"] = spec["maximumAmount"]
-        if spec["maximumAmount"] < spec["minimumAmount"]:
-          log.warning(f"Spec {spec['type']} maximumAmount {spec['maximumAmount']} is below minimumAmount {spec['minimumAmount']}")
-          spec_message = ""
+        if over_allocated:
+          log.warning(f"Spec {spec['type']} maximumAmount {spec['maximumAmount']} is below required threshold")
           spec_max = spec['maximumAmount']
           if spec_max < 0: spec_max = 0
           if spec["type"] == "ram":
@@ -182,6 +188,12 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
           else:
             spec_message = f"Available: {spec_max} {spec['type']}."
           return api_response(False, f"Not enough resources to make a reservation: {spec['type']}. {spec_message}")
+
+        # Clamp leftover and cap user max only after the over-allocation check
+        if spec["maximumAmount"] < 0:
+          spec["maximumAmount"] = 0
+        if spec["maximumAmountForUser"] > spec["maximumAmount"]:
+          spec["maximumAmountForUser"] = spec["maximumAmount"]
 
   return api_response(True, "Hardware resources fetched.", { "computers": computers, "containers": containers })
 

@@ -47,7 +47,7 @@
           <div class="mx-auto text-center" style="max-width: 500px;">
             <h2>{{ durationPanelHeading }}</h2>
             <p v-if="isLowPriorityOptionVisible" class="text-center mb-3" style="margin-top: -4px;">
-              <a href="#" class="reservation-type-switch" @click.prevent="isLowPriority = !isLowPriority">
+              <a href="#" @click.prevent="isLowPriority = !isLowPriority">
                 {{ isLowPriority ? 'Switch back to normal reservation' : 'Switch to low-priority reservation' }}
               </a>
             </p>
@@ -1830,11 +1830,6 @@
 
   .gpu-card-reserved {
     opacity: 0.5;
-  }
-
-  .reservation-type-switch,
-  .reservation-type-switch:hover {
-    text-decoration: none;
   }
 
   .gpu-reserved-badge {

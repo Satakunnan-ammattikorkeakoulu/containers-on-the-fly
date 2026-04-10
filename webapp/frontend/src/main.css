@@ -186,18 +186,20 @@ a,
 
 .v-application a {
     color: #2196f3;
+    text-decoration: none;
     transition: 0.3s all ease;
 }
 
 .v-application a:hover {
     color: #007cd6;
+    text-decoration: none;
 }
 
 /* Hoverable info hint — for <span> tooltip triggers and other non-anchor
    elements that should look interactive. Inherits color from parent. */
 .link-hint {
     cursor: pointer;
-    text-decoration: underline dashed;
+    text-decoration: underline dotted;
     text-underline-offset: 3px;
 }
 .link-hint:hover {

@@ -24,18 +24,35 @@ def is_port_in_use(port: int) -> bool:
         return s.connect_ex(('localhost', port)) == 0
 
 
-def get_available_port():
+def get_available_port(exclude: set[int] | None = None) -> int:
     """Find an available port within the configured port range.
 
     Builds a list of all ports in the configured range and randomly
-    selects one that is not bound on the host.
+    selects one that is not bound on the host and not in `exclude`.
+
+    Args:
+        exclude: Optional set of port numbers to skip. Used by callers
+            allocating multiple ports in a single pass to avoid
+            returning a port they have already claimed but not yet
+            bound to a running container.
 
     Returns:
         int: An available port number.
+
+    Raises:
+        RuntimeError: If no ports remain in the configured range after
+            applying the exclude set.
     """
+    exclude = exclude or set()
     min_port = settings_handler.get_setting("docker.port_range_start")
     max_port = settings_handler.get_setting("docker.port_range_end")
-    available_ports = list(range(min_port, max_port))
+    available_ports = [p for p in range(min_port, max_port) if p not in exclude]
+
+    if not available_ports:
+        raise RuntimeError(
+            f"No ports left in range {min_port}-{max_port} after "
+            f"excluding {len(exclude)} already-assigned ports."
+        )
 
     # Try to bind to a random available port 50 times
     for _ in range(50):

@@ -408,8 +408,10 @@ def start_docker_container(res, tasks):
 
     # Build port mappings
     ports = []
+    ports_taken: set[int] = set()
     for port_def in container_data.get("containerPorts", []):
-        outside_port = get_available_port()
+        outside_port = get_available_port(exclude=ports_taken)
+        ports_taken.add(outside_port)
         ports.append({
             "containerPortId": port_def["containerPortId"],
             "serviceName": port_def["serviceName"],

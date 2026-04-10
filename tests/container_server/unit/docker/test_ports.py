@@ -1,5 +1,6 @@
 """Tests for container server docker/ports.py."""
 
+import pytest
 from unittest.mock import patch, MagicMock
 from docker.ports import is_port_in_use, get_available_port
 
@@ -63,3 +64,24 @@ class TestGetAvailablePort:
         # After 50 failed attempts, falls back to random choice
         assert port == 20050
         assert mock_in_use.call_count == 50
+
+    @patch("docker.ports.is_port_in_use", return_value=False)
+    @patch("docker.ports.settings_handler")
+    def test_excludes_specified_ports(self, mock_settings, mock_in_use):
+        mock_settings.get_setting.side_effect = lambda k: {
+            "docker.port_range_start": 20000,
+            "docker.port_range_end": 20003,
+        }[k]
+        # Range is 20000, 20001, 20002. Exclude two — only 20002 remains.
+        port = get_available_port(exclude={20000, 20001})
+        assert port == 20002
+
+    @patch("docker.ports.is_port_in_use", return_value=False)
+    @patch("docker.ports.settings_handler")
+    def test_raises_when_all_ports_excluded(self, mock_settings, mock_in_use):
+        mock_settings.get_setting.side_effect = lambda k: {
+            "docker.port_range_start": 20000,
+            "docker.port_range_end": 20003,
+        }[k]
+        with pytest.raises(RuntimeError, match="No ports left"):
+            get_available_port(exclude={20000, 20001, 20002})

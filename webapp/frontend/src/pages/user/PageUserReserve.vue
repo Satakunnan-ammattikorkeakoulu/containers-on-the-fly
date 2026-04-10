@@ -356,7 +356,7 @@
                     style="cursor: pointer; min-height: 90px;"
                     :outlined="!selectedgpus.includes(gpu.value)"
                   >
-                    <v-card-text style="height: 100%; padding: 10px;">
+                    <v-card-text style="height: 100%; padding: 15px 10px;">
                       <div class="d-flex flex-column align-center justify-center h-100 text-center">
                         <v-icon
                           size="28"

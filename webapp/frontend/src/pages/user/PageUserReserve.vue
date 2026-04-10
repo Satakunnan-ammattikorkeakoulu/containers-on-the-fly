@@ -328,7 +328,7 @@
 
           <!-- Hardware selection (shown after computer is selected) -->
           <div v-if="computer && hardwareData">
-            <h2 id="select-hardware-section" style="margin-top: 15px;">Configure Hardware</h2>
+            <h2 id="select-hardware-section" style="margin-top: 25px;">Configure Hardware</h2>
 
             <v-col cols="12">
               <h3 class="text-center">
@@ -356,8 +356,8 @@
                     style="cursor: pointer; min-height: 90px;"
                     :outlined="!selectedgpus.includes(gpu.value)"
                   >
-                    <v-card-text style="height: 100%;">
-                      <div class="d-flex flex-column align-center justify-center h-100 text-center" style="padding: 10px;">
+                    <v-card-text style="height: 100%; padding: 10px;">
+                      <div class="d-flex flex-column align-center justify-center h-100 text-center">
                         <v-icon
                           size="28"
                           class="mb-2"

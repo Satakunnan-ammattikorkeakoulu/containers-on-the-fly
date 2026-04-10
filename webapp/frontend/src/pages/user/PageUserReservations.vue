@@ -103,7 +103,7 @@
     <!-- Data table -->
     <v-row v-if="!initialLoading">
       <v-col cols="12">
-        <div style="margin-top: 50px">
+        <div style="margin-top: 10px">
           <UserReservationTable
             @emitCancelReservation="cancelReservation"
             @emitExtendReservation="extendReservation"

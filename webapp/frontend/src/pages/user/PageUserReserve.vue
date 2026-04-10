@@ -236,7 +236,7 @@
         <v-expansion-panel-text>
           <!-- Select computer -->
           <h2 id="select-computer-section">Select Server</h2>
-          <div class="text-center">
+          <div class="text-center" style="margin-bottom: 5px;">
             <v-tooltip location="top" text="Refresh server capacity in case it changed. Note: your GPU selections (if any) will be cleared.">
               <template v-slot:activator="{ props }">
                 <a
@@ -298,16 +298,25 @@
                             Available Hardware
                           </div>
                           <template v-if="!computerItem.fullyBooked">
-                            <div
-                              v-for="spec in getComputerHardwareList(computerItem.value)"
-                              :key="spec.id"
-                              :style="{
-                                color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
-                                fontSize: '14px',
-                                lineHeight: '1.6'
-                              }"
-                            >
-                              • {{ spec.text }}
+                            <div class="spec-tile-row">
+                              <div
+                                v-for="spec in getComputerHardwareList(computerItem.value)"
+                                :key="spec.id"
+                                class="spec-tile"
+                                :class="{
+                                  'spec-tile-selected': computer === computerItem.value,
+                                  'spec-tile-empty': spec.available === 0
+                                }"
+                              >
+                                <v-icon
+                                  size="20"
+                                  :color="computer === computerItem.value ? 'white' : 'primary'"
+                                >
+                                  {{ spec.icon }}
+                                </v-icon>
+                                <div class="spec-tile-value">{{ spec.value }}</div>
+                                <div class="spec-tile-label">{{ spec.label }}</div>
+                              </div>
                             </div>
                           </template>
                           <div
@@ -1444,55 +1453,69 @@
         return formattedSpecs.length > 0 ? formattedSpecs.join(" • ") : "No resources available"
       },
       /**
-       * Gets a list of hardware specs formatted for display in computer cards
+       * Gets a list of hardware specs formatted for display as tiles in the
+       * computer cards. Each entry includes a pre-built display value (the
+       * amount currently reservable by the user), a short label, and an mdi
+       * icon name.
        * @param {number} computerId The computer ID to get the hardware list for
-       * @returns {Array} Array of formatted hardware spec objects
+       * @returns {Array} Array of structured hardware spec objects
        */
       getComputerHardwareList(computerId) {
         let specs = this.getComputerHardwareById(computerId)
-        if (!specs || specs.length === 0) return [{ id: 'none', text: 'No hardware specs available' }]
+        if (!specs || specs.length === 0) return []
 
         let hardwareList = []
 
-        // Group specs by type - GPUs first, then others alphabetically
         let gpuSpecs = specs.filter(spec => spec.type === "gpu")
         let otherSpecs = specs.filter(spec => spec.type !== "gpus" && spec.type !== "gpu")
 
-        // Always add GPUs first
-        let gpuCount = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
+        let gpuAvailable = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
         hardwareList.push({
           id: 'gpu',
-          text: `${gpuCount} GPU${gpuCount !== 1 ? 's' : ''}`
+          type: 'gpu',
+          icon: 'mdi-expansion-card',
+          value: `${gpuAvailable}`,
+          label: 'GPUs',
+          available: gpuAvailable
         })
 
-        // Add other specs sorted alphabetically
         let sortedOtherSpecs = [...otherSpecs].sort((a, b) => a.type.localeCompare(b.type))
 
         sortedOtherSpecs.forEach(spec => {
-          let displayName
-          let text
+          let label
+          let icon
+          let value
+          let unit = spec.format ? ` ${spec.format}` : ''
 
           if (spec.type === "cpus") {
-            displayName = "CPUs"
-            text = `${spec.maximumAmountForUser} ${displayName}`
+            label = "CPUs"
+            icon = "mdi-cpu-64-bit"
+            value = `${spec.maximumAmountForUser}`
           } else if (spec.type === "memory") {
-            displayName = "RAM"
-            text = `${spec.maximumAmountForUser} ${spec.format} ${displayName}`
+            label = "RAM"
+            icon = "mdi-memory"
+            value = `${spec.maximumAmountForUser}${unit}`
           } else if (spec.type === "storage") {
-            displayName = "Storage"
-            text = `${spec.maximumAmountForUser} ${spec.format} ${displayName}`
+            label = "Storage"
+            icon = "mdi-harddisk"
+            value = `${spec.maximumAmountForUser}${unit}`
           } else {
-            displayName = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
-            text = `${spec.maximumAmountForUser} ${spec.format} ${displayName}`
+            label = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
+            icon = "mdi-chip"
+            value = `${spec.maximumAmountForUser}${unit}`
           }
 
           hardwareList.push({
             id: spec.hardwareSpecId || spec.type,
-            text: text
+            type: spec.type,
+            icon,
+            value,
+            label,
+            available: spec.maximumAmountForUser
           })
         })
 
-        return hardwareList.length > 0 ? hardwareList : [{ id: 'none', text: 'No resources available' }]
+        return hardwareList
       },
       /**
        * Refreshes the calendar reservations data.
@@ -1766,5 +1789,54 @@
   .panel-title-content {
     flex: 1;
     text-align: left;
+  }
+
+  .spec-tile-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .spec-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 calc((100% - 16px) / 3);
+    min-width: 72px;
+    max-width: 100%;
+    min-height: 74px;
+    padding: 10px 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .spec-tile-value {
+    margin-top: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .spec-tile-label {
+    margin-top: 1px;
+    font-size: 10px;
+    line-height: 1.2;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    opacity: 0.75;
+  }
+
+  .spec-tile-selected {
+    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+  }
+
+  .spec-tile-empty {
+    opacity: 0.55;
   }
 </style>

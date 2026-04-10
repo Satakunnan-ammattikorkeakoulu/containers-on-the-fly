@@ -206,6 +206,8 @@ When implementing a new feature or extending existing functionality, explicitly 
 
   If a feature cannot be made upgrade-safe automatically, document the required manual step in the PR description so the user can include it in release notes.
 
+- **Database diagram regeneration**: Whenever the SQLAlchemy models in `webapp/backend/database.py` change (new table, new column, new relationship, rename), automatically run `make generate-db-diagram` as part of the change. The diagram at `additional_documentation/database_diagram.md` is a static Mermaid file produced by `scripts/generate_db_diagram.py` — it is **not** generated on the fly, so skipping the regen leaves the docs silently out of sync. If the rendered PNG also needs refreshing (requires Node.js), run `make generate-db-diagram-png` instead.
+
 ### Function Return Values
 - **2 values**: Tuples are fine (e.g., `return success, message`)
 - **3+ values**: Always return a dictionary instead of a tuple. Dictionary keys are self-documenting and easier to extend without breaking callers. Example: `return {"started": True, "containerName": name, "error": ""}` instead of `return True, name, ""`

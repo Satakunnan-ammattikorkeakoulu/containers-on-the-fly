@@ -58,7 +58,7 @@
               density="compact"
               class="mb-4 text-left"
             >
-              Low-priority reservations may be paused when resources are needed by other users, and resumed automatically when resources become available. Save your work to mounted volumes.
+              Low-priority reservations may be paused when resources are needed by other users, and resumed automatically when resources become available. If multiple low-priority reservations are running, older ones take priority &mdash; they are paused last and resumed first. Save your work to mounted volumes.
             </v-alert>
           </div>
           <v-row justify="center">

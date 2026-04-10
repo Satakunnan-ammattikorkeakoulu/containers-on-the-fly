@@ -39,13 +39,19 @@ def get_public_computers() -> object:
 
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
 # TODO: Should also be able to only fail there is not enough resources any computer. Right now it fails if any of the computers are out of resources for the given time period.
-def get_available_hardware(date : str, duration : int, reducable_specs : dict = None, is_admin = False, ignored_reservation_id : int = None, user_id : int = None) -> object:
+def get_available_hardware(date : str, duration : int, reducable_specs : dict = None, is_admin = False, ignored_reservation_id : int = None, user_id : int = None, target_computer_id : int = None) -> object:
   """Calculate available hardware resources for a given time slot.
 
   Fetches all public computers and their hardware specs, subtracts
   resources already reserved during the requested time period, and
   applies role-based or default user limits. Admin users receive
   full maximum amounts without restrictions.
+
+  Each returned computer dict has a ``fullyBooked`` flag indicating
+  whether at least one of its specs has insufficient capacity for the
+  requested time slot. The listing path returns success as long as at
+  least one computer has capacity; the validation path returns success
+  as long as the target computer has capacity.
 
   Args:
       date: The reservation start date as an ISO-format string.
@@ -58,11 +64,18 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
           conflict checking (used when editing an existing reservation).
       user_id: The requesting user's ID, used to look up role-based
           hardware limits.
+      target_computer_id: When set together with ``reducable_specs``,
+          over-allocation errors are only raised for specs that belong
+          to this computer; other computers' availability is ignored.
+          Callers that know exactly which computer they intend to
+          reserve against should pass this so that an unrelated
+          computer being fully booked cannot fail their request.
 
   Returns:
-      Response with computers list (each with adjusted hardwareSpecs)
-      and containers list on success, or an error message if resources
-      are insufficient for the requested time period.
+      Response with computers list (each with adjusted hardwareSpecs
+      and a ``fullyBooked`` flag) and containers list on success, or an
+      error message if resources are insufficient for the requested
+      time period.
   """
   date = parser.parse(date)
   end_date = date+relativedelta(hours=+duration)
@@ -161,7 +174,11 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
         elif spec["type"] == "gpu" and spec["maximumAmountForUser"] > 1:
           spec["maximumAmountForUser"] = 1
 
+  all_fully_booked = len(computers) > 0
   for computer in computers:
+    computer_fully_booked = False
+    is_target = (target_computer_id is None) or (computer["computerId"] == target_computer_id)
+
     for spec in computer["hardwareSpecs"]:
       if spec["hardwareSpecId"] in removable_hardware_specs:
         spec["maximumAmount"] -= removable_hardware_specs[spec["hardwareSpecId"]]
@@ -169,7 +186,7 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
         # Two semantically different callers share this function:
         #   - Listing mode (reducable_specs is None): the leftover represents
         #     what is still bookable; a slot smaller than minimumAmount is not
-        #     useful to anyone, so reject it.
+        #     useful to anyone, so flag the computer as fully booked.
         #   - Validation mode (reducable_specs was passed): the leftover is
         #     "what remains after the user's request lands", so the request
         #     fits iff the leftover is >= 0. Comparing against minimumAmount
@@ -180,20 +197,36 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
           over_allocated = spec["maximumAmount"] < spec["minimumAmount"]
 
         if over_allocated:
-          log.warning(f"Spec {spec['type']} maximumAmount {spec['maximumAmount']} is below required threshold")
-          spec_max = spec['maximumAmount']
-          if spec_max < 0: spec_max = 0
-          if spec["type"] == "ram":
-            spec_message = f"Available: {spec_max} {spec['format']} {spec['type']}."
-          else:
-            spec_message = f"Available: {spec_max} {spec['type']}."
-          return api_response(False, f"Not enough resources to make a reservation: {spec['type']}. {spec_message}")
+          computer_fully_booked = True
+          # In validation mode, surface this as a hard error — but only if it
+          # belongs to the target computer the caller actually cares about.
+          # Other computers' state should not poison a request that targets a
+          # specific machine.
+          if reducable_specs is not None and is_target:
+            log.warning(f"Spec {spec['type']} on computer {computer['computerId']} is over-allocated ({spec['maximumAmount']})")
+            spec_max = spec['maximumAmount']
+            if spec_max < 0: spec_max = 0
+            if spec["type"] == "ram":
+              spec_message = f"Available: {spec_max} {spec['format']} {spec['type']}."
+            else:
+              spec_message = f"Available: {spec_max} {spec['type']}."
+            return api_response(False, f"Not enough resources to make a reservation: {spec['type']}. {spec_message}")
 
         # Clamp leftover and cap user max only after the over-allocation check
         if spec["maximumAmount"] < 0:
           spec["maximumAmount"] = 0
         if spec["maximumAmountForUser"] > spec["maximumAmount"]:
           spec["maximumAmountForUser"] = spec["maximumAmount"]
+
+    computer["fullyBooked"] = computer_fully_booked
+    if not computer_fully_booked:
+      all_fully_booked = False
+
+  # Listing mode only: surface a global error when every public computer is
+  # unbookable for the requested slot. If at least one computer has capacity,
+  # return success and let the frontend disable the fully-booked cards.
+  if reducable_specs is None and all_fully_booked:
+    return api_response(False, "No public computer has enough resources for the requested time slot.")
 
   return api_response(True, "Hardware resources fetched.", { "computers": computers, "containers": containers })
 
@@ -644,7 +677,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
 
   # Phase 2: Check hardware availability outside session to avoid nested sessions
   if not isLowPriority:
-    available_hardware_response = get_available_hardware(date.isoformat(), duration, hardwareSpecs, is_user_admin, None, resolved_user_id)
+    available_hardware_response = get_available_hardware(date.isoformat(), duration, hardwareSpecs, is_user_admin, None, resolved_user_id, target_computer_id=computerId)
     if (available_hardware_response["status"] == False):
       return api_response(False, available_hardware_response["message"])
 
@@ -916,9 +949,10 @@ def extend_reservation(userId : int, reservationId: int, duration: int):
       reducable_specs[spec.hardwareSpecId] = spec.amount
     res_id = reservation.reservationId
     res_user_id = reservation.userId
+    res_computer_id = reservation.computerId
 
   # Phase 2: Check resource availability outside session to avoid nested sessions
-  available_hardware_response = get_available_hardware(end_time_string, duration, reducable_specs, False, res_id, res_user_id)
+  available_hardware_response = get_available_hardware(end_time_string, duration, reducable_specs, False, res_id, res_user_id, target_computer_id=res_computer_id)
   if not available_hardware_response["status"]:
     log.debug(available_hardware_response["message"])
     return api_response(False, "Cannot extend reservation due to lack of resources. Try with less hours.")

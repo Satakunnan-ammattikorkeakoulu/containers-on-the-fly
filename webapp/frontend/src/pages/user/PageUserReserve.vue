@@ -236,6 +236,20 @@
         <v-expansion-panel-text>
           <!-- Select computer -->
           <h2 id="select-computer-section">Select Server</h2>
+          <div class="text-center">
+            <v-tooltip location="top" text="Refresh server capacity in case it changed. Note: your GPU selections (if any) will be cleared.">
+              <template v-slot:activator="{ props }">
+                <a
+                  v-bind="props"
+                  href="#"
+                  @click.prevent="fetchingComputers ? null : refreshHardware({ suppressScroll: true, showToast: true })"
+                  :style="{ pointerEvents: fetchingComputers ? 'none' : 'auto', opacity: fetchingComputers ? 0.6 : 1 }"
+                >
+                  Refresh Hardware
+                </a>
+              </template>
+            </v-tooltip>
+          </div>
           <p class="panel-description">Choose which server to run your container on. Hardware shown is what's available for your selected time slot.</p>
           <v-row justify="center" v-if="computers && computers.length">
             <v-col cols="10">
@@ -249,9 +263,10 @@
                 >
                   <v-card
                     :class="{ 'selected-card': computer === computerItem.value }"
-                    @click="computer = computerItem.value; computerChanged()"
+                    @click="computerItem.fullyBooked ? null : (computer = computerItem.value, computerChanged())"
+                    :disabled="computerItem.fullyBooked"
                     hover
-                    style="cursor: pointer; min-height: 260px;"
+                    :style="{ cursor: computerItem.fullyBooked ? 'not-allowed' : 'pointer', minHeight: '260px' }"
                     :outlined="computer !== computerItem.value"
                     :color="computer === computerItem.value ? 'primary' : ''"
                   >
@@ -282,16 +297,25 @@
                           >
                             Available Hardware
                           </div>
+                          <template v-if="!computerItem.fullyBooked">
+                            <div
+                              v-for="spec in getComputerHardwareList(computerItem.value)"
+                              :key="spec.id"
+                              :style="{
+                                color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
+                                fontSize: '14px',
+                                lineHeight: '1.6'
+                              }"
+                            >
+                              • {{ spec.text }}
+                            </div>
+                          </template>
                           <div
-                            v-for="spec in getComputerHardwareList(computerItem.value)"
-                            :key="spec.id"
-                            :style="{
-                              color: computer === computerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
-                              fontSize: '14px',
-                              lineHeight: '1.6'
-                            }"
+                            v-else
+                            class="text-center mt-2"
+                            style="color: rgba(255,255,255,0.7); font-size: 14px; font-style: italic;"
                           >
-                            • {{ spec.text }}
+                            No capacity at this time
                           </div>
                         </div>
                       </div>
@@ -740,16 +764,22 @@
         this.selectedgpus = []
       },
       /**
-       * Refreshes hardware data for the current date and duration after a failed
-       * reservation attempt. Preserves container/computer choices but always clears
-       * GPU selections (the dominant failure mode is "GPU got reserved by someone
-       * else"), and clamps any hardware spec values that now exceed availability.
-       * The alert is dismissed by fetchAvailableHardware on success; on failure it
-       * stays visible so the user can retry.
+       * Refreshes hardware data for the current date and duration. Preserves
+       * container/computer choices but always clears GPU selections (the dominant
+       * failure mode is "GPU got reserved by someone else"), and clamps any
+       * hardware spec values that now exceed availability. The post-failure
+       * refreshTip alert is dismissed by fetchAvailableHardware on success.
+       *
+       * @param {Object} [options]
+       * @param {boolean} [options.suppressScroll=false] - Skip scrolling to the
+       *   Configure Hardware section. Set when the user explicitly clicked the
+       *   in-panel "Refresh Hardware" link and is already where they want to be.
+       * @param {boolean} [options.showToast=false] - Show a success toast on
+       *   completion. Set for the explicit refresh affordance.
        */
-      refreshHardware() {
+      refreshHardware(options = {}) {
         if (this.reserveDate && this.completedSections.duration) {
-          this.fetchAvailableHardware(true)
+          this.fetchAvailableHardware(true, options.suppressScroll === true, options.showToast === true)
         }
       },
       /**
@@ -904,9 +934,20 @@
       computerChanged() {
         let currentComputerId = this.computer
         let data = null
+        let selectedComputer = null
         this.allComputers.forEach((comp) => {
-          if (comp.computerId == currentComputerId) data = comp.hardwareSpecs
+          if (comp.computerId == currentComputerId) {
+            data = comp.hardwareSpecs
+            selectedComputer = comp
+          }
         })
+        // Defensive: the disabled-card click guard should already prevent this,
+        // but a stale `this.computer` from a previous fetch could still land here.
+        if (selectedComputer && selectedComputer.fullyBooked === true) {
+          this.computer = null
+          this.hardwareData = null
+          return
+        }
         this.hardwareData = data
 
         // Set default values for hardware specs
@@ -982,8 +1023,12 @@
        *   container/computer/hardware selections (used by the post-failure refresh path).
        *   If false (default), clears downstream selections — appropriate when the date
        *   or duration changed and prior choices are no longer valid.
+       * @param {boolean} suppressScroll - If true, do not auto-scroll to the
+       *   Configure Hardware section after the re-point branch. Used by the
+       *   in-panel "Refresh Hardware" link so the user is not jerked around.
+       * @param {boolean} showToast - If true, show a success toast on completion.
        */
-      fetchAvailableHardware(preserveSelection = false) {
+      fetchAvailableHardware(preserveSelection = false, suppressScroll = false, showToast = false) {
         this.fetchingComputers = true
         this.hardwareFetchError = null
 
@@ -1016,7 +1061,11 @@
 
               let computers = []
               _this.allComputers.forEach((computer) => {
-                computers.push({ "value": computer.computerId, "text": computer.name })
+                computers.push({
+                  "value": computer.computerId,
+                  "text": computer.name,
+                  "fullyBooked": computer.fullyBooked === true,
+                })
               });
               _this.computers = computers
 
@@ -1045,9 +1094,13 @@
 
               if (preserveSelection) {
                 const stillHasContainer = _this.allContainers.some(c => c.containerId === _this.container)
-                const refreshedComputer = _this.allComputers.find(c => c.computerId === _this.computer)
+                const hadComputerSelected = _this.computer != null
+                const refreshedComputer = hadComputerSelected
+                  ? _this.allComputers.find(c => c.computerId === _this.computer)
+                  : null
+                const computerStillBookable = refreshedComputer && refreshedComputer.fullyBooked !== true
 
-                if (stillHasContainer && refreshedComputer) {
+                if (stillHasContainer && hadComputerSelected && computerStillBookable) {
                   // Re-point hardwareData at the refreshed computer's specs
                   // (the previous reference is now stale).
                   _this.hardwareData = refreshedComputer.hardwareSpecs
@@ -1092,25 +1145,44 @@
                     _this.completedSections.hardware = false
                   }
 
-                  // Always reopen the Server & Hardware panel and scroll to the
-                  // Configure Hardware section, so the user lands directly where
-                  // they need to act (typically re-picking a GPU).
+                  // Always reopen the Server & Hardware panel; on the
+                  // post-failure refresh path, also scroll to the Configure
+                  // Hardware section so the user lands directly where they
+                  // need to act (typically re-picking a GPU). The explicit
+                  // in-panel "Refresh Hardware" link suppresses the scroll.
                   _this.advanceToPanel(3)
-                  _this.$nextTick(() => {
-                    setTimeout(() => {
-                      const element = document.getElementById('select-hardware-section')
-                      if (element) {
-                        const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 48
-                        const rect = element.getBoundingClientRect()
-                        window.scrollTo({
-                          top: window.scrollY + rect.top - navbarHeight - 10,
-                          behavior: 'smooth'
-                        })
-                      }
-                    }, 500)
-                  })
+                  if (!suppressScroll) {
+                    _this.$nextTick(() => {
+                      setTimeout(() => {
+                        const element = document.getElementById('select-hardware-section')
+                        if (element) {
+                          const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 48
+                          const rect = element.getBoundingClientRect()
+                          window.scrollTo({
+                            top: window.scrollY + rect.top - navbarHeight - 10,
+                            behavior: 'smooth'
+                          })
+                        }
+                      }, 500)
+                    })
+                  }
+                } else if (stillHasContainer && !hadComputerSelected) {
+                  // User is still on Panel 3 picking a computer; just refresh
+                  // the cards in place without clearing their container choice.
+                  _this.advanceToPanel(3)
+                } else if (stillHasContainer && hadComputerSelected && !computerStillBookable) {
+                  // Container still valid, but the previously-selected computer
+                  // is now gone or fully booked. Clear computer/hardware
+                  // selection but keep the container so the user lands back on
+                  // the Server picker.
+                  _this.computer = null
+                  _this.hardwareData = null
+                  _this.selectedHardwareSpecs = {}
+                  _this.selectedgpus = []
+                  _this.completedSections.hardware = false
+                  _this.advanceToPanel(3)
                 } else {
-                  // Previous selection no longer exists — fall back to the standard reset
+                  // Container itself is gone — full reset back to Container panel
                   _this.container = null
                   _this.computer = null
                   _this.hardwareData = null
@@ -1125,6 +1197,10 @@
               }
 
               _this.refreshTip = false
+
+              if (showToast) {
+                _this.store.showMessage({ text: "Hardware availability refreshed.", color: "green" })
+              }
             }
             // Fail
             else {

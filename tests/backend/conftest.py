@@ -183,6 +183,29 @@ def seed_test_data():
             )
         )
 
+        # Second computer for multi-computer test scenarios
+        computer2 = _db.Computer(name="server2", ip="127.0.0.2", public=True)
+        session.add(computer2)
+        session.flush()
+        computer2.hardwareSpecs.append(
+            _db.HardwareSpec(
+                type="cpus", maximumAmount=4, minimumAmount=1,
+                maximumAmountForUser=4, defaultAmountForUser=1, format="CPUs",
+            )
+        )
+        computer2.hardwareSpecs.append(
+            _db.HardwareSpec(
+                type="ram", maximumAmount=8, minimumAmount=1,
+                maximumAmountForUser=8, defaultAmountForUser=2, format="GB",
+            )
+        )
+        computer2.hardwareSpecs.append(
+            _db.HardwareSpec(
+                type="gpus", maximumAmount=0, minimumAmount=0,
+                maximumAmountForUser=1, defaultAmountForUser=0, format="GPUs",
+            )
+        )
+
         # Container with SSH port
         container = _db.Container(
             public=True, imageName="ubuntu-base",

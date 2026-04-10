@@ -105,6 +105,44 @@ def _create_reservation_in_db(status="reserved", hours_offset=0, duration_hours=
         return reservation.reservationId
 
 
+def _fully_book_computer(computer_name, hours_offset=0, duration_hours=4, user_email="admin@foo.com"):
+    """Create a reservation that consumes all CPU/RAM on the named computer."""
+    now = datetime.now(timezone.utc) + timedelta(hours=hours_offset)
+    with db.Session() as session:
+        computer = session.execute(
+            select(db.Computer).where(db.Computer.name == computer_name)
+        ).scalar_one()
+        user = session.execute(
+            select(db.User).where(db.User.email == user_email)
+        ).scalar_one()
+        container = session.execute(select(db.Container)).scalars().first()
+
+        reserved_container = db.ReservedContainer(containerId=container.containerId)
+        session.add(reserved_container)
+        session.flush()
+
+        reservation = db.Reservation(
+            userId=user.userId,
+            computerId=computer.computerId,
+            reservedContainerId=reserved_container.reservedContainerId,
+            startDate=now,
+            endDate=now + timedelta(hours=duration_hours),
+            status="reserved",
+        )
+        session.add(reservation)
+        session.flush()
+
+        for spec in computer.hardwareSpecs:
+            if spec.type in ("cpus", "ram"):
+                reservation.reservedHardwareSpecs.append(
+                    db.ReservedHardwareSpec(
+                        hardwareSpecId=spec.hardwareSpecId,
+                        amount=spec.maximumAmount,
+                    )
+                )
+        session.commit()
+
+
 # =============================================================================
 # get_available_hardware
 # =============================================================================
@@ -208,8 +246,14 @@ class TestGetAvailableHardware:
             ).scalar_one()
             user.roles.append(role)
 
+            server1 = session.execute(
+                select(db.Computer).where(db.Computer.name == "server1")
+            ).scalar_one()
             cpu_spec = session.execute(
-                select(db.HardwareSpec).where(db.HardwareSpec.type == "cpus")
+                select(db.HardwareSpec).where(
+                    db.HardwareSpec.type == "cpus",
+                    db.HardwareSpec.computerId == server1.computerId,
+                )
             ).scalar_one()
 
             limit = db.RoleHardwareLimit(
@@ -242,6 +286,32 @@ class TestGetAvailableHardware:
         cpu_spec = next(s for s in specs if s["type"] == "cpus")
         # Full capacity should be available
         assert cpu_spec["maximumAmount"] == 8
+
+    def test_listing_marks_only_overbooked_computer(self, test_client, admin_token):
+        """Listing succeeds and flags fullyBooked per-computer."""
+        _fully_book_computer("server1")
+
+        resp = test_client.get(
+            f"/api/reservation/get_available_hardware?date={_future_date()}&duration=2",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        body = resp.json()
+        assert body["status"] is True, body["message"]
+        by_name = {c["name"]: c for c in body["data"]["computers"]}
+        assert by_name["server1"]["fullyBooked"] is True
+        assert by_name["server2"]["fullyBooked"] is False
+
+    def test_listing_fails_when_all_computers_overbooked(self, test_client, admin_token):
+        """Listing returns an error only when no computer has capacity."""
+        _fully_book_computer("server1")
+        _fully_book_computer("server2")
+
+        resp = test_client.get(
+            f"/api/reservation/get_available_hardware?date={_future_date()}&duration=2",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        body = resp.json()
+        assert body["status"] is False
 
 
 # =============================================================================
@@ -288,6 +358,29 @@ class TestCreateReservation:
         data = resp.json()
         assert data["status"] is True
         assert "Reservation created" in data["message"]
+
+    def test_create_reservation_succeeds_when_other_computer_overbooked(self, test_client, admin_token):
+        """A reservation on server2 must succeed even if server1 is fully booked."""
+        _fully_book_computer("server1")
+
+        resp = test_client.get(
+            f"/api/reservation/get_available_hardware?date={_future_date()}&duration=2",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        body = resp.json()["data"]
+        server2 = next(c for c in body["computers"] if c["name"] == "server2")
+        container_id = body["containers"][0]["containerId"]
+
+        hw_specs = {}
+        for spec in server2["hardwareSpecs"]:
+            if spec["type"] in ("cpus", "ram"):
+                hw_specs[str(spec["hardwareSpecId"])] = spec["maximumAmountForUser"]
+
+        create_resp = _create_reservation_via_api(
+            test_client, admin_token, server2["computerId"], container_id, hw_specs,
+        )
+        assert create_resp.status_code == 200
+        assert create_resp.json()["status"] is True, create_resp.json()["message"]
 
     def test_create_reservation_max_out_resources(self, test_client, admin_token):
         """A reservation that consumes all available CPUs and RAM must succeed.
@@ -403,11 +496,20 @@ class TestCreateReservation:
 
         # Request more CPUs than the user max (8)
         with db.Session() as session:
+            server1 = session.execute(
+                select(db.Computer).where(db.Computer.name == "server1")
+            ).scalar_one()
             cpu_spec = session.execute(
-                select(db.HardwareSpec).where(db.HardwareSpec.type == "cpus")
+                select(db.HardwareSpec).where(
+                    db.HardwareSpec.type == "cpus",
+                    db.HardwareSpec.computerId == server1.computerId,
+                )
             ).scalar_one()
             ram_spec = session.execute(
-                select(db.HardwareSpec).where(db.HardwareSpec.type == "ram")
+                select(db.HardwareSpec).where(
+                    db.HardwareSpec.type == "ram",
+                    db.HardwareSpec.computerId == server1.computerId,
+                )
             ).scalar_one()
 
         hw_specs = {

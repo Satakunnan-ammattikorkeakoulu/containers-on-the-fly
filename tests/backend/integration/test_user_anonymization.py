@@ -30,7 +30,9 @@ def _create_user_with_data(session, email="target@example.com", name="Target Use
 
     # Get existing container and computer from seed data
     container = session.execute(select(db.Container)).scalar_one()
-    computer = session.execute(select(db.Computer)).scalar_one()
+    computer = session.execute(
+        select(db.Computer).where(db.Computer.name == "server1")
+    ).scalar_one()
 
     # Create a reserved container
     reserved_container = db.ReservedContainer(

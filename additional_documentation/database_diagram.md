@@ -32,6 +32,7 @@ erDiagram
         bool managedExternally
         bigint imageSize
         datetime lastBuiltAt
+        int primaryConnectionPortId
         datetime createdAt
         datetime updatedAt
     }
@@ -63,6 +64,7 @@ erDiagram
         text sshPublicKey
         text startScriptPath
         text stopScriptPath
+        bool removed
     }
     UserBlacklist {
         int userBlacklistId PK
@@ -72,11 +74,22 @@ erDiagram
         int userWhitelistId PK
         text email
     }
+    AuditLog {
+        int auditLogId PK
+        int userId FK
+        text action
+        text resourceType
+        int resourceId
+        text details
+        text ipAddress
+        datetime createdAt
+    }
     ContainerPort {
         int containerPortId PK
         int containerId FK
         text serviceName
         int port
+        text portType
         datetime createdAt
         datetime updatedAt
     }
@@ -88,6 +101,7 @@ erDiagram
         float maximumAmount
         float minimumAmount
         float maximumAmountForUser
+        float maximumAmountForUserLowPriority
         float defaultAmountForUser
         text format
         datetime createdAt
@@ -125,6 +139,8 @@ erDiagram
         int roleId FK
         int minDuration
         int maxDuration
+        int lowPriorityMaxDuration
+        bool allowLowPriority
         int maxActiveReservations
         datetime createdAt
         datetime updatedAt
@@ -192,6 +208,7 @@ erDiagram
         int roleId FK
         int hardwareSpecId FK
         int maximumAmountForRole
+        int maximumAmountForRoleLowPriority
         datetime createdAt
         datetime updatedAt
     }
@@ -204,6 +221,7 @@ erDiagram
         datetime updatedAt
     }
 
+    User ||--o{ AuditLog : "user"
     Container ||--o{ ContainerPort : "container"
     Computer ||--o{ HardwareSpec : "computer"
     Container ||--o{ ReservedContainer : "container"

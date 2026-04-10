@@ -64,9 +64,9 @@
                           <span class="font-weight-medium">{{ spec.displayName || spec.type.toUpperCase() }}</span>
                         </div>
                         <div class="hardware-spec-info text-caption text-grey">
-                          Current user max: {{ spec.maximumAmountForUser }} | System max: {{ getSystemMaximum(computer, spec) }}
+                          Current user max: {{ spec.maximumAmountForUser }} | Low-priority user max: {{ spec.maximumAmountForUserLowPriority }} | System max: {{ getSystemMaximum(computer, spec) }}
                         </div>
-                        <div class="d-flex align-center mt-2">
+                        <div class="d-flex align-center flex-wrap mt-2">
                           <v-text-field
                             v-model.number="hardwareLimits[computer.computerId][spec.hardwareSpecId].maximum"
                             type="number"
@@ -77,6 +77,7 @@
                             dense
                             outlined
                             hide-details
+                            clearable
                             class="flex-grow-1 mr-2"
                             style="max-width: 300px;"
                           >
@@ -85,7 +86,30 @@
                                 <template v-slot:activator="{ props }">
                                   <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
                                 </template>
-                                <span>Maximum amount users with this role can reserve (0-{{ getSystemMaximum(computer, spec) }})</span>
+                                <span>Maximum amount users with this role can reserve (0-{{ getSystemMaximum(computer, spec) }}). Leave blank to inherit the computer default.</span>
+                              </v-tooltip>
+                            </template>
+                          </v-text-field>
+                          <v-text-field
+                            v-model.number="hardwareLimits[computer.computerId][spec.hardwareSpecId].maximumLowPriority"
+                            type="number"
+                            label="Override Low-Priority Max"
+                            :placeholder="spec.maximumAmountForUserLowPriority.toString()"
+                            :min="0"
+                            :max="getSystemMaximum(computer, spec)"
+                            dense
+                            outlined
+                            hide-details
+                            clearable
+                            class="flex-grow-1"
+                            style="max-width: 300px;"
+                          >
+                            <template v-slot:append>
+                              <v-tooltip bottom>
+                                <template v-slot:activator="{ props }">
+                                  <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                                </template>
+                                <span>Maximum amount users with this role can reserve in a low-priority reservation (0-{{ getSystemMaximum(computer, spec) }}). Leave blank to inherit the normal Override Max.</span>
                               </v-tooltip>
                             </template>
                           </v-text-field>
@@ -181,11 +205,12 @@ export default {
             this.hardwareLimits[computer.computerId] = {};
             computer.hardwareSpecs.forEach(spec => {
               this.hardwareLimits[computer.computerId][spec.hardwareSpecId] = {
-                maximum: null
+                maximum: null,
+                maximumLowPriority: null
               };
             });
           });
-          
+
           // Fetch existing role hardware limits from backend
           const limitsResponse = await axios({
             method: "get",
@@ -195,7 +220,7 @@ export default {
               'Authorization': `Bearer ${currentUser.loginToken}`
             }
           });
-          
+
           if (limitsResponse.data.status === true) {
             // Apply fetched limits to our structure
             const fetchedLimits = limitsResponse.data.data.hardwareLimits;
@@ -204,6 +229,7 @@ export default {
               const hardwareSpecId = limit.hardwareSpecId;
               if (this.hardwareLimits[computerId] && this.hardwareLimits[computerId][hardwareSpecId]) {
                 this.hardwareLimits[computerId][hardwareSpecId].maximum = limit.maximumAmountForRole;
+                this.hardwareLimits[computerId][hardwareSpecId].maximumLowPriority = limit.maximumAmountForRoleLowPriority;
               }
             });
           }
@@ -275,21 +301,28 @@ export default {
     hasCustomLimits(computerId) {
       const limits = this.hardwareLimits[computerId];
       if (!limits) return false;
-      return Object.values(limits).some(limit => limit.maximum !== null);
+      return Object.values(limits).some(limit => limit.maximum !== null || limit.maximumLowPriority !== null);
     },
     /** Converts the nested hardwareLimits object into a flat array for the backend API. */
     formatHardwareLimitsForBackend() {
       const formattedLimits = [];
 
+      const normalize = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        return parseInt(value);
+      };
+
       Object.entries(this.hardwareLimits).forEach(([computerId, specs]) => {
         Object.entries(specs).forEach(([hardwareSpecId, limits]) => {
-          if (limits.maximum !== null && limits.maximum !== '') {
-            formattedLimits.push({
-              computerId: parseInt(computerId),
-              hardwareSpecId: parseInt(hardwareSpecId),
-              maximumAmountForRole: limits.maximum === '' ? null : parseInt(limits.maximum)
-            });
-          }
+          const normal = normalize(limits.maximum);
+          const low = normalize(limits.maximumLowPriority);
+          if (normal === null && low === null) return;
+          formattedLimits.push({
+            computerId: parseInt(computerId),
+            hardwareSpecId: parseInt(hardwareSpecId),
+            maximumAmountForRole: normal,
+            maximumAmountForRoleLowPriority: low
+          });
         });
       });
 

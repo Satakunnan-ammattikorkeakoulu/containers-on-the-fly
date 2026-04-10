@@ -130,6 +130,12 @@ def get_user_reservation_limits(userId: int) -> dict:
     min_duration = float('inf')
     max_duration = 0
     max_active_reservations = 0
+    # Collect each role's explicit low-priority opinion (True/False). Missing
+    # rows contribute nothing so an admin's explicit `False` on one role can
+    # actually take effect — otherwise a user with a disabled role plus the
+    # built-in "everyone" role (which may have no row) would still get LP via
+    # the "no row = allow" fallback, making the admin's toggle meaningless.
+    lp_opinions = []
 
     # Apply the most permissive limits from all roles
     for role in user_roles:
@@ -145,6 +151,7 @@ def get_user_reservation_limits(userId: int) -> dict:
         role_min = db_limit.minDuration if db_limit.minDuration is not None else role_default_min
         role_max = db_limit.maxDuration if db_limit.maxDuration is not None else role_default_max
         role_active = db_limit.maxActiveReservations if db_limit.maxActiveReservations is not None else role_default_active
+        lp_opinions.append(bool(db_limit.allowLowPriority))
       else:
         role_min, role_max, role_active = role_default_min, role_default_max, role_default_active
 
@@ -168,10 +175,23 @@ def get_user_reservation_limits(userId: int) -> dict:
     if max_active_reservations == 0:
       max_active_reservations = default_active
 
+    # Resolve low-priority permission:
+    # - admins always allowed
+    # - no explicit opinions from any role: allow (default-on for fresh installs)
+    # - at least one explicit True: allow (most-permissive — a trusted role can re-enable)
+    # - only explicit False values: deny
+    if user_is_admin:
+      allow_low_priority = True
+    elif not lp_opinions:
+      allow_low_priority = True
+    else:
+      allow_low_priority = any(lp_opinions)
+
     return {
       'minDuration': min_duration,
       'maxDuration': max_duration,
-      'maxActiveReservations': max_active_reservations
+      'maxActiveReservations': max_active_reservations,
+      'allowLowPriority': allow_low_priority
     }
 
 def check_token(token : str) -> object:

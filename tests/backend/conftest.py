@@ -167,19 +167,22 @@ def seed_test_data():
         computer.hardwareSpecs.append(
             _db.HardwareSpec(
                 type="cpus", maximumAmount=8, minimumAmount=1,
-                maximumAmountForUser=8, defaultAmountForUser=2, format="CPUs",
+                maximumAmountForUser=8, maximumAmountForUserLowPriority=8,
+                defaultAmountForUser=2, format="CPUs",
             )
         )
         computer.hardwareSpecs.append(
             _db.HardwareSpec(
                 type="ram", maximumAmount=16, minimumAmount=1,
-                maximumAmountForUser=16, defaultAmountForUser=4, format="GB",
+                maximumAmountForUser=16, maximumAmountForUserLowPriority=16,
+                defaultAmountForUser=4, format="GB",
             )
         )
         computer.hardwareSpecs.append(
             _db.HardwareSpec(
                 type="gpus", maximumAmount=0, minimumAmount=0,
-                maximumAmountForUser=1, defaultAmountForUser=0, format="GPUs",
+                maximumAmountForUser=1, maximumAmountForUserLowPriority=1,
+                defaultAmountForUser=0, format="GPUs",
             )
         )
 
@@ -190,19 +193,22 @@ def seed_test_data():
         computer2.hardwareSpecs.append(
             _db.HardwareSpec(
                 type="cpus", maximumAmount=4, minimumAmount=1,
-                maximumAmountForUser=4, defaultAmountForUser=1, format="CPUs",
+                maximumAmountForUser=4, maximumAmountForUserLowPriority=4,
+                defaultAmountForUser=1, format="CPUs",
             )
         )
         computer2.hardwareSpecs.append(
             _db.HardwareSpec(
                 type="ram", maximumAmount=8, minimumAmount=1,
-                maximumAmountForUser=8, defaultAmountForUser=2, format="GB",
+                maximumAmountForUser=8, maximumAmountForUserLowPriority=8,
+                defaultAmountForUser=2, format="GB",
             )
         )
         computer2.hardwareSpecs.append(
             _db.HardwareSpec(
                 type="gpus", maximumAmount=0, minimumAmount=0,
-                maximumAmountForUser=1, defaultAmountForUser=0, format="GPUs",
+                maximumAmountForUser=1, maximumAmountForUserLowPriority=1,
+                defaultAmountForUser=0, format="GPUs",
             )
         )
 

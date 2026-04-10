@@ -70,7 +70,6 @@
                   type="number"
                   label="Maximum Duration (hours)"
                   :min="reservationLimits.minDuration || 1"
-                  :max="1440"
                   outlined
                   dense
                   required
@@ -81,10 +80,47 @@
                       <template v-slot:activator="{ props }">
                         <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
                       </template>
-                      <span>Maximum hours a user can reserve a container (up to 60 days)</span>
+                      <span>Maximum hours a user can reserve a container. No upper bound — set a large value for persistent workloads (e.g. web servers).</span>
                     </v-tooltip>
                   </template>
                 </v-text-field>
+              </v-col>
+
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model.number="reservationLimits.lowPriorityMaxDuration"
+                  type="number"
+                  label="Low-priority Maximum Duration (hours)"
+                  :min="1"
+                  outlined
+                  dense
+                  clearable
+                  placeholder="Inherits Maximum Duration when blank"
+                  :rules="lowPriorityMaxDurationRules"
+                  :disabled="!reservationLimits.allowLowPriority"
+                >
+                  <template v-slot:append>
+                    <v-tooltip bottom>
+                      <template v-slot:activator="{ props }">
+                        <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                      </template>
+                      <span>Maximum hours a user can reserve a low-priority container. Leave blank to inherit the normal Maximum Duration.</span>
+                    </v-tooltip>
+                  </template>
+                </v-text-field>
+              </v-col>
+
+              <v-col cols="12">
+                <v-switch
+                  v-model="reservationLimits.allowLowPriority"
+                  color="success"
+                  density="compact"
+                  hide-details
+                  label="Allow low-priority reservations for users in this role"
+                ></v-switch>
+                <p class="text-caption text-medium-emphasis mt-1" style="line-height: 1.3;">
+                  When disabled, users whose only roles all have this off cannot create low-priority reservations. Disable on the built-in "everyone" role to restrict the feature to specific roles only. Users inherit the most permissive setting across all their roles.
+                </p>
               </v-col>
             </v-row>
 
@@ -188,6 +224,8 @@ export default {
       reservationLimits: {
         minDuration: null,
         maxDuration: null,
+        lowPriorityMaxDuration: null,
+        allowLowPriority: true,
         maxActiveReservations: null
       }
     }
@@ -215,11 +253,11 @@ export default {
         }
       ];
     },
-    /** Validation rules for maximum duration: required, 1-1440 hours, must not be below min. */
+    /** Validation rules for maximum duration: required, at least 1 hour, must not be below min. No upper bound so persistent workloads are possible. */
     maxDurationRules() {
       return [
         v => !!v || v === 0 || 'This field is required',
-        v => (v >= 1 && v <= 1440) || 'Must be between 1 and 1440 hours (60 days)',
+        v => v >= 1 || 'Must be at least 1 hour',
         v => {
           if (this.reservationLimits.minDuration !== null && this.reservationLimits.minDuration !== '') {
             return v >= this.reservationLimits.minDuration || 'Must be greater than or equal to min duration';
@@ -232,6 +270,15 @@ export default {
       return [
         v => v !== null && v !== '' && v !== undefined || 'This field is required',
         v => (v >= 0 && v <= 99) || 'Must be between 0 and 99'
+      ];
+    },
+    /** Validation rules for low-priority max duration: optional (null inherits), at least 1 hour. No upper bound. */
+    lowPriorityMaxDurationRules() {
+      return [
+        v => {
+          if (v === null || v === undefined || v === '') return true;
+          return v >= 1 || 'Must be at least 1 hour';
+        }
       ];
     }
   },
@@ -259,6 +306,8 @@ export default {
           this.reservationLimits = {
             minDuration: limits.minDuration,
             maxDuration: limits.maxDuration,
+            lowPriorityMaxDuration: limits.lowPriorityMaxDuration,
+            allowLowPriority: limits.allowLowPriority !== false,
             maxActiveReservations: limits.maxActiveReservations
           };
         }

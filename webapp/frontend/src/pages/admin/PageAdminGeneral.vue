@@ -135,8 +135,8 @@
                 
                 <v-row>
                   <v-col cols="12">
-                    <v-btn 
-                      color="primary" 
+                    <v-btn
+                      color="primary"
                       :loading="saving.general"
                       @click="saveSection('general')"
                     >
@@ -148,7 +148,7 @@
               </v-form>
             </v-expansion-panel-text>
           </v-expansion-panel>
-          
+
           <!-- Authentication Section -->
           <v-expansion-panel>
             <v-expansion-panel-title>

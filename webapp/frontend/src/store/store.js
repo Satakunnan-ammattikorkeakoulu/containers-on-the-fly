@@ -60,7 +60,8 @@ export const useMainStore = defineStore('main', {
       reservationLimits: {
         minDuration: 1,
         maxDuration: 48,
-        maxActiveReservations: 1
+        maxActiveReservations: 1,
+        allowLowPriority: true
       },
       startScriptPath: "",
       stopScriptPath: ""
@@ -138,6 +139,8 @@ export const useMainStore = defineStore('main', {
     userMaxDuration: (state) => state.user.reservationLimits.maxDuration,
     /** @returns {number} Maximum concurrent active reservations for the current user. */
     userMaxActiveReservations: (state) => state.user.reservationLimits.maxActiveReservations,
+    /** @returns {boolean} Whether the current user is allowed to create low-priority reservations, based on their roles. */
+    userAllowLowPriority: (state) => state.user.reservationLimits?.allowLowPriority !== false,
   },
 
   actions: {

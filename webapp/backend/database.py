@@ -254,6 +254,7 @@ class HardwareSpec(Base):
   maximumAmount = Column(Float, nullable = False)
   minimumAmount = Column(Float, nullable = False)
   maximumAmountForUser = Column(Float, nullable = False)
+  maximumAmountForUserLowPriority = Column(Float, nullable = False)
   defaultAmountForUser = Column(Float, nullable = False)
   format = Column(Text, nullable = False)
   createdAt = Column(DateTime(timezone=True), server_default=func.now())
@@ -313,6 +314,7 @@ class RoleHardwareLimit(Base):
     roleId = Column(ForeignKey("Role.roleId", name="fk_RoleHardwareLimit_roleId", ondelete="CASCADE"), nullable=False, index=True)
     hardwareSpecId = Column(ForeignKey("HardwareSpec.hardwareSpecId", name="fk_RoleHardwareLimit_hardwareSpecId", ondelete="CASCADE"), nullable=False, index=True)
     maximumAmountForRole = Column(Integer, nullable=True)
+    maximumAmountForRoleLowPriority = Column(Integer, nullable=True)  # NULL = inherit maximumAmountForRole
     createdAt = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     updatedAt = Column(DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now())
     
@@ -336,6 +338,8 @@ class RoleReservationLimit(Base):
     roleId = Column(ForeignKey("Role.roleId"), nullable=False)
     minDuration = Column(Integer, nullable=True)  # hours (NULL = use default)
     maxDuration = Column(Integer, nullable=True)  # hours (NULL = use default)
+    lowPriorityMaxDuration = Column(Integer, nullable=True)  # hours (NULL = inherit maxDuration, then default)
+    allowLowPriority = Column(Boolean, nullable=False, default=True)  # Per-role: can users in this role create low-priority reservations
     maxActiveReservations = Column(Integer, nullable=True)  # count (NULL = use default)
     createdAt = Column(DateTime(timezone=True), server_default=func.now())
     updatedAt = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -1,6 +1,6 @@
 <template>
   <v-form ref="form">
-    <v-dialog v-model="isOpen" persistent max-width="900px">
+    <v-dialog v-model="isOpen" persistent max-width="1100px">
       <v-card>
         <v-card-text v-if="item">
           <v-container>
@@ -27,31 +27,170 @@
               <!-- vCPUs -->
               <v-col cols="12">
                 <h2 style="margin-bottom: 20px; margin-top: 40px;">vCPUs</h2>
-                <p class="help-text">Write the minimum amount of reservable vCPUs, maximum and the default selected for the user. This should be just an integer number for each, like: 3.</p>
+                <p class="help-text">Configure vCPU limits for this server. Integer values, e.g. 3. Hover the field icons for details.</p>
                 <v-row>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.minimumAmount" label="minimum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmount" label="maximum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.defaultAmountForUser" label="default*"></v-text-field></v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmount" label="Total on server*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The total vCPUs physically available on this server. Hard ceiling — no user or role can exceed it.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.minimumAmount" label="Minimum per reservation*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The smallest number of vCPUs a user can request in one reservation. Prevents wasteful tiny slices.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.defaultAmountForUser" label="Default for user*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The vCPU amount pre-selected on the reserve page when a user opens it. A reasonable starting point for most reservations.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                </v-row>
+                <v-row class="mt-n3">
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmountForUser" label="Maximum per user (normal)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest number of vCPUs one user can request in a single normal reservation. Role-level overrides can raise this further.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmountForUserLowPriority" label="Maximum per user (low-priority)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest number of vCPUs one user can request in a single low-priority reservation. Usually set higher than the normal cap since low-priority reservations may be paused when resources are needed by others.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
                 </v-row>
               </v-col>
               <!-- RAM -->
               <v-col cols="12">
                 <h2 style="margin-bottom: 20px; margin-top: 40px;">Ram Memory</h2>
-                <p class="help-text">Write the minimum amount of reservable RAM memory amount (in GBs), maximum and the default selected for the user. This should be just an integer number for each, like: 256.</p>
+                <p class="help-text">Configure RAM limits (in GB) for this server. Integer values, e.g. 256. Hover the field icons for details.</p>
                 <v-row>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.minimumAmount" label="minimum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmount" label="maximum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.defaultAmountForUser" label="default for user*"></v-text-field></v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmount" label="Total on server*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The total RAM (in GB) physically available on this server. Hard ceiling — no user or role can exceed it.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.minimumAmount" label="Minimum per reservation*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The smallest amount of RAM (in GB) a user can request in one reservation. Prevents wasteful tiny slices.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.defaultAmountForUser" label="Default for user*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The RAM amount (in GB) pre-selected on the reserve page when a user opens it. A reasonable starting point for most reservations.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                </v-row>
+                <v-row class="mt-n3">
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmountForUser" label="Maximum per user (normal)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest amount of RAM (in GB) one user can request in a single normal reservation. Role-level overrides can raise this further.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmountForUserLowPriority" label="Maximum per user (low-priority)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest amount of RAM (in GB) one user can request in a single low-priority reservation. Usually set higher than the normal cap since low-priority reservations may be paused when resources are needed by others.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
                 </v-row>
               </v-col>
               <!-- GPU Max -->
               <v-col cols="12">
                 <h2 style="margin-bottom: 20px; margin-top: 40px;">GPU</h2>
-                <p class="help-text">Write the maximum amount of GPUs that user can reserve in integer. For example: 2</p>
+                <p class="help-text">Configure per-user GPU caps for this server. Integer values, e.g. 2. Hover the field icons for details.</p>
                 <v-row>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.gpu.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.gpu.maximumAmountForUser" label="Maximum per user (normal)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest number of GPUs one user can request in a single normal reservation.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.gpu.maximumAmountForUserLowPriority" label="Maximum per user (low-priority)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest number of GPUs one user can request in a single low-priority reservation. Usually set higher than the normal cap since low-priority reservations may be paused when the GPUs are needed.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
                 </v-row>
               </v-col>
               <!-- GPUs -->

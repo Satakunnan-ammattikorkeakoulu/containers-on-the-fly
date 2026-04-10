@@ -142,6 +142,7 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
 
     # Get user's roles and their hardware limits (in the same session)
     user_role_limits = {}
+    user_role_limits_low = {}
     if user_id:
       from database import RoleHardwareLimit, UserRole
       user_roles = session.execute(select(UserRole).where(UserRole.userId == user_id)).scalars().all()
@@ -155,14 +156,22 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
         # Build a dict of hardwareSpecId -> max limit across all roles
         for limit in role_limits:
           spec_id = limit.hardwareSpecId
-          if spec_id not in user_role_limits or limit.maximumAmountForRole > user_role_limits[spec_id]:
-            user_role_limits[spec_id] = limit.maximumAmountForRole
+          if limit.maximumAmountForRole is not None:
+            if spec_id not in user_role_limits or limit.maximumAmountForRole > user_role_limits[spec_id]:
+              user_role_limits[spec_id] = limit.maximumAmountForRole
+
+          # Low-priority falls back to the normal override on rows where it is NULL
+          low_value = limit.maximumAmountForRoleLowPriority if limit.maximumAmountForRoleLowPriority is not None else limit.maximumAmountForRole
+          if low_value is not None:
+            if spec_id not in user_role_limits_low or low_value > user_role_limits_low[spec_id]:
+              user_role_limits_low[spec_id] = low_value
 
   # Set all user maximums to max for admins
   if (is_admin == True):
     for computer in computers:
       for spec in computer["hardwareSpecs"]:
         spec["maximumAmountForUser"] = spec["maximumAmount"]
+        spec["maximumAmountForUserLowPriority"] = spec["maximumAmount"]
   else:
     # Apply role-based limits or default limits
     for computer in computers:
@@ -174,12 +183,21 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
         elif spec["type"] == "gpu" and spec["maximumAmountForUser"] > 1:
           spec["maximumAmountForUser"] = 1
 
+        # Low-priority max: role override (with fallback) if present, otherwise the HardwareSpec column
+        if spec["hardwareSpecId"] in user_role_limits_low:
+          spec["maximumAmountForUserLowPriority"] = min(user_role_limits_low[spec["hardwareSpecId"]], spec["maximumAmount"])
+        # No GPU-1-cap for low-priority — low-priority is meant to allow more, not less
+
   all_fully_booked = len(computers) > 0
   for computer in computers:
     computer_fully_booked = False
     is_target = (target_computer_id is None) or (computer["computerId"] == target_computer_id)
 
     for spec in computer["hardwareSpecs"]:
+      # Expose the reserved-by-normal-reservations amount so the reserve page
+      # can show a "currently reserved" hint when low-priority is toggled on.
+      spec["reservedAmount"] = removable_hardware_specs.get(spec["hardwareSpecId"], 0)
+
       if spec["hardwareSpecId"] in removable_hardware_specs:
         spec["maximumAmount"] -= removable_hardware_specs[spec["hardwareSpecId"]]
 
@@ -217,6 +235,8 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
           spec["maximumAmount"] = 0
         if spec["maximumAmountForUser"] > spec["maximumAmount"]:
           spec["maximumAmountForUser"] = spec["maximumAmount"]
+        # Low-priority max is intentionally NOT clamped here — low-priority
+        # reservations are allowed to exceed current remaining availability.
 
     computer["fullyBooked"] = computer_fully_booked
     if not computer_fully_booked:
@@ -642,13 +662,31 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
         if limit.minDuration is not None:
             min_duration = min(min_duration, limit.minDuration)
 
-        # For max duration, take the highest value (most permissive)
-        if limit.maxDuration is not None:
-            max_duration = max(max_duration, limit.maxDuration)
+        # For max duration, take the highest value (most permissive). Low-priority
+        # reservations use lowPriorityMaxDuration if set, otherwise fall back to
+        # the normal maxDuration on the same row.
+        if isLowPriority:
+            effective_max = limit.lowPriorityMaxDuration if limit.lowPriorityMaxDuration is not None else limit.maxDuration
+        else:
+            effective_max = limit.maxDuration
+        if effective_max is not None:
+            max_duration = max(max_duration, effective_max)
 
         # For max active reservations, take the highest value (most permissive)
         if limit.maxActiveReservations is not None:
             max_active_reservations = max(max_active_reservations, limit.maxActiveReservations)
+
+    # Enforce the per-role "allow low-priority" gate. Admins bypass.
+    # Only explicit RoleReservationLimit rows contribute opinions — if every
+    # role the user has is silent (no row), LP is allowed (default-on posture
+    # for fresh installs). If ANY role explicitly allows, LP is allowed
+    # (most-permissive, so a trusted role can re-enable). If every explicit
+    # opinion is False, LP is denied.
+    if isLowPriority and not is_user_admin:
+        lp_opinions = [limit.allowLowPriority for limit in role_limits]
+        allow_lp = True if not lp_opinions else any(lp_opinions)
+        if not allow_lp:
+            return api_response(False, "Low-priority reservations are not enabled for your role.")
 
     # Check active reservations limit
     user_active_reservations = session.execute(
@@ -704,6 +742,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
 
     # Get user's role-based hardware limits
     user_role_limits = {}
+    user_role_limits_low = {}
     from database import RoleHardwareLimit, UserRole
     user_roles = session.execute(select(UserRole).where(UserRole.userId == resolved_user_id)).scalars().all()
     role_ids = [ur.roleId for ur in user_roles]
@@ -716,8 +755,18 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       # Build a dict of hardwareSpecId -> max limit across all roles
       for limit in role_limits:
         spec_id = limit.hardwareSpecId
-        if spec_id not in user_role_limits or limit.maximumAmountForRole > user_role_limits[spec_id]:
-          user_role_limits[spec_id] = limit.maximumAmountForRole
+        if limit.maximumAmountForRole is not None:
+          if spec_id not in user_role_limits or limit.maximumAmountForRole > user_role_limits[spec_id]:
+            user_role_limits[spec_id] = limit.maximumAmountForRole
+
+        # Low-priority falls back to the normal override on rows where it is NULL
+        low_value = limit.maximumAmountForRoleLowPriority if limit.maximumAmountForRoleLowPriority is not None else limit.maximumAmountForRole
+        if low_value is not None:
+          if spec_id not in user_role_limits_low or low_value > user_role_limits_low[spec_id]:
+            user_role_limits_low[spec_id] = low_value
+
+    # Select which role-limit dict applies to this reservation based on priority
+    effective_role_limits = user_role_limits_low if isLowPriority else user_role_limits
 
     # Add GPU count validation
     total_gpus_requested = 0
@@ -732,8 +781,8 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       gpu_limit_from_roles = 1
       for key, val in hardwareSpecs.items():
         hardware_spec = session.execute(select(HardwareSpec).where( HardwareSpec.hardwareSpecId == key )).scalar_one_or_none()
-        if hardware_spec and hardware_spec.type == "gpu" and key in user_role_limits:
-          gpu_limit_from_roles = max(gpu_limit_from_roles, user_role_limits[key])
+        if hardware_spec and hardware_spec.type == "gpu" and key in effective_role_limits:
+          gpu_limit_from_roles = max(gpu_limit_from_roles, effective_role_limits[key])
 
       if total_gpus_requested > gpu_limit_from_roles:
         return api_response(False, f"You can only reserve {gpu_limit_from_roles} GPU(s) at a time.")
@@ -755,10 +804,16 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       # Check that the amount does not exceed user limits for the given hardware
       # Skipped for admins
       if is_user_admin == False:
-        # Use role-based limit if available, otherwise use default computer limit
-        effective_limit = hardware_spec.maximumAmountForUser
-        if int(key) in user_role_limits:
-          effective_limit = min(user_role_limits[int(key)], hardware_spec.maximumAmount)
+        # Use role-based limit if available, otherwise use default computer limit.
+        # For low-priority reservations, use the low-priority cap/override.
+        if isLowPriority:
+          effective_limit = hardware_spec.maximumAmountForUserLowPriority
+          if int(key) in user_role_limits_low:
+            effective_limit = min(user_role_limits_low[int(key)], hardware_spec.maximumAmount)
+        else:
+          effective_limit = hardware_spec.maximumAmountForUser
+          if int(key) in user_role_limits:
+            effective_limit = min(user_role_limits[int(key)], hardware_spec.maximumAmount)
 
         if val > effective_limit:
           return api_response(False, f"Trying to utilize hardware specs above the user maximum amount for {hardware_spec.type} {hardware_spec.format}: {val} > {effective_limit}")
@@ -950,12 +1005,15 @@ def extend_reservation(userId : int, reservationId: int, duration: int):
     res_id = reservation.reservationId
     res_user_id = reservation.userId
     res_computer_id = reservation.computerId
+    res_is_low_priority = reservation.isLowPriority
 
-  # Phase 2: Check resource availability outside session to avoid nested sessions
-  available_hardware_response = get_available_hardware(end_time_string, duration, reducable_specs, False, res_id, res_user_id, target_computer_id=res_computer_id)
-  if not available_hardware_response["status"]:
-    log.debug(available_hardware_response["message"])
-    return api_response(False, "Cannot extend reservation due to lack of resources. Try with less hours.")
+  # Phase 2: Check resource availability outside session to avoid nested sessions.
+  # Low-priority extensions skip the availability check entirely, mirroring creation.
+  if not res_is_low_priority:
+    available_hardware_response = get_available_hardware(end_time_string, duration, reducable_specs, False, res_id, res_user_id, target_computer_id=res_computer_id)
+    if not available_hardware_response["status"]:
+      log.debug(available_hardware_response["message"])
+      return api_response(False, "Cannot extend reservation due to lack of resources. Try with less hours.")
 
   # Phase 3: Update session — apply the extension
   with Session() as session:

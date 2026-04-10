@@ -45,7 +45,7 @@ def add_hardware_spec(computerId, type, maxAmount, minAmount, maxUserAmount, def
       defaultUserAmount: The default amount allocated to a user.
       format: The unit format for the amounts (e.g. 'cores', 'GB').
   """
-  new_hardware_spec = HardwareSpec(computerId = computerId, type = type, maximumAmount = maxAmount, minimumAmount = minAmount, maximumAmountForUser = maxUserAmount, defaultAmountForUser = defaultUserAmount, format = format)
+  new_hardware_spec = HardwareSpec(computerId = computerId, type = type, maximumAmount = maxAmount, minimumAmount = minAmount, maximumAmountForUser = maxUserAmount, maximumAmountForUserLowPriority = maxUserAmount, defaultAmountForUser = defaultUserAmount, format = format)
   with Session() as session:
     session.add(new_hardware_spec)
     session.commit()

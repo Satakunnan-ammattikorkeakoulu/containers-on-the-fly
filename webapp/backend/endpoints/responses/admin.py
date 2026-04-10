@@ -1008,6 +1008,13 @@ def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> obj
       Response indicating success or failure with an appropriate message.
   """
   
+  def _low_priority_or_normal(section):
+    """Pick the low-priority max from the payload, falling back to the normal max."""
+    value = section.get("maximumAmountForUserLowPriority")
+    if value is None:
+      value = section.get("maximumAmountForUser")
+    return value
+
   with Session() as session:
     # If new, create a new computer
     if computerEdit.computerId == -1:
@@ -1023,6 +1030,7 @@ def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> obj
         maximumAmount = hardware.get("cpu").get("maximumAmount"),
         minimumAmount = hardware.get("cpu").get("minimumAmount"),
         maximumAmountForUser = hardware.get("cpu").get("maximumAmountForUser"),
+        maximumAmountForUserLowPriority = _low_priority_or_normal(hardware.get("cpu")),
         defaultAmountForUser = hardware.get("cpu").get("defaultAmountForUser"),
       )
       computer.hardwareSpecs.append(cpu)
@@ -1032,6 +1040,7 @@ def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> obj
         maximumAmount = hardware.get("ram").get("maximumAmount"),
         minimumAmount = hardware.get("ram").get("minimumAmount"),
         maximumAmountForUser = hardware.get("ram").get("maximumAmountForUser"),
+        maximumAmountForUserLowPriority = _low_priority_or_normal(hardware.get("ram")),
         defaultAmountForUser = hardware.get("ram").get("defaultAmountForUser"),
       )
       computer.hardwareSpecs.append(ram)
@@ -1042,6 +1051,7 @@ def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> obj
         minimumAmount = 0,
         defaultAmountForUser = 0,
         maximumAmountForUser = hardware.get("gpu").get("maximumAmountForUser"),
+        maximumAmountForUserLowPriority = _low_priority_or_normal(hardware.get("gpu")),
       )
       computer.hardwareSpecs.append(gpus)
       # Add GPUs
@@ -1053,6 +1063,7 @@ def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> obj
           minimumAmount = 0,
           defaultAmountForUser = 0,
           maximumAmountForUser = 1,
+          maximumAmountForUserLowPriority = 1,
           internalId = gpu.get("internalId", ""))
         computer.hardwareSpecs.append(gpu_spec)
       session.add(computer)
@@ -1072,18 +1083,24 @@ def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> obj
         # Update hardware specs
         for spec in computer.hardwareSpecs:
           if spec.type == "cpus":
-            spec.maximumAmount = computerEdit.data.get("hardware").get("cpu").get("maximumAmount")
-            spec.minimumAmount = computerEdit.data.get("hardware").get("cpu").get("minimumAmount")
-            spec.maximumAmountForUser = computerEdit.data.get("hardware").get("cpu").get("maximumAmountForUser")
-            spec.defaultAmountForUser = computerEdit.data.get("hardware").get("cpu").get("defaultAmountForUser")
+            cpu_data = computerEdit.data.get("hardware").get("cpu")
+            spec.maximumAmount = cpu_data.get("maximumAmount")
+            spec.minimumAmount = cpu_data.get("minimumAmount")
+            spec.maximumAmountForUser = cpu_data.get("maximumAmountForUser")
+            spec.maximumAmountForUserLowPriority = _low_priority_or_normal(cpu_data)
+            spec.defaultAmountForUser = cpu_data.get("defaultAmountForUser")
           if spec.type == "ram":
-            spec.maximumAmount = computerEdit.data.get("hardware").get("ram").get("maximumAmount")
-            spec.minimumAmount = computerEdit.data.get("hardware").get("ram").get("minimumAmount")
-            spec.maximumAmountForUser = computerEdit.data.get("hardware").get("ram").get("maximumAmountForUser")
-            spec.defaultAmountForUser = computerEdit.data.get("hardware").get("ram").get("defaultAmountForUser")
+            ram_data = computerEdit.data.get("hardware").get("ram")
+            spec.maximumAmount = ram_data.get("maximumAmount")
+            spec.minimumAmount = ram_data.get("minimumAmount")
+            spec.maximumAmountForUser = ram_data.get("maximumAmountForUser")
+            spec.maximumAmountForUserLowPriority = _low_priority_or_normal(ram_data)
+            spec.defaultAmountForUser = ram_data.get("defaultAmountForUser")
           if spec.type == "gpus":
+            gpu_data = computerEdit.data.get("hardware").get("gpu")
             spec.maximumAmount = len(computerEdit.data.get("hardware").get("gpus"))
-            spec.maximumAmountForUser = computerEdit.data.get("hardware").get("gpu").get("maximumAmountForUser")
+            spec.maximumAmountForUser = gpu_data.get("maximumAmountForUser")
+            spec.maximumAmountForUserLowPriority = _low_priority_or_normal(gpu_data)
         # Remove all removable GPUs
         for spec in computerEdit.data.get("removedGPUs", []):
           session.execute(delete(ReservedHardwareSpec).where(ReservedHardwareSpec.hardwareSpecId == spec))
@@ -1099,6 +1116,7 @@ def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> obj
               minimumAmount = 0,
               defaultAmountForUser = 0,
               maximumAmountForUser = 1,
+              maximumAmountForUserLowPriority = 1,
             ))
         # Edit changed GPUs
         for gpu in computerEdit.data.get("hardware").get("gpus", []):

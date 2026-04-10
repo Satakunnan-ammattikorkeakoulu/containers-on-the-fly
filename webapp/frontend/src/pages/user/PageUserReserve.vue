@@ -27,7 +27,7 @@
               <span class="text-white text-body-2 font-weight-bold">1</span>
             </v-avatar>
             <v-icon class="mr-2">mdi-timer-outline</v-icon>
-            <span class="font-weight-bold">Duration</span>
+            <span class="font-weight-bold">{{ isLowPriorityOptionVisible ? 'Reservation Type & Duration' : 'Duration' }}</span>
             <v-chip
               v-if="completedSections.duration && activePanel !== 0"
               color="success" variant="tonal" size="small" class="ml-3"
@@ -44,9 +44,25 @@
           >
             Changing the duration will reset your selections and require re-checking hardware availability.
           </v-alert>
+          <div class="mx-auto text-center" style="max-width: 500px;">
+            <h2>{{ durationPanelHeading }}</h2>
+            <p v-if="isLowPriorityOptionVisible" class="text-center mb-3" style="margin-top: -4px;">
+              <a href="#" class="reservation-type-switch" @click.prevent="isLowPriority = !isLowPriority">
+                {{ isLowPriority ? 'Switch back to normal reservation' : 'Switch to low-priority reservation' }}
+              </a>
+            </p>
+            <v-alert
+              v-if="isLowPriority"
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mb-4 text-left"
+            >
+              Low-priority reservations may be paused when resources are needed by other users, and resumed automatically when resources become available. Save your work to mounted volumes.
+            </v-alert>
+          </div>
           <v-row justify="center">
             <v-col cols="12" sm="6" md="4" lg="3" style="min-width: 320px">
-              <h2>Reservation Duration</h2>
               <p class="panel-description">Select how long you need the server. Minimum is <b>{{ formatDuration(minimumDuration) }}</b>, maximum is <b>{{ formatDuration(maximumDuration) }}</b>.</p>
               <v-row>
                 <v-col cols="6">
@@ -345,29 +361,37 @@
                 GPUs
               </h3>
               <p class="text-center text-medium-emphasis" style="font-size: 13px; margin-bottom: 5px;">
-                {{ hardwareDataOnlyGPUs().length }} available — select up to {{ getMaxGpus() }}
+                {{ availableGpuCount }} of {{ totalGpuCount }} available — select up to {{ getMaxGpus() }}
+                <template v-if="hasReservedGpus">
+                  &nbsp;
+                  <a href="#" class="link-hint" @click.prevent="showReservedGpus = !showReservedGpus">
+                    {{ showReservedGpus ? 'Hide reserved' : 'Show reserved' }}
+                  </a>
+                </template>
               </p>
-              <div style="margin-bottom: 30px; margin-top: 15px;" v-if="hardwareDataOnlyGPUs().length === 0" class="text-center text-medium-emphasis">
+              <div style="margin-bottom: 30px; margin-top: 15px;" v-if="totalGpuCount === 0" class="text-center text-medium-emphasis">
                 No GPUs Available
               </div>
               <v-row v-else justify="center" style="margin-top: 15px; margin-bottom: 20px;">
                 <v-col
-                  v-for="gpu in hardwareDataOnlyGPUs()"
+                  v-for="gpu in visibleGpus()"
                   :key="gpu.value"
                   cols="4"
                   sm="3"
                   md="2"
                 >
                   <v-card
-                    :class="{ 'selected-card': selectedgpus.includes(gpu.value) }"
+                    :class="{ 'selected-card': selectedgpus.includes(gpu.value), 'gpu-card-reserved': gpu.isReserved && !isLowPriority }"
                     @click="toggleGpu(gpu.value)"
                     hover
-                    style="cursor: pointer; min-height: 90px;"
+                    :style="{ cursor: gpu.isReserved && !isLowPriority ? 'not-allowed' : 'pointer', minHeight: '90px' }"
                     :outlined="!selectedgpus.includes(gpu.value)"
                   >
                     <v-card-text style="height: 100%; padding: 15px 10px;">
                       <div class="d-flex flex-column align-center justify-center h-100 text-center">
+                        <div v-if="gpu.isReserved" class="gpu-reserved-badge mb-2">Reserved</div>
                         <v-icon
+                          v-else
                           size="28"
                           class="mb-2"
                           :color="selectedgpus.includes(gpu.value) ? 'primary' : 'grey'"
@@ -397,16 +421,19 @@
                   :min="spec.minimumAmount"
                   show-ticks="always"
                   v-model="selectedHardwareSpecs[spec.hardwareSpecId]"
-                  :max="spec.maximumAmountForUser"
+                  :max="getSpecMax(spec)"
                   thumb-label="always"
                   :step="1"
                   color="primary"
                   track-color="grey-darken-2"
                 >
                   <template v-slot:thumb-label="{ modelValue }">
-                    <span style="font-size: 15px;">{{ (modelValue ?? 0) }} / {{ spec.maximumAmountForUser }} {{ spec.format }}</span>
+                    <span style="font-size: 15px;">{{ (modelValue ?? 0) }} / {{ getSpecMax(spec) }} {{ spec.format }}</span>
                   </template>
                 </v-slider>
+                <p v-if="isLowPriority && spec.reservedAmount !== undefined" class="text-center text-caption text-medium-emphasis mt-1" style="margin-top: -5px;">
+                  {{ spec.reservedAmount }} / {{ spec.reservedAmount + spec.maximumAmount }} {{ spec.format }} already reserved in this time range by normal reservations.
+                </p>
               </v-col>
             </v-row>
             <!-- Review & Create button -->
@@ -528,23 +555,6 @@
             </v-col>
           </v-row>
 
-          <!-- Low-Priority Reservation -->
-          <v-row style="margin-top: 20px;">
-            <v-col cols="12" md="6" style="padding: 0 40px;">
-              <h3>Low-Priority Reservation</h3>
-              <p style="color: gray; font-size: 15px;">
-                Low-priority reservations may be paused when resources are needed by other users,
-                and automatically resumed when resources become available. Save your work to mounted volumes.
-              </p>
-              <div class="d-flex justify-center">
-                <v-switch
-                  v-model="isLowPriority"
-                  color="warning"
-                  label="Make reservation low-priority"
-                ></v-switch>
-              </div>
-            </v-col>
-          </v-row>
         </v-expansion-panel-text>
       </v-expansion-panel>
 
@@ -659,6 +669,7 @@
       reserveDurationHours: null,
       initializingDefaults: false,
       isLowPriority: false,
+      showReservedGpus: false,
       shmSizePercent: 50,
       ramDiskSizePercent: 0,
       fetchingReservations: false,
@@ -817,19 +828,35 @@
         if (currentUser.roles && currentUser.roles.includes("admin")) return true
         return false
       },
+      /** Returns the priority-aware per-user maximum for a given hardware spec. */
+      getSpecMax(spec) {
+        if (!spec) return 0
+        if (this.isLowPriority && spec.maximumAmountForUserLowPriority !== undefined && spec.maximumAmountForUserLowPriority !== null) {
+          return spec.maximumAmountForUserLowPriority
+        }
+        return spec.maximumAmountForUser
+      },
       /** Get the maximum number of GPUs the user can select. */
       getMaxGpus() {
         if (this.isAdmin()) return this.hardwareDataOnlyGPUs().length;
         let max = 1;
         this.hardwareData.forEach((spec) => {
-          if (spec.type === "gpus" && spec.maximumAmountForUser) {
-            max = spec.maximumAmountForUser;
+          if (spec.type === "gpus") {
+            const specMax = this.getSpecMax(spec)
+            if (specMax) max = specMax
           }
         });
         return max;
       },
-      /** Toggle GPU selection by clicking its card. */
+      /**
+       * Toggle GPU selection by clicking its card. Reserved GPUs are only
+       * selectable in low-priority mode, where the user explicitly accepts
+       * that their reservation may be preempted.
+       */
       toggleGpu(gpuValue) {
+        const spec = this.hardwareData.find(s => s.hardwareSpecId === gpuValue)
+        const isReserved = spec && (spec.reservedAmount || 0) > 0
+        if (isReserved && !this.isLowPriority) return
         let index = this.selectedgpus.indexOf(gpuValue);
         if (index > -1) {
           this.selectedgpus.splice(index, 1);
@@ -860,7 +887,7 @@
 
         // Use the computer-specific GPU limit from the "gpus" summary spec
         if (gpusSummarySpec) {
-          max = gpusSummarySpec.maximumAmountForUser
+          max = this.getSpecMax(gpusSummarySpec)
         }
 
         if (this.selectedgpus.length > max) {
@@ -899,21 +926,45 @@
         return data.sort((a, b) => a.type.localeCompare(b.type))
       },
       /**
-       * Returns a list of all GPUs in the hardware data.
-       * @returns {Array} Array of all GPUs
+       * Returns a list of all individual GPUs on the selected computer, including
+       * ones that are already reserved by a normal reservation. Each entry has an
+       * `isReserved` flag the template uses to render the grey "Reserved" state
+       * and block selection in normal mode. Reserved GPUs are sorted to the end
+       * so the default (available) cards stay left-aligned.
+       * @returns {Array} Array of all per-GPU specs
        */
       hardwareDataOnlyGPUs() {
         let data = []
         this.hardwareData.forEach((spec) => {
-          if (spec.type === "gpu") {
-            // Only add individual GPUs that are reservable (not the summary "gpus" type)
-            if (spec.maximumAmountForUser > 0) {
-              let obj = { text: `${spec.internalId}: ${spec.format}`, value: spec.hardwareSpecId }
-              data.push(obj)
-            }
+          if (spec.type === "gpu" && spec.internalId) {
+            data.push({
+              text: `${spec.internalId}: ${spec.format}`,
+              value: spec.hardwareSpecId,
+              isReserved: (spec.reservedAmount || 0) > 0
+            })
           }
         })
-        return data.sort((a, b) => a.text.localeCompare(b.text))
+        return data.sort((a, b) => {
+          if (a.isReserved !== b.isReserved) return a.isReserved ? 1 : -1
+          return a.text.localeCompare(b.text)
+        })
+      },
+      /**
+       * Returns the GPUs visible in the list right now — reserved ones are
+       * hidden unless the user has clicked "Show reserved" or has already
+       * selected them (so a hidden selection never becomes invisible).
+       */
+      visibleGpus() {
+        return this.hardwareDataOnlyGPUs().filter(gpu => {
+          if (!gpu.isReserved) return true
+          if (this.showReservedGpus) return true
+          if (this.selectedgpus.includes(gpu.value)) return true
+          return false
+        })
+      },
+      /** True if the current computer has at least one GPU reserved by a normal reservation. */
+      hasReservedGpus() {
+        return this.hardwareDataOnlyGPUs().some(gpu => gpu.isReserved)
       },
       /**
        * Called when the user clicks "Start Immediately".
@@ -968,6 +1019,7 @@
 
         // Set default values for selected GPUs
         this.selectedgpus = []
+        this.showReservedGpus = false
 
         this.completedSections.hardware = true
 
@@ -1132,11 +1184,12 @@
                   Object.keys(_this.selectedHardwareSpecs).forEach((specId) => {
                     const value = _this.selectedHardwareSpecs[specId]
                     const newSpec = newSpecsById[specId]
+                    const newSpecMax = _this.getSpecMax(newSpec)
                     if (!newSpec) {
                       delete _this.selectedHardwareSpecs[specId]
                       specsChanged = true
-                    } else if (value > newSpec.maximumAmountForUser) {
-                      _this.selectedHardwareSpecs[specId] = newSpec.maximumAmountForUser
+                    } else if (value > newSpecMax) {
+                      _this.selectedHardwareSpecs[specId] = newSpecMax
                       specsChanged = true
                     }
                   })
@@ -1430,7 +1483,7 @@
 
         // Add GPU info
         if (gpuSpecs.length > 0) {
-          let gpuCount = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
+          let gpuCount = gpuSpecs.filter(spec => this.getSpecMax(spec) > 0).length
           if (gpuCount > 0) {
             formattedSpecs.push(`${gpuCount} GPU${gpuCount > 1 ? 's' : ''}`)
           }
@@ -1439,14 +1492,15 @@
         // Add other specs (limit to first 2-3 most important ones)
         let prioritySpecs = otherSpecs.slice(0, 2)
         prioritySpecs.forEach(spec => {
-          if (spec.maximumAmountForUser > 0) {
+          const specMax = this.getSpecMax(spec)
+          if (specMax > 0) {
             let displayName
             if (spec.type === "cpus") displayName = "CPUs"
             else if (spec.type === "memory") displayName = "RAM"
             else if (spec.type === "storage") displayName = "Storage"
             else displayName = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
 
-            formattedSpecs.push(`${spec.maximumAmountForUser} ${spec.format} ${displayName}`)
+            formattedSpecs.push(`${specMax} ${spec.format} ${displayName}`)
           }
         })
 
@@ -1469,7 +1523,7 @@
         let gpuSpecs = specs.filter(spec => spec.type === "gpu")
         let otherSpecs = specs.filter(spec => spec.type !== "gpus" && spec.type !== "gpu")
 
-        let gpuAvailable = gpuSpecs.filter(spec => spec.maximumAmountForUser > 0).length
+        let gpuAvailable = gpuSpecs.filter(spec => this.getSpecMax(spec) > 0).length
         hardwareList.push({
           id: 'gpu',
           type: 'gpu',
@@ -1486,23 +1540,24 @@
           let icon
           let value
           let unit = spec.format ? ` ${spec.format}` : ''
+          const specMax = this.getSpecMax(spec)
 
           if (spec.type === "cpus") {
             label = "CPUs"
             icon = "mdi-cpu-64-bit"
-            value = `${spec.maximumAmountForUser}`
+            value = `${specMax}`
           } else if (spec.type === "memory") {
             label = "RAM"
             icon = "mdi-memory"
-            value = `${spec.maximumAmountForUser}${unit}`
+            value = `${specMax}${unit}`
           } else if (spec.type === "storage") {
             label = "Storage"
             icon = "mdi-harddisk"
-            value = `${spec.maximumAmountForUser}${unit}`
+            value = `${specMax}${unit}`
           } else {
             label = spec.type.charAt(0).toUpperCase() + spec.type.slice(1)
             icon = "mdi-chip"
-            value = `${spec.maximumAmountForUser}${unit}`
+            value = `${specMax}${unit}`
           }
 
           hardwareList.push({
@@ -1511,7 +1566,7 @@
             icon,
             value,
             label,
-            available: spec.maximumAmountForUser
+            available: specMax
           })
         })
 
@@ -1567,13 +1622,19 @@
       }
     },
     computed: {
-      /** Summary text for the Duration panel when collapsed. */
+      /** Heading shown inside the Duration panel. Adapts to the current reservation type. */
+      durationPanelHeading() {
+        if (!this.isLowPriorityOptionVisible) return 'Reservation Duration'
+        return this.isLowPriority ? 'Low-Priority Reservation' : 'Normal Reservation'
+      },
+      /** Summary text for the Duration panel when collapsed. Prepends the mode only when low-priority. */
       durationSummary() {
         if (this.reserveDurationDays === null && this.reserveDurationHours === null) return ''
         let parts = []
         if (this.reserveDurationDays > 0) parts.push(`${this.reserveDurationDays} day${this.reserveDurationDays !== 1 ? 's' : ''}`)
         if (this.reserveDurationHours > 0) parts.push(`${this.reserveDurationHours} hour${this.reserveDurationHours !== 1 ? 's' : ''}`)
-        return parts.join(', ') || `${this.minimumDuration} hours`
+        const durationText = parts.join(', ') || `${this.minimumDuration} hours`
+        return this.isLowPriority ? `Low-priority \u2022 ${durationText}` : durationText
       },
       /** Summary text for the Start Time panel when collapsed. Shows relative time + full date. */
       parsedTimeSummary() {
@@ -1615,7 +1676,6 @@
       /** Summary text for the Advanced Settings panel when collapsed. */
       advancedSettingsSummary() {
         let parts = []
-        if (this.isLowPriority) parts.push('Low-priority')
         if (this.reservationDescription && this.reservationDescription.trim()) parts.push(`"${this.reservationDescription.trim()}"`)
         if (this.shmSizePercent !== 50) parts.push(`SHM ${this.shmSizePercent}%`)
         if (this.ramDiskSizePercent > 0) parts.push(`RAM Disk ${this.ramDiskSizePercent}%`)
@@ -1659,6 +1719,25 @@
       },
       reservationPageInstructions() {
         return this.store.reservationPageInstructions
+      },
+      /**
+       * Whether the low-priority toggle is visible in the Duration panel.
+       * Admins always see it; other users see it only when at least one of
+       * their roles has low-priority reservations enabled.
+       */
+      isLowPriorityOptionVisible() {
+        if (this.isAdmin()) return true
+        return this.store.userAllowLowPriority
+      },
+      /** Total number of individual GPUs present on the selected computer. */
+      totalGpuCount() {
+        if (!this.hardwareData) return 0
+        return this.hardwareData.filter(spec => spec.type === "gpu" && spec.internalId).length
+      },
+      /** Number of GPUs not currently reserved by a normal reservation. */
+      availableGpuCount() {
+        if (!this.hardwareData) return 0
+        return this.hardwareData.filter(spec => spec.type === "gpu" && spec.internalId && (spec.reservedAmount || 0) === 0).length
       }
     },
     watch: {
@@ -1681,6 +1760,37 @@
       'store.configLoaded'(isLoaded) {
         if (isLoaded && this.reservableDays.length === 0) {
           this.initializeDurationDefaults()
+        }
+      },
+      /**
+       * When the user toggles low-priority mode, re-clamp any existing
+       * hardware selections against the new (possibly lower) per-spec max
+       * and drop any reserved-GPU selections that are only valid in LP mode.
+       * This prevents a stale selection from being silently submitted after
+       * the toggle flips off.
+       */
+      isLowPriority(newVal) {
+        if (!this.hardwareData) return
+        const specsById = {}
+        this.hardwareData.forEach((spec) => {
+          specsById[spec.hardwareSpecId] = spec
+        })
+        if (this.selectedHardwareSpecs) {
+          Object.keys(this.selectedHardwareSpecs).forEach((specId) => {
+            const spec = specsById[specId]
+            if (!spec) return
+            const max = this.getSpecMax(spec)
+            if (this.selectedHardwareSpecs[specId] > max) {
+              this.selectedHardwareSpecs[specId] = max
+            }
+          })
+        }
+        if (!newVal) {
+          this.selectedgpus = this.selectedgpus.filter((gpuId) => {
+            const spec = specsById[gpuId]
+            if (!spec) return true
+            return (spec.reservedAmount || 0) === 0
+          })
         }
       },
       /**
@@ -1716,6 +1826,24 @@
     margin-top: 0px;
     margin-bottom: 30px;
     color: gray;
+  }
+
+  .gpu-card-reserved {
+    opacity: 0.5;
+  }
+
+  .reservation-type-switch,
+  .reservation-type-switch:hover {
+    text-decoration: none;
+  }
+
+  .gpu-reserved-badge {
+    font-size: 11px;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.6);
+    height: 28px;
+    line-height: 28px;
+    letter-spacing: 0.5px;
   }
 
   .spec-row {

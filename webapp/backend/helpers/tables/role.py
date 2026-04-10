@@ -320,6 +320,7 @@ def get_role_hardware_limits(roleId: int) -> list:
                 "roleId": limit.roleId,
                 "hardwareSpecId": limit.hardwareSpecId,
                 "maximumAmountForRole": limit.maximumAmountForRole,
+                "maximumAmountForRoleLowPriority": limit.maximumAmountForRoleLowPriority,
                 "computerId": limit.hardwareSpec.computerId if limit.hardwareSpec else None,
                 "hardwareType": limit.hardwareSpec.type if limit.hardwareSpec else None
             }
@@ -364,11 +365,14 @@ def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> tuple[bool, 
         # Add new hardware limits
         for limit_data in hardwareLimits:
             # Validate required fields
-            if not all(key in limit_data for key in ['hardwareSpecId', 'maximumAmountForRole']):
+            if 'hardwareSpecId' not in limit_data:
                 return False, "Missing required hardware limit fields"
 
-            # Skip if maximumAmountForRole is None
-            if limit_data['maximumAmountForRole'] is None:
+            normal_value = limit_data.get('maximumAmountForRole')
+            low_priority_value = limit_data.get('maximumAmountForRoleLowPriority')
+
+            # Skip rows where neither normal nor low-priority override is set
+            if normal_value is None and low_priority_value is None:
                 continue
 
             # Check if hardware spec exists
@@ -377,19 +381,6 @@ def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> tuple[bool, 
             ).scalar_one_or_none()
             if not hardware_spec:
                 return False, f"Hardware spec with ID {limit_data['hardwareSpecId']} not found"
-
-            # Validate that role limit doesn't exceed system maximum
-            max_amount = limit_data['maximumAmountForRole']
-
-            # Validate that the value is a positive integer
-            if not isinstance(max_amount, int):
-                try:
-                    max_amount = int(max_amount)
-                except (ValueError, TypeError):
-                    return False, f"Invalid value for hardware limit: must be an integer, got '{max_amount}'"
-
-            if max_amount < 0:
-                return False, f"Hardware limit cannot be negative: {max_amount}"
 
             # For GPUs without internalId, system max is the count of all GPU specs
             if hardware_spec.type == 'gpu' and not hardware_spec.internalId:
@@ -403,13 +394,34 @@ def save_role_hardware_limits(roleId: int, hardwareLimits: list) -> tuple[bool, 
             else:
                 system_max = hardware_spec.maximumAmount
 
-            if max_amount > system_max:
-                return False, f"Role limit ({max_amount}) exceeds system maximum ({system_max}) for {hardware_spec.type} on computer {hardware_spec.computer.name}"
+            def _validate_value(value, label):
+                """Coerce to int and enforce [0, system_max] bounds; return (value, error_message)."""
+                if value is None:
+                    return None, None
+                if not isinstance(value, int):
+                    try:
+                        value = int(value)
+                    except (ValueError, TypeError):
+                        return None, f"Invalid value for {label}: must be an integer, got '{value}'"
+                if value < 0:
+                    return None, f"{label} cannot be negative: {value}"
+                if value > system_max:
+                    return None, f"{label} ({value}) exceeds system maximum ({system_max}) for {hardware_spec.type} on computer {hardware_spec.computer.name}"
+                return value, None
+
+            normal_value, err = _validate_value(normal_value, "Hardware limit")
+            if err:
+                return False, err
+
+            low_priority_value, err = _validate_value(low_priority_value, "Low-priority hardware limit")
+            if err:
+                return False, err
 
             new_limit = RoleHardwareLimit(
                 roleId=roleId,
                 hardwareSpecId=limit_data['hardwareSpecId'],
-                maximumAmountForRole=max_amount
+                maximumAmountForRole=normal_value,
+                maximumAmountForRoleLowPriority=low_priority_value
             )
             session.add(new_limit)
 
@@ -459,6 +471,8 @@ def get_role_reservation_limits(roleId: int) -> dict:
             return {
                 "minDuration": limits.minDuration if limits.minDuration is not None else default_min,
                 "maxDuration": limits.maxDuration if limits.maxDuration is not None else default_max,
+                "lowPriorityMaxDuration": limits.lowPriorityMaxDuration,
+                "allowLowPriority": limits.allowLowPriority,
                 "maxActiveReservations": limits.maxActiveReservations if limits.maxActiveReservations is not None else default_active
             }
         else:
@@ -466,6 +480,8 @@ def get_role_reservation_limits(roleId: int) -> dict:
             return {
                 "minDuration": default_min,
                 "maxDuration": default_max,
+                "lowPriorityMaxDuration": None,
+                "allowLowPriority": True,
                 "maxActiveReservations": default_active
             }
 
@@ -473,9 +489,9 @@ def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> tuple[
     """Save reservation limits for a role (create or update).
 
     Validates that all required fields are present and within allowed
-    ranges: minDuration (1-720 hours), maxDuration (1-1440 hours),
-    maxActiveReservations (0-99). Also ensures minDuration does not
-    exceed maxDuration.
+    ranges: minDuration (1-720 hours), maxDuration (>= 1 hour, no upper
+    bound so persistent workloads are possible), maxActiveReservations
+    (0-99). Also ensures minDuration does not exceed maxDuration.
 
     Args:
         roleId: The ID of the role to save reservation limits for.
@@ -513,6 +529,12 @@ def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> tuple[
         # Update values
         limits.minDuration = reservationLimits['minDuration']
         limits.maxDuration = reservationLimits['maxDuration']
+        limits.lowPriorityMaxDuration = reservationLimits.get('lowPriorityMaxDuration')
+        if 'allowLowPriority' in reservationLimits and reservationLimits['allowLowPriority'] is not None:
+            raw_allow = reservationLimits['allowLowPriority']
+            if not isinstance(raw_allow, bool):
+                return False, "allowLowPriority must be a boolean"
+            limits.allowLowPriority = raw_allow
         limits.maxActiveReservations = reservationLimits['maxActiveReservations']
 
         # Validate min/max relationship
@@ -523,8 +545,14 @@ def save_role_reservation_limits(roleId: int, reservationLimits: dict) -> tuple[
         if limits.minDuration < 1 or limits.minDuration > 720:
             return False, "Minimum duration must be between 1 and 720 hours"
 
-        if limits.maxDuration < 1 or limits.maxDuration > 1440:
-            return False, "Maximum duration must be between 1 and 1440 hours (60 days)"
+        if limits.maxDuration < 1:
+            return False, "Maximum duration must be at least 1 hour"
+
+        if limits.lowPriorityMaxDuration is not None:
+            if not isinstance(limits.lowPriorityMaxDuration, int):
+                return False, "Low-priority maximum duration must be an integer"
+            if limits.lowPriorityMaxDuration < 1:
+                return False, "Low-priority maximum duration must be at least 1 hour"
 
         if limits.maxActiveReservations < 0 or limits.maxActiveReservations > 99:
             return False, "Max active reservations must be between 0 and 99"

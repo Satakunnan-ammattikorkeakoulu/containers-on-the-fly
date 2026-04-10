@@ -86,11 +86,11 @@ def login(username, password):
         raise HTTPException(status_code=400, detail="User not found.")
 
       if user.password == "" or user.password is None:
-        log_action(user.userId, "LOGIN_FAILED", "user", details={"email": username, "reason": "no password set"})
+        log_action(None, "LOGIN_FAILED", "user", details={"email": username, "reason": "no password set"})
         raise HTTPException(status_code=400, detail="User password was not set yet. Please set the password first to login.")
 
       if is_correct_password(base64.b64decode(user.passwordSalt), base64.b64decode(user.password), password) == False:
-        log_action(user.userId, "LOGIN_FAILED", "user", details={"email": username, "reason": "incorrect password"})
+        log_action(None, "LOGIN_FAILED", "user", details={"email": username, "reason": "incorrect password"})
         raise HTTPException(status_code=400, detail="Incorrect password.")
 
       # Password is correct

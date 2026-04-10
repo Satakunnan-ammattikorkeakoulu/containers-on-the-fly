@@ -520,13 +520,31 @@
     <!-- Review & Create Card (visible when all steps complete and panels collapsed) -->
     <v-row v-if="readyToCreate && (activePanel == null || activePanel === 4)" justify="center" class="mt-4">
       <v-col cols="12" sm="10" md="8" lg="6">
-        <!-- Notification of depleted resources -->
-        <v-alert v-if="refreshTip" color="info" title="Information" class="mb-4">
-          <v-btn style="margin-bottom: 10px;" @click="refreshHardware">Refresh Hardware Data</v-btn>
-          <p>If there were not enough resources for reservation, click the button above to refresh the hardware data.</p>
+        <!-- Blocks creation after a failed attempt until the user refreshes hardware data -->
+        <v-alert
+          v-if="refreshTip"
+          type="warning"
+          variant="tonal"
+          title="Not enough available resources"
+          class="text-center refresh-prompt-alert"
+        >
+          <p class="mb-3">
+            Available hardware may have changed since this page loaded.
+            <br>
+            Refresh capacity and try again.
+          </p>
+          <v-btn
+            color="warning"
+            variant="flat"
+            prepend-icon="mdi-refresh"
+            :loading="fetchingComputers"
+            @click="refreshHardware"
+          >
+            Refresh Hardware Data
+          </v-btn>
         </v-alert>
 
-        <v-card class="pa-6 text-center">
+        <v-card v-else class="pa-6 text-center">
           <p class="text-medium-emphasis mb-4" style="font-size: 14px;">
             Review your selections above. Expand any section to make changes, or adjust <strong>Advanced Settings</strong>. When ready, click below to create your reservation.
           </p>
@@ -722,13 +740,17 @@
         this.selectedgpus = []
       },
       /**
-       * Refreshes the hardware data for the current date and duration.
+       * Refreshes hardware data for the current date and duration after a failed
+       * reservation attempt. Preserves container/computer choices but always clears
+       * GPU selections (the dominant failure mode is "GPU got reserved by someone
+       * else"), and clamps any hardware spec values that now exceed availability.
+       * The alert is dismissed by fetchAvailableHardware on success; on failure it
+       * stays visible so the user can retry.
        */
       refreshHardware() {
         if (this.reserveDate && this.completedSections.duration) {
-          this.fetchAvailableHardware()
+          this.fetchAvailableHardware(true)
         }
-        this.refreshTip = false
       },
       /**
        * Handles container selection and advances to the Server & Hardware panel.
@@ -955,18 +977,26 @@
       /**
        * Fetches all available hardware from the server for the selected date and duration.
        * On success, populates computers/containers and advances to the Container panel.
+       *
+       * @param {boolean} preserveSelection - If true, keeps the user's existing
+       *   container/computer/hardware selections (used by the post-failure refresh path).
+       *   If false (default), clears downstream selections — appropriate when the date
+       *   or duration changed and prior choices are no longer valid.
        */
-      fetchAvailableHardware() {
+      fetchAvailableHardware(preserveSelection = false) {
         this.fetchingComputers = true
         this.hardwareFetchError = null
-        // Clear downstream selections
-        this.container = null
-        this.computer = null
-        this.hardwareData = null
-        this.selectedHardwareSpecs = {}
-        this.selectedgpus = []
-        this.completedSections.container = false
-        this.completedSections.hardware = false
+
+        if (!preserveSelection) {
+          // Clear downstream selections
+          this.container = null
+          this.computer = null
+          this.hardwareData = null
+          this.selectedHardwareSpecs = {}
+          this.selectedgpus = []
+          this.completedSections.container = false
+          this.completedSections.hardware = false
+        }
 
         let _this = this
         let currentUser = this.store.user
@@ -1012,7 +1042,89 @@
               _this.containers = containers
               _this.hardwareFetched = true
               _this.completedSections.time = true
-              _this.advanceToPanel(2) // Advance to Container panel
+
+              if (preserveSelection) {
+                const stillHasContainer = _this.allContainers.some(c => c.containerId === _this.container)
+                const refreshedComputer = _this.allComputers.find(c => c.computerId === _this.computer)
+
+                if (stillHasContainer && refreshedComputer) {
+                  // Re-point hardwareData at the refreshed computer's specs
+                  // (the previous reference is now stale).
+                  _this.hardwareData = refreshedComputer.hardwareSpecs
+
+                  // Always clear GPU selections — the dominant failure mode is
+                  // "another user reserved the GPU we picked", so the user must
+                  // re-pick regardless of which GPU was the conflict.
+                  const hadGpus = _this.selectedgpus.length > 0
+                  _this.selectedgpus = []
+
+                  // Validate hardware spec selections against refreshed availability:
+                  // clamp values that now exceed the maximum, drop entries for specs
+                  // that no longer exist, and seed defaults for any newly-appeared specs.
+                  let specsChanged = false
+                  const newSpecsById = {}
+                  refreshedComputer.hardwareSpecs.forEach((spec) => {
+                    newSpecsById[spec.hardwareSpecId] = spec
+                  })
+
+                  Object.keys(_this.selectedHardwareSpecs).forEach((specId) => {
+                    const value = _this.selectedHardwareSpecs[specId]
+                    const newSpec = newSpecsById[specId]
+                    if (!newSpec) {
+                      delete _this.selectedHardwareSpecs[specId]
+                      specsChanged = true
+                    } else if (value > newSpec.maximumAmountForUser) {
+                      _this.selectedHardwareSpecs[specId] = newSpec.maximumAmountForUser
+                      specsChanged = true
+                    }
+                  })
+
+                  refreshedComputer.hardwareSpecs.forEach((spec) => {
+                    if (!(spec.hardwareSpecId in _this.selectedHardwareSpecs)) {
+                      _this.selectedHardwareSpecs[spec.hardwareSpecId] = spec.defaultAmountForUser
+                      specsChanged = true
+                    }
+                  })
+
+                  // If anything was cleared/clamped, mark hardware as needing
+                  // re-confirmation (the panel's avatar/summary updates accordingly).
+                  if (hadGpus || specsChanged) {
+                    _this.completedSections.hardware = false
+                  }
+
+                  // Always reopen the Server & Hardware panel and scroll to the
+                  // Configure Hardware section, so the user lands directly where
+                  // they need to act (typically re-picking a GPU).
+                  _this.advanceToPanel(3)
+                  _this.$nextTick(() => {
+                    setTimeout(() => {
+                      const element = document.getElementById('select-hardware-section')
+                      if (element) {
+                        const navbarHeight = document.querySelector('.navbar')?.offsetHeight || 48
+                        const rect = element.getBoundingClientRect()
+                        window.scrollTo({
+                          top: window.scrollY + rect.top - navbarHeight - 10,
+                          behavior: 'smooth'
+                        })
+                      }
+                    }, 500)
+                  })
+                } else {
+                  // Previous selection no longer exists — fall back to the standard reset
+                  _this.container = null
+                  _this.computer = null
+                  _this.hardwareData = null
+                  _this.selectedHardwareSpecs = {}
+                  _this.selectedgpus = []
+                  _this.completedSections.container = false
+                  _this.completedSections.hardware = false
+                  _this.advanceToPanel(2)
+                }
+              } else {
+                _this.advanceToPanel(2) // Advance to Container panel
+              }
+
+              _this.refreshTip = false
             }
             // Fail
             else {
@@ -1529,6 +1641,14 @@
 
   .refresh-tip {
     margin-top: 30px;
+  }
+
+  // Center the v-alert title inside the post-failure refresh prompt.
+  // Vuetify 4's .v-alert-title doesn't inherit text-align from a wrapper
+  // div, so we target it directly.
+  .refresh-prompt-alert :deep(.v-alert-title) {
+    justify-content: center;
+    text-align: center;
   }
 
   .selected-card {

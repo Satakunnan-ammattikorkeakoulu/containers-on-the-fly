@@ -192,6 +192,20 @@ fix: Fix group removal logic to not break on empty usernames
 - **UI changes — change only what was requested**: When modifying frontend components, only change the elements explicitly requested. Do not move, resize, restyle, or reorganize other elements in the same component or page. If an adjacent change seems beneficial, mention it and wait for approval.
 - **Respect existing structure**: When adding new items to arrays, config objects, endpoint lists (like `AppUrls.js`), database models, or Pinia store, study the existing entries first and replicate their exact pattern (spacing, naming, ordering conventions).
 
+### Feature Implementation Checklist
+
+When implementing a new feature or extending existing functionality, explicitly consider these two cross-cutting concerns before finishing the task. Raise them with the user if the answer is non-obvious.
+
+- **Audit log coverage**: If the new feature performs a sensitive or state-changing action (creating/updating/deleting a resource, changing permissions, authentication events, administrative overrides), log it via `log_action()` in `webapp/backend/helpers/tables/audit_log.py`. Follow the existing pattern in `webapp/backend/endpoints/responses/admin.py` and `webapp/backend/endpoints/responses/user.py` — action constants are UPPER_SNAKE_CASE (e.g. `USER_CREATE`, `CONTAINER_UPDATE`, `ROLE_UPDATE`). Pass `resource_type` + `resource_id` when the action targets a specific record, and put any useful context into `details` as a JSON-serializable dict. **Never** put passwords, tokens, or API keys into `details`. Read-only queries and internal background bookkeeping do not need to be audited.
+
+- **Upgrade path for existing installations**: This project is self-hosted; users pull new code and run `make migrate-database`. Before finishing a feature, check that an existing install can upgrade cleanly:
+  - **New DB column** — create the migration with `make create-migration MESSAGE="..."`. If the column is required (non-nullable), add it as nullable first, backfill existing rows with a default in the same migration (`op.execute("UPDATE Table SET col = default WHERE col IS NULL")`), then alter to non-nullable. See `webapp/backend/alembic/versions/c0de8fe27417_add_new_columns_shmsizepercent_and_.py` for the established pattern. Also write a module-level docstring in the migration describing what it does.
+  - **New setting** — define it in `webapp/backend/helpers/settings_schema.py` with a sensible `default=`, so upgrading users get the new behavior without having to touch their config. For file-based settings, also add it to `user_config/settings_example` and the relevant template under `user_config/templates/`. Never read a new setting without a schema default — upgrading users will hit a KeyError.
+  - **New role, permission, or role-scoped table** — ensure the migration either creates the rows existing users need, or that the code degrades gracefully when the rows are absent (e.g. a missing `RoleMount` row means "no extra mounts," not a crash).
+  - **Changed behavior of an existing endpoint or response shape** — consider whether an older frontend talking to a newer backend (or vice versa during a rolling upgrade) would break. Prefer additive changes over renames/removals.
+
+  If a feature cannot be made upgrade-safe automatically, document the required manual step in the PR description so the user can include it in release notes.
+
 ### Function Return Values
 - **2 values**: Tuples are fine (e.g., `return success, message`)
 - **3+ values**: Always return a dictionary instead of a tuple. Dictionary keys are self-documenting and easier to extend without breaking callers. Example: `return {"started": True, "containerName": name, "error": ""}` instead of `return True, name, ""`

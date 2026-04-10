@@ -21,6 +21,7 @@ from helpers.email_notifications import (
     send_container_resume_failed_email, send_admin_failure_alert,
 )
 from helpers.logger import log
+from helpers.tables.audit_log import log_action
 
 
 def _time_now():
@@ -446,6 +447,7 @@ def report_started(reservation_id: int, data, computer_id: int):
             })
 
         email_primary_port_id = container_obj.primaryConnectionPortId
+        audit_computer_name = reservation.computer.name
 
     # Send notification email outside session to avoid holding DB connection during SMTP I/O
     if is_resume:
@@ -463,6 +465,14 @@ def report_started(reservation_id: int, data, computer_id: int):
             primary_connection_port_id=email_primary_port_id,
             is_low_priority=email_is_low_priority,
         )
+
+    log_action(
+        None,
+        "RESERVATION_RESUMED" if is_resume else "RESERVATION_STARTED",
+        "reservation", reservation_id,
+        {"computerName": audit_computer_name, "imageName": email_image_name,
+         "isLowPriority": email_is_low_priority},
+    )
 
     log.info(f"Container started for reservation {reservation_id}, user={log_user_id}, docker_name={data.containerDockerName}, resume={is_resume}")
     return api_response(True, "Reservation marked as started")
@@ -529,12 +539,22 @@ def report_start_failed(reservation_id: int, data, computer_id: int):
         image_name, computer_name, data.errorMessage,
     )
 
+    log_action(
+        None, "RESERVATION_ERROR", "reservation", reservation_id,
+        {"computerName": computer_name, "imageName": image_name,
+         "errorMessage": data.errorMessage, "resumeFailure": is_resume_failure},
+    )
+
     log.error(f"Container start failed for reservation {reservation_id}: {data.errorMessage}, resume_failure={is_resume_failure}")
     return api_response(True, "Reservation marked as error")
 
 
 def report_stopped(reservation_id: int, computer_id: int):
     """Record that a container was stopped.
+
+    Distinguishes between a user/admin-initiated stop (status already
+    "stopping", because cancel_reservation set it) and an automatic
+    stop triggered by the reservation's endDate being reached.
 
     Args:
         reservation_id: Database ID of the reservation.
@@ -546,7 +566,10 @@ def report_stopped(reservation_id: int, computer_id: int):
     with Session() as session:
         reservation = session.execute(
             select(Reservation)
-            .options(joinedload(Reservation.reservedContainer))
+            .options(
+                joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
+                joinedload(Reservation.computer),
+            )
             .where(
                 Reservation.reservationId == reservation_id,
                 Reservation.computerId == computer_id,
@@ -556,13 +579,33 @@ def report_stopped(reservation_id: int, computer_id: int):
         if not reservation:
             return api_response(False, "Reservation not found")
 
+        # If the reservation is already in "stopping", a user/admin triggered
+        # the cancel and the RESERVATION_CANCEL / RESERVATION_ADMIN_EDIT entry
+        # is already in the audit log; don't double-log here.
+        was_user_initiated = reservation.status == "stopping"
+
         reservation.status = "stopped"
         reservation.reservedContainer.stoppedAt = _time_now()
         reservation.reservedContainer.containerStatus = "stopped"
+
+        audit_computer_name = reservation.computer.name if reservation.computer else None
+        audit_image_name = (
+            reservation.reservedContainer.container.imageName
+            if reservation.reservedContainer and reservation.reservedContainer.container
+            else None
+        )
+
         session.commit()
 
-        log.info(f"Container stopped for reservation {reservation_id}")
-        return api_response(True, "Reservation marked as stopped")
+    if not was_user_initiated:
+        log_action(
+            None, "RESERVATION_AUTO_STOPPED", "reservation", reservation_id,
+            {"computerName": audit_computer_name, "imageName": audit_image_name,
+             "reason": "endDate reached"},
+        )
+
+    log.info(f"Container stopped for reservation {reservation_id}")
+    return api_response(True, "Reservation marked as stopped")
 
 
 def report_paused(reservation_id: int, data, computer_id: int):
@@ -604,6 +647,11 @@ def report_paused(reservation_id: int, data, computer_id: int):
     send_container_paused_email(
         email_recipient, data.imageName,
         data.computerName, reservation_id,
+    )
+
+    log_action(
+        None, "RESERVATION_PAUSED", "reservation", reservation_id,
+        {"computerName": data.computerName, "imageName": data.imageName},
     )
 
     log.info(f"Low-priority reservation {reservation_id} paused")

@@ -11,7 +11,11 @@ from helpers.email_notifications import generate_connection_text
 from helpers.server import api_response, orm_to_dict
 from helpers.logger import log
 from helpers.auth import is_admin
-from helpers.tables.audit_log import log_action
+from helpers.tables.audit_log import (
+    log_action, get_user_reservation_activity,
+    get_user_unread_activity_count, mark_user_activity_seen,
+    UNREAD_ACTIVITY_COUNT_CAP,
+)
 from dateutil import parser
 from dateutil.relativedelta import *
 import datetime
@@ -329,6 +333,19 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
         )
     ).scalar()
 
+    # Unread activity count (events newer than the user's last activity-view).
+    # Used by the frontend to render a badge next to the "Activity" link.
+    user_row = session.execute(
+        select(User.activityLastSeenAt).where(User.userId == userId)
+    ).first()
+    user_last_seen = user_row[0] if user_row else None
+    unread_activity_count = get_user_unread_activity_count(
+        session, userId, user_last_seen
+    )
+    unread_activity_capped = unread_activity_count > UNREAD_ACTIVITY_COUNT_CAP
+    if unread_activity_capped:
+        unread_activity_count = UNREAD_ACTIVITY_COUNT_CAP
+
     # Build filtered base query
     base_filtered = select(Reservation).where(Reservation.userId == userId)
     base_filtered = _apply_user_reservation_filters(base_filtered)
@@ -397,7 +414,42 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
       "totalItems": total_items,
       "statusCounts": status_counts,
       "activeReservationCount": active_count,
+      "unreadActivityCount": unread_activity_count,
+      "unreadActivityCapped": unread_activity_capped,
   })
+
+def get_own_activity(userId: int, request) -> object:
+  """Retrieve paginated audit log entries for the user's own reservations.
+
+  Returns chronological reservation events (create, cancel, extend,
+  restart, paused, resumed, started, error, auto-stopped) for the
+  authenticated user. Events initiated by the system (daemon) are
+  included alongside events initiated by the user or an admin.
+
+  Args:
+      userId: The ID of the user whose activity to fetch.
+      request: Pagination, sorting, and filter parameters. Supported
+          filter keys: action, dateFrom, dateTo.
+
+  Returns:
+      Response with paginated logs, totalItems, retentionDays,
+      reservationSummaries, and activityLastSeenAt.
+  """
+  return get_user_reservation_activity(userId, request)
+
+def mark_own_activity_seen(userId: int) -> object:
+  """Mark the user's activity feed as seen up to the current moment.
+
+  Updates ``User.activityLastSeenAt`` to NOW() and returns the previous
+  value so the caller can highlight rows newer than that snapshot.
+
+  Args:
+      userId: The ID of the requesting user.
+
+  Returns:
+      Response containing ``previousLastSeenAt`` (ISO string or None).
+  """
+  return mark_user_activity_seen(userId)
 
 def get_own_reservation_details(reservationId : int, userId : int) -> object:
   """Retrieve connection details for a specific reservation.

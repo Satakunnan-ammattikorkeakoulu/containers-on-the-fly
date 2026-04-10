@@ -44,13 +44,38 @@
     <!-- Title -->
     <v-row class="text-center">
       <v-col cols="12">
-        <h2 class="m-0">Your Reservations</h2>
-        <a v-if="!showFilters" style="font-size: 14px;" @click="showFilters = true">Show Filters</a>
+        <h2 class="m-0">{{ viewMode === 'activity' ? 'Your Activity' : 'Your Reservations' }}</h2>
+        <div class="header-links">
+          <template v-if="viewMode === 'reservations'">
+            <a @click="showFilters = !showFilters">Filters</a>
+            <span class="header-link-separator">·</span>
+            <a @click="showActivityView">Activity</a>
+            <v-badge
+              v-if="unreadActivityCount > 0"
+              :content="unreadActivityBadgeText"
+              color="info"
+              inline
+              class="activity-badge"
+            ></v-badge>
+          </template>
+          <template v-else>
+            <a @click="showReservationsView">&larr; Back to Reservations</a>
+          </template>
+        </div>
+      </v-col>
+    </v-row>
+
+    <!-- Activity retention info -->
+    <v-row v-if="viewMode === 'activity'" class="justify-center" style="margin-top: 8px; margin-bottom: 0;">
+      <v-col cols="12" md="9" class="text-center">
+        <span class="filter-summary-text">
+          Showing events for your reservations.<template v-if="retentionDescription"> {{ retentionDescription }}</template>
+        </span>
       </v-col>
     </v-row>
 
     <!-- Filters -->
-    <v-row v-if="showFilters" class="text-center row-filters justify-center">
+    <v-row v-if="viewMode === 'reservations' && showFilters" class="text-center row-filters justify-center">
       <v-col cols="12" md="3">
         <v-select
           :items="statusItems"
@@ -93,15 +118,15 @@
     </v-row>
 
     <!-- Filter summary -->
-    <v-row v-if="!initialLoading && showFilters" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
+    <v-row v-if="viewMode === 'reservations' && !initialLoading && showFilters" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
       <v-col cols="12" md="9" class="text-center">
         <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
         <a v-if="hasActiveFilters" class="filter-summary-action" @click="resetFilters">Reset Filters</a>
       </v-col>
     </v-row>
 
-    <!-- Data table -->
-    <v-row v-if="!initialLoading">
+    <!-- Reservations data table -->
+    <v-row v-if="viewMode === 'reservations' && !initialLoading">
       <v-col cols="12">
         <div style="margin-top: 10px">
           <UserReservationTable
@@ -121,7 +146,32 @@
         </div>
       </v-col>
     </v-row>
-    <v-row v-else>
+    <v-row v-else-if="viewMode === 'reservations'">
+      <v-col cols="12">
+        <Loading class="loading" />
+      </v-col>
+    </v-row>
+
+    <!-- Activity data table -->
+    <v-row v-if="viewMode === 'activity' && !activityInitialLoading">
+      <v-col cols="12">
+        <div style="margin-top: 10px">
+          <UserActivityTable
+            @update:options="onActivityTableOptionsUpdate"
+            :propItems="activity"
+            :propReservationSummaries="activityReservationSummaries"
+            :propLastSeenAt="activitySeenSnapshot"
+            :propNotableActions="activityNotableActions"
+            :totalItems="activityTotalItems"
+            :loading="activityLoading"
+            :page="activityTableOptions.page"
+            :itemsPerPage="activityTableOptions.itemsPerPage"
+            :sortBy="activityTableOptions.sortBy"
+          />
+        </div>
+      </v-col>
+    </v-row>
+    <v-row v-else-if="viewMode === 'activity'">
       <v-col cols="12">
         <Loading class="loading" />
       </v-col>
@@ -143,6 +193,7 @@
   import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import UserReservationTable from '/src/components/user/UserReservationTable.vue';
+  import UserActivityTable from '/src/components/user/UserActivityTable.vue';
   import UserReservationsModalConnectionDetails from '/src/components/user/UserReservationsModalConnectionDetails.vue';
   import CalendarReservations from '/src/components/user/CalendarReservations.vue';
   import { useMainStore } from '@/store/store'
@@ -158,10 +209,12 @@
     components: {
       Loading,
       UserReservationTable,
+      UserActivityTable,
       UserReservationsModalConnectionDetails,
       CalendarReservations
     },
     data: () => ({
+      viewMode: 'reservations',
       showFilters: false,
       filters: {
         status: "All",
@@ -169,6 +222,7 @@
         dateTo: '',
       },
       intervalFetchReservations: null,
+      intervalFetchActivity: null,
       initialLoading: true,
       loading: false,
       reservations: [],
@@ -186,6 +240,22 @@
         page: 1,
         itemsPerPage: 10,
         sortBy: [{key: 'reservationId', order: 'desc'}],
+      },
+      activity: [],
+      activityTotalItems: 0,
+      activityInitialLoading: true,
+      activityLoading: false,
+      activityRetentionDays: null,
+      activityReservationSummaries: {},
+      activityNotableActions: [],
+      unreadActivityCount: 0,
+      unreadActivityCapped: false,
+      activitySeenSnapshot: null,
+      activityMarkedSeenForThisOpen: false,
+      activityTableOptions: {
+        page: 1,
+        itemsPerPage: 10,
+        sortBy: [{key: 'createdAt', order: 'desc'}],
       },
     }),
     mounted () {
@@ -222,6 +292,108 @@
           this.tableOptions.sortBy = options.sortBy;
         }
         this.fetchReservations();
+      },
+      /** Switch to the activity view, mark seen once, and start polling. */
+      showActivityView() {
+        this.viewMode = 'activity';
+        this.activityMarkedSeenForThisOpen = false;
+        this.fetchActivity();
+        this.markActivitySeen();
+        clearInterval(this.intervalFetchActivity);
+        this.intervalFetchActivity = setInterval(() => { this.fetchActivity() }, 30000);
+      },
+      /** Switch back to the reservations view and stop activity polling. */
+      showReservationsView() {
+        this.viewMode = 'reservations';
+        clearInterval(this.intervalFetchActivity);
+        this.intervalFetchActivity = null;
+        // Refresh reservations immediately so the badge clears (unread count
+        // is reported from the reservations endpoint).
+        this.fetchReservations();
+      },
+      /**
+       * POST mark_activity_seen exactly once per activity-view open.
+       * Captures the previous activityLastSeenAt as the snapshot used to
+       * highlight "NEW" rows for the rest of this session in the view.
+       */
+      markActivitySeen() {
+        if (this.activityMarkedSeenForThisOpen) return;
+        this.activityMarkedSeenForThisOpen = true;
+        let _this = this;
+        let currentUser = this.store.user;
+        axios({
+          method: "post",
+          url: this.$appSettings.APIServer.reservation.mark_activity_seen,
+          headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
+        })
+        .then(function (response) {
+            if (response.data && response.data.status === true && response.data.data) {
+              _this.activitySeenSnapshot = response.data.data.previousLastSeenAt || null;
+            }
+            // Optimistically clear the badge in this view; the next
+            // reservations poll will confirm.
+            _this.unreadActivityCount = 0;
+            _this.unreadActivityCapped = false;
+        })
+        .catch(function (error) {
+            console.log("Failed to mark activity as seen", error);
+            // Allow a retry on the next view open.
+            _this.activityMarkedSeenForThisOpen = false;
+        });
+      },
+      /** Handles pagination/sort changes from the activity table. */
+      onActivityTableOptionsUpdate(options) {
+        this.activityTableOptions.page = options.page;
+        this.activityTableOptions.itemsPerPage = options.itemsPerPage;
+        if (options.sortBy && options.sortBy.length > 0) {
+          this.activityTableOptions.sortBy = options.sortBy;
+        }
+        this.fetchActivity();
+      },
+      fetchActivity() {
+        let _this = this
+        let currentUser = this.store.user
+        _this.activityLoading = true;
+
+        axios({
+          method: "post",
+          url: this.$appSettings.APIServer.reservation.get_own_activity,
+          data: {
+            page: _this.activityTableOptions.page,
+            itemsPerPage: _this.activityTableOptions.itemsPerPage,
+            sortBy: _this.activityTableOptions.sortBy,
+            filters: {},
+          },
+          headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+        })
+        .then(function (response) {
+            if (response.data.status == true) {
+              _this.activity = response.data.data.logs
+              _this.activityTotalItems = response.data.data.totalItems
+              if (response.data.data.retentionDays !== undefined) {
+                _this.activityRetentionDays = response.data.data.retentionDays
+              }
+              _this.activityReservationSummaries = response.data.data.reservationSummaries || {}
+              _this.activityNotableActions = Array.isArray(response.data.data.notableActions) ? response.data.data.notableActions : []
+            }
+            else {
+              console.log("Failed getting activity...")
+              _this.store.showMessage({ text: "There was an error getting your activity.", color: "red" })
+            }
+            _this.activityLoading = false
+            _this.activityInitialLoading = false
+        })
+        .catch(function (error) {
+            if (error.response && (error.response.status == 400 || error.response.status == 401)) {
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
+            }
+            else {
+              console.log(error)
+              _this.store.showMessage({ text: "Unknown error while trying to get activity.", color: "red" })
+            }
+            _this.activityLoading = false
+            _this.activityInitialLoading = false
+        });
       },
       /** Handles dropdown filter changes (immediate). */
       onFilterChange() {
@@ -280,6 +452,8 @@
               // Always update status counts and total from server
               _this.statusCounts = response.data.data.statusCounts || {}
               _this.totalReservationCount = (_this.statusCounts.reserved || 0) + (_this.statusCounts.started || 0) + (_this.statusCounts.stopping || 0) + (_this.statusCounts.stopped || 0) + (_this.statusCounts.error || 0) + (_this.statusCounts.paused || 0)
+              _this.unreadActivityCount = response.data.data.unreadActivityCount || 0
+              _this.unreadActivityCapped = !!response.data.data.unreadActivityCapped
             }
             else {
               console.log("Failed getting own reservations...")
@@ -606,9 +780,20 @@
           this.filters.dateFrom || this.filters.dateTo
         );
       },
+      retentionDescription() {
+        const days = this.activityRetentionDays;
+        if (days === -1) return 'Activity logging is currently disabled.';
+        if (days && days > 0) return `Activity is kept for ${days} ${days === 1 ? 'day' : 'days'}.`;
+        return '';
+      },
+      unreadActivityBadgeText() {
+        if (this.unreadActivityCapped) return '99+';
+        return String(this.unreadActivityCount);
+      },
     },
     beforeUnmount() {
       clearInterval(this.intervalFetchReservations)
+      clearInterval(this.intervalFetchActivity)
     },
   }
 </script>
@@ -631,6 +816,20 @@
   .filter-summary-action {
     font-size: 14px;
     margin-left: 8px;
+  }
+
+  .header-links {
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
+  .header-link-separator {
+    margin: 0 8px;
+    opacity: 0.4;
+  }
+
+  .activity-badge {
+    margin-left: 4px;
   }
 </style>
 

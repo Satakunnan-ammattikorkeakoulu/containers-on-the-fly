@@ -11,7 +11,7 @@ from helpers.auth import is_admin, get_authenticated_user_id
 from endpoints.responses.user import validate_script_path
 from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import reservation as functionality
-from endpoints.models.reservation import ReservationFilters, UserReservationRequest
+from endpoints.models.reservation import ReservationFilters, UserReservationRequest, UserActivityRequest
 import json
 import re
 
@@ -81,6 +81,35 @@ def get_own_reservations(request: UserReservationRequest, token: str = Depends(o
   """
   userId = get_authenticated_user_id(token)
   return functionality.get_own_reservations(userId, request)
+
+@router.post("/get_own_activity")
+def get_own_activity(request: UserActivityRequest, token: str = Depends(oauth2_scheme)):
+  """Retrieve audit log entries for the authenticated user's own reservations.
+
+  Args:
+      request: Pagination, sorting, and filter parameters.
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Paginated list of audit log entries for the user's reservations,
+      along with the current audit log retention setting.
+  """
+  userId = get_authenticated_user_id(token)
+  return functionality.get_own_activity(userId, request)
+
+@router.post("/mark_activity_seen")
+def mark_activity_seen(token: str = Depends(oauth2_scheme)):
+  """Mark the authenticated user's activity feed as seen up to now.
+
+  Args:
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Response containing the previous activityLastSeenAt value so the
+      caller can highlight rows that arrived since the prior view.
+  """
+  userId = get_authenticated_user_id(token)
+  return functionality.mark_own_activity_seen(userId)
 
 @router.get("/get_public_computers")
 def get_public_computers(token: str = Depends(oauth2_scheme)):

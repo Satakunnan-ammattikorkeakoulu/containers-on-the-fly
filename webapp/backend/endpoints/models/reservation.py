@@ -37,3 +37,14 @@ class UserReservationRequest(PaginationParams):
     """
 
     pass
+
+
+class UserActivityRequest(PaginationParams):
+    """Request model for paginated user reservation activity listing.
+
+    Inherits page, itemsPerPage, sortBy, and filters from PaginationParams.
+    Returns audit log entries scoped to the authenticated user's own
+    reservations. Supported filter keys: action, dateFrom, dateTo.
+    """
+
+    pass

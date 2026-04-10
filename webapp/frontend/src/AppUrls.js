@@ -29,6 +29,8 @@ function createUrls(baseAddress) {
     URLS.reservation.get_current_reservations = baseReservationUrl + "get_current_reservations"
     URLS.reservation.create_reservation = baseReservationUrl + "create_reservation"
     URLS.reservation.get_own_reservations = baseReservationUrl + "get_own_reservations"
+    URLS.reservation.get_own_activity = baseReservationUrl + "get_own_activity"
+    URLS.reservation.mark_activity_seen = baseReservationUrl + "mark_activity_seen"
     URLS.reservation.cancel_reservation = baseReservationUrl + "cancel_reservation"
     URLS.reservation.get_own_reservation_details = baseReservationUrl + "get_own_reservation_details"
     URLS.reservation.restart_container = baseReservationUrl + "restart_container"

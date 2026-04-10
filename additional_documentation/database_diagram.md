@@ -65,6 +65,7 @@ erDiagram
         text startScriptPath
         text stopScriptPath
         bool removed
+        datetime activityLastSeenAt
     }
     UserBlacklist {
         int userBlacklistId PK

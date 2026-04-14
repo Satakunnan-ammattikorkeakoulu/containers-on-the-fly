@@ -640,9 +640,6 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		else \
 			EFFECTIVE_REGISTRY_ADDRESS=$$EXISTING_REGISTRY_ADDRESS; \
 		fi; \
-		EXISTING_DB_ADDRESS=$$(grep "^MARIADB_SERVER_ADDRESS=" user_config/settings | cut -d'"' -f2); \
-		EXISTING_DB_NAME=$$(grep "^MARIADB_DB_NAME=" user_config/settings | cut -d'"' -f2); \
-		EXISTING_DB_USER=$$(grep "^MARIADB_DB_USER=" user_config/settings | cut -d'"' -f2); \
 		\
 		echo ""; \
 		echo "$(GREEN)Docker settings file exists with current configuration:$(RESET)"; \
@@ -651,9 +648,19 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		echo "  - Port Range: $(GREEN)$$EXISTING_PORT_START - $$EXISTING_PORT_END$(RESET)"; \
 		echo "  - Registry Address: $(GREEN)$$EFFECTIVE_REGISTRY_ADDRESS$(RESET)"; \
 		echo "  - Registry Port: $(GREEN)5000$(RESET)"; \
-		echo "  - Database Address: $(GREEN)$$EXISTING_DB_ADDRESS$(RESET)"; \
-		echo "  - Database Name: $(GREEN)$$EXISTING_DB_NAME$(RESET)"; \
-		echo "  - Database User: $(GREEN)$$EXISTING_DB_USER$(RESET)"; \
+		EXISTING_DAEMON_KEY=$$(grep "^DAEMON_API_KEY=" user_config/settings | cut -d'"' -f2); \
+		if [ -n "$$EXISTING_DAEMON_KEY" ]; then \
+			MASKED_KEY="$$(echo "$$EXISTING_DAEMON_KEY" | cut -c1-8)..."; \
+			echo "  - Daemon API Key: $(GREEN)$$MASKED_KEY$(RESET)"; \
+		else \
+			echo "  - Daemon API Key: $(RED)not set$(RESET)"; \
+		fi; \
+		if [ "$$IS_MAIN_SERVER" = "false" ]; then \
+			echo ""; \
+			echo "  $(BOLD)NOTE:$(RESET) DAEMON_API_KEY in user_config/settings must match the same key in your"; \
+			echo "  main server user_config/settings file. The container server uses it to connect"; \
+			echo "  to the main server Web REST API."; \
+		fi; \
 		echo ""; \
 		echo "What would you like to do?"; \
 		echo "  $(GREEN)1$(RESET) - Use these settings and proceed with setup"; \
@@ -689,43 +696,20 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			CURRENT_SERVER_IP=$$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "127.0.0.1"); \
 			REGISTRY_ADDRESS=$$CURRENT_SERVER_IP; \
 			SERVER_IP_ADDRESS=$$CURRENT_SERVER_IP; \
-			DB_ADDRESS="localhost"; \
-			DB_NAME="containerfly"; \
-			DB_USER="containerflyuser"; \
-			EXISTING_DB_PASSWORD=$$(grep "^MARIADB_DB_USER_PASSWORD=" user_config/settings | cut -d'"' -f2 2>/dev/null || echo ""); \
-			if [ -z "$$EXISTING_DB_PASSWORD" ] || [ "$$EXISTING_DB_PASSWORD" = "password" ]; then \
-				echo "$(GREEN)$(BOLD)Database Password:$(RESET)"; \
-				echo "Enter database password for main server:"; \
-				echo -n "Database password: "; \
-				read DB_PASSWORD; \
-			else \
-				DB_PASSWORD=$$EXISTING_DB_PASSWORD; \
-			fi; \
 		else \
 			echo ""; \
 			echo "$(GREEN)$(BOLD)Main Server IP Configuration:$(RESET)"; \
 			echo -n "Enter the IP address of your main server: "; \
 			read MAIN_SERVER_IP; \
-			DB_ADDRESS=$$MAIN_SERVER_IP; \
 			REGISTRY_ADDRESS=$$MAIN_SERVER_IP; \
 			CURRENT_SERVER_IP=$$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "127.0.0.1"); \
 			SERVER_IP_ADDRESS=$$CURRENT_SERVER_IP; \
 			echo ""; \
-			echo "$(GREEN)$(BOLD)Database Connection Details:$(RESET)"; \
-			echo "These must match the database configuration on your main server."; \
-			echo -n "Database name (or empty for $(GREEN)containerfly$(RESET)): "; \
-			read DB_NAME; \
-			if [ -z "$$DB_NAME" ]; then \
-				DB_NAME="containerfly"; \
-			fi; \
-			echo -n "Database user (or empty for $(GREEN)containerflyuser$(RESET)): "; \
-			read DB_USER; \
-			if [ -z "$$DB_USER" ]; then \
-				DB_USER="containerflyuser"; \
-			fi; \
-			echo "$(GREEN)$(BOLD)WARNING:$(RESET) Password will be visible on screen"; \
-			echo -n "Database password: "; \
-			read DB_PASSWORD; \
+			echo "$(GREEN)$(BOLD)Daemon API Key:$(RESET)"; \
+			echo "The container server uses this key to connect to the main server REST API."; \
+			echo "It must match the $(GREEN)DAEMON_API_KEY$(RESET) value in $(GREEN)user_config/settings$(RESET) on your main server."; \
+			echo -n "Enter the daemon API key: "; \
+			read DAEMON_KEY_INPUT; \
 		fi; \
 		\
 		echo ""; \
@@ -762,11 +746,10 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		sed -i "s/DOCKER_RESERVATION_PORT_RANGE_START=[^[:space:]]*/DOCKER_RESERVATION_PORT_RANGE_START=$$PORT_START/" user_config/settings; \
 		sed -i "s/DOCKER_RESERVATION_PORT_RANGE_END=[^[:space:]]*/DOCKER_RESERVATION_PORT_RANGE_END=$$PORT_END/" user_config/settings; \
 		sed -i "s/DOCKER_REGISTRY_ADDRESS=.*/DOCKER_REGISTRY_ADDRESS=$$REGISTRY_ADDRESS/" user_config/settings; \
-		sed -i "s/MARIADB_SERVER_ADDRESS=\"[^\"]*\"/MARIADB_SERVER_ADDRESS=\"$$DB_ADDRESS\"/" user_config/settings; \
-		sed -i "s/MARIADB_DB_NAME=\"[^\"]*\"/MARIADB_DB_NAME=\"$$DB_NAME\"/" user_config/settings; \
-		sed -i "s/MARIADB_DB_USER=\"[^\"]*\"/MARIADB_DB_USER=\"$$DB_USER\"/" user_config/settings; \
-		DB_PASSWORD_ESCAPED=$$(printf '%s\n' "$$DB_PASSWORD" | sed 's/[\/&]/\\&/g'); \
-		sed -i "s/^MARIADB_DB_USER_PASSWORD=.*/MARIADB_DB_USER_PASSWORD=\"$$DB_PASSWORD_ESCAPED\"/" user_config/settings; \
+		if [ -n "$$DAEMON_KEY_INPUT" ]; then \
+			DAEMON_KEY_ESCAPED=$$(printf '%s\n' "$$DAEMON_KEY_INPUT" | sed 's/[\/&]/\\&/g'); \
+			sed -i "s/^DAEMON_API_KEY=.*/DAEMON_API_KEY=\"$$DAEMON_KEY_ESCAPED\"/" user_config/settings; \
+		fi; \
 	fi; \
 	\
 	echo ""; \

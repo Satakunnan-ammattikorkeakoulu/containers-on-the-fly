@@ -161,6 +161,22 @@ else
   echo -e "${GREEN}Database ${MARIADB_DB_NAME} was created successfully.${RESET}"
 fi
 
+# Migrate existing user from @'%' to @'localhost' if needed (legacy cleanup).
+# Container servers now communicate via REST API, so remote DB access is no longer needed.
+REMOTE_USER_EXISTS=$(mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$MARIADB_DB_USER' AND host = '%');" 2>/dev/null)
+if [ "$REMOTE_USER_EXISTS" = "1" ]; then
+    LOCALHOST_USER_EXISTS=$(mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$MARIADB_DB_USER' AND host = 'localhost');" 2>/dev/null)
+    if [ "$LOCALHOST_USER_EXISTS" = "1" ]; then
+        # Both exist -- drop the remote one, keep localhost
+        mysql -e "DROP USER '$MARIADB_DB_USER'@'%';"
+    else
+        # Only remote exists -- rename to localhost
+        mysql -e "RENAME USER '$MARIADB_DB_USER'@'%' TO '$MARIADB_DB_USER'@'localhost';"
+    fi
+    mysql -e "FLUSH PRIVILEGES;"
+    echo -e "${GREEN}Migrated database user from @'%' to @'localhost' (remote DB access no longer needed).${RESET}"
+fi
+
 # Check if user exists
 RESULT=$(mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$MARIADB_DB_USER');")
 
@@ -180,7 +196,7 @@ if [ "$RESULT" -eq 1 ]; then
       DB_PASSWORD=$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15)
       DB_PASSWORD_ESCAPED=$(printf '%s\n' "$DB_PASSWORD" | sed 's/[\/&]/\\&/g')
       sed -i "s/^MARIADB_DB_USER_PASSWORD=.*/MARIADB_DB_USER_PASSWORD=\"$DB_PASSWORD_ESCAPED\"/" user_config/settings
-      mysql -e "ALTER USER '$MARIADB_DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';"
+      mysql -e "ALTER USER '$MARIADB_DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
       mysql -e "FLUSH PRIVILEGES;"
       echo -e "${GREEN}Password has been reset successfully.${RESET}"
       echo "New password has been saved to user_config/settings"
@@ -193,13 +209,13 @@ if [ "$RESULT" -eq 1 ]; then
   fi
   echo -e "${GREEN}Password verification successful.${RESET}"
   # Ensure user has privileges on the current database
-  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'%';"
+  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'localhost';"
   mysql -e "FLUSH PRIVILEGES;"
   echo -e "${GREEN}Granted privileges on database $MARIADB_DB_NAME to user $MARIADB_DB_USER.${RESET}"
 else
   echo "User '$MARIADB_DB_USER' does not exist."
-  mysql -e "CREATE USER IF NOT EXISTS '$MARIADB_DB_USER'@'%' IDENTIFIED BY '$MARIADB_DB_USER_PASSWORD';"
-  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'%';"
+  mysql -e "CREATE USER IF NOT EXISTS '$MARIADB_DB_USER'@'localhost' IDENTIFIED BY '$MARIADB_DB_USER_PASSWORD';"
+  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'localhost';"
   mysql -e "FLUSH PRIVILEGES;"
   echo -e "${GREEN}In mariadb/mysql, created the user ${MARIADB_DB_USER} and granted the user full access to the database ${MARIADB_DB_NAME}."
 fi
@@ -216,7 +232,7 @@ if [ ! -f "$MYSQL_CONF_FILE" ]; then
     NEEDS_CONFIG=true
 else
     # Check if our specific configurations are already present
-    if ! grep -q "wait_timeout=240" "$MYSQL_CONF_FILE" || ! grep -q "max_connections=2000" "$MYSQL_CONF_FILE"; then
+    if ! grep -q "bind-address=127.0.0.1" "$MYSQL_CONF_FILE" || ! grep -q "wait_timeout=240" "$MYSQL_CONF_FILE" || ! grep -q "max_connections=2000" "$MYSQL_CONF_FILE"; then
         echo "MySQL configuration file exists but missing required settings. Updating..."
         NEEDS_CONFIG=true
     else
@@ -228,6 +244,7 @@ if [ "$NEEDS_CONFIG" = true ]; then
     # Create or update the configuration file with proper permissions
     sudo tee "$MYSQL_CONF_FILE" > /dev/null <<EOF
 [mysqld]
+bind-address=127.0.0.1
 wait_timeout=240
 max_connections=2000
 EOF

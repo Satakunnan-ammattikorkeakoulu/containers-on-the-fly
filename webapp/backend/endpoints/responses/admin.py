@@ -54,8 +54,8 @@ def get_reservations(request: AdminReservationRequest) -> object:
   """Retrieve paginated reservations with server-side filtering and sorting.
 
   Fetches reservations from the last 90 days (or with future end dates),
-  with pagination and filtering support. Also returns unfiltered status
-  counts and time-based statistics for the dashboard cards.
+  with pagination and filtering support. Returns filter-aware status
+  counts and statistics for the dashboard cards.
 
   Args:
       request: Pagination, sorting, and filter parameters. Supported
@@ -87,44 +87,6 @@ def get_reservations(request: AdminReservationRequest) -> object:
   time_scope = (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now())
 
   with Session() as session:
-    # Status counts (unfiltered, 90-day scoped)
-    status_counts = {"reserved": 0, "started": 0, "stopping": 0, "stopped": 0, "error": 0, "paused": 0}
-    count_rows = session.execute(
-        select(Reservation.status, func.count())
-        .where(time_scope)
-        .group_by(Reservation.status)
-    ).all()
-    for s, c in count_rows:
-        if s == "restart_error":
-            status_counts["error"] += c
-        elif s in status_counts:
-            status_counts[s] = c
-
-    # Time-based stats (unfiltered, 90-day scoped)
-    now = time_now()
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    week_ago = now - timedelta(days=7)
-    month_ago = now - timedelta(days=30)
-
-    stats_row = session.execute(
-        select(
-            func.count().label("total"),
-            func.sum(case((Reservation.startDate >= today_start, 1), else_=0)).label("today"),
-            func.sum(case((Reservation.startDate >= week_ago, 1), else_=0)).label("lastWeek"),
-            func.sum(case((Reservation.startDate >= month_ago, 1), else_=0)).label("lastMonth"),
-        )
-        .where(time_scope)
-    ).one()
-    stats = {
-        "total": stats_row.total or 0,
-        "started": status_counts.get("started", 0),
-        "stopped": status_counts.get("stopped", 0),
-        "error": status_counts.get("error", 0),
-        "today": int(stats_row.today or 0),
-        "lastWeek": int(stats_row.lastWeek or 0),
-        "lastMonth": int(stats_row.lastMonth or 0),
-        "lastThreeMonths": stats_row.total or 0,
-    }
 
     def _apply_reservation_filters(query):
         """Apply shared reservation filters to a query."""
@@ -160,6 +122,58 @@ def get_reservations(request: AdminReservationRequest) -> object:
             except (ValueError, TypeError):
                 pass
         return query
+
+    def _apply_non_status_filters(query):
+        """Apply all filters except status, for computing per-status counts."""
+        if user_filter:
+            query = query.where(
+                User.email.ilike(f"%{user_filter}%") | User.name.ilike(f"%{user_filter}%")
+            )
+        if reservation_id_filter:
+            query = query.where(
+                cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")
+            )
+        if computer_id_filter:
+            try:
+                query = query.where(Reservation.computerId == int(computer_id_filter))
+            except (ValueError, TypeError):
+                pass
+        if container_id_filter:
+            query = query.join(ReservedContainer, Reservation.reservedContainerId == ReservedContainer.reservedContainerId)\
+                .where(ReservedContainer.containerId == int(container_id_filter))
+        if date_from_filter:
+            try:
+                query = query.where(Reservation.startDate >= parser.parse(date_from_filter))
+            except (ValueError, TypeError):
+                pass
+        if date_to_filter:
+            try:
+                query = query.where(Reservation.startDate < parser.parse(date_to_filter) + timedelta(days=1))
+            except (ValueError, TypeError):
+                pass
+        return query
+
+    # Status counts — filtered by all criteria except status itself
+    status_counts = {"reserved": 0, "started": 0, "stopping": 0, "stopped": 0, "error": 0, "paused": 0}
+    counts_query = select(Reservation.status, func.count())\
+        .where(time_scope)\
+        .join(User, Reservation.userId == User.userId)\
+        .group_by(Reservation.status)
+    counts_query = _apply_non_status_filters(counts_query)
+    count_rows = session.execute(counts_query).all()
+    for s, c in count_rows:
+        if s == "restart_error":
+            status_counts["error"] += c
+        elif s in status_counts:
+            status_counts[s] = c
+
+    total_all_statuses = sum(status_counts.values())
+    stats = {
+        "total": total_all_statuses,
+        "started": status_counts.get("started", 0),
+        "stopped": status_counts.get("stopped", 0),
+        "error": status_counts.get("error", 0),
+    }
 
     # Build filtered base query (for counting and pagination)
     base_filtered = select(Reservation).where(time_scope)

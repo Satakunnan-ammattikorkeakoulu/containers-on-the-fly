@@ -129,7 +129,7 @@
         <span class="filter-summary-text">Showing <strong>{{ logs.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
         <v-menu location="bottom center" :close-on-content-click="true">
           <template v-slot:activator="{ props }">
-            <a class="filter-summary-action" v-bind="props">Quick Filters</a>
+            <a class="filter-summary-action" v-bind="props">Time Range</a>
           </template>
           <v-list density="compact">
             <v-list-item v-for="preset in quickPresets" :key="preset.label" @click="applyPreset(preset.days)">

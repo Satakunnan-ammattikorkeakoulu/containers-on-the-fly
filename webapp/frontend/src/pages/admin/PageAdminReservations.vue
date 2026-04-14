@@ -9,92 +9,11 @@
       </v-col>
     </v-row>
 
-    <!-- Statistics Cards -->
-    <div v-if="!initialLoading" id="stats-row">
-      <!-- Status Statistics -->
-      <v-row class="mb-4 justify-center">
-        <v-col cols="12" sm="6" md="2">
-          <v-card variant="outlined">
-            <v-card-text class="text-center">
-              <v-icon size="24" color="blue-grey" class="mb-2">mdi-chart-bar</v-icon>
-              <div class="text-h6 font-weight-bold">{{ stats.total }}</div>
-              <div class="text-subtitle-2">Total</div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" sm="6" md="2">
-          <v-card variant="outlined">
-            <v-card-text class="text-center">
-              <v-icon size="24" color="green" class="mb-2">mdi-play-circle</v-icon>
-              <div class="text-h6 font-weight-bold text--primary" style="color: #4CAF50 !important;">{{ stats.started }}</div>
-              <div class="text-subtitle-2">Running</div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" sm="6" md="2">
-          <v-card variant="outlined">
-            <v-card-text class="text-center">
-              <v-icon size="24" color="orange" class="mb-2">mdi-stop-circle</v-icon>
-              <div class="text-h6 font-weight-bold" style="color: #FF9800 !important;">{{ stats.stopped }}</div>
-              <div class="text-subtitle-2">Stopped</div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" sm="6" md="2">
-          <v-card variant="outlined">
-            <v-card-text class="text-center">
-              <v-icon size="24" color="red" class="mb-2">mdi-alert-circle</v-icon>
-              <div class="text-h6 font-weight-bold" style="color: #F44336 !important;">{{ stats.error }}</div>
-              <div class="text-subtitle-2">Errored</div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-
-      <!-- Time-based Statistics -->
-      <v-row class="mb-6 justify-center">
-        <v-col cols="12" sm="6" md="2">
-          <v-card variant="outlined">
-            <v-card-text class="text-center">
-              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-today</v-icon>
-              <div class="text-h6 font-weight-bold text-primary">{{ stats.today }}</div>
-              <div class="text-subtitle-2">Today</div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" sm="6" md="2">
-          <v-card variant="outlined">
-            <v-card-text class="text-center">
-              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-week</v-icon>
-              <div class="text-h6 font-weight-bold text-primary">{{ stats.lastWeek }}</div>
-              <div class="text-subtitle-2">Week</div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" sm="6" md="2">
-          <v-card variant="outlined">
-            <v-card-text class="text-center">
-              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-month</v-icon>
-              <div class="text-h6 font-weight-bold text-primary">{{ stats.lastMonth }}</div>
-              <div class="text-subtitle-2">Month</div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" sm="6" md="2">
-          <v-card variant="outlined">
-            <v-card-text class="text-center">
-              <v-icon size="24" color="primary" class="mb-2">mdi-calendar-range</v-icon>
-              <div class="text-h6 font-weight-bold text-primary">{{ stats.lastThreeMonths }}</div>
-              <div class="text-subtitle-2">3 Months</div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-    </div>
-
-    <v-row v-if="!initialLoading && !showFilters" class="text-center" style="margin-top: 0px; margin-bottom: 24px;">
+    <!-- Toggle controls -->
+    <v-row v-if="!initialLoading" class="text-center justify-center" style="margin-top: 0px; margin-bottom: 16px;">
       <v-col cols="12">
-        <a style="font-size: 14px;" @click="showFilters = true">Show Filters</a>
+        <a style="font-size: 14px; margin-right: 16px;" @click="showFilters = !showFilters">{{ showFilters ? 'Hide Filters' : 'Show Filters' }}</a>
+        <a style="font-size: 14px;" @click="showStatistics = !showStatistics">{{ showStatistics ? 'Hide Statistics' : 'Show Statistics' }}</a>
       </v-col>
     </v-row>
 
@@ -183,13 +102,53 @@
       </v-col>
     </v-row>
 
-    <!-- Filter summary -->
-    <v-row v-if="!initialLoading && showFilters" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
+    <!-- Statistics Cards -->
+    <v-row v-if="!initialLoading && showStatistics" class="mb-4 justify-center">
+      <v-col cols="12" sm="6" md="2">
+        <v-card variant="outlined">
+          <v-card-text class="text-center">
+            <v-icon size="24" color="blue-grey" class="mb-2">mdi-chart-bar</v-icon>
+            <div class="text-h6 font-weight-bold">{{ stats.total }}</div>
+            <div class="text-subtitle-2">Total</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="2">
+        <v-card variant="outlined">
+          <v-card-text class="text-center">
+            <v-icon size="24" color="green" class="mb-2">mdi-play-circle</v-icon>
+            <div class="text-h6 font-weight-bold" style="color: #4CAF50 !important;">{{ stats.started }}</div>
+            <div class="text-subtitle-2">Running</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="2">
+        <v-card variant="outlined">
+          <v-card-text class="text-center">
+            <v-icon size="24" color="orange" class="mb-2">mdi-stop-circle</v-icon>
+            <div class="text-h6 font-weight-bold" style="color: #FF9800 !important;">{{ stats.stopped }}</div>
+            <div class="text-subtitle-2">Stopped</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+      <v-col cols="12" sm="6" md="2">
+        <v-card variant="outlined">
+          <v-card-text class="text-center">
+            <v-icon size="24" color="red" class="mb-2">mdi-alert-circle</v-icon>
+            <div class="text-h6 font-weight-bold" style="color: #F44336 !important;">{{ stats.error }}</div>
+            <div class="text-subtitle-2">Errored</div>
+          </v-card-text>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <!-- Filter summary (always visible) -->
+    <v-row v-if="!initialLoading" class="justify-center" style="margin-top: 8px; margin-bottom: 24px;">
       <v-col cols="12" md="9" class="text-center">
         <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
         <v-menu location="bottom center" :close-on-content-click="true">
           <template v-slot:activator="{ props }">
-            <a class="filter-summary-action" v-bind="props">Quick Filters</a>
+            <a class="filter-summary-action" v-bind="props">Time Range</a>
           </template>
           <v-list density="compact">
             <v-list-item v-for="preset in quickPresets" :key="preset.label" @click="applyPreset(preset.days)">
@@ -260,6 +219,7 @@
     },
     data: () => ({
       showFilters: false,
+      showStatistics: true,
       intervalFetchReservations: null,
       initialLoading: true,
       loading: false,
@@ -285,11 +245,7 @@
         total: 0,
         started: 0,
         stopped: 0,
-        error: 0,
-        today: 0,
-        lastWeek: 0,
-        lastMonth: 0,
-        lastThreeMonths: 0
+        error: 0
       },
       tableOptions: {
         page: 1,
@@ -298,6 +254,7 @@
       },
       debounceTimer: null,
       quickPresets: [
+        { label: 'All time', days: null },
         { label: 'Today', days: 0 },
         { label: 'Yesterday', days: 1 },
         { label: 'Last 3 days', days: 3 },
@@ -396,6 +353,13 @@
         this.onFilterChange();
       },
       applyPreset(days) {
+        if (days === null) {
+          this.filters.dateFrom = '';
+          this.filters.dateTo = '';
+          this.tableOptions.page = 1;
+          this.fetchReservations();
+          return;
+        }
         const today = new Date();
         const from = new Date(today);
         if (days === 0) {
@@ -699,11 +663,6 @@
   .row-filters {
     margin-top: 30px;
     margin-bottom: 0px;
-  }
-
-  #stats-row .row.mb-4, #stats-row .row.mb-6 {
-    margin-bottom: 0px !important;
-    margin-top: 0px !important;
   }
 
   .row-filters-second {

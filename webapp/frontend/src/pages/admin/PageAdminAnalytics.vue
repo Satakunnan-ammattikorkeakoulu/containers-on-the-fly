@@ -37,7 +37,7 @@
         <span class="date-range-info" v-html="dateRangeText"></span>
         <v-menu v-if="dateRangeText" location="bottom center" :close-on-content-click="true">
           <template v-slot:activator="{ props }">
-            <a class="filter-summary-action" v-bind="props">Quick Filters</a>
+            <a class="filter-summary-action" v-bind="props">Time Range</a>
           </template>
           <v-list density="compact">
             <v-list-item v-for="preset in quickPresets" :key="preset.label" @click="applyPreset(preset.days)">

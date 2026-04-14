@@ -35,7 +35,12 @@ def get_public_config() -> object:
             'analytics.rybbitUrl',
             'analytics.rybbitSiteId',
             'analytics.googleAnalyticsId',
-            'legal.enabled'
+            'legal.enabled',
+            'features.startScriptsEnabled',
+            'features.stopScriptsEnabled',
+            'features.sshKeysEnabled',
+            'features.startScriptTimeoutSeconds',
+            'features.stopScriptTimeoutSeconds'
         ]
         
         # Get settings from database
@@ -70,6 +75,13 @@ def get_public_config() -> object:
             },
             "legal": {
                 "enabled": settings_dict.get('legal.enabled', False)
+            },
+            "features": {
+                "startScriptsEnabled": settings_dict.get('features.startScriptsEnabled', True),
+                "stopScriptsEnabled": settings_dict.get('features.stopScriptsEnabled', True),
+                "sshKeysEnabled": settings_dict.get('features.sshKeysEnabled', True),
+                "startScriptTimeoutSeconds": settings_dict.get('features.startScriptTimeoutSeconds', 40),
+                "stopScriptTimeoutSeconds": settings_dict.get('features.stopScriptTimeoutSeconds', 40),
             }
         }
         

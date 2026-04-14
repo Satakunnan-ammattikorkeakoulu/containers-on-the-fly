@@ -94,6 +94,13 @@ export const useMainStore = defineStore('main', {
       },
       legal: {
         enabled: false
+      },
+      features: {
+        startScriptsEnabled: true,
+        stopScriptsEnabled: true,
+        sshKeysEnabled: true,
+        startScriptTimeoutSeconds: 40,
+        stopScriptTimeoutSeconds: 40
       }
     },
     configLoaded: false,
@@ -141,6 +148,16 @@ export const useMainStore = defineStore('main', {
     userMaxActiveReservations: (state) => state.user.reservationLimits.maxActiveReservations,
     /** @returns {boolean} Whether the current user is allowed to create low-priority reservations, based on their roles. */
     userAllowLowPriority: (state) => state.user.reservationLimits?.allowLowPriority !== false,
+    /** @returns {boolean} Whether start scripts are enabled system-wide. */
+    startScriptsEnabled: (state) => state.appConfig.features?.startScriptsEnabled !== false,
+    /** @returns {boolean} Whether stop scripts are enabled system-wide. */
+    stopScriptsEnabled: (state) => state.appConfig.features?.stopScriptsEnabled !== false,
+    /** @returns {boolean} Whether SSH key authentication is enabled system-wide. */
+    sshKeysEnabled: (state) => state.appConfig.features?.sshKeysEnabled !== false,
+    /** @returns {number} Start script timeout in seconds. */
+    startScriptTimeoutSeconds: (state) => state.appConfig.features?.startScriptTimeoutSeconds || 40,
+    /** @returns {number} Stop script timeout in seconds. */
+    stopScriptTimeoutSeconds: (state) => state.appConfig.features?.stopScriptTimeoutSeconds || 40,
   },
 
   actions: {

@@ -532,10 +532,10 @@
           </v-row>
 
           <!-- Start/Stop Script Paths -->
-          <v-row style="margin-top: 20px;">
-            <v-col cols="12" md="6" style="padding: 0 60px;">
+          <v-row v-if="store.startScriptsEnabled || store.stopScriptsEnabled" style="margin-top: 20px;">
+            <v-col v-if="store.startScriptsEnabled" cols="12" md="6" style="padding: 0 60px;">
               <h3 class="text-center">Start Script Path</h3>
-              <p style="color: gray; font-size: 15px;">Absolute path to a script inside the container to run on start. Pre-filled from your profile.</p>
+              <p style="color: gray; font-size: 15px;">Absolute path to a script inside the container to run on start ({{ store.startScriptTimeoutSeconds }}s timeout). Pre-filled from your profile.</p>
               <v-text-field
                 v-model="reservationStartScriptPath"
                 label="Start Script (optional)"
@@ -543,9 +543,9 @@
                 :rules="[rules.scriptPath]"
               ></v-text-field>
             </v-col>
-            <v-col cols="12" md="6" style="padding: 0 60px;">
+            <v-col v-if="store.stopScriptsEnabled" cols="12" md="6" style="padding: 0 60px;">
               <h3 class="text-center">Stop Script Path</h3>
-              <p style="color: gray; font-size: 15px;">Absolute path to a script inside the container to run before stop. Pre-filled from your profile.</p>
+              <p style="color: gray; font-size: 15px;">Absolute path to a script inside the container to run before stop ({{ store.stopScriptTimeoutSeconds }}s timeout). Pre-filled from your profile.</p>
               <v-text-field
                 v-model="reservationStopScriptPath"
                 label="Stop Script (optional)"
@@ -702,9 +702,9 @@
       // Otherwise, the watcher will handle initialization when config loads
 
       this.fetchReservations()
-      // Pre-fill script paths from user profile (synced via store)
-      this.reservationStartScriptPath = this.store.user.startScriptPath || ''
-      this.reservationStopScriptPath = this.store.user.stopScriptPath || ''
+      // Pre-fill script paths from user profile (synced via store) if feature is enabled
+      this.reservationStartScriptPath = this.store.startScriptsEnabled ? (this.store.user.startScriptPath || '') : ''
+      this.reservationStopScriptPath = this.store.stopScriptsEnabled ? (this.store.user.stopScriptPath || '') : ''
       // Update relative time display every 60 seconds
       this.timeTickInterval = setInterval(() => { this.timeTick = Date.now() }, 60000)
     },

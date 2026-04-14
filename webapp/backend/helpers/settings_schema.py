@@ -419,6 +419,30 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.DATABASE, SettingType.TEXT, default="",
         description="Timestamp of last legal document save (ISO format)"
     ),
+
+    # Feature Toggle Settings
+    "features.startScriptsEnabled": SettingSetting(
+        SettingSource.DATABASE, SettingType.BOOLEAN, default=True,
+        description="Allow users to configure and run start scripts in containers"
+    ),
+    "features.stopScriptsEnabled": SettingSetting(
+        SettingSource.DATABASE, SettingType.BOOLEAN, default=True,
+        description="Allow users to configure and run stop scripts in containers"
+    ),
+    "features.sshKeysEnabled": SettingSetting(
+        SettingSource.DATABASE, SettingType.BOOLEAN, default=True,
+        description="Allow users to configure SSH public keys for container access"
+    ),
+    "features.startScriptTimeoutSeconds": SettingSetting(
+        SettingSource.DATABASE, SettingType.INTEGER, default=40,
+        min_value=5, max_value=300,
+        description="Timeout in seconds for start script execution inside containers"
+    ),
+    "features.stopScriptTimeoutSeconds": SettingSetting(
+        SettingSource.DATABASE, SettingType.INTEGER, default=40,
+        min_value=5, max_value=300,
+        description="Timeout in seconds for stop script execution inside containers"
+    ),
 }
 
 # Helper functions for schema access

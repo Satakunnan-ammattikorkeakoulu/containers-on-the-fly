@@ -34,7 +34,8 @@ def _time_now():
 
 
 def _serialize_reservation(res, include_container=False, include_user=False,
-                           include_hardware=False, include_mounts=False):
+                           include_hardware=False, include_mounts=False,
+                           feature_flags=None):
     """Serialize a Reservation ORM object to a JSON-safe dict.
 
     Args:
@@ -43,10 +44,15 @@ def _serialize_reservation(res, include_container=False, include_user=False,
         include_user: Include user email, SSH key, roles.
         include_hardware: Include reserved hardware specs.
         include_mounts: Include role mounts for the reservation's computer.
+        feature_flags: Dict of feature toggle states. When a feature is
+            disabled, the corresponding field is nulled out so the
+            container server skips it.
 
     Returns:
         Dict with reservation data.
     """
+    if feature_flags is None:
+        feature_flags = {}
     data = {
         "reservationId": res.reservationId,
         "computerId": res.computerId,
@@ -71,8 +77,8 @@ def _serialize_reservation(res, include_container=False, include_user=False,
             "containerDockerErrorMessage": rc.containerDockerErrorMessage,
             "shmSizePercent": rc.shmSizePercent,
             "ramDiskSizePercent": rc.ramDiskSizePercent,
-            "startScriptPath": rc.startScriptPath,
-            "stopScriptPath": rc.stopScriptPath,
+            "startScriptPath": rc.startScriptPath if feature_flags.get("startScriptsEnabled", True) else None,
+            "stopScriptPath": rc.stopScriptPath if feature_flags.get("stopScriptsEnabled", True) else None,
         }
     else:
         data["reservedContainer"] = None
@@ -124,9 +130,9 @@ def _serialize_reservation(res, include_container=False, include_user=False,
         user_data = {
             "userId": res.user.userId,
             "email": res.user.email,
-            "sshPublicKey": res.user.sshPublicKey,
-            "startScriptPath": res.user.startScriptPath,
-            "stopScriptPath": res.user.stopScriptPath,
+            "sshPublicKey": res.user.sshPublicKey if feature_flags.get("sshKeysEnabled", True) else None,
+            "startScriptPath": res.user.startScriptPath if feature_flags.get("startScriptsEnabled", True) else None,
+            "stopScriptPath": res.user.stopScriptPath if feature_flags.get("stopScriptsEnabled", True) else None,
         }
         if include_mounts:
             user_data["roles"] = []
@@ -178,6 +184,23 @@ def get_tasks(computer_id: int):
     now = _time_now()
     look_ahead_end = now + timedelta(minutes=30)
 
+    # Fetch feature flags once for the entire polling cycle
+    from helpers.settings_handler import get_multiple_settings
+    flags_dict = get_multiple_settings([
+        'features.startScriptsEnabled',
+        'features.stopScriptsEnabled',
+        'features.sshKeysEnabled',
+        'features.startScriptTimeoutSeconds',
+        'features.stopScriptTimeoutSeconds',
+    ])
+    feature_flags = {
+        "startScriptsEnabled": flags_dict.get('features.startScriptsEnabled', True),
+        "stopScriptsEnabled": flags_dict.get('features.stopScriptsEnabled', True),
+        "sshKeysEnabled": flags_dict.get('features.sshKeysEnabled', True),
+        "startScriptTimeoutSeconds": flags_dict.get('features.startScriptTimeoutSeconds', 40),
+        "stopScriptTimeoutSeconds": flags_dict.get('features.stopScriptTimeoutSeconds', 40),
+    }
+
     with Session() as session:
         # Load all reservations for this computer with relevant relations
         all_reservations = session.execute(
@@ -228,41 +251,48 @@ def get_tasks(computer_id: int):
                 if res.isLowPriority:
                     reservations_to_start.append(
                         _serialize_reservation(res, include_container=True, include_user=True,
-                                               include_hardware=True, include_mounts=True)
+                                               include_hardware=True, include_mounts=True,
+                                               feature_flags=feature_flags)
                     )
                 else:
                     normal_pending.append(
                         _serialize_reservation(res, include_container=True, include_user=True,
-                                               include_hardware=True, include_mounts=True)
+                                               include_hardware=True, include_mounts=True,
+                                               feature_flags=feature_flags)
                     )
                     reservations_to_start.append(
                         _serialize_reservation(res, include_container=True, include_user=True,
-                                               include_hardware=True, include_mounts=True)
+                                               include_hardware=True, include_mounts=True,
+                                               feature_flags=feature_flags)
                     )
 
             # To stop: end date passed
             if res.status in ("started", "reserved", "restart_error", "paused", "stopping") and res.endDate < now:
                 reservations_to_stop.append(
-                    _serialize_reservation(res, include_container=True)
+                    _serialize_reservation(res, include_container=True,
+                                           feature_flags=feature_flags)
                 )
 
             # To restart: status=restart, not expired
             if res.status == "restart" and res.endDate > now:
                 reservations_to_restart.append(
-                    _serialize_reservation(res, include_container=True)
+                    _serialize_reservation(res, include_container=True,
+                                           feature_flags=feature_flags)
                 )
 
             # Running: for crash detection
             if res.status == "started" and res.startDate < now and res.endDate > now:
                 running_reservations.append(
-                    _serialize_reservation(res, include_container=True)
+                    _serialize_reservation(res, include_container=True,
+                                           feature_flags=feature_flags)
                 )
 
             # Paused: LP containers waiting to resume
             if res.status == "paused" and res.endDate > now:
                 paused_reservations.append(
                     _serialize_reservation(res, include_container=True, include_user=True,
-                                           include_hardware=True)
+                                           include_hardware=True,
+                                           feature_flags=feature_flags)
                 )
 
             # LP running: for preemption logic
@@ -270,13 +300,15 @@ def get_tasks(computer_id: int):
                     and res.endDate > now):
                 lp_running.append(
                     _serialize_reservation(res, include_container=True, include_user=True,
-                                           include_hardware=True)
+                                           include_hardware=True,
+                                           feature_flags=feature_flags)
                 )
 
             # All active: for resource calculation
             if res.status in ("started", "reserved") and res.endDate > now:
                 all_active.append(
-                    _serialize_reservation(res, include_hardware=True)
+                    _serialize_reservation(res, include_hardware=True,
+                                           feature_flags=feature_flags)
                 )
 
             # Future normal: for LP resume look-ahead
@@ -285,7 +317,8 @@ def get_tasks(computer_id: int):
                     and res.startDate < look_ahead_end
                     and res.endDate > now):
                 future_normal.append(
-                    _serialize_reservation(res, include_hardware=True)
+                    _serialize_reservation(res, include_hardware=True,
+                                           feature_flags=feature_flags)
                 )
 
         # Sort paused by createdAt ascending (FIFO)
@@ -357,6 +390,8 @@ def get_tasks(computer_id: int):
             "containersToBuild": containers_to_build,
             "containersToRemove": containers_to_remove,
             "everyoneMounts": everyone_mounts,
+            "startScriptTimeoutSeconds": feature_flags.get("startScriptTimeoutSeconds", 40),
+            "stopScriptTimeoutSeconds": feature_flags.get("stopScriptTimeoutSeconds", 40),
         })
 
 

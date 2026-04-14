@@ -212,10 +212,11 @@ def start_container(pars):
     start_script = pars.get("startScriptPath")
     if start_script:
         try:
-            log.info(f"Running start script '{start_script}' in container {container_name}")
+            start_timeout = pars.get("startScriptTimeoutSeconds", 40)
+            log.info(f"Running start script '{start_script}' in container {container_name} (timeout={start_timeout}s)")
             docker.execute(
                 container=container_name,
-                command=["/bin/bash", "-c", f"timeout 40 {shlex.quote(start_script)}"],
+                command=["/bin/bash", "-c", f"timeout {int(start_timeout)} {shlex.quote(start_script)}"],
                 user=pars.get("username", "user")
             )
         except Exception as e:
@@ -258,24 +259,25 @@ def stop_container(container_name):
 
     return no_errors
 
-def run_stop_script(container_name, stop_script_path, container_username="user"):
+def run_stop_script(container_name, stop_script_path, container_username="user", timeout_seconds=40):
     """Execute a stop script inside a running container before stopping it.
 
     Non-critical — logs a warning on failure but does not raise. The script
-    runs with a 40-second timeout to prevent blocking container shutdown.
+    runs with a configurable timeout to prevent blocking container shutdown.
 
     Args:
         container_name: Name of the running Docker container.
         stop_script_path: Absolute path to the stop script inside the container.
         container_username: Username to run the script as (default "user").
+        timeout_seconds: Maximum execution time in seconds (default 40).
     """
     if not stop_script_path:
         return
     try:
-        log.info(f"Running stop script '{stop_script_path}' in container {container_name}")
+        log.info(f"Running stop script '{stop_script_path}' in container {container_name} (timeout={timeout_seconds}s)")
         docker.execute(
             container=container_name,
-            command=["/bin/bash", "-c", f"timeout 40 {shlex.quote(stop_script_path)}"],
+            command=["/bin/bash", "-c", f"timeout {int(timeout_seconds)} {shlex.quote(stop_script_path)}"],
             user=container_username
         )
     except Exception as e:

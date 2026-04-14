@@ -81,9 +81,10 @@ def stop_finished_servers(tasks):
     if not settings_handler.get_setting("docker.enabled"):
         return
 
+    stop_timeout = tasks.get("stopScriptTimeoutSeconds", 40)
     for res in tasks.get("reservationsToStop", []):
         try:
-            stop_docker_container(res)
+            stop_docker_container(res, stop_timeout)
         except Exception as e:
             log.error(f"Error stopping container for reservation {res['reservationId']}: {e}")
 
@@ -245,7 +246,7 @@ def pause_low_priority_for_normal_reservations(tasks):
                         if stop_script:
                             container_data = lp_res.get("container", {})
                             container_username = (container_data.get("containerUsername") or "user") if container_data else "user"
-                            run_stop_script(container_docker_name, stop_script, container_username)
+                            run_stop_script(container_docker_name, stop_script, container_username, tasks.get("stopScriptTimeoutSeconds", 40))
                         stop_container(container_docker_name)
 
                     container_data = lp_res.get("container", {})
@@ -451,6 +452,8 @@ def start_docker_container(res, tasks):
         "sshKeyDeployCommands": container_data.get("sshKeyDeployCommands"),
         "startScriptPath": rc.get("startScriptPath"),
         "stopScriptPath": rc.get("stopScriptPath"),
+        "startScriptTimeoutSeconds": tasks.get("startScriptTimeoutSeconds", 40),
+        "stopScriptTimeoutSeconds": tasks.get("stopScriptTimeoutSeconds", 40),
     }
 
     # Build role mounts from user roles + everyone mounts
@@ -483,11 +486,12 @@ def start_docker_container(res, tasks):
         api.report_start_failed(reservation_id, result["error"])
 
 
-def stop_docker_container(res):
+def stop_docker_container(res, stop_script_timeout=40):
     """Stop a Docker container and report to backend.
 
     Args:
         res: Reservation dict from the tasks API response.
+        stop_script_timeout: Timeout in seconds for the stop script.
     """
     reservation_id = res["reservationId"]
     rc = res.get("reservedContainer", {}) or {}
@@ -500,7 +504,7 @@ def stop_docker_container(res):
             if stop_script:
                 container_data = res.get("container", {})
                 container_username = (container_data.get("containerUsername") or "user") if container_data else "user"
-                run_stop_script(container_docker_name, stop_script, container_username)
+                run_stop_script(container_docker_name, stop_script, container_username, stop_script_timeout)
             stop_container(container_docker_name)
         # Paused containers are already stopped in Docker, just finalize
         api.report_stopped(reservation_id)

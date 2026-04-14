@@ -1575,7 +1575,12 @@ def get_general_settings() -> object:
             'email.bodyIntroContainerPaused',
             'email.bodyIntroContainerResumed',
             'email.bodyIntroContainerResumeFailed',
-            'email.lowPriorityNotice'
+            'email.lowPriorityNotice',
+            'features.startScriptsEnabled',
+            'features.stopScriptsEnabled',
+            'features.sshKeysEnabled',
+            'features.startScriptTimeoutSeconds',
+            'features.stopScriptTimeoutSeconds'
         ]
         
         # Get all settings
@@ -1678,9 +1683,16 @@ def get_general_settings() -> object:
                 "bodyIntroContainerResumed": settings_dict.get('email.bodyIntroContainerResumed', ''),
                 "bodyIntroContainerResumeFailed": settings_dict.get('email.bodyIntroContainerResumeFailed', ''),
                 "lowPriorityNotice": settings_dict.get('email.lowPriorityNotice', '')
+            },
+            "features": {
+                "startScriptsEnabled": settings_dict.get('features.startScriptsEnabled', True),
+                "stopScriptsEnabled": settings_dict.get('features.stopScriptsEnabled', True),
+                "sshKeysEnabled": settings_dict.get('features.sshKeysEnabled', True),
+                "startScriptTimeoutSeconds": settings_dict.get('features.startScriptTimeoutSeconds', 40),
+                "stopScriptTimeoutSeconds": settings_dict.get('features.stopScriptTimeoutSeconds', 40),
             }
         }
-        
+
         return api_response(True, "Settings retrieved successfully", response_data)
         
     except Exception as e:
@@ -1692,7 +1704,7 @@ def save_general_settings(section: str, settings: dict, actor_user_id: int = Non
     Persists settings to the database for the given section. Supported
     sections: general, access, email, contact, emailEnable, notifications,
     auth (including nested LDAP settings), auditLog, analytics, legal,
-    connection, and emailTemplates.
+    connection, emailTemplates, and features.
 
     Args:
         section: The settings section name to save.
@@ -1893,6 +1905,18 @@ def save_general_settings(section: str, settings: dict, actor_user_id: int = Non
                 set_setting('email.bodyIntroContainerResumeFailed', settings['bodyIntroContainerResumeFailed'])
             if 'lowPriorityNotice' in settings:
                 set_setting('email.lowPriorityNotice', settings['lowPriorityNotice'])
+
+        elif section == "features":
+            if 'startScriptsEnabled' in settings:
+                set_setting('features.startScriptsEnabled', settings['startScriptsEnabled'])
+            if 'stopScriptsEnabled' in settings:
+                set_setting('features.stopScriptsEnabled', settings['stopScriptsEnabled'])
+            if 'sshKeysEnabled' in settings:
+                set_setting('features.sshKeysEnabled', settings['sshKeysEnabled'])
+            if 'startScriptTimeoutSeconds' in settings:
+                set_setting('features.startScriptTimeoutSeconds', settings['startScriptTimeoutSeconds'])
+            if 'stopScriptTimeoutSeconds' in settings:
+                set_setting('features.stopScriptTimeoutSeconds', settings['stopScriptTimeoutSeconds'])
 
         else:
             return api_response(False, f"Unknown section: {section}")

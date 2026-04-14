@@ -305,6 +305,80 @@
             </v-expansion-panel-text>
           </v-expansion-panel>
 
+          <!-- Feature Toggles Section -->
+          <v-expansion-panel id="panel-features" value="features">
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-toggle-switch-outline</v-icon>
+              <span class="font-weight-bold">Feature Toggles</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+
+              <div class="mb-6">
+                <p class="body-2 text-grey mb-4">
+                  Enable or disable optional features system-wide.
+                  Disabled features are hidden from all users and ignored by the backend.
+                </p>
+                <v-switch
+                  v-model="settings.features.startScriptsEnabled"
+                  label="Start Scripts — Allow users to configure a script that runs when their container starts. Configured in Profile and Reservation Advanced Settings."
+                  color="primary"
+                  hide-details
+                  class="mb-2"
+                />
+                <v-text-field
+                  v-if="settings.features.startScriptsEnabled"
+                  v-model.number="settings.features.startScriptTimeoutSeconds"
+                  label="Start Script Timeout (seconds)"
+                  type="number"
+                  :min="5"
+                  :max="300"
+                  :rules="[rules.scriptTimeout]"
+                  density="compact"
+                  style="max-width: 280px; margin-left: 52px;"
+                  class="mb-2"
+                />
+                <v-switch
+                  v-model="settings.features.stopScriptsEnabled"
+                  label="Stop Scripts — Allow users to configure a script that runs before their container stops. Configured in Profile and Reservation Advanced Settings."
+                  color="primary"
+                  hide-details
+                  class="mb-2"
+                />
+                <v-text-field
+                  v-if="settings.features.stopScriptsEnabled"
+                  v-model.number="settings.features.stopScriptTimeoutSeconds"
+                  label="Stop Script Timeout (seconds)"
+                  type="number"
+                  :min="5"
+                  :max="300"
+                  :rules="[rules.scriptTimeout]"
+                  density="compact"
+                  style="max-width: 280px; margin-left: 52px;"
+                  class="mb-2"
+                />
+                <v-switch
+                  v-model="settings.features.sshKeysEnabled"
+                  label="SSH Key Authentication — Allow users to add SSH public keys for passwordless container access. Configured in Profile."
+                  color="primary"
+                  hide-details
+                  class="mb-2"
+                />
+
+                <v-btn
+                  v-if="settings.features.startScriptsEnabled || settings.features.stopScriptsEnabled"
+                  color="primary"
+                  :loading="saving.features"
+                  class="mt-4"
+                  @click="saveSection('features')"
+                >
+                  <v-icon left>mdi-content-save</v-icon>
+                  Save Timeout Settings
+                </v-btn>
+              </div>
+
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
         </v-expansion-panels>
 
         <h2 class="settings-group-header">Access &amp; Security</h2>
@@ -1440,7 +1514,10 @@ export default {
       containerAlertsEnabled: false,
       sendEmail: false,
       loginType: false,
-      legalEnabled: false
+      legalEnabled: false,
+      featuresStartScriptsEnabled: false,
+      featuresStopScriptsEnabled: false,
+      featuresSshKeysEnabled: false
     }, // Track which settings have been initialized from backend
     legalPreview: {
       privacyPolicy: false,
@@ -1492,7 +1569,8 @@ export default {
       analytics: false,
       legal: false,
       connection: false,
-      emailTemplates: false
+      emailTemplates: false,
+      features: false
     },
     
     // Form validation rules
@@ -1507,6 +1585,13 @@ export default {
         if (!value) return 'This field is required'
         const num = parseInt(value)
         return (num > 0) || 'Must be a positive number'
+      },
+      scriptTimeout: value => {
+        const num = parseInt(value)
+        if (isNaN(num)) return 'Must be a number'
+        if (num < 5) return 'Minimum 5 seconds'
+        if (num > 300) return 'Maximum 300 seconds'
+        return true
       }
     },
     
@@ -1694,6 +1779,13 @@ export default {
         bodyIntroContainerResumed: '',
         bodyIntroContainerResumeFailed: '',
         lowPriorityNotice: ''
+      },
+      features: {
+        startScriptsEnabled: true,
+        stopScriptsEnabled: true,
+        sshKeysEnabled: true,
+        startScriptTimeoutSeconds: 40,
+        stopScriptTimeoutSeconds: 40
       }
     }
   }),
@@ -1889,6 +1981,15 @@ export default {
               lowPriorityNotice: data.emailTemplates?.lowPriorityNotice || ''
             };
 
+            // Update feature toggle settings
+            _this.settings.features = {
+              startScriptsEnabled: data.features?.startScriptsEnabled !== false,
+              stopScriptsEnabled: data.features?.stopScriptsEnabled !== false,
+              sshKeysEnabled: data.features?.sshKeysEnabled !== false,
+              startScriptTimeoutSeconds: data.features?.startScriptTimeoutSeconds || 40,
+              stopScriptTimeoutSeconds: data.features?.stopScriptTimeoutSeconds || 40
+            };
+
             // Mark settings as initialized after a small delay to ensure watchers don't fire during load
             setTimeout(() => {
               _this.settingsInitialized.blacklistEnabled = true;
@@ -1897,6 +1998,9 @@ export default {
               _this.settingsInitialized.sendEmail = true;
               _this.settingsInitialized.loginType = true;
               _this.settingsInitialized.legalEnabled = true;
+              _this.settingsInitialized.featuresStartScriptsEnabled = true;
+              _this.settingsInitialized.featuresStopScriptsEnabled = true;
+              _this.settingsInitialized.featuresSshKeysEnabled = true;
             }, 200);
             
             // Update email lists
@@ -2002,7 +2106,7 @@ export default {
             });
             
             // Reload app config for sections that affect public settings
-            if (sectionName === 'general' || sectionName === 'contact' || sectionName === 'legal' || sectionName === 'analytics') {
+            if (sectionName === 'general' || sectionName === 'contact' || sectionName === 'legal' || sectionName === 'analytics' || sectionName === 'features') {
               try {
                 await _this.store.loadAppConfig();
                 //console.log('App configuration reloaded after saving', sectionName, 'settings');
@@ -2190,7 +2294,8 @@ export default {
         analytics: 'Analytics',
         legal: 'Legal Documents',
         connection: 'Connection Methods',
-        emailTemplates: 'Email Templates'
+        emailTemplates: 'Email Templates',
+        features: 'Feature Toggles'
       };
       return names[sectionName] || sectionName;
     },
@@ -2301,6 +2406,25 @@ export default {
     'settings.legal.enabled': function(newValue, oldValue) {
       if (this.settingsInitialized.legalEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
         this.saveSection('legal');
+      }
+    },
+
+    // Auto-save when feature toggles are changed
+    'settings.features.startScriptsEnabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.featuresStartScriptsEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveSection('features');
+      }
+    },
+
+    'settings.features.stopScriptsEnabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.featuresStopScriptsEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveSection('features');
+      }
+    },
+
+    'settings.features.sshKeysEnabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.featuresSshKeysEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveSection('features');
       }
     },
 

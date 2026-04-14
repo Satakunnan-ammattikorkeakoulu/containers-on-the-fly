@@ -879,20 +879,23 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
             amount = val,
           )
       )
+    # Clear script paths if the corresponding feature is disabled
+    effective_start_script = startScriptPath if get_setting('features.startScriptsEnabled') else None
+    effective_stop_script = stopScriptPath if get_setting('features.stopScriptsEnabled') else None
+
     # Create the ReservedContainer
     reservation.reservedContainer = ReservedContainer(
       containerId = containerId,
       shmSizePercent = shmSizePercent,
       ramDiskSizePercent = ramDiskSizePercent,
-      startScriptPath = startScriptPath or None,
-      stopScriptPath = stopScriptPath or None,
+      startScriptPath = effective_start_script or None,
+      stopScriptPath = effective_stop_script or None,
     )
     user.reservations.append(reservation)
     session.add(reservation)
     session.commit()
 
     created_reservation_id = reservation.reservationId
-    from helpers.settings_handler import get_setting
     inform_by_email = get_setting('email.sendEmail')
 
     log_action(userId, "RESERVATION_CREATE", "reservation", created_reservation_id,

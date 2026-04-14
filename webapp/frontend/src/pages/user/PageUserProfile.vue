@@ -109,8 +109,8 @@
         </v-card>
       </v-col>
     </v-row>
-    <v-row>
-      <v-col cols="12" md="6">
+    <v-row v-if="store.sshKeysEnabled || store.startScriptsEnabled || store.stopScriptsEnabled">
+      <v-col v-if="store.sshKeysEnabled" cols="12" md="6">
         <v-card>
           <v-card-text>
             <div class="ssh-key-section">
@@ -152,7 +152,7 @@
           </v-card-text>
         </v-card>
       </v-col>
-      <v-col cols="12" md="6">
+      <v-col v-if="store.startScriptsEnabled || store.stopScriptsEnabled" cols="12" md="6">
         <v-card>
           <v-card-text>
             <div class="script-paths-section">
@@ -160,15 +160,18 @@
               <p class="text-caption mb-8">
                 Set default scripts to run when your containers start or stop.
                 These must be absolute paths inside the container (e.g. <code><i>/home/user/persistent/start.sh</i></code>).
+                Scripts have a {{ store.startScriptTimeoutSeconds }}s / {{ store.stopScriptTimeoutSeconds }}s timeout (start / stop) and will not prevent the container from starting or stopping if they fail.
                 Per-reservation overrides can be set in Advanced Settings when creating a reservation.
               </p>
               <v-text-field
+                v-if="store.startScriptsEnabled"
                 v-model="startScriptPath"
                 label="Start Script Path (optional)"
                 placeholder=""
                 :rules="[rules.scriptPath]"
               ></v-text-field>
               <v-text-field
+                v-if="store.stopScriptsEnabled"
                 v-model="stopScriptPath"
                 label="Stop Script Path (optional)"
                 placeholder=""

@@ -54,10 +54,10 @@
 
     <!-- Charts -->
     <template v-if="!loading && analyticsData">
-      <!-- Row 1: Platform Activity (full width) -->
+      <!-- Row 1: Platform Activity + Reservation Statuses -->
       <v-row class="mt-4">
-        <v-col cols="12">
-          <v-card variant="outlined">
+        <v-col cols="12" md="6">
+          <v-card variant="outlined" class="fill-height">
             <v-card-title class="chart-title">Platform Activity</v-card-title>
             <p class="chart-description">Daily reservation and login activity over time.</p>
             <v-card-text>
@@ -65,11 +65,7 @@
             </v-card-text>
           </v-card>
         </v-col>
-      </v-row>
-
-      <!-- Row 2: Reservation Statuses + Actions by Type -->
-      <v-row>
-        <v-col cols="12" md="5">
+        <v-col cols="12" md="6">
           <v-card variant="outlined" class="fill-height">
             <v-card-title class="chart-title">Reservation Statuses</v-card-title>
             <p class="chart-description">Breakdown of reservations by their current status.</p>
@@ -78,7 +74,11 @@
             </v-card-text>
           </v-card>
         </v-col>
-        <v-col cols="12" md="7">
+      </v-row>
+
+      <!-- Row 2: Actions by Type + Top Users -->
+      <v-row>
+        <v-col cols="12" md="6">
           <v-card variant="outlined" class="fill-height">
             <v-card-title class="chart-title">Actions by Type</v-card-title>
             <p class="chart-description">All audit log action types ranked by frequency.</p>
@@ -91,10 +91,6 @@
             </v-card-text>
           </v-card>
         </v-col>
-      </v-row>
-
-      <!-- Row 3: Top Users + Reservations by Server -->
-      <v-row>
         <v-col cols="12" md="6">
           <v-card variant="outlined" class="fill-height">
             <v-card-title class="chart-title">Top Users</v-card-title>

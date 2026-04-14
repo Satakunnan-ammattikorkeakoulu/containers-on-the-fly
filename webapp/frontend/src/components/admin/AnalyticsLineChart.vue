@@ -47,6 +47,8 @@
       },
       chartData() {
         if (!this.data || this.data.length === 0) return null
+        const hasActivity = this.data.some(d => d.reservations > 0 || d.logins > 0)
+        if (!hasActivity) return null
         if (this.isSingleDay) {
           return {
             labels: this.data.map(d => d.day),

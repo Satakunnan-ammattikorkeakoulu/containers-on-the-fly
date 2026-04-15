@@ -114,7 +114,7 @@
       <v-col cols="12" md="3">
         <v-text-field
           v-model="filters.dateFrom"
-          label="Date From"
+          label="Reservation Date From"
           type="date"
           clearable
           @update:model-value="onFilterChange"
@@ -123,7 +123,7 @@
       <v-col cols="12" md="3">
         <v-text-field
           v-model="filters.dateTo"
-          label="Date To"
+          label="Reservation Date To"
           type="date"
           clearable
           @update:model-value="onFilterChange"

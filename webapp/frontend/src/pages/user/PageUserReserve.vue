@@ -153,6 +153,18 @@
         <v-expansion-panel-text>
           <h2>Container Image</h2>
           <p class="panel-description">Select the operating system and software environment for your reservation.</p>
+          <v-row v-if="!containers || !containers.length" justify="center" class="mt-4">
+            <v-col cols="12" md="6">
+              <v-alert type="info" variant="tonal" density="compact">
+                <template v-if="isAdmin()">
+                  <strong>No containers available.</strong> Create a container image in the <router-link to="/admin/containers">Containers</router-link> page to get started.
+                </template>
+                <template v-else>
+                  <strong>No containers available.</strong> A system administrator needs to create at least one container image before reservations can be made.
+                </template>
+              </v-alert>
+            </v-col>
+          </v-row>
           <v-row justify="center" v-if="containers && containers.length">
             <v-col cols="10">
               <v-row style="justify-content: center !important;">

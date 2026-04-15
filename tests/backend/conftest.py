@@ -106,6 +106,7 @@ _db.Base.metadata.create_all(_test_engine)
 #    endpoints). Here we must mirror that order so all names resolve.
 # ---------------------------------------------------------------------------
 import helpers.server  # noqa: F401
+import helpers.rate_limiter as _rate_limiter
 
 
 # ===========================================================================
@@ -115,7 +116,8 @@ import helpers.server  # noqa: F401
 
 @pytest.fixture(autouse=True)
 def _clean_db():
-    """Truncate all tables and re-seed built-in roles before each test."""
+    """Truncate all tables, reset rate limiter, and re-seed built-in roles before each test."""
+    _rate_limiter.reset()
     with _db.Session() as session:
         session.execute(text("PRAGMA foreign_keys=OFF"))
         for table in reversed(_db.Base.metadata.sorted_tables):

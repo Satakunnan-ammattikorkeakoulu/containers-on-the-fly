@@ -12,6 +12,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from routes.api import router as api_router
 from helpers.settings_handler import settings_handler
 from helpers.request_context import set_client_ip
+from middleware.rate_limit import RateLimitMiddleware
 
 
 class PollingEndpointFilter(logging.Filter):
@@ -75,6 +76,7 @@ class ClientIPMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(ClientIPMiddleware)
+app.add_middleware(RateLimitMiddleware)
 
 # Setup allowed origins
 origins = [

@@ -354,6 +354,13 @@
           <!-- Hardware selection (shown after computer is selected) -->
           <div v-if="computer && hardwareData">
             <h2 id="select-hardware-section" style="margin-top: 25px;">Configure Hardware</h2>
+            <v-row v-if="isLowPriority" justify="center" class="mt-3 mb-2">
+              <v-col cols="12" md="6">
+                <v-alert type="warning" variant="tonal" density="compact">
+                  <strong>Note:</strong> Only allocate what you need for this low-priority reservation. Your container won't start if requested resources exceed availability, and it may be paused later if normal reservations need the resources it's using.
+                </v-alert>
+              </v-col>
+            </v-row>
 
             <v-col cols="12">
               <h3 class="text-center">
@@ -431,9 +438,9 @@
                     <span style="font-size: 15px;">{{ (modelValue ?? 0) }} / {{ getSpecMax(spec) }} {{ spec.format }}</span>
                   </template>
                 </v-slider>
-                <p v-if="isLowPriority && spec.reservedAmount !== undefined" class="text-center text-caption text-medium-emphasis mt-1" style="margin-top: -5px;">
-                  {{ spec.reservedAmount }} / {{ spec.reservedAmount + spec.maximumAmount }} {{ spec.format }} already reserved in this time range by normal reservations.
-                </p>
+                <v-alert v-if="isLowPriority && spec.reservedAmount !== undefined" type="info" variant="tonal" density="compact" class="mt-1" style="margin-top: -5px;">
+                  {{ spec.maximumAmount }} {{ spec.format }} available for low-priority reservation ({{ spec.reservedAmount }} reserved by normal reservations)
+                </v-alert>
               </v-col>
             </v-row>
             <!-- Review & Create button -->

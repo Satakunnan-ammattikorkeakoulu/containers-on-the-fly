@@ -160,6 +160,7 @@
               <p class="text-caption mb-8">
                 Set default scripts to run when your containers start or stop.
                 These must be absolute paths inside the container (e.g. <code><i>/home/user/persistent/start.sh</i></code>).
+                Execute permissions are applied automatically before running.
                 Scripts have a {{ store.startScriptTimeoutSeconds }}s / {{ store.stopScriptTimeoutSeconds }}s timeout (start / stop) and will not prevent the container from starting or stopping if they fail.
                 Per-reservation overrides can be set in Advanced Settings when creating a reservation.
               </p>

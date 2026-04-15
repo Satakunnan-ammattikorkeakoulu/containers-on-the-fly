@@ -164,7 +164,7 @@ def run_user_config_script(role_mounts, computer_id, user_email, user_id, contai
                 config_path = f'{host_path}/config/config.bash'
                 if os.path.exists(config_path):
                     config_script = container_path + '/config/config.bash'
-                    docker.execute(container=container_name, command=["/bin/bash", "-c", f"timeout 60 {shlex.quote(config_script)}"], user="root")
+                    docker.execute(container=container_name, command=["/bin/bash", "-c", f"chmod +x {shlex.quote(config_script)} && timeout 60 {shlex.quote(config_script)}"], user="root")
                     break  # Only run the first config.bash found
     except Exception as e:
         log.warning(f"Error running user config.bash in container {container_name} (non-critical): {e}")

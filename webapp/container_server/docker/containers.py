@@ -233,7 +233,7 @@ def start_container(pars):
             log.info(f"Running start script '{start_script}' in container {container_name} (timeout={start_timeout}s)")
             docker.execute(
                 container=container_name,
-                command=["/bin/bash", "-c", f"timeout {int(start_timeout)} {shlex.quote(start_script)}"],
+                command=["/bin/bash", "-c", f"chmod +x {shlex.quote(start_script)} && timeout {int(start_timeout)} {shlex.quote(start_script)}"],
                 user=pars.get("username", "user")
             )
         except Exception as e:
@@ -294,7 +294,7 @@ def run_stop_script(container_name, stop_script_path, container_username="user",
         log.info(f"Running stop script '{stop_script_path}' in container {container_name} (timeout={timeout_seconds}s)")
         docker.execute(
             container=container_name,
-            command=["/bin/bash", "-c", f"timeout {int(timeout_seconds)} {shlex.quote(stop_script_path)}"],
+            command=["/bin/bash", "-c", f"chmod +x {shlex.quote(stop_script_path)} && timeout {int(timeout_seconds)} {shlex.quote(stop_script_path)}"],
             user=container_username
         )
     except Exception as e:

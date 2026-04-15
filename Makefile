@@ -376,8 +376,16 @@ start-main-server: check-not-root verify-config-file-exists apply-settings-main-
 	@sudo systemctl reload caddy
 	@echo ""
 	@echo "Starting frontend and backend"
-	@cd webapp/frontend && pm2 restart frontend 2>/dev/null || pm2 start "npm run production" --name frontend --log-date-format="YYYY-MM-DD HH:mm Z"
-	@cd webapp/backend && pm2 restart backend 2>/dev/null || pm2 start "$(PYTHON) main.py" --name backend --log-date-format="YYYY-MM-DD HH:mm Z"
+	@-pm2 delete frontend 2>/dev/null
+	@if [ "$(DEV)" = "1" ]; then \
+		echo "Starting frontend in development mode (Vite dev server)"; \
+		cd webapp/frontend && pm2 start "npm run serve" --name frontend --log-date-format="YYYY-MM-DD HH:mm Z"; \
+	else \
+		echo "Building frontend for production..."; \
+		cd webapp/frontend && npm run build && pm2 start "npx serve dist/ -s -l 8080" --name frontend --log-date-format="YYYY-MM-DD HH:mm Z"; \
+	fi
+	@-pm2 delete backend 2>/dev/null
+	@cd webapp/backend && pm2 start "$(PYTHON) main.py" --name backend --log-date-format="YYYY-MM-DD HH:mm Z"
 	@pm2 save
 	@ADD_TEST=$$(grep "^ADD_TEST_DATA=" user_config/settings 2>/dev/null | cut -d'=' -f2 | tr -d '"' | tr '[:upper:]' '[:lower:]'); \
 	if [ "$$ADD_TEST" = "true" ] || [ -z "$$ADD_TEST" ]; then \
@@ -586,19 +594,6 @@ stop-servers: ## Kills (stops) the frontend, backend and docker utility servers 
 	@-pm2 delete backendDockerUtil 2>/dev/null || echo "backendDockerUtil pm2 service was not running. Nothing to stop."
 	@echo "\n$(GREEN)Servers stopped!$(RESET)"
 
-
-# Scripts for development
-
-start-dev-frontend: apply-settings
-	cd webapp/frontend && npm run serve
-
-start-dev-backend: apply-settings install-backend-deps init-database
-	cd webapp/backend && $(PYTHON) main.py
-
-start-dev-container-server: apply-settings
-	cd webapp/container_server && $(PYTHON) main.py
-
-start-dev-docker-utility: start-dev-container-server ## Alias for start-dev-container-server (backward compatibility)
 
 seed-data: check-not-root verify-config-file-exists ## Seed test data (admin user, normal user, test server with hardware specs)
 	@cd $(BACKEND_PATH) && $(PYTHON) ../../scripts/seed_test_data.py

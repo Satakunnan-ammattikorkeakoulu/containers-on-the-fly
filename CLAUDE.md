@@ -22,13 +22,9 @@ The application follows a multi-component architecture:
 
 ### Core Development Workflow
 ```bash
-# Start development servers
-make start-dev-frontend          # Vue.js dev server with hot reload
-make start-dev-backend           # FastAPI backend with auto-reload
-make start-dev-container-server  # Container server daemon for container management
-
-# Production deployment
-make start-main-server           # Start/restart all main server services
+# Start/restart services
+make start-main-server           # Build frontend + start all main server services
+make start-main-server DEV=1     # Same but with Vite dev server (hot reload) instead of production build
 make start-container-server      # Start/restart container server daemon
 
 # Configuration management
@@ -55,7 +51,6 @@ cd webapp/frontend
 npm run serve          # Development server
 npm run build          # Production build
 npm run lint           # ESLint
-npm run production     # Production mode serve
 npm test               # Run unit + component tests (vitest)
 npm run test:watch     # Tests in watch mode
 npm run test:coverage  # Tests with coverage report

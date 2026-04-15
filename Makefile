@@ -647,6 +647,10 @@ interactive-docker-settings-creation: # Creates container server daemon settings
 		echo "  - Port Range: $(GREEN)$$EXISTING_PORT_START - $$EXISTING_PORT_END$(RESET)"; \
 		echo "  - Registry Address: $(GREEN)$$EFFECTIVE_REGISTRY_ADDRESS$(RESET)"; \
 		echo "  - Registry Port: $(GREEN)5000$(RESET)"; \
+		EXISTING_WEB_HOST=$$(grep "^MAIN_SERVER_WEB_HOST=" user_config/settings | cut -d'"' -f2); \
+		EXISTING_WEB_HTTPS=$$(grep "^MAIN_SERVER_WEB_HTTPS=" user_config/settings | cut -d'=' -f2); \
+		echo "  - Main Server Web Host: $(GREEN)$$EXISTING_WEB_HOST$(RESET)"; \
+		echo "  - Main Server HTTPS: $(GREEN)$$EXISTING_WEB_HTTPS$(RESET)"; \
 		EXISTING_DAEMON_KEY=$$(grep "^DAEMON_API_KEY=" user_config/settings | cut -d'"' -f2); \
 		if [ -n "$$EXISTING_DAEMON_KEY" ]; then \
 			MASKED_KEY="$$(echo "$$EXISTING_DAEMON_KEY" | cut -c1-8)..."; \
@@ -697,12 +701,34 @@ interactive-docker-settings-creation: # Creates container server daemon settings
 			SERVER_IP_ADDRESS=$$CURRENT_SERVER_IP; \
 		else \
 			echo ""; \
-			echo "$(GREEN)$(BOLD)Main Server IP Configuration:$(RESET)"; \
-			echo -n "Enter the IP address of your main server: "; \
+			echo "$(GREEN)$(BOLD)Main Server IP Address:$(RESET)"; \
+			echo "The IP address of the machine running the main server. Used to connect to the Docker registry."; \
+			echo -n "Enter the main server IP address: "; \
 			read MAIN_SERVER_IP; \
 			REGISTRY_ADDRESS=$$MAIN_SERVER_IP; \
 			CURRENT_SERVER_IP=$$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' || echo "127.0.0.1"); \
 			SERVER_IP_ADDRESS=$$CURRENT_SERVER_IP; \
+			echo ""; \
+			echo "$(GREEN)$(BOLD)Main Server Web Address:$(RESET)"; \
+			echo "The address used to access the web interface, without the http/https protocol prefix."; \
+			echo "This can be the same IP address, or a domain if you have one configured."; \
+			echo "Examples: \"192.168.1.100\", \"myapp.example.com\""; \
+			echo -n "Enter the main server web address (or empty for $(GREEN)$$MAIN_SERVER_IP$(RESET)): "; \
+			read MAIN_SERVER_WEB_HOST_INPUT; \
+			if [ -z "$$MAIN_SERVER_WEB_HOST_INPUT" ]; then \
+				MAIN_SERVER_WEB_HOST_INPUT=$$MAIN_SERVER_IP; \
+			fi; \
+			echo ""; \
+			echo "$(GREEN)$(BOLD)Main Server HTTPS:$(RESET)"; \
+			echo "Is the main server using HTTPS? If you access the web interface with https"; \
+			echo "(e.g. https://myapp.example.com), select yes."; \
+			echo -n "Enter (y/N): "; \
+			read HTTPS_INPUT; \
+			if [ "$$HTTPS_INPUT" = "y" ] || [ "$$HTTPS_INPUT" = "Y" ]; then \
+				MAIN_SERVER_HTTPS=true; \
+			else \
+				MAIN_SERVER_HTTPS=false; \
+			fi; \
 			echo ""; \
 			echo "$(GREEN)$(BOLD)Daemon API Key:$(RESET)"; \
 			echo "The container server uses this key to authenticate with the main server."; \
@@ -746,6 +772,12 @@ interactive-docker-settings-creation: # Creates container server daemon settings
 		sed -i "s/DOCKER_RESERVATION_PORT_RANGE_START=[^[:space:]]*/DOCKER_RESERVATION_PORT_RANGE_START=$$PORT_START/" user_config/settings; \
 		sed -i "s/DOCKER_RESERVATION_PORT_RANGE_END=[^[:space:]]*/DOCKER_RESERVATION_PORT_RANGE_END=$$PORT_END/" user_config/settings; \
 		sed -i "s/DOCKER_REGISTRY_ADDRESS=.*/DOCKER_REGISTRY_ADDRESS=$$REGISTRY_ADDRESS/" user_config/settings; \
+		if [ -n "$$MAIN_SERVER_WEB_HOST_INPUT" ]; then \
+			sed -i "s/MAIN_SERVER_WEB_HOST=\"[^\"]*\"/MAIN_SERVER_WEB_HOST=\"$$MAIN_SERVER_WEB_HOST_INPUT\"/" user_config/settings; \
+		fi; \
+		if [ -n "$$MAIN_SERVER_HTTPS" ]; then \
+			sed -i "s/MAIN_SERVER_WEB_HTTPS=.*/MAIN_SERVER_WEB_HTTPS=$$MAIN_SERVER_HTTPS/" user_config/settings; \
+		fi; \
 		if [ -n "$$DAEMON_KEY_INPUT" ]; then \
 			DAEMON_KEY_ESCAPED=$$(printf '%s\n' "$$DAEMON_KEY_INPUT" | sed 's/[\/&]/\\&/g'); \
 			sed -i "s/^DAEMON_API_KEY=.*/DAEMON_API_KEY=\"$$DAEMON_KEY_ESCAPED\"/" user_config/settings; \

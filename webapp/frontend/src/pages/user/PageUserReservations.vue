@@ -3,29 +3,6 @@
     <v-row class="text-center section">
       <v-col>
         <v-btn color="success" large @click="createReservation">Reserve Server</v-btn>
-        <br>
-        <p style="color: grey; font-size: 13px; margin-top: 8px; margin-bottom: 0px;">{{ activeReservationCount }} of {{ maxActiveReservations }} active reservations</p>
-        <a @click="toggleCalendarView" style="margin-top: 15px; display: inline-block; font-size: 13px;">
-          {{ showCalendar ? 'hide reservation calendar' : 'show reservation calendar' }}
-        </a>
-      </v-col>
-    </v-row>
-
-    <!-- Reservation Calendar -->
-    <v-row v-if="showCalendar" class="section">
-      <v-col cols="12">
-        <h3 style="margin-bottom: 10px;">Reservation Calendar</h3>
-        <p style="margin-bottom: 20px; color: #666; font-size: 14px;">All times are in timezone <strong>{{globalTimezone}}</strong></p>
-        <CalendarReservations
-          v-if="showCalendar"
-          :propReservations="allReservations || []"
-          :readOnly="true"
-          @slotSelected="handleSlotSelected"
-          @reservationsRefreshed="handleReservationsRefreshed"
-          @requestRefresh="fetchAllReservations"
-          ref="calendarComponent"
-        />
-        <Loading v-if="fetchingAllReservations" />
       </v-col>
     </v-row>
 
@@ -45,11 +22,22 @@
     <v-row class="text-center">
       <v-col cols="12">
         <h2 class="m-0">{{ viewMode === 'activity' ? 'Your Activity' : 'Your Reservations' }}</h2>
+        <p v-if="viewMode === 'reservations'" class="dim m-0" style="font-size: 13px;">{{ activeReservationCount }} of {{ maxActiveReservations }} active reservations</p>
         <div class="header-links">
           <template v-if="viewMode === 'reservations'">
-            <a @click="showFilters = !showFilters">Filters</a>
+            <v-tooltip location="bottom">
+              <template v-slot:activator="{ props }">
+                <a v-bind="props" @click="showFilters = !showFilters"><v-icon size="x-small" class="mr-1">mdi-filter-outline</v-icon>Filters</a>
+              </template>
+              <span>Show or hide filters</span>
+            </v-tooltip>
             <span class="header-link-separator">·</span>
-            <a @click="showActivityView">Activity</a>
+            <v-tooltip location="bottom">
+              <template v-slot:activator="{ props }">
+                <a v-bind="props" @click="showActivityView"><v-icon size="x-small" class="mr-1">mdi-history</v-icon>Activity</a>
+              </template>
+              <span>View reservation activity log</span>
+            </v-tooltip>
             <v-badge
               v-if="unreadActivityCount > 0"
               :content="unreadActivityBadgeText"
@@ -58,24 +46,49 @@
               class="activity-badge"
             ></v-badge>
             <span class="header-link-separator">·</span>
-            <v-tooltip location="bottom" max-width="250">
+            <v-tooltip location="bottom">
               <template v-slot:activator="{ props }">
-                <a v-bind="props" @click="fetchReservations">Refresh</a>
+                <a v-bind="props" @click="toggleCalendarView"><v-icon size="x-small" class="mr-1">mdi-calendar</v-icon>Reservation Calendar</a>
               </template>
-              <span>Data is automatically refreshed every 15 seconds. Click to refresh manually.</span>
+              <span>{{ showCalendar ? 'Hide' : 'Show' }} reservation calendar</span>
+            </v-tooltip>
+            <span class="header-link-separator">·</span>
+            <v-tooltip location="bottom">
+              <template v-slot:activator="{ props }">
+                <a v-bind="props" @click="fetchReservations"><v-icon size="x-small" class="mr-1">mdi-refresh</v-icon>Refresh</a>
+              </template>
+              <span>Auto-refreshes every 15s. Click to refresh now.</span>
             </v-tooltip>
           </template>
           <template v-else>
-            <a @click="showReservationsView">&larr; Back to Reservations</a>
+            <a @click="showReservationsView"><v-icon size="x-small" class="mr-1">mdi-arrow-left</v-icon>Back to Reservations</a>
             <span class="header-link-separator">·</span>
-            <v-tooltip location="bottom" max-width="250">
+            <v-tooltip location="bottom">
               <template v-slot:activator="{ props }">
-                <a v-bind="props" @click="fetchActivity">Refresh</a>
+                <a v-bind="props" @click="fetchActivity"><v-icon size="x-small" class="mr-1">mdi-refresh</v-icon>Refresh</a>
               </template>
-              <span>Data is automatically refreshed every 30 seconds. Click to refresh manually.</span>
+              <span>Auto-refreshes every 30s. Click to refresh now.</span>
             </v-tooltip>
           </template>
         </div>
+      </v-col>
+    </v-row>
+
+    <!-- Reservation Calendar -->
+    <v-row v-if="showCalendar" class="section">
+      <v-col cols="12">
+        <h3 style="margin-bottom: 10px;">Reservation Calendar</h3>
+        <p style="margin-bottom: 20px; color: #666; font-size: 14px;">All times are in timezone <strong>{{globalTimezone}}</strong></p>
+        <CalendarReservations
+          v-if="showCalendar"
+          :propReservations="allReservations || []"
+          :readOnly="true"
+          @slotSelected="handleSlotSelected"
+          @reservationsRefreshed="handleReservationsRefreshed"
+          @requestRefresh="fetchAllReservations"
+          ref="calendarComponent"
+        />
+        <Loading v-if="fetchingAllReservations" />
       </v-col>
     </v-row>
 
@@ -833,8 +846,8 @@
   }
 
   .header-links {
-    font-size: 14px;
-    margin-top: 4px;
+    font-size: 15px;
+    margin-top: 6px;
   }
 
   .header-link-separator {

@@ -706,8 +706,8 @@
   }
 
   .header-links {
-    font-size: 14px;
-    margin-top: 4px;
+    font-size: 15px;
+    margin-top: 6px;
   }
 
   .header-link-separator {

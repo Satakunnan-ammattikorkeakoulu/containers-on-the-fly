@@ -22,8 +22,8 @@
               </v-col>
               <!-- IP -->
               <v-col cols="12">
-                <v-text-field type="text" :rules="[rules.required]" v-model="data.ip" label="IP address / Address*"></v-text-field>
-                <p class="help-text">IP address / address of the computer. This will be used to instruct users to access the server using this address. For example: aiserver1.samk.fi</p>
+                <v-text-field type="text" :rules="[rules.required]" v-model="data.ip" label="IP Address / Domain*"></v-text-field>
+                <p class="help-text">IP address or domain of the computer. This will be used to instruct users to access the server using this address. For example: 192.168.1.100 or aiserver1.samk.fi</p>
               </v-col>
               <!-- vCPUs -->
               <v-col cols="12">

@@ -133,6 +133,16 @@ if ! command -v pm2 > /dev/null; then
     pm2 startup
 fi
 
+# Ensure PM2_LOG_RETAIN_DAYS exists in settings file
+if ! grep -q "^PM2_LOG_RETAIN_DAYS=" "$CURRENT_DIR/user_config/settings"; then
+    echo '' >> "$CURRENT_DIR/user_config/settings"
+    echo '' >> "$CURRENT_DIR/user_config/settings"
+    echo '# Number of rotated pm2 log files to retain (with daily rotation, this equals days)' >> "$CURRENT_DIR/user_config/settings"
+    echo '# Default: 90' >> "$CURRENT_DIR/user_config/settings"
+    echo 'PM2_LOG_RETAIN_DAYS=90' >> "$CURRENT_DIR/user_config/settings"
+    source "$CURRENT_DIR/user_config/settings"
+fi
+
 # Install and configure pm2-logrotate for log retention management
 if ! pm2 describe pm2-logrotate > /dev/null 2>&1; then
     echo "Installing pm2-logrotate..."
@@ -141,12 +151,12 @@ fi
 
 # Configure pm2-logrotate settings (suppress verbose output)
 pm2 set pm2-logrotate:max_size 500M > /dev/null 2>&1
-pm2 set pm2-logrotate:retain 90 > /dev/null 2>&1
+pm2 set pm2-logrotate:retain ${PM2_LOG_RETAIN_DAYS:-90} > /dev/null 2>&1
 pm2 set pm2-logrotate:compress true > /dev/null 2>&1
 pm2 set pm2-logrotate:workerInterval 60 > /dev/null 2>&1
 pm2 set pm2-logrotate:rotateInterval '0 0 * * *' > /dev/null 2>&1
 pm2 set pm2-logrotate:rotateModule true > /dev/null 2>&1
-echo -e "${GREEN}pm2-logrotate configured.${RESET}"
+echo -e "${GREEN}pm2-logrotate configured (retention: ${PM2_LOG_RETAIN_DAYS:-90} days).${RESET}"
 
 # Exit immediately if a command exits with a non-zero status.
 set -e

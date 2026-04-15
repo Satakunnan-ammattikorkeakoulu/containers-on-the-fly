@@ -372,7 +372,7 @@
                   @click="saveSection('features')"
                 >
                   <v-icon left>mdi-content-save</v-icon>
-                  Save Timeout Settings
+                  Save Features
                 </v-btn>
               </div>
 

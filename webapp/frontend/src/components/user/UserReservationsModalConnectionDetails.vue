@@ -76,7 +76,7 @@
               <v-alert v-if="details.hasSshPublicKey" type="info" variant="tonal" density="compact" class="mt-4">
                 Your SSH public key has been deployed to this container. You can also connect without a password.
               </v-alert>
-              <p v-else class="text-medium-emphasis" style="margin-top: 12px; font-size: 13px;">
+              <p v-else-if="store.sshKeysEnabled && !$route.path.startsWith('/admin')" class="text-medium-emphasis" style="margin-top: 12px; font-size: 13px;">
                 <v-icon size="x-small" class="mr-1">mdi-information-outline</v-icon>
                 <v-tooltip location="bottom" max-width="300">
                   <template v-slot:activator="{ props }">

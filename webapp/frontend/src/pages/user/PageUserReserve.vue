@@ -294,7 +294,7 @@
                     @click="computerItem.fullyBooked ? null : (computer = computerItem.value, computerChanged())"
                     :disabled="computerItem.fullyBooked"
                     hover
-                    :style="{ cursor: computerItem.fullyBooked ? 'not-allowed' : 'pointer', minHeight: '260px' }"
+                    :style="{ cursor: computerItem.fullyBooked ? 'not-allowed' : 'pointer', minHeight: '290px' }"
                     :outlined="computer !== computerItem.value"
                     :color="computer === computerItem.value ? 'primary' : ''"
                   >

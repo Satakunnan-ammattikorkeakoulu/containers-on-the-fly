@@ -705,8 +705,8 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 			SERVER_IP_ADDRESS=$$CURRENT_SERVER_IP; \
 			echo ""; \
 			echo "$(GREEN)$(BOLD)Daemon API Key:$(RESET)"; \
-			echo "The container server uses this key to connect to the main server REST API."; \
-			echo "It must match the $(GREEN)DAEMON_API_KEY$(RESET) value in $(GREEN)user_config/settings$(RESET) on your main server."; \
+			echo "The container server uses this key to authenticate with the main server."; \
+			echo "This key can be found in the $(GREEN)user_config/settings$(RESET) file on your main server (look for $(GREEN)DAEMON_API_KEY$(RESET))."; \
 			echo -n "Enter the daemon API key: "; \
 			read DAEMON_KEY_INPUT; \
 		fi; \

@@ -311,9 +311,12 @@ def get_tasks(computer_id: int):
                                            feature_flags=feature_flags)
                 )
 
-            # Future normal: for LP resume look-ahead
+            # Future normal: for LP resume look-ahead (only "reserved",
+            # not "started" — started reservations are already counted
+            # in allActiveReservations/used, so including them here
+            # would double-count and block LP resumption)
             if (not res.isLowPriority
-                    and res.status in ("reserved", "started")
+                    and res.status == "reserved"
                     and res.startDate < look_ahead_end
                     and res.endDate > now):
                 future_normal.append(
@@ -440,6 +443,13 @@ def report_started(reservation_id: int, data, computer_id: int):
         rc.startedAt = _time_now()
         rc.containerDockerId = data.containerDockerId
         rc.containerStatus = "running"
+
+        # On resume, clear old port mappings before creating new ones
+        # (the container was fully stopped and restarted with new ports)
+        if is_resume:
+            for old_port in list(rc.reservedContainerPorts):
+                session.delete(old_port)
+            session.flush()
 
         # Create port mappings
         for port in data.ports:

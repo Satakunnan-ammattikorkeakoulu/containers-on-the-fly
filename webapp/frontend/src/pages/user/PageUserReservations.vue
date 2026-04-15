@@ -57,9 +57,23 @@
               inline
               class="activity-badge"
             ></v-badge>
+            <span class="header-link-separator">·</span>
+            <v-tooltip location="bottom" max-width="250">
+              <template v-slot:activator="{ props }">
+                <a v-bind="props" @click="fetchReservations">Refresh</a>
+              </template>
+              <span>Data is automatically refreshed every 15 seconds. Click to refresh manually.</span>
+            </v-tooltip>
           </template>
           <template v-else>
             <a @click="showReservationsView">&larr; Back to Reservations</a>
+            <span class="header-link-separator">·</span>
+            <v-tooltip location="bottom" max-width="250">
+              <template v-slot:activator="{ props }">
+                <a v-bind="props" @click="fetchActivity">Refresh</a>
+              </template>
+              <span>Data is automatically refreshed every 30 seconds. Click to refresh manually.</span>
+            </v-tooltip>
           </template>
         </div>
       </v-col>

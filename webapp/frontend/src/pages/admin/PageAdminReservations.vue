@@ -157,7 +157,12 @@
           </v-list>
         </v-menu>
         <a v-if="hasActiveFilters" class="filter-summary-action" @click="resetFilters">Reset Filters</a>
-        <a class="filter-summary-action" @click="fetchReservations">Refresh Data</a>
+        <v-tooltip location="bottom" max-width="250">
+          <template v-slot:activator="{ props }">
+            <a v-bind="props" class="filter-summary-action" @click="fetchReservations">Refresh Data</a>
+          </template>
+          <span>Data is automatically refreshed every 15 seconds. Click to refresh manually.</span>
+        </v-tooltip>
       </v-col>
     </v-row>
 

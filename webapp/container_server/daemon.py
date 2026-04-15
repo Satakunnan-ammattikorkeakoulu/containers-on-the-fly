@@ -52,6 +52,7 @@ def main():
                     continue
 
                 pause_low_priority_for_normal_reservations(tasks)
+                pause_overcommitted_low_priority(tasks)
                 stop_finished_servers(tasks)
                 start_new_servers(tasks)
                 resume_paused_containers(tasks)
@@ -265,6 +266,111 @@ def pause_low_priority_for_normal_reservations(tasks):
 
     except Exception as e:
         log.error(f"Error in pause_low_priority_for_normal_reservations: {e}")
+
+
+def pause_overcommitted_low_priority(tasks):
+    """Pause LP containers when total resource usage exceeds computer capacity.
+
+    Unlike pause_low_priority_for_normal_reservations() which only reacts to
+    pending normal reservations that can't start, this function detects
+    overcommitment across all running containers (LP + normal) and pauses LP
+    containers until total usage is back within capacity. This handles the
+    case where Docker successfully started both normal and LP containers
+    but their combined allocation exceeds the computer's limits.
+
+    Works for CPUs, RAM, and GPUs — each GPU is a separate HardwareSpec
+    with maximumAmount=1, so if an LP and normal reservation both use the
+    same GPU, overcommit is detected and the LP container is paused.
+
+    Args:
+        tasks: The task bundle from the backend API containing
+            lowPriorityRunning, computerCapacity, and allActiveReservations.
+    """
+    if not settings_handler.get_setting("docker.enabled"):
+        return
+
+    lp_running = tasks.get("lowPriorityRunning", [])
+    if not lp_running:
+        return
+
+    computer_capacity = tasks.get("computerCapacity", {})
+    all_active = tasks.get("allActiveReservations", [])
+
+    try:
+        # Build total capacity map
+        total_capacity = {}
+        for spec in computer_capacity.get("hardwareSpecs", []):
+            total_capacity[spec["hardwareSpecId"]] = spec["maximumAmount"]
+
+        # Calculate total resource usage across ALL active reservations
+        total_used = {}
+        for res in all_active:
+            for spec in res.get("reservedHardwareSpecs", []):
+                sid = spec["hardwareSpecId"]
+                total_used[sid] = total_used.get(sid, 0) + spec["amount"]
+
+        # Calculate overcommit per resource
+        overcommit = {}
+        for sid, used in total_used.items():
+            capacity = total_capacity.get(sid, 0)
+            if used > capacity:
+                overcommit[sid] = used - capacity
+
+        if not overcommit:
+            return
+
+        log.warning(f"Resource overcommit detected: {overcommit}")
+
+        # Pause LP containers (newest first) until overcommit resolved
+        lp_sorted = sorted(lp_running, key=lambda r: r.get("createdAt", ""), reverse=True)
+        to_pause = []
+
+        for lp_res in lp_sorted:
+            if not overcommit:
+                break
+            lp_specs = {}
+            for spec in lp_res.get("reservedHardwareSpecs", []):
+                lp_specs[spec["hardwareSpecId"]] = spec["amount"]
+
+            has_overlap = any(sid in lp_specs for sid in overcommit)
+            if not has_overlap:
+                continue
+
+            to_pause.append(lp_res)
+            for sid in list(overcommit.keys()):
+                if sid in lp_specs:
+                    overcommit[sid] -= lp_specs[sid]
+                    if overcommit[sid] <= 0:
+                        del overcommit[sid]
+
+        # Execute pauses (same pattern as pause_low_priority_for_normal_reservations)
+        for lp_res in to_pause:
+            try:
+                rc = lp_res.get("reservedContainer", {})
+                container_docker_name = rc.get("containerDockerName") if rc else None
+                if container_docker_name:
+                    stop_script = rc.get("stopScriptPath")
+                    if stop_script:
+                        container_data = lp_res.get("container", {})
+                        container_username = (container_data.get("containerUsername") or "user") if container_data else "user"
+                        run_stop_script(container_docker_name, stop_script, container_username, tasks.get("stopScriptTimeoutSeconds", 40))
+                    stop_container(container_docker_name)
+
+                container_data = lp_res.get("container", {})
+                image_name = container_data.get("imageName", "unknown") if container_data else "unknown"
+                computer_name = lp_res.get("computer", {}).get("name", "unknown")
+
+                api.report_paused(lp_res["reservationId"], image_name, computer_name)
+                log.info(f"Overcommitted low-priority reservation {lp_res['reservationId']} paused")
+
+                if lp_res in lp_running:
+                    lp_running.remove(lp_res)
+
+            except Exception as e:
+                log.error(f"Error pausing overcommitted LP reservation {lp_res['reservationId']}: {e}")
+
+    except Exception as e:
+        log.error(f"Error in pause_overcommitted_low_priority: {e}")
 
 
 def resume_paused_containers(tasks):

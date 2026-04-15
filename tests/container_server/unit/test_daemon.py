@@ -5,6 +5,7 @@ from unittest.mock import patch, MagicMock, call
 from daemon import (
     _are_resources_available,
     pause_low_priority_for_normal_reservations,
+    pause_overcommitted_low_priority,
     resume_paused_containers,
 )
 
@@ -237,6 +238,165 @@ class TestPauseLowPriorityForNormalReservations:
         # non-lp used = 6, available = 2, need 4, deficit = 2
         # Pause newest (lp2, 4 cpu) -> deficit resolved, stop
         assert mock_stop.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# pause_overcommitted_low_priority
+# ---------------------------------------------------------------------------
+
+class TestPauseOvercommittedLowPriority:
+
+    @patch("daemon.settings_handler")
+    @patch("daemon.api")
+    def test_no_action_when_docker_disabled(self, mock_api, mock_settings):
+        mock_settings.get_setting.return_value = False
+        pause_overcommitted_low_priority(_tasks())
+        mock_api.report_paused.assert_not_called()
+
+    @patch("daemon.settings_handler")
+    @patch("daemon.api")
+    def test_no_action_when_no_lp_running(self, mock_api, mock_settings):
+        mock_settings.get_setting.return_value = True
+        tasks = _tasks(lowPriorityRunning=[])
+        pause_overcommitted_low_priority(tasks)
+        mock_api.report_paused.assert_not_called()
+
+    @patch("daemon.settings_handler")
+    @patch("daemon.api")
+    def test_no_action_when_within_capacity(self, mock_api, mock_settings):
+        mock_settings.get_setting.return_value = True
+        lp = _reservation(2, [("cpu", 2)], is_lp=True, container_name="r-2")
+        tasks = _tasks(
+            computerCapacity=_capacity([("cpu", 10)]),
+            allActiveReservations=[
+                _reservation(1, [("cpu", 4)]),
+                lp,
+            ],
+            lowPriorityRunning=[lp],
+        )
+        pause_overcommitted_low_priority(tasks)
+        mock_api.report_paused.assert_not_called()
+
+    @patch("daemon.run_stop_script")
+    @patch("daemon.stop_container")
+    @patch("daemon.settings_handler")
+    @patch("daemon.api")
+    def test_pauses_lp_when_overcommitted(self, mock_api, mock_settings, mock_stop, mock_run_stop):
+        mock_settings.get_setting.return_value = True
+        lp = _reservation(2, [("cpu", 4)], is_lp=True, container_name="r-2")
+        # 8 normal + 4 LP = 12, capacity 10 -> overcommit 2
+        tasks = _tasks(
+            computerCapacity=_capacity([("cpu", 10)]),
+            allActiveReservations=[
+                _reservation(1, [("cpu", 8)]),
+                lp,
+            ],
+            lowPriorityRunning=[lp],
+        )
+        pause_overcommitted_low_priority(tasks)
+        mock_stop.assert_called_once_with("r-2")
+        mock_api.report_paused.assert_called_once()
+
+    @patch("daemon.run_stop_script")
+    @patch("daemon.stop_container")
+    @patch("daemon.settings_handler")
+    @patch("daemon.api")
+    def test_pauses_newest_lp_first(self, mock_api, mock_settings, mock_stop, mock_run_stop):
+        mock_settings.get_setting.return_value = True
+        lp_old = _reservation(10, [("cpu", 4)], is_lp=True, container_name="r-10", created_at="2025-01-01")
+        lp_new = _reservation(11, [("cpu", 4)], is_lp=True, container_name="r-11", created_at="2025-06-01")
+        # 6 normal + 4+4 LP = 14, capacity 10 -> overcommit 4
+        tasks = _tasks(
+            computerCapacity=_capacity([("cpu", 10)]),
+            allActiveReservations=[
+                _reservation(99, [("cpu", 6)]),
+                lp_old, lp_new,
+            ],
+            lowPriorityRunning=[lp_old, lp_new],
+        )
+        pause_overcommitted_low_priority(tasks)
+        # Newest (r-11) paused first, frees 4 CPUs, overcommit resolved
+        mock_stop.assert_called_once_with("r-11")
+
+    @patch("daemon.run_stop_script")
+    @patch("daemon.stop_container")
+    @patch("daemon.settings_handler")
+    @patch("daemon.api")
+    def test_pauses_multiple_lp_if_needed(self, mock_api, mock_settings, mock_stop, mock_run_stop):
+        mock_settings.get_setting.return_value = True
+        lp1 = _reservation(10, [("cpu", 2)], is_lp=True, container_name="r-10", created_at="2025-01-01")
+        lp2 = _reservation(11, [("cpu", 2)], is_lp=True, container_name="r-11", created_at="2025-06-01")
+        # 8 normal + 2+2 LP = 12, capacity 10 -> overcommit 2
+        # Pausing r-11 (newest, 2 CPU) resolves overcommit exactly
+        tasks = _tasks(
+            computerCapacity=_capacity([("cpu", 10)]),
+            allActiveReservations=[
+                _reservation(99, [("cpu", 8)]),
+                lp1, lp2,
+            ],
+            lowPriorityRunning=[lp1, lp2],
+        )
+        pause_overcommitted_low_priority(tasks)
+        assert mock_stop.call_count == 1
+        mock_stop.assert_called_with("r-11")
+
+    @patch("daemon.run_stop_script")
+    @patch("daemon.stop_container")
+    @patch("daemon.settings_handler")
+    @patch("daemon.api")
+    def test_handles_gpu_overcommit(self, mock_api, mock_settings, mock_stop, mock_run_stop):
+        mock_settings.get_setting.return_value = True
+        # GPU spec with maximumAmount=1 (single GPU)
+        lp = _reservation(2, [("gpu_rtx5000", 1)], is_lp=True, container_name="r-2")
+        # Normal also uses the same GPU -> total 2 > capacity 1
+        tasks = _tasks(
+            computerCapacity=_capacity([("gpu_rtx5000", 1)]),
+            allActiveReservations=[
+                _reservation(1, [("gpu_rtx5000", 1)]),
+                lp,
+            ],
+            lowPriorityRunning=[lp],
+        )
+        pause_overcommitted_low_priority(tasks)
+        mock_stop.assert_called_once_with("r-2")
+        mock_api.report_paused.assert_called_once()
+
+    @patch("daemon.run_stop_script")
+    @patch("daemon.stop_container")
+    @patch("daemon.settings_handler")
+    @patch("daemon.api")
+    def test_handles_mixed_cpu_ram_overcommit(self, mock_api, mock_settings, mock_stop, mock_run_stop):
+        mock_settings.get_setting.return_value = True
+        lp = _reservation(2, [("cpu", 4), ("ram", 4)], is_lp=True, container_name="r-2")
+        # CPU: 8+4=12 > 10, RAM: 8+4=12 > 10
+        tasks = _tasks(
+            computerCapacity=_capacity([("cpu", 10), ("ram", 10)]),
+            allActiveReservations=[
+                _reservation(1, [("cpu", 8), ("ram", 8)]),
+                lp,
+            ],
+            lowPriorityRunning=[lp],
+        )
+        pause_overcommitted_low_priority(tasks)
+        mock_stop.assert_called_once_with("r-2")
+
+    @patch("daemon.settings_handler")
+    @patch("daemon.api")
+    def test_no_pause_when_overcommit_on_non_lp_resource_only(self, mock_api, mock_settings):
+        mock_settings.get_setting.return_value = True
+        # LP uses CPU, but overcommit is only on RAM (which LP doesn't use)
+        lp = _reservation(2, [("cpu", 2)], is_lp=True, container_name="r-2")
+        tasks = _tasks(
+            computerCapacity=_capacity([("cpu", 10), ("ram", 10)]),
+            allActiveReservations=[
+                _reservation(1, [("cpu", 4), ("ram", 12)]),
+                lp,
+            ],
+            lowPriorityRunning=[lp],
+        )
+        pause_overcommitted_low_priority(tasks)
+        # RAM is overcommitted but LP doesn't use RAM -> no pause
+        mock_api.report_paused.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

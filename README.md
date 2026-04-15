@@ -241,7 +241,7 @@ sudo make setup-container-server
 
 > **Note:** If you are setting up the container server on a separate machine (not the main server), you will be prompted for the Daemon API Key during setup. This must match the `DAEMON_API_KEY` value from the main server's `user_config/settings` file.
 
-> After the initial setup the script asks you to review the `user_config/settings` file. You should do it before you finish the installation.
+After the initial setup the script asks you to review the `user_config/settings` file. You should do it before you finish the installation.
 
 It is required to restart the server after finishing the installation of the container server.
 

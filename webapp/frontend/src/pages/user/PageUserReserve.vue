@@ -157,7 +157,7 @@
             <v-col cols="12" md="6">
               <v-alert type="info" variant="tonal" density="compact">
                 <template v-if="isAdmin()">
-                  <strong>No containers available.</strong> Create a container image in the <router-link to="/admin/containers">Containers</router-link> page to get started.
+                  <strong>No containers available.</strong> Create a container image in the <router-link to="/admin/containers" style="font-weight: bold; text-decoration: underline;">Containers</router-link> page to get started.
                 </template>
                 <template v-else>
                   <strong>No containers available.</strong> A system administrator needs to create at least one container image before reservations can be made.

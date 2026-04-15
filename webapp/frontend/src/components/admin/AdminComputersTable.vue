@@ -42,6 +42,13 @@
         </div>
       </template>
 
+      <!-- Public -->
+      <template v-slot:item.public="{item}">
+        <v-chip size="small" :color="item.public ? 'green' : 'red'" text-color="white">
+          {{ item.public ? 'Public' : 'Not Public' }}
+        </v-chip>
+      </template>
+
       <!-- Created -->
       <template v-slot:item.createdAt="{item}">
         <v-tooltip v-if="item.createdAt" location="bottom" :text="parseTime(item.createdAt)">

@@ -261,6 +261,7 @@
 import axios from 'axios'
 import dayjs from 'dayjs'
 import { useMainStore } from '@/store/store'
+import { copyToClipboard } from '/src/helpers/clipboard.js'
 
 export default {
   name: 'PageUserProfile',
@@ -581,8 +582,9 @@ export default {
       await this.updateScriptPaths()
     },
     copySshConfig() {
-      navigator.clipboard.writeText(this.generatedSshConfig);
-      this.store.showMessage({ text: 'SSH config copied to clipboard', color: 'green' });
+      copyToClipboard(this.generatedSshConfig).then(ok => {
+        this.store.showMessage({ text: ok ? 'SSH config copied to clipboard' : 'Failed to copy to clipboard', color: ok ? 'green' : 'red' });
+      });
     },
     async loadSshConfigComputers() {
       const currentUser = this.store.user

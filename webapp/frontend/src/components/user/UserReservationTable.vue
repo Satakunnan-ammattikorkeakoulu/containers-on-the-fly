@@ -141,6 +141,7 @@
    */
   import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
   import { useMainStore } from '/src/store/store.js'
+  import { copyToClipboard } from '/src/helpers/clipboard.js'
 
   export default {
     name: 'UserReservationTable',
@@ -223,8 +224,8 @@
       },
       copyIssueText(text) {
         if (!text) return;
-        navigator.clipboard.writeText(text).then(() => {
-          this.store.showMessage({ text: "Issue text copied to clipboard", color: "green" });
+        copyToClipboard(text).then(ok => {
+          this.store.showMessage({ text: ok ? "Issue text copied to clipboard" : "Failed to copy to clipboard", color: ok ? "green" : "red" });
         });
       },
       emitExtendReservation(reservationId) {

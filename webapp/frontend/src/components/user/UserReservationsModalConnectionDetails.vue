@@ -19,7 +19,7 @@
                   <code class="text-body-1">{{ primaryPortUrl }}</code>
                 </a>
                 <code v-else class="text-body-1">{{ primaryPortUrl }}</code>
-                <v-icon size="small" class="copy-icon ml-3" @click="copyToClipboard(primaryPortUrl, primaryPort.serviceName)">mdi-content-copy</v-icon>
+                <v-icon size="small" class="copy-icon ml-3" @click="copyText(primaryPortUrl, primaryPort.serviceName)">mdi-content-copy</v-icon>
               </div>
               <div class="mt-2" style="font-style: italic; opacity: 0.5; font-size: 13px;">
                 {{ primaryPort.serviceName }} — {{ primaryPortTypeConfig.name || 'TCP' }}, local port {{ primaryPort.localPort }}
@@ -57,7 +57,7 @@
                 <v-icon
                   size="small"
                   class="copy-icon ml-3"
-                  @click="copyToClipboard(renderedConnectionString, activeMethod.name + ' connection string')"
+                  @click="copyText(renderedConnectionString, activeMethod.name + ' connection string')"
                 >mdi-content-copy</v-icon>
               </div>
 
@@ -70,7 +70,7 @@
               </div>
               <div class="d-flex align-center justify-space-between connection-string-box pa-3 rounded">
                 <code class="text-body-1">{{ details.sshPassword }}</code>
-                <v-icon size="small" class="copy-icon ml-3" @click="copyToClipboard(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
+                <v-icon size="small" class="copy-icon ml-3" @click="copyText(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
               </div>
 
               <v-alert v-if="details.hasSshPublicKey" type="info" variant="tonal" density="compact" class="mt-4">
@@ -117,14 +117,14 @@
                 <div class="text-body-2 text-medium-emphasis mb-2">{{ activeMethod.helpText }}</div>
                 <div class="d-flex align-center justify-space-between connection-string-box pa-3 rounded mb-3">
                   <code class="text-body-1">{{ renderedConnectionString }}</code>
-                  <v-icon size="small" class="copy-icon ml-3" @click="copyToClipboard(renderedConnectionString, activeMethod.name)">mdi-content-copy</v-icon>
+                  <v-icon size="small" class="copy-icon ml-3" @click="copyText(renderedConnectionString, activeMethod.name)">mdi-content-copy</v-icon>
                 </div>
                 <div class="text-body-2 text-medium-emphasis mb-2">
                   <v-icon size="small" class="mr-1">mdi-key-variant</v-icon> Password
                 </div>
                 <div class="d-flex align-center justify-space-between connection-string-box pa-3 rounded">
                   <code class="text-body-1">{{ details.sshPassword }}</code>
-                  <v-icon size="small" class="copy-icon ml-3" @click="copyToClipboard(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
+                  <v-icon size="small" class="copy-icon ml-3" @click="copyText(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
                 </div>
               </v-expansion-panel-text>
             </v-expansion-panel>
@@ -149,7 +149,7 @@
                     density="compact"
                   >
                     <template v-slot:append-inner>
-                      <v-icon size="small" class="copy-icon" @click="copyToClipboard(renderPortUrl(port), port.serviceName)">mdi-content-copy</v-icon>
+                      <v-icon size="small" class="copy-icon" @click="copyText(renderPortUrl(port), port.serviceName)">mdi-content-copy</v-icon>
                     </template>
                   </v-text-field>
                 </div>
@@ -219,7 +219,7 @@
                   class="mb-2 mt-2"
                 >
                   <template v-slot:append-inner>
-                    <v-icon size="small" class="copy-icon" @click="copyToClipboard(details.ip, 'IP address')">mdi-content-copy</v-icon>
+                    <v-icon size="small" class="copy-icon" @click="copyText(details.ip, 'IP address')">mdi-content-copy</v-icon>
                   </template>
                 </v-text-field>
 
@@ -288,6 +288,7 @@
   import Loading from '/src/components/global/Loading.vue';
   import axios from 'axios';
   import { useMainStore } from '@/store/store'
+  import { copyToClipboard } from '/src/helpers/clipboard.js'
   import { DisplayTime } from '/src/helpers/time.js'
 
   const FALLBACK_SSH_METHODS = [
@@ -391,30 +392,10 @@
       }
     },
     methods: {
-      copyToClipboard(text, label) {
-        // navigator.clipboard requires a secure context (HTTPS).
-        // Fall back to the legacy execCommand approach for HTTP.
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(() => {
-            this.store.showMessage({ text: `${label} copied to clipboard`, color: "green" })
-          }).catch(() => {
-            this.store.showMessage({ text: "Failed to copy to clipboard", color: "red" })
-          })
-        } else {
-          const textarea = document.createElement('textarea')
-          textarea.value = text
-          textarea.style.position = 'fixed'
-          textarea.style.opacity = '0'
-          document.body.appendChild(textarea)
-          textarea.select()
-          try {
-            document.execCommand('copy')
-            this.store.showMessage({ text: `${label} copied to clipboard`, color: "green" })
-          } catch {
-            this.store.showMessage({ text: "Failed to copy to clipboard", color: "red" })
-          }
-          document.body.removeChild(textarea)
-        }
+      copyText(text, label) {
+        copyToClipboard(text).then(ok => {
+          this.store.showMessage({ text: ok ? `${label} copied to clipboard` : "Failed to copy to clipboard", color: ok ? "green" : "red" })
+        })
       },
       /** Get port type rendering config for a non-SSH port. */
       getPortTypeConfig(port) {

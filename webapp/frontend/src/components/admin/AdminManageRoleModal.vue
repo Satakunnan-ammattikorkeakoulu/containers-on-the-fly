@@ -179,8 +179,6 @@ export default {
   <style scoped lang="scss">
   .help-text {
     margin-top: 4px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.5);
   }
   .built-in-notice {
     color: #f44336;

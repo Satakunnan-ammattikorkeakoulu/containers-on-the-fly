@@ -247,3 +247,10 @@ a,
 .v-input.v-input--horizontal.v-input--indent-details {
   margin-top: 10px;
 }
+
+/* Help text below form fields */
+.help-text {
+  margin-top: -7px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}

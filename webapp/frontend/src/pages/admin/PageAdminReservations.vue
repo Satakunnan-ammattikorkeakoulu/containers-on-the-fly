@@ -9,11 +9,47 @@
       </v-col>
     </v-row>
 
-    <!-- Toggle controls -->
+    <!-- Action links -->
     <v-row v-if="!initialLoading" class="text-center justify-center" style="margin-top: 0px; margin-bottom: 16px;">
       <v-col cols="12">
-        <a style="font-size: 14px; margin-right: 16px;" @click="showFilters = !showFilters">{{ showFilters ? 'Hide Filters' : 'Show Filters' }}</a>
-        <a style="font-size: 14px;" @click="showStatistics = !showStatistics">{{ showStatistics ? 'Hide Statistics' : 'Show Statistics' }}</a>
+        <div class="header-links">
+          <v-tooltip location="bottom">
+            <template v-slot:activator="{ props }">
+              <a v-bind="props" @click="showFilters = !showFilters"><v-icon size="x-small" class="mr-1">mdi-filter-outline</v-icon>Filters</a>
+            </template>
+            <span>Show or hide filters</span>
+          </v-tooltip>
+          <span class="header-link-separator">·</span>
+          <v-menu location="bottom center" :close-on-content-click="true">
+            <template v-slot:activator="{ props: menuProps }">
+              <v-tooltip location="bottom">
+                <template v-slot:activator="{ props: tooltipProps }">
+                  <a v-bind="{ ...menuProps, ...tooltipProps }"><v-icon size="x-small" class="mr-1">mdi-calendar-range</v-icon>Time Range</a>
+                </template>
+                <span>Filter by preset time range</span>
+              </v-tooltip>
+            </template>
+            <v-list density="compact">
+              <v-list-item v-for="preset in quickPresets" :key="preset.label" @click="applyPreset(preset.days)">
+                <v-list-item-title>{{ preset.label }}</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+          <span class="header-link-separator">·</span>
+          <v-tooltip location="bottom">
+            <template v-slot:activator="{ props }">
+              <a v-bind="props" @click="showStatistics = !showStatistics"><v-icon size="x-small" class="mr-1">mdi-chart-bar</v-icon>Statistics</a>
+            </template>
+            <span>Show or hide statistics</span>
+          </v-tooltip>
+          <span class="header-link-separator">·</span>
+          <v-tooltip location="bottom" max-width="250">
+            <template v-slot:activator="{ props }">
+              <a v-bind="props" @click="fetchReservations"><v-icon size="x-small" class="mr-1">mdi-refresh</v-icon>Refresh</a>
+            </template>
+            <span>Auto-refreshes every 15s. Click to refresh now.</span>
+          </v-tooltip>
+        </div>
       </v-col>
     </v-row>
 
@@ -146,23 +182,7 @@
     <v-row v-if="!initialLoading" class="justify-center" style="margin-top: 8px; margin-bottom: 24px;">
       <v-col cols="12" md="9" class="text-center">
         <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
-        <v-menu location="bottom center" :close-on-content-click="true">
-          <template v-slot:activator="{ props }">
-            <a class="filter-summary-action" v-bind="props">Time Range</a>
-          </template>
-          <v-list density="compact">
-            <v-list-item v-for="preset in quickPresets" :key="preset.label" @click="applyPreset(preset.days)">
-              <v-list-item-title>{{ preset.label }}</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </v-menu>
         <a v-if="hasActiveFilters" class="filter-summary-action" @click="resetFilters">Reset Filters</a>
-        <v-tooltip location="bottom" max-width="250">
-          <template v-slot:activator="{ props }">
-            <a v-bind="props" class="filter-summary-action" @click="fetchReservations">Refresh Data</a>
-          </template>
-          <span>Data is automatically refreshed every 15 seconds. Click to refresh manually.</span>
-        </v-tooltip>
       </v-col>
     </v-row>
 
@@ -683,5 +703,15 @@
   .filter-summary-action {
     font-size: 14px;
     margin-left: 8px;
+  }
+
+  .header-links {
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
+  .header-link-separator {
+    margin: 0 8px;
+    opacity: 0.4;
   }
 </style>

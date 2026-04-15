@@ -1029,13 +1029,18 @@ def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> obj
       value = section.get("maximumAmountForUser")
     return value
 
+  import re
+  computer_name = computerEdit.data.get("name", "")
+  if not computer_name or not re.match(r'^[a-zA-Z0-9._-]+$', computer_name):
+    return Response(False, "Computer name can only contain letters, numbers, dots, underscores, and hyphens.")
+
   with Session() as session:
     # If new, create a new computer
     if computerEdit.computerId == -1:
       hardware = computerEdit.data.get("hardware")
       computer = Computer()
       computer.public = computerEdit.data.get("public", False)
-      computer.name = computerEdit.data.get("name")
+      computer.name = computer_name
       computer.ip = computerEdit.data.get("ip")
       # Add hardware specs
       cpu = HardwareSpec(
@@ -1091,7 +1096,7 @@ def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> obj
         return api_response(False, "Computer not found.")
       else:
         computer.public = computerEdit.data.get("public", False)
-        computer.name = computerEdit.data.get("name")
+        computer.name = computer_name
         computer.ip = computerEdit.data.get("ip")
         computer.updatedAt = datetime.datetime.now(datetime.timezone.utc)
         # Update hardware specs

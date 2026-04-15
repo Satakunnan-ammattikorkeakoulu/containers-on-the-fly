@@ -12,12 +12,13 @@
 
               <!-- PUBLIC? -->
               <v-col cols="12">
-                <v-checkbox type="text" v-model="data.public" label="Public"></v-checkbox>
+                <v-switch v-model="data.public" :label="data.public ? 'Public' : 'Not Public'" :color="data.public ? 'success' : 'error'" :base-color="data.public ? '' : 'error'" hide-details></v-switch>
+                <p class="help-text" style="margin-top: 8px;">When public, all users can see and reserve from this computer. When not public, only administrators can use it for testing.</p>
               </v-col>
               <!-- NAME -->
               <v-col cols="12">
-                <v-text-field type="text" id="name" :rules="[rules.required]" v-model="data.name" label="Name*"></v-text-field>
-                <p class="help-text">Visible in the reservation computer dropdown listing.</p>
+                <v-text-field type="text" id="name" :rules="[rules.required, rules.computerName]" v-model="data.name" label="Name*"></v-text-field>
+                <p class="help-text">Visible in the reservation dropdown. Must exactly match the DOCKER_SERVER_NAME setting in the container server's <code>user_config/settings</code> file. Only letters, numbers, dots, underscores, and hyphens allowed.</p>
               </v-col>
               <!-- IP -->
               <v-col cols="12">
@@ -269,6 +270,7 @@
         dataName: "computer",
         rules: {
           required: value => !!value || "Required",
+          computerName: value => !value || /^[a-zA-Z0-9._-]+$/.test(value) || "Only letters, numbers, dots, underscores, and hyphens allowed.",
           requiredNumber: value => value !== '' && value !== null && value !== undefined || "Required",
           newPassword: value => {
             if (!value || value == "" || value.trim() == "") return "Password cannot be empty.";

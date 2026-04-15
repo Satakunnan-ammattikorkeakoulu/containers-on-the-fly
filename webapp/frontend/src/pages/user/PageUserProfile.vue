@@ -232,12 +232,14 @@
           <div v-else class="ssh-config-block mb-2">
             <pre class="ssh-config-pre">Host myserver
     HostName SERVER_ADDRESS
+    User user
     IdentityFile ~/.ssh/id_rsa</pre>
           </div>
 
           <v-alert type="info" variant="tonal" density="compact" class="mb-4">
             <div class="mb-1"><strong>Host</strong> — a nickname you choose for this connection</div>
             <div class="mb-1"><strong>HostName</strong> — the server address</div>
+            <div class="mb-1"><strong>User</strong> — the container username (usually "user")</div>
             <div class="mb-1"><strong>IdentityFile</strong> — path to your private key (matches the public key you added above)</div>
             <div class="mt-2">If servers are added or their addresses change, you will need to update this configuration.</div>
           </v-alert>
@@ -319,7 +321,7 @@ export default {
       if (this.sshConfigComputers.length === 0) return ''
       return '# Containers on the Fly — SSH passwordless connections\n' +
         this.sshConfigComputers.map(c =>
-          `Host ${c.name}\n    HostName ${c.ip}\n    IdentityFile ~/.ssh/id_rsa`
+          `Host ${c.name}\n    HostName ${c.ip}\n    User user\n    IdentityFile ~/.ssh/id_rsa`
         ).join('\n\n')
     }
   },

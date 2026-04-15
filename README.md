@@ -239,7 +239,7 @@ Set up the container server with:
 sudo make setup-container-server
 ```
 
-> **Note:** During setup, you will be prompted for the Daemon API Key. This must match the `DAEMON_API_KEY` value from the main server's `user_config/settings` file.
+> **Note:** If you are setting up the container server on a separate machine (not the main server), you will be prompted for the Daemon API Key during setup. This must match the `DAEMON_API_KEY` value from the main server's `user_config/settings` file.
 
 > After the initial setup the script asks you to review the `user_config/settings` file. You should do it before you finish the installation.
 

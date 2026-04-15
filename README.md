@@ -56,8 +56,7 @@ This project has been featured in the following academic publications:
          * [Open Ports](#open-ports-1)
          * [Install Required APT Packages](#install-required-apt-packages-1)
          * [Setup the Container Server](#setup-the-container-server)
-         * [Start Container Server](#start-container-server)
-            * [Start the Servers](#start-the-servers)
+         * [Start The Container Server](#start-container-server)
    * [Additional Tasks](#additional-tasks)
       * [Creating Reservable Containers](#creating-reservable-containers)
       * [LDAP Authentication Setup](#ldap-authentication-setup)
@@ -244,7 +243,7 @@ sudo make setup-container-server
 
 It is required to restart the server after finishing the installation of the container server.
 
-#### Start Container Server
+#### Start the Container Server
 
 After the setup is complete and the server has been restarted, run the container server with:
 
@@ -253,16 +252,6 @@ make start-container-server
 ```
 
 That's it! If the container crashes or something happens to the container server, then you should only need to run the `make start-container-server` command again.
-
-##### Start the Servers
-
-After the setup is complete, run the main server dependencies with:
-
-```bash
-make start-main-server
-```
-
-That's it! Now you should be able to access the web interface using a browser. There will be more information printed on your console after running the `make start-main-server` command.
 
 ## Additional Tasks
 

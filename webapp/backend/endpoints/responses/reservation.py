@@ -559,6 +559,7 @@ def get_own_reservation_details(reservationId : int, userId : int) -> object:
 
     connection_details = {
       "ip": reservation.computer.ip,
+      "computerName": reservation.computer.name,
       "sshPassword": ssh_password,
       "sshPort": ssh_port,
       "sshMethods": ssh_methods,

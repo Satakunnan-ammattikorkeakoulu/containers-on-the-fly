@@ -712,10 +712,11 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		fi; \
 		\
 		echo ""; \
-		echo "$(GREEN)$(BOLD)Docker Server Name:$(RESET)"; \
-		echo "This identifies your Docker server in the system."; \
+		echo "$(GREEN)$(BOLD)Container Server Name:$(RESET)"; \
+		echo "This identifies your container server in the system. It must exactly match the"; \
+		echo "computer name you create in the admin web interface under Computers."; \
 		echo "Examples: \"server1\", \"server2\", \"docker-node-1\""; \
-		echo -n "Enter Docker server name (or empty for $(GREEN)$$DEFAULT_SERVER_NAME$(RESET)): "; \
+		echo -n "Enter container server name (or empty for $(GREEN)$$DEFAULT_SERVER_NAME$(RESET)): "; \
 		read DOCKER_SERVER_NAME_INPUT; \
 		if [ -z "$$DOCKER_SERVER_NAME_INPUT" ]; then \
 			DOCKER_SERVER_NAME_INPUT=$$DEFAULT_SERVER_NAME; \

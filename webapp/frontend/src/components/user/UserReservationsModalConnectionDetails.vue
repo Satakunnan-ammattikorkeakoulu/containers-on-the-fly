@@ -77,7 +77,7 @@
                 Your SSH public key has been deployed to this container. You can also connect without a password.
                 <div v-if="details.computerName && details.sshPort" class="mt-2">
                   If you've set up your SSH config, connect with: <code>ssh {{ details.computerName }} -p {{ details.sshPort }}</code>
-                  <a class="ml-2" style="font-size: 12px;" @click="copyText(`ssh ${details.computerName} -p ${details.sshPort}`, 'SSH command')">Copy</a>
+                  <a class="ml-2" style="font-size: 12px; font-weight: bold; text-decoration: underline;" @click="copyText(`ssh ${details.computerName} -p ${details.sshPort}`, 'SSH command')">Copy</a>
                 </div>
               </v-alert>
               <p v-else-if="store.sshKeysEnabled && !$route.path.startsWith('/admin')" class="text-medium-emphasis" style="margin-top: 12px; font-size: 13px;">

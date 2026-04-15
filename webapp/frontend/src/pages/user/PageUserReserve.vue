@@ -314,6 +314,7 @@
                           >
                             {{ computerItem.text }}
                           </div>
+                          <v-chip v-if="!computerItem.public" size="x-small" color="red" class="mt-1">Not Public</v-chip>
                         </div>
                         <div class="flex-grow-1">
                           <div
@@ -1145,6 +1146,7 @@
                   "value": computer.computerId,
                   "text": computer.name,
                   "fullyBooked": computer.fullyBooked === true,
+                  "public": computer.public,
                 })
               });
               _this.computers = computers

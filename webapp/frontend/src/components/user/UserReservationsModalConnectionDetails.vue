@@ -392,11 +392,29 @@
     },
     methods: {
       copyToClipboard(text, label) {
-        navigator.clipboard.writeText(text).then(() => {
-          this.store.showMessage({ text: `${label} copied to clipboard`, color: "green" })
-        }).catch(() => {
-          this.store.showMessage({ text: "Failed to copy to clipboard", color: "red" })
-        })
+        // navigator.clipboard requires a secure context (HTTPS).
+        // Fall back to the legacy execCommand approach for HTTP.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => {
+            this.store.showMessage({ text: `${label} copied to clipboard`, color: "green" })
+          }).catch(() => {
+            this.store.showMessage({ text: "Failed to copy to clipboard", color: "red" })
+          })
+        } else {
+          const textarea = document.createElement('textarea')
+          textarea.value = text
+          textarea.style.position = 'fixed'
+          textarea.style.opacity = '0'
+          document.body.appendChild(textarea)
+          textarea.select()
+          try {
+            document.execCommand('copy')
+            this.store.showMessage({ text: `${label} copied to clipboard`, color: "green" })
+          } catch {
+            this.store.showMessage({ text: "Failed to copy to clipboard", color: "red" })
+          }
+          document.body.removeChild(textarea)
+        }
       },
       /** Get port type rendering config for a non-SSH port. */
       getPortTypeConfig(port) {

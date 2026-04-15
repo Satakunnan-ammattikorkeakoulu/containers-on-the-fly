@@ -2,7 +2,7 @@
 
 import os
 from unittest.mock import patch, MagicMock, call
-from docker.ssh_host_keys import ensure_host_keys, get_host_keys, _KEY_TYPES
+from docker.ssh_host_keys import ensure_host_keys, get_host_keys, inject_host_keys, _KEY_TYPES
 
 
 class TestGetHostKeys:
@@ -73,3 +73,48 @@ class TestEnsureHostKeys:
         ensure_host_keys(str(keys_dir))
         # Should generate 2 keys (ecdsa and ed25519)
         assert mock_run.call_count == 2
+
+
+class TestInjectHostKeys:
+
+    @patch("docker.ssh_host_keys.docker")
+    @patch("docker.ssh_host_keys.get_host_keys")
+    def test_injects_all_keys(self, mock_get_keys, mock_docker):
+        mock_get_keys.return_value = {
+            "ssh_host_rsa_key": "RSA_PRIVATE",
+            "ssh_host_rsa_key.pub": "RSA_PUBLIC",
+            "ssh_host_ecdsa_key": "ECDSA_PRIVATE",
+        }
+        inject_host_keys("reservation-1", "/keys")
+        # 3 key injections + 1 sshd reload = 4 calls
+        assert mock_docker.execute.call_count == 4
+
+    @patch("docker.ssh_host_keys.docker")
+    @patch("docker.ssh_host_keys.get_host_keys")
+    def test_correct_permissions(self, mock_get_keys, mock_docker):
+        mock_get_keys.return_value = {
+            "ssh_host_rsa_key": "PRIVATE",
+            "ssh_host_rsa_key.pub": "PUBLIC",
+        }
+        inject_host_keys("reservation-1", "/keys")
+        calls = mock_docker.execute.call_args_list
+        # Find the private key injection (contains chmod 600)
+        private_calls = [c for c in calls if "chmod 600" in str(c)]
+        public_calls = [c for c in calls if "chmod 644" in str(c)]
+        assert len(private_calls) == 1
+        assert len(public_calls) == 1
+
+    @patch("docker.ssh_host_keys.docker")
+    @patch("docker.ssh_host_keys.get_host_keys")
+    def test_skips_when_no_keys(self, mock_get_keys, mock_docker):
+        mock_get_keys.return_value = {}
+        inject_host_keys("reservation-1", "/keys")
+        mock_docker.execute.assert_not_called()
+
+    @patch("docker.ssh_host_keys.docker")
+    @patch("docker.ssh_host_keys.get_host_keys")
+    def test_handles_injection_error(self, mock_get_keys, mock_docker):
+        mock_get_keys.return_value = {"ssh_host_rsa_key": "PRIVATE"}
+        mock_docker.execute.side_effect = Exception("container not running")
+        # Should not raise
+        inject_host_keys("reservation-1", "/keys")

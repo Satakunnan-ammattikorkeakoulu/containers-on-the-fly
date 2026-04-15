@@ -1,5 +1,8 @@
 """Integration tests for /api/admin endpoints."""
 
+import database as db
+from sqlalchemy import select
+
 
 class TestAdminAuthGuard:
     """All admin endpoints must reject non-admin users."""
@@ -414,6 +417,76 @@ class TestAdminContainerDefaults:
         assert resp.status_code == 200
         data = resp.json()["data"]
         assert "student" in data["dockerfileBody"]
+
+
+class TestAdminSaveComputer:
+
+    def test_requires_admin(self, test_client, user_token, seed_test_data):
+        resp = test_client.post(
+            "/api/admin/save_computer",
+            json={"computerId": 1, "data": {"name": "hack-server"}},
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 401
+
+
+class TestAdminEditReservation:
+
+    def _create_reservation_for_admin_test(self):
+        from datetime import datetime, timezone, timedelta
+        now = datetime.now(timezone.utc)
+        with db.Session() as session:
+            computer = session.execute(
+                select(db.Computer).where(db.Computer.name == "server1")
+            ).scalar_one()
+            user = session.execute(
+                select(db.User).where(db.User.email == "user@foo.com")
+            ).scalar_one()
+            container = session.execute(
+                select(db.Container).where(db.Container.imageName == "ubuntu-base")
+            ).scalar_one()
+            rc = db.ReservedContainer(containerId=container.containerId)
+            session.add(rc)
+            session.flush()
+            res = db.Reservation(
+                userId=user.userId,
+                computerId=computer.computerId,
+                reservedContainerId=rc.reservedContainerId,
+                startDate=now,
+                endDate=now + timedelta(hours=4),
+                status="reserved",
+            )
+            session.add(res)
+            session.flush()
+            res_id = res.reservationId
+            session.commit()
+            return res_id
+
+    def test_admin_can_edit_reservation(self, test_client, admin_token, seed_test_data):
+        from datetime import datetime, timezone, timedelta
+        res_id = self._create_reservation_for_admin_test()
+        new_end = (datetime.now(timezone.utc) + timedelta(hours=8)).isoformat()
+        resp = test_client.post(
+            f"/api/admin/edit_reservation?reservationId={res_id}&endDate={new_end}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_rejects_non_admin(self, test_client, user_token, seed_test_data):
+        resp = test_client.post(
+            "/api/admin/edit_reservation?reservationId=1&endDate=2025-01-01T00:00:00",
+            headers={"Authorization": f"Bearer {user_token}"},
+        )
+        assert resp.status_code == 401
+
+    def test_nonexistent_reservation(self, test_client, admin_token, seed_test_data):
+        resp = test_client.post(
+            "/api/admin/edit_reservation?reservationId=99999&endDate=2025-01-01T00:00:00",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is False
 
 
 class TestAdminServerMonitoring:

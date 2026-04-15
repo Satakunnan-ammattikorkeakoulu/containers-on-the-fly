@@ -93,3 +93,112 @@ class TestGetAuditLogs:
         assert result["status"] is True
         assert result["data"]["totalItems"] == 0
         assert result["data"]["logs"] == []
+
+    def test_filter_by_user(self, seed_test_data):
+        with db.Session() as s:
+            admin = s.execute(select(db.User).where(db.User.email == "admin@foo.com")).scalar_one()
+            user = s.execute(select(db.User).where(db.User.email == "user@foo.com")).scalar_one()
+
+        log_action(admin.userId, "LOGIN")
+        log_action(user.userId, "LOGOUT")
+
+        result = get_audit_logs(_FakeRequest(filters={"user": "admin@foo.com"}))
+        assert result["status"] is True
+        assert result["data"]["totalItems"] == 1
+
+    def test_sort_by_created_at(self, seed_test_data):
+        with db.Session() as s:
+            user = s.execute(select(db.User).where(db.User.email == "admin@foo.com")).scalar_one()
+            user_id = user.userId
+
+        log_action(user_id, "FIRST")
+        log_action(user_id, "SECOND")
+
+        result = get_audit_logs(_FakeRequest(
+            sort_by=[{"key": "createdAt", "order": "asc"}]
+        ))
+        assert result["status"] is True
+        actions = [l["action"] for l in result["data"]["logs"]]
+        assert actions == ["FIRST", "SECOND"]
+
+
+class TestCleanupOldLogs:
+
+    def test_deletes_logs_older_than_retention(self, seed_test_data):
+        from datetime import datetime, timezone, timedelta
+        from helpers.tables.audit_log import _cleanup_old_logs
+
+        with db.Session() as s:
+            user = s.execute(select(db.User).where(db.User.email == "admin@foo.com")).scalar_one()
+            user_id = user.userId
+
+        set_client_ip("127.0.0.1")
+        log_action(user_id, "OLD_ACTION")
+
+        # Manually backdate the log entry
+        with db.Session() as s:
+            entry = s.execute(select(db.AuditLog)).scalar_one()
+            entry.createdAt = datetime.now(timezone.utc) - timedelta(days=100)
+            s.commit()
+
+        with patch("helpers.tables.audit_log.settings_handler") as mock_sh:
+            mock_sh.get_setting.return_value = 7
+            with db.Session() as s:
+                _cleanup_old_logs(s)
+
+        with db.Session() as s:
+            count = s.execute(select(db.AuditLog)).scalars().all()
+            assert len(count) == 0
+
+    def test_keeps_logs_within_retention(self, seed_test_data):
+        from helpers.tables.audit_log import _cleanup_old_logs
+
+        with db.Session() as s:
+            user = s.execute(select(db.User).where(db.User.email == "admin@foo.com")).scalar_one()
+            user_id = user.userId
+
+        set_client_ip("127.0.0.1")
+        log_action(user_id, "RECENT_ACTION")
+
+        with patch("helpers.tables.audit_log.settings_handler") as mock_sh:
+            mock_sh.get_setting.return_value = 7
+            with db.Session() as s:
+                _cleanup_old_logs(s)
+
+        with db.Session() as s:
+            count = s.execute(select(db.AuditLog)).scalars().all()
+            assert len(count) == 1
+
+
+class TestMarkUserActivitySeen:
+
+    def test_updates_activity_last_seen(self, seed_test_data):
+        from helpers.tables.audit_log import mark_user_activity_seen
+
+        with db.Session() as s:
+            user = s.execute(select(db.User).where(db.User.email == "user@foo.com")).scalar_one()
+            user_id = user.userId
+
+        result = mark_user_activity_seen(user_id)
+        assert result["status"] is True
+        assert result["data"]["previousLastSeenAt"] is None
+
+    def test_returns_previous_last_seen(self, seed_test_data):
+        from helpers.tables.audit_log import mark_user_activity_seen
+
+        with db.Session() as s:
+            user = s.execute(select(db.User).where(db.User.email == "user@foo.com")).scalar_one()
+            user_id = user.userId
+
+        # First call sets the marker
+        mark_user_activity_seen(user_id)
+        # Second call returns the previous value
+        result = mark_user_activity_seen(user_id)
+        assert result["status"] is True
+        assert result["data"]["previousLastSeenAt"] is not None
+
+    def test_user_not_found(self):
+        from helpers.tables.audit_log import mark_user_activity_seen
+
+        result = mark_user_activity_seen(99999)
+        assert result["status"] is False

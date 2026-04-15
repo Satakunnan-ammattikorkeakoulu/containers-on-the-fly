@@ -274,4 +274,79 @@ describe('Main Store', () => {
     })
   })
 
+  // -----------------------------------------------------------------------
+  // Dialog actions
+  // -----------------------------------------------------------------------
+
+  describe('showConfirmDialog', () => {
+    it('sets dialog visible with options', () => {
+      store.showConfirmDialog({ title: 'Delete?', message: 'Are you sure?' })
+      expect(store.confirmDialog.visible).toBe(true)
+      expect(store.confirmDialog.title).toBe('Delete?')
+      expect(store.confirmDialog.message).toBe('Are you sure?')
+    })
+
+    it('uses defaults for missing options', () => {
+      store.showConfirmDialog({})
+      expect(store.confirmDialog.title).toBe('Confirm')
+      expect(store.confirmDialog.confirmText).toBe('Yes')
+      expect(store.confirmDialog.cancelText).toBe('Cancel')
+    })
+
+    it('resolves true when confirmed', async () => {
+      const promise = store.showConfirmDialog({ title: 'OK?' })
+      store.resolveConfirmDialog(true)
+      const result = await promise
+      expect(result).toBe(true)
+    })
+
+    it('resolves false when cancelled', async () => {
+      const promise = store.showConfirmDialog({ title: 'OK?' })
+      store.resolveConfirmDialog(false)
+      const result = await promise
+      expect(result).toBe(false)
+    })
+  })
+
+  describe('resolveConfirmDialog', () => {
+    it('hides dialog after resolve', async () => {
+      store.showConfirmDialog({ title: 'Test' })
+      store.resolveConfirmDialog(true)
+      expect(store.confirmDialog.visible).toBe(false)
+      expect(store.confirmDialog.resolve).toBeNull()
+    })
+  })
+
+  describe('showPromptDialog', () => {
+    it('sets prompt dialog visible with options', () => {
+      store.showPromptDialog({ title: 'Enter name', inputLabel: 'Name' })
+      expect(store.promptDialog.visible).toBe(true)
+      expect(store.promptDialog.title).toBe('Enter name')
+      expect(store.promptDialog.inputLabel).toBe('Name')
+    })
+
+    it('resolves with input value', async () => {
+      const promise = store.showPromptDialog({ title: 'Input' })
+      store.resolvePromptDialog('hello')
+      const result = await promise
+      expect(result).toBe('hello')
+    })
+
+    it('resolves null on cancel', async () => {
+      const promise = store.showPromptDialog({ title: 'Input' })
+      store.resolvePromptDialog(null)
+      const result = await promise
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('resolvePromptDialog', () => {
+    it('hides dialog after resolve', () => {
+      store.showPromptDialog({ title: 'Test' })
+      store.resolvePromptDialog('val')
+      expect(store.promptDialog.visible).toBe(false)
+      expect(store.promptDialog.resolve).toBeNull()
+    })
+  })
+
 })

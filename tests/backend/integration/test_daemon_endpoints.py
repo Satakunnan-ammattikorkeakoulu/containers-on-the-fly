@@ -209,3 +209,161 @@ class TestReservationLifecycle:
                 select(db.Reservation).where(db.Reservation.reservationId == res_id)
             ).scalar_one()
             assert res.status == "error"
+
+    def test_report_paused(self, test_client):
+        res_id = self._create_reservation()
+        with db.Session() as session:
+            res = session.execute(
+                select(db.Reservation).where(db.Reservation.reservationId == res_id)
+            ).scalar_one()
+            res.status = "started"
+            session.commit()
+
+        resp = test_client.post(
+            f"/api/daemon/reservation/{res_id}/paused",
+            json={"imageName": "ubuntu-base", "computerName": "server1"},
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+        with db.Session() as session:
+            res = session.execute(
+                select(db.Reservation).where(db.Reservation.reservationId == res_id)
+            ).scalar_one()
+            assert res.status == "paused"
+
+    def test_report_paused_nonexistent(self, test_client):
+        resp = test_client.post(
+            "/api/daemon/reservation/99999/paused",
+            json={"imageName": "img", "computerName": "srv"},
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is False
+
+    def test_report_resumed(self, test_client):
+        res_id = self._create_reservation()
+        with db.Session() as session:
+            res = session.execute(
+                select(db.Reservation).where(db.Reservation.reservationId == res_id)
+            ).scalar_one()
+            res.status = "paused"
+            session.commit()
+
+        resp = test_client.post(
+            f"/api/daemon/reservation/{res_id}/resumed",
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_report_resumed_nonexistent(self, test_client):
+        resp = test_client.post(
+            "/api/daemon/reservation/99999/resumed",
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is False
+
+    def test_report_restarted_success(self, test_client):
+        res_id = self._create_reservation()
+        with db.Session() as session:
+            res = session.execute(
+                select(db.Reservation).where(db.Reservation.reservationId == res_id)
+            ).scalar_one()
+            res.status = "started"
+            session.commit()
+
+        resp = test_client.post(
+            f"/api/daemon/reservation/{res_id}/restarted",
+            json={"success": True},
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_report_restarted_failure(self, test_client):
+        res_id = self._create_reservation()
+        with db.Session() as session:
+            res = session.execute(
+                select(db.Reservation).where(db.Reservation.reservationId == res_id)
+            ).scalar_one()
+            res.status = "started"
+            session.commit()
+
+        resp = test_client.post(
+            f"/api/daemon/reservation/{res_id}/restarted",
+            json={"success": False, "errorMessage": "Container not found"},
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+
+class TestBuildLifecycle:
+
+    def _get_container_id(self):
+        with db.Session() as session:
+            container = session.execute(
+                select(db.Container).where(db.Container.imageName == "ubuntu-base")
+            ).scalar_one()
+            return container.containerId
+
+    def test_report_build_progress(self, test_client, seed_test_data):
+        cid = self._get_container_id()
+        resp = test_client.post(
+            f"/api/daemon/container/{cid}/build-progress",
+            json={"buildLog": "Step 1/5: FROM ubuntu:22.04", "buildStatus": "building"},
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_report_build_complete(self, test_client, seed_test_data):
+        cid = self._get_container_id()
+        resp = test_client.post(
+            f"/api/daemon/container/{cid}/build-complete",
+            json={
+                "buildStatus": "success",
+                "buildLog": "Build complete",
+                "imageSize": 1500000000,
+            },
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_report_build_complete_nonexistent(self, test_client, seed_test_data):
+        resp = test_client.post(
+            "/api/daemon/container/99999/build-complete",
+            json={"buildStatus": "success", "buildLog": "done"},
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is False
+
+
+class TestImageSizeBatch:
+
+    def test_update_image_sizes_batch(self, test_client, seed_test_data):
+        resp = test_client.post(
+            "/api/daemon/update-image-sizes",
+            json={"images": [
+                {"imageName": "ubuntu-base", "imageSize": 2000000000},
+            ]},
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_update_image_sizes_batch_unmatched(self, test_client, seed_test_data):
+        resp = test_client.post(
+            "/api/daemon/update-image-sizes",
+            json={"images": [
+                {"imageName": "nonexistent-image", "imageSize": 100},
+            ]},
+            headers=DAEMON_HEADERS,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True

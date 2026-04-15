@@ -345,11 +345,11 @@
                   ></v-textarea>
                 </div>
                 
-                <!-- Docker Utility Logs -->
+                <!-- Container Server Daemon Logs -->
                 <div class="mb-6">
                   <div class="d-flex align-center mb-2">
                     <v-icon class="mr-2" color="orange">mdi-docker</v-icon>
-                    <h6 class="text-subtitle-1 font-weight-medium">Backend Docker Utility</h6>
+                    <h6 class="text-subtitle-1 font-weight-medium">Container Server Daemon</h6>
                     <v-spacer></v-spacer>
                     <v-chip
                       size="small"
@@ -364,7 +364,7 @@
                     readonly
                     outlined
                     rows="10"
-                    placeholder="Backend Docker Utility logs will appear here..."
+                    placeholder="Container server daemon logs will appear here..."
                     class="logs-textarea"
                   ></v-textarea>
                 </div>

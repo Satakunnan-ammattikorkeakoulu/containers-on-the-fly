@@ -9,7 +9,7 @@ CURRENT_DIR=$(pwd)
 # Load settings
 source "$CURRENT_DIR/user_config/settings"
 
-# Load server type from temporary file if it exists (for Docker utility setup)
+# Load server type from temporary file if it exists (for container server daemon setup)
 IS_MAIN_SERVER=true  # Default to true for backward compatibility
 if [ -f .server_type ]; then
     IS_MAIN_SERVER=$(cat "${CURRENT_DIR}/.server_type")

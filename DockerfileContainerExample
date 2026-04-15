@@ -24,7 +24,7 @@ RUN apt-get update && \
 RUN groupadd -g 5620 containerfly
 
 # Create a user with username 'user'
-# When spinning up a new container from this image, the password will be randomly set for the user by the docker utility.
+# When spinning up a new container from this image, the password will be randomly set for the user by the container server daemon.
 RUN useradd -rm -d /home/user -s /bin/bash -g containerfly -G sudo -u 1000 user
 RUN echo 'user:password' | chpasswd
 

@@ -231,7 +231,7 @@ def get_container_templates(username: str = "user", token: str = Depends(oauth2_
 def rebuild_container_image(containerId: int, token: str = Depends(oauth2_scheme)):
   """Queue a container image rebuild.
 
-  Sets the container's buildStatus to "pending" so the Docker utility
+  Sets the container's buildStatus to "pending" so the container server
   daemon picks it up on its next polling cycle. Does not perform the
   build itself — the web server has no Docker access.
 
@@ -250,7 +250,7 @@ def get_container_build_status(containerId: int, token: str = Depends(oauth2_sch
   """Get the current build status and log for a container image.
 
   Used by the frontend to poll build progress while an image is being
-  built by the Docker utility daemon.
+  built by the container server daemon.
 
   Args:
       containerId: ID of the container to check.

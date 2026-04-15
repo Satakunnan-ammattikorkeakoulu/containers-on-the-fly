@@ -368,7 +368,7 @@ setup-main-server: check-root check-os-ubuntu interactive-settings-creation appl
 	@echo "$(GREEN)2. Run $(GREEN)$(BOLD)make start-main-server$(RESET)$(GREEN) to start the main server.$(RESET)\n"
 	@rm -f .server_type
 
-start-main-server: check-not-root verify-config-file-exists apply-settings-main-server init-database ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings to restart the Docker utility and apply changes.
+start-main-server: check-not-root verify-config-file-exists apply-settings-main-server init-database ## Starts all the main server services or restarts them if started. Caddy is used to create a reverse proxy with automatic HTTPS. pm2 process manager is used to run the frontend and backend. Run this again after changing settings to restart the container server daemon and apply changes.
 	@echo ""
 	@echo "Moving Caddyfile to /etc/caddy/Caddyfile"
 	@sudo cp user_config/Caddyfile /etc/caddy/Caddyfile
@@ -505,7 +505,7 @@ setup-container-server: check-root check-os-ubuntu interactive-docker-settings-c
 		echo "$(RED)Could not automatically configure pm2 startup. Please run 'pm2 startup' manually and run the output command at the end of the output.$(RESET)"; \
 	fi
 
-	@echo "\n$(GREEN)The Docker utility has been setup.\n"
+	@echo "\n$(GREEN)Container server daemon has been setup.\n"
 	@echo "NEXT STEPS:"
 	@echo "1. Restart the machine for all the changes to take effect."
 	@echo "2. Run $(BOLD)make start-container-server$(RESET)$(GREEN) to start the container server daemon.$(RESET)\n"
@@ -588,7 +588,7 @@ logs: ## View log entries for started servers (pm2)
 status: ## Views the status of the started servers (pm2)
 	pm2 list
 
-stop-servers: ## Kills (stops) the frontend, backend and docker utility servers (pm2 process manager)
+stop-servers: ## Kills (stops) the frontend, backend and container server daemon (pm2 process manager)
 	@-pm2 delete frontend 2>/dev/null || echo "frontend pm2 service was not running. Nothing to stop."
 	@-pm2 delete backend 2>/dev/null || echo "backend pm2 service was not running. Nothing to stop."
 	@-pm2 delete backendDockerUtil 2>/dev/null || echo "backendDockerUtil pm2 service was not running. Nothing to stop."
@@ -598,10 +598,10 @@ stop-servers: ## Kills (stops) the frontend, backend and docker utility servers 
 seed-data: check-not-root verify-config-file-exists ## Seed test data (admin user, normal user, test server with hardware specs)
 	@cd $(BACKEND_PATH) && $(PYTHON) ../../scripts/seed_test_data.py
 
-interactive-docker-settings-creation: # Creates Docker utility settings interactively
+interactive-docker-settings-creation: # Creates container server daemon settings interactively
 	@echo ""
 	@echo "$(GREEN)$(BOLD)Server Type Configuration:$(RESET)"
-	@echo "Are you setting up a Docker utility for:"
+	@echo "Are you setting up a container server daemon for:"
 	@echo "  $(GREEN)1$(RESET) - Main server (same machine as web interface)"
 	@echo "  $(GREEN)2$(RESET) - Separate container server (different machine)"
 	@echo -n "Enter your choice (1 or 2): "
@@ -609,12 +609,12 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 	\
 	case "$$SERVER_TYPE_CHOICE" in \
 		1) \
-			echo "Setting up Docker utility for main server..."; \
+			echo "Setting up container server daemon for main server..."; \
 			IS_MAIN_SERVER=true; \
 			DEFAULT_SERVER_NAME="server1"; \
 			;; \
 		2) \
-			echo "Setting up Docker utility for separate container server..."; \
+			echo "Setting up container server daemon for separate container server..."; \
 			IS_MAIN_SERVER=false; \
 			DEFAULT_SERVER_NAME="server2"; \
 			;; \
@@ -663,7 +663,7 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 		echo ""; \
 		echo "What would you like to do?"; \
 		echo "  $(GREEN)1$(RESET) - Use these settings and proceed with setup"; \
-		echo "  $(GREEN)2$(RESET) - Reconfigure all Docker utility settings"; \
+		echo "  $(GREEN)2$(RESET) - Reconfigure all container server daemon settings"; \
 		echo "  $(GREEN)3$(RESET) - Cancel setup"; \
 		echo -n "Enter your choice (1, 2, or 3): "; \
 		read SETUP_CHOICE; \
@@ -759,15 +759,15 @@ interactive-docker-settings-creation: # Creates Docker utility settings interact
 	echo "as it contains additional optional settings that you may want to configure for your setup."; \
 	echo ""; \
 	echo "What would you like to do?"; \
-	echo "  $(GREEN)1$(RESET) - Settings are correct - Proceed with Docker utility installation"; \
-	echo "  $(GREEN)2$(RESET) - Reconfigure Docker utility settings again"; \
+	echo "  $(GREEN)1$(RESET) - Settings are correct - Proceed with container server daemon installation"; \
+	echo "  $(GREEN)2$(RESET) - Reconfigure container server daemon settings again"; \
 	echo "  $(GREEN)3$(RESET) - Cancel setup"; \
 	echo -n "Enter your choice (1, 2, or 3): "; \
 	read FINAL_CHOICE; \
 	\
 	case "$$FINAL_CHOICE" in \
 		1) \
-			echo "Proceeding with Docker utility installation..."; \
+			echo "Proceeding with container server daemon installation..."; \
 			;; \
 		2) \
 			echo "Starting reconfiguration again..."; \

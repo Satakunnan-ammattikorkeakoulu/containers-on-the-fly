@@ -564,7 +564,7 @@ def remove_container(containerId : int, actor_user_id: int = None) -> object:
 def rebuild_container_image(container_id: int, actor_user_id: int = None) -> object:
   """Queue a container image for rebuild by setting buildStatus to "pending".
 
-  The Docker utility daemon will pick this up on its next polling cycle
+  The container server daemon will pick this up on its next polling cycle
   and perform the actual build. Refuses if the container has no Dockerfile
   commands or if a build is already in progress.
 
@@ -589,7 +589,7 @@ def rebuild_container_image(container_id: int, actor_user_id: int = None) -> obj
     container.buildLog = ""
     session.commit()
   log_action(actor_user_id, "CONTAINER_REBUILD", "container", container_id)
-  return api_response(True, "Image build queued. The Docker utility will build it shortly.")
+  return api_response(True, "Image build queued. The container server daemon will build it shortly.")
 
 def get_container_defaults(username: str = "user") -> object:
   """Get default values for container creation fields.

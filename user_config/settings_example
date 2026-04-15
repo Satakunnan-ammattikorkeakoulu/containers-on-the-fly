@@ -83,11 +83,10 @@ DOCKER_RESERVATION_PORT_RANGE_START=2000
 DOCKER_RESERVATION_PORT_RANGE_END=3000
 
 # Name / ID of the server.
-# This is used by the backend docker utility to start the reserved docker container in the correct server.
-# This should be the same as specified in the database for the computer as a name.
+# This is used by the container server daemon to start the reserved docker container in the correct server.
+# This must exactly match the computer name created in the admin web interface under Computers.
 # 
 # If you are just creating your main server, then leave this as the default value "server1"
-# If you are creating another container server, then you can change this value to something else, like "server2"
 DOCKER_SERVER_NAME="server1"
 
 # Shared secret (password) for main server web rest api <-> container server authentication.

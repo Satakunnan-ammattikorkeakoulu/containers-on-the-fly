@@ -910,7 +910,7 @@ def cancel_reservation(userId : int, reservationId: int):
   """Cancel a reservation by setting its end date to now.
 
   The reservation's end date is set to the current UTC time, which
-  triggers the Docker utility to stop the container. Regular users
+  triggers the container server daemon to stop the container. Regular users
   can only cancel their own reservations; admins can cancel any.
 
   Args:
@@ -1095,7 +1095,7 @@ def extend_reservation(userId : int, reservationId: int, duration: int):
 def restart_container(userId : int, reservationId: int):
   """Request a restart for a reservation's running container.
 
-  Sets the reservation status to 'restart', which the Docker utility
+  Sets the reservation status to 'restart', which the container server daemon
   picks up to perform the actual container restart. Only started
   reservations can be restarted. Regular users can only restart their
   own containers; admins can restart any.

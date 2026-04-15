@@ -8,13 +8,14 @@ from typing import Tuple
 import os
 import hashlib
 import hmac
-import random
 import string
 from database import User, Session, UserWhitelist
 from helpers.settings_handler import get_setting
 import helpers.server
 #import ldap3 as ldap
 import ldap
+from ldap.filter import escape_filter_chars
+from ldap.dn import escape_dn_chars
 from datetime import timedelta
 import datetime
 import secrets
@@ -250,6 +251,17 @@ def check_token(token : str) -> object:
       "stopScriptPath": user_data["stopScriptPath"],
     })
   else:
+    # Clean up expired tokens: if the token exists but is past its
+    # expiration window, null it out so it doesn't sit in the DB forever.
+    with Session() as session:
+      expired_user = session.execute(
+        select(User).where(User.loginToken == token)
+      ).scalar_one_or_none()
+      if expired_user is not None:
+        expired_user.loginToken = None
+        expired_user.loginTokenCreatedAt = None
+        session.commit()
+
     return helpers.server.api_response(False, "Invalid token.")
 
 def get_authenticated_user_id(token: str) -> int:
@@ -286,7 +298,7 @@ def create_login_token() -> str:
   """
   allowed_chars = string.ascii_lowercase + string.ascii_uppercase + string.digits + "!_-"
   limit = 100
-  return ''.join(random.choice(allowed_chars) for _ in range(limit))
+  return ''.join(secrets.choice(allowed_chars) for _ in range(limit))
 
 def hash_password(password: str) -> Tuple[bytes, bytes]:
   """Hash a password using PBKDF2-HMAC-SHA256 with a random salt.
@@ -375,11 +387,14 @@ def get_ldap_user(username, password):
 
   with Session() as session:
     try:
-      l.simple_bind_s(username_format.replace("{username}", username), password_format.replace("{password}", password))
+      # Escape username to prevent LDAP injection attacks
+      escaped_username_dn = escape_dn_chars(username)
+      escaped_username_filter = escape_filter_chars(username)
+      l.simple_bind_s(username_format.replace("{username}", escaped_username_dn), password_format.replace("{password}", password))
       search_attrs = [account_field, email_field]
       if name_field:
         search_attrs.append(name_field)
-      result = l.search_s(ldap_domain, ldap.SCOPE_SUBTREE, search_method.replace("{username}", username), search_attrs)
+      result = l.search_s(ldap_domain, ldap.SCOPE_SUBTREE, search_method.replace("{username}", escaped_username_filter), search_attrs)
       account = result[0][1][account_field][0].decode("utf-8")
       if account != username:
         return False, "Wrong username / ldap username association"

@@ -296,6 +296,10 @@ def update_ssh_key(token, ssh_public_key):
           continue
         if not any(line.startswith(p) for p in valid_prefixes):
           return api_response(False, "Invalid SSH public key format. Each key line should start with ssh-rsa, ssh-ed25519, ecdsa-sha2-, or ssh-dss.")
+      # Reject keys containing the heredoc delimiter used during deployment
+      # to prevent heredoc injection attacks inside the container
+      if 'SSHEOF' in ssh_public_key:
+        return api_response(False, "SSH key contains invalid content.")
       user.sshPublicKey = ssh_public_key
     else:
       user.sshPublicKey = None

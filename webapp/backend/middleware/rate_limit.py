@@ -26,6 +26,7 @@ GENERAL_UNAUTH_LIMIT = 60       # per IP per window (no auth token)
 GENERAL_AUTH_LIMIT = 200         # per IP per window (with auth token)
 LOGIN_LIMIT = 10                 # per IP per window
 PASSWORD_CHANGE_LIMIT = 10       # per user per window
+CREATE_PASSWORD_LIMIT = 10       # per user per window
 DAEMON_LIMIT = 300               # per IP per window for /api/daemon/*
 RATE_LIMIT_WINDOW = 60           # window duration in seconds
 
@@ -97,6 +98,23 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     if limited:
                         log.warning(
                             "Rate limit exceeded for password change: user %s",
+                            user_id,
+                        )
+                        return _rate_limit_response(retry_after)
+
+        # 5d. Create password endpoint (per-user limit).
+        if path == "/api/user/create_password" and method == "POST":
+            if token:
+                user_id = await _extract_user_id(token)
+                if user_id is not None:
+                    limited, retry_after = is_rate_limited(
+                        f"create_password:user:{user_id}",
+                        CREATE_PASSWORD_LIMIT,
+                        RATE_LIMIT_WINDOW,
+                    )
+                    if limited:
+                        log.warning(
+                            "Rate limit exceeded for create password: user %s",
                             user_id,
                         )
                         return _rate_limit_response(retry_after)

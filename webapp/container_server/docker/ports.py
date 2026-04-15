@@ -5,7 +5,7 @@ container services to the host machine. Uses socket probing to check
 actual port availability.
 """
 
-import random
+import secrets
 import socket
 from helpers.settings_handler import settings_handler
 from helpers.logger import log
@@ -46,6 +46,17 @@ def get_available_port(exclude: set[int] | None = None) -> int:
     exclude = exclude or set()
     min_port = settings_handler.get_setting("docker.port_range_start")
     max_port = settings_handler.get_setting("docker.port_range_end")
+
+    # Validate port range boundaries
+    if not isinstance(min_port, int) or not isinstance(max_port, int):
+        raise RuntimeError(f"Port range settings must be integers, got {type(min_port)} and {type(max_port)}")
+    if min_port < 1024:
+        raise RuntimeError(f"Port range start ({min_port}) must be >= 1024 to avoid privileged ports")
+    if max_port > 65535:
+        raise RuntimeError(f"Port range end ({max_port}) must be <= 65535")
+    if min_port >= max_port:
+        raise RuntimeError(f"Port range start ({min_port}) must be less than end ({max_port})")
+
     available_ports = [p for p in range(min_port, max_port) if p not in exclude]
 
     if not available_ports:
@@ -56,9 +67,9 @@ def get_available_port(exclude: set[int] | None = None) -> int:
 
     # Try to bind to a random available port 50 times
     for _ in range(50):
-        rand_port = random.choice(available_ports)
+        rand_port = secrets.choice(available_ports)
         if not is_port_in_use(rand_port):
             return rand_port
 
     log.warning("Did not find an available port after 50 attempts. Randomly assigning one.")
-    return random.choice(available_ports)
+    return secrets.choice(available_ports)

@@ -52,7 +52,7 @@ class TestGetAvailablePort:
         port = get_available_port()
         assert 20000 <= port < 20010
 
-    @patch("docker.ports.random.choice", return_value=20050)
+    @patch("docker.ports.secrets.choice", return_value=20050)
     @patch("docker.ports.is_port_in_use", return_value=True)
     @patch("docker.ports.settings_handler")
     def test_falls_back_after_50_attempts(self, mock_settings, mock_in_use, mock_choice):

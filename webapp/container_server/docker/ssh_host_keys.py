@@ -7,11 +7,16 @@ consistent across all containers on the server.
 """
 
 import os
+import re
+import secrets
 import subprocess
 import traceback
 
 from python_on_whales import docker
 from helpers.logger import log
+
+# Only allow standard SSH host key filenames to prevent path traversal
+_VALID_HOST_KEY_RE = re.compile(r'^ssh_host_[a-z0-9_]+_key(\.pub)?$')
 
 
 # Key types to generate, matching standard openssh-server defaults
@@ -92,15 +97,22 @@ def inject_host_keys(container_name, keys_path):
             return
 
         for filename, content in keys.items():
+            # Validate filename to prevent path traversal
+            if not _VALID_HOST_KEY_RE.match(filename):
+                log.warning(f"Skipping invalid SSH host key filename: {filename}")
+                continue
+
             # Determine correct permissions: private keys 600, public keys 644
             is_private = not filename.endswith(".pub")
             chmod = "600" if is_private else "644"
 
-            # Use heredoc-style injection to avoid shell escaping issues
+            # Use heredoc with a randomized delimiter to prevent injection
+            # via key content that contains the delimiter string
+            delimiter = f"HOSTKEY_EOF_{secrets.token_hex(8)}"
             inject_cmd = (
-                f"cat > /etc/ssh/{filename} << 'HOSTKEY_EOF'\n"
+                f"cat > /etc/ssh/{filename} << '{delimiter}'\n"
                 f"{content}"
-                f"HOSTKEY_EOF\n"
+                f"{delimiter}\n"
                 f"chmod {chmod} /etc/ssh/{filename}"
             )
             docker.execute(

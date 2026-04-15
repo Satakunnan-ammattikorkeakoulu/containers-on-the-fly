@@ -8,12 +8,19 @@ from python_on_whales import docker
 from helpers.utils import create_password
 from helpers.settings_handler import settings_handler
 from python_on_whales.exceptions import NoSuchContainer
+import re
+import secrets
 import traceback
 import shlex
 from helpers.logger import log
 from docker.mounts import build_volume_list, run_user_config_script
 from docker.image_builder import DEFAULT_PASSWORD_COMMAND, DEFAULT_SSH_KEY_DEPLOY_COMMANDS
 from docker.ssh_host_keys import inject_host_keys
+
+# Regex for valid Linux usernames (alphanumeric, dots, underscores, hyphens)
+_VALID_USERNAME_RE = re.compile(r'^[a-zA-Z0-9._-]+$')
+# Regex for valid generated passwords (alphanumeric only)
+_VALID_PASSWORD_RE = re.compile(r'^[a-zA-Z0-9]+$')
 
 
 def start_container(pars):
@@ -78,6 +85,13 @@ def start_container(pars):
 
         # Create random password for the user if it was not passed
         if "password" not in pars: pars["password"] = create_password()
+
+        # Validate username and password to prevent command injection via templates
+        username = pars.get("username", "user")
+        if not _VALID_USERNAME_RE.match(username):
+            raise Exception(f"Invalid container username: contains disallowed characters")
+        if not _VALID_PASSWORD_RE.match(pars["password"]):
+            raise Exception("Invalid password: contains disallowed characters")
 
         # Calculate SHM size based on percentage
         mem_value = int(float((pars["memory"][:-1])))
@@ -197,6 +211,9 @@ def start_container(pars):
         try:
             ssh_key = pars["sshPublicKey"]
             ssh_cmd_template = pars.get("sshKeyDeployCommands") or DEFAULT_SSH_KEY_DEPLOY_COMMANDS
+            # Randomize the heredoc delimiter to prevent injection via key content
+            ssh_delimiter = f"SSHEOF_{secrets.token_hex(8)}"
+            ssh_cmd_template = ssh_cmd_template.replace("SSHEOF", ssh_delimiter)
             ssh_cmd = ssh_cmd_template.replace("{username}", pars.get("username", "user")).replace("{ssh_key}", ssh_key)
             docker.execute(
                 container=container_name,

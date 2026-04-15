@@ -121,8 +121,8 @@ def get_public_computers(token: str = Depends(oauth2_scheme)):
   Returns:
       API response with a list of public computers (name and IP only).
   """
-  force_authentication(token)
-  return functionality.get_public_computers()
+  userId = get_authenticated_user_id(token)
+  return functionality.get_public_computers(userId)
 
 @router.get("/get_own_reservation_details")
 def get_own_reservation_details(reservationId: int, token: str = Depends(oauth2_scheme)):

@@ -26,20 +26,27 @@ from sqlalchemy.orm import joinedload
 from helpers.pagination import apply_pagination, get_total_count
 from helpers.settings_handler import get_setting
 
-def get_public_computers() -> object:
-  """Return names and IP addresses of all public, non-removed computers.
+def get_public_computers(user_id: int = None) -> object:
+  """Return names and IP addresses of all non-removed computers visible to the user.
+
+  Admins see all computers (including non-public ones). Regular users
+  only see public computers.
+
+  Args:
+      user_id: The requesting user's ID. Used to check admin status.
 
   Returns:
       Response with a list of dicts, each containing ``name`` and ``ip``.
   """
+  user_is_admin = is_admin(user_id) if user_id else False
   with Session() as session:
-    computers = session.execute(
-      select(Computer)
-      .where(Computer.removed.isnot(True), Computer.public.is_(True))
-    ).scalars().all()
+    query = select(Computer).where(Computer.removed.isnot(True))
+    if not user_is_admin:
+      query = query.where(Computer.public.is_(True))
+    computers = session.execute(query).scalars().all()
 
     result = [{"name": c.name, "ip": c.ip} for c in computers]
-    return api_response(True, "Public computers retrieved", result)
+    return api_response(True, "Computers retrieved", result)
 
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
 # TODO: Should also be able to only fail there is not enough resources any computer. Right now it fails if any of the computers are out of resources for the given time period.
@@ -98,10 +105,10 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
         (Reservation.status == "reserved") | (Reservation.status == "started")
       )
     ).unique().scalars().all()
-    all_computers = session.execute(
-      select(Computer).options(joinedload(Computer.hardwareSpecs))
-      .where(Computer.removed.isnot(True), Computer.public.is_(True))
-    ).unique().scalars().all()
+    computer_query = select(Computer).options(joinedload(Computer.hardwareSpecs)).where(Computer.removed.isnot(True))
+    if not is_admin:
+      computer_query = computer_query.where(Computer.public.is_(True))
+    all_computers = session.execute(computer_query).unique().scalars().all()
     all_containers = session.execute(select(Container)).scalars().all()
 
     # All reserved hardware specs for the given time period will be listed here
@@ -1170,11 +1177,10 @@ def get_availability_timeline(startDate: str, endDate: str, is_admin = False) ->
   
   # Fetch all computers and reservations in the time range
   with Session() as session:
-    computers = session.execute(
-      select(Computer)
-      .options(joinedload(Computer.hardwareSpecs))
-      .where(Computer.removed.isnot(True), Computer.public.is_(True))
-    ).unique().scalars().all()
+    computer_query = select(Computer).options(joinedload(Computer.hardwareSpecs)).where(Computer.removed.isnot(True))
+    if not is_admin:
+      computer_query = computer_query.where(Computer.public.is_(True))
+    computers = session.execute(computer_query).unique().scalars().all()
 
     reservations = session.execute(
       select(Reservation)

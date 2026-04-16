@@ -33,7 +33,8 @@ class UserReservationRequest(PaginationParams):
     """Request model for paginated, filtered user reservation listing.
 
     Inherits page, itemsPerPage, sortBy, and filters from PaginationParams.
-    Supported filter keys: status.
+    Supported filter keys: status, dateFrom, dateTo, reservationType
+    ("normal" or "lowPriority").
     """
 
     pass

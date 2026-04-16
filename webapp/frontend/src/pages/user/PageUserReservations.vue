@@ -103,11 +103,12 @@
 
     <!-- Filters -->
     <v-row v-if="viewMode === 'reservations' && showFilters" class="text-center row-filters justify-center">
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="5" class="py-1">
         <v-select
           :items="statusItems"
           label="Status"
           v-model="filters.status"
+          hide-details
           @update:model-value="onFilterChange"
         >
           <template v-slot:item="{ item, props }">
@@ -124,28 +125,39 @@
           </template>
         </v-select>
       </v-col>
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="5" class="py-1">
+        <v-select
+          :items="reservationTypeItems"
+          label="Reservation Type"
+          v-model="filters.reservationType"
+          hide-details
+          @update:model-value="onFilterChange"
+        ></v-select>
+      </v-col>
+      <v-col cols="12" md="5" class="py-1">
         <v-text-field
           v-model="filters.dateFrom"
           label="Reservation Date From"
           type="date"
           clearable
+          hide-details
           @update:model-value="onFilterChange"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="5" class="py-1">
         <v-text-field
           v-model="filters.dateTo"
           label="Reservation Date To"
           type="date"
           clearable
+          hide-details
           @update:model-value="onFilterChange"
         ></v-text-field>
       </v-col>
     </v-row>
 
     <!-- Filter summary -->
-    <v-row v-if="viewMode === 'reservations' && !initialLoading && showFilters" class="justify-center" style="margin-top: -8px; margin-bottom: 24px;">
+    <v-row v-if="viewMode === 'reservations' && !initialLoading && showFilters" class="justify-center" style="margin-top: 16px; margin-bottom: 24px;">
       <v-col cols="12" md="9" class="text-center">
         <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
         <a v-if="hasActiveFilters" class="filter-summary-action" @click="resetFilters">Reset Filters</a>
@@ -245,6 +257,7 @@
       showFilters: false,
       filters: {
         status: "All",
+        reservationType: "All",
         dateFrom: '',
         dateTo: '',
       },
@@ -256,6 +269,7 @@
       totalItems: 0,
       totalReservationCount: 0,
       statusCounts: {},
+      reservationTypeCounts: {},
       activeReservationCount: 0,
       justReserved: false,
       modalConnectionDetailsVisible: false,
@@ -430,6 +444,7 @@
       /** Reset all filters to defaults. */
       resetFilters() {
         this.filters.status = 'All';
+        this.filters.reservationType = 'All';
         this.filters.dateFrom = '';
         this.filters.dateTo = '';
         this.tableOptions.page = 1;
@@ -465,6 +480,7 @@
             sortBy: _this.tableOptions.sortBy,
             filters: {
               status: _this.filters.status === 'All' ? '' : (_this.filters.status || ''),
+              reservationType: _this.filters.reservationType === 'All' ? '' : (_this.filters.reservationType || ''),
               dateFrom: _this.filters.dateFrom || '',
               dateTo: _this.filters.dateTo || '',
             }
@@ -478,6 +494,7 @@
               _this.activeReservationCount = response.data.data.activeReservationCount || 0
               // Always update status counts and total from server
               _this.statusCounts = response.data.data.statusCounts || {}
+              _this.reservationTypeCounts = response.data.data.reservationTypeCounts || {}
               _this.totalReservationCount = (_this.statusCounts.reserved || 0) + (_this.statusCounts.started || 0) + (_this.statusCounts.stopping || 0) + (_this.statusCounts.stopped || 0) + (_this.statusCounts.error || 0) + (_this.statusCounts.paused || 0)
               _this.unreadActivityCount = response.data.data.unreadActivityCount || 0
               _this.unreadActivityCapped = !!response.data.data.unreadActivityCapped
@@ -789,6 +806,15 @@
         ];
         return items;
       },
+      reservationTypeItems() {
+        const normal = this.reservationTypeCounts.normal || 0;
+        const lowPriority = this.reservationTypeCounts.lowPriority || 0;
+        return [
+          { title: `All (${normal + lowPriority})`, value: 'All' },
+          { title: `Normal (${normal})`, value: 'normal' },
+          { title: `Low-Priority (${lowPriority})`, value: 'lowPriority' },
+        ];
+      },
       globalTimezone() {
         return this.store.appTimezone;
       },
@@ -806,6 +832,7 @@
       hasActiveFilters() {
         return !!(
           (this.filters.status && this.filters.status !== 'All') ||
+          (this.filters.reservationType && this.filters.reservationType !== 'All') ||
           this.filters.dateFrom || this.filters.dateTo
         );
       },
@@ -835,6 +862,10 @@
   .row-filters {
     margin-top: 30px;
     margin-bottom: 0px;
+
+    .v-col {
+      max-width: 250px;
+    }
   }
 
   .filter-summary-text {

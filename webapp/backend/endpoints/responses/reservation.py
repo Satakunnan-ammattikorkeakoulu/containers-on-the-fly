@@ -272,7 +272,8 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
   Args:
       userId: The ID of the user whose reservations to fetch.
       request: Pagination, sorting, and filter parameters. Supported
-          filter keys: status.
+          filter keys: status, dateFrom, dateTo, reservationType
+          ("normal" or "lowPriority").
 
   Returns:
       Response with paginated reservations, totalItems, statusCounts,
@@ -282,6 +283,7 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
   status_filter = filters.get("status", "")
   date_from_filter = str(filters.get("dateFrom", "")).strip()
   date_to_filter = str(filters.get("dateTo", "")).strip()
+  reservation_type_filter = str(filters.get("reservationType", "")).strip()
 
   allowed_sort_keys = {
       "reservationId": Reservation.reservationId,
@@ -290,13 +292,7 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
       "endDate": Reservation.endDate,
   }
 
-  def _apply_user_reservation_filters(query):
-      """Apply shared filters for user reservation queries."""
-      if status_filter:
-          if status_filter == "error":
-              query = query.where(Reservation.status.in_(["error", "restart_error"]))
-          else:
-              query = query.where(Reservation.status == status_filter)
+  def _apply_date_filter(query):
       if date_from_filter:
           try:
               query = query.where(Reservation.startDate >= parser.parse(date_from_filter))
@@ -309,26 +305,52 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
               pass
       return query
 
+  def _apply_status_filter(query):
+      if status_filter:
+          if status_filter == "error":
+              query = query.where(Reservation.status.in_(["error", "restart_error"]))
+          else:
+              query = query.where(Reservation.status == status_filter)
+      return query
+
+  def _apply_reservation_type_filter(query):
+      if reservation_type_filter == "normal":
+          query = query.where(Reservation.isLowPriority == False)
+      elif reservation_type_filter == "lowPriority":
+          query = query.where(Reservation.isLowPriority == True)
+      return query
+
+  def _apply_user_reservation_filters(query):
+      """Apply shared filters for user reservation queries."""
+      query = _apply_status_filter(query)
+      query = _apply_date_filter(query)
+      query = _apply_reservation_type_filter(query)
+      return query
+
   with Session() as session:
-    # Status counts (unfiltered by status, but scoped to date range if set)
+    # Status counts (scoped to date + reservation-type filters, but NOT status filter —
+    # so the dropdown shows counts for each status within the other active filters).
     status_counts = {"reserved": 0, "started": 0, "stopping": 0, "stopped": 0, "error": 0, "paused": 0}
     status_query = select(Reservation.status, func.count()).where(Reservation.userId == userId)
-    if date_from_filter:
-        try:
-            status_query = status_query.where(Reservation.startDate >= parser.parse(date_from_filter))
-        except (ValueError, TypeError):
-            pass
-    if date_to_filter:
-        try:
-            status_query = status_query.where(Reservation.startDate < parser.parse(date_to_filter) + timedelta(days=1))
-        except (ValueError, TypeError):
-            pass
+    status_query = _apply_date_filter(status_query)
+    status_query = _apply_reservation_type_filter(status_query)
     count_rows = session.execute(status_query.group_by(Reservation.status)).all()
     for s, c in count_rows:
         if s == "restart_error":
             status_counts["error"] += c
         elif s in status_counts:
             status_counts[s] = c
+
+    # Reservation-type counts (scoped to date + status filters, but NOT reservation-type).
+    reservation_type_counts = {"normal": 0, "lowPriority": 0}
+    type_query = select(Reservation.isLowPriority, func.count()).where(Reservation.userId == userId)
+    type_query = _apply_date_filter(type_query)
+    type_query = _apply_status_filter(type_query)
+    for is_low, c in session.execute(type_query.group_by(Reservation.isLowPriority)).all():
+        if is_low:
+            reservation_type_counts["lowPriority"] = c
+        else:
+            reservation_type_counts["normal"] = c
 
     # Active reservation count (no date scope — for limit enforcement)
     active_count = session.execute(
@@ -420,6 +442,7 @@ def get_own_reservations(userId: int, request: UserReservationRequest) -> object
       "reservations": reservations,
       "totalItems": total_items,
       "statusCounts": status_counts,
+      "reservationTypeCounts": reservation_type_counts,
       "activeReservationCount": active_count,
       "unreadActivityCount": unread_activity_count,
       "unreadActivityCapped": unread_activity_capped,

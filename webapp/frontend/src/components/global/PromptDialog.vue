@@ -15,6 +15,8 @@
           :type="dialog.inputType || 'text'"
           :min="dialog.min"
           :max="dialog.max"
+          :maxlength="dialog.maxlength"
+          :counter="dialog.counter"
           variant="outlined"
           autofocus
           @keyup.enter="confirm"

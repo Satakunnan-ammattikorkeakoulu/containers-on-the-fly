@@ -639,7 +639,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
           hardware resources (CPUs, RAM, GPUs).
       adminReserveUserEmail: Optional email to reserve on behalf of
           another user (admin only).
-      description: Optional short description (max 50 characters).
+      description: Optional short description (max 40 characters).
       shmSizePercent: Shared memory size as percentage of allocated
           RAM (10-90, default 50).
       ramDiskSizePercent: RAM disk size as percentage of allocated
@@ -656,8 +656,8 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       message describing validation failure.
   """
   # Validate description length if provided
-  if description and len(description) > 50:
-    return api_response(False, "Description must be 50 characters or less.")
+  if description and len(description) > 40:
+    return api_response(False, "Description must be 40 characters or less.")
   
   # Validate SHM size percentage (minimum 10%, maximum 90%)
   if shmSizePercent < 10:

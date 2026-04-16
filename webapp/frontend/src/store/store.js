@@ -45,6 +45,8 @@ export const useMainStore = defineStore('main', {
       defaultValue: '',
       min: undefined,
       max: undefined,
+      maxlength: undefined,
+      counter: false,
       rules: [],
       resolve: null,
     },
@@ -352,6 +354,8 @@ export const useMainStore = defineStore('main', {
           defaultValue: options.defaultValue != null ? options.defaultValue : '',
           min: options.min,
           max: options.max,
+          maxlength: options.maxlength,
+          counter: options.counter || false,
           rules: options.rules || [],
           resolve,
         }

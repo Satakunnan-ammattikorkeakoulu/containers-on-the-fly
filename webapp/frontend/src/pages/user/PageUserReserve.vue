@@ -492,14 +492,14 @@
             </v-col>
             <v-col cols="12" :md="isAdmin() ? 6 : 6" :style="isAdmin() ? 'padding: 0 40px;' : 'margin: 0 auto; padding: 0 40px;'">
               <h3 class="text-center">Reservation Description</h3>
-              <p class="text-center" style="color: gray; font-size: 15px;">Optional description for your reservation. (max 50 characters)</p>
+              <p class="text-center" style="color: gray; font-size: 15px;">Optional description for your reservation. (max 40 characters)</p>
               <v-text-field
                 v-model="reservationDescription"
                 label="Description (optional)"
                 placeholder="Enter description..."
-                counter="50"
-                :rules="[rules.maxLength50]"
-                maxlength="50">
+                counter="40"
+                :rules="[rules.maxLength40]"
+                maxlength="40">
               </v-text-field>
             </v-col>
           </v-row>
@@ -710,7 +710,7 @@
       timeTickInterval: null,
       isSubmittingReservation: false,
       rules: {
-        maxLength50: value => !value || value.length <= 50 || "Description must be 50 characters or less",
+        maxLength40: value => !value || value.length <= 40 || "Description must be 40 characters or less",
         scriptPath: v => !v || !v.trim() || v.trim().startsWith('/') || 'Must be an absolute path (starting with /)'
       }
     }),

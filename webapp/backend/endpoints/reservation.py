@@ -143,7 +143,7 @@ def get_own_reservation_details(reservationId: int, token: str = Depends(oauth2_
 def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, startScriptPath: str = "", stopScriptPath: str = "", token: str = Depends(oauth2_scheme)):
   """Create a new container reservation after validating all inputs.
 
-  Validates date, duration, IDs, email format, description length,
+  Validates date, duration, IDs, email format, description length (max 40),
   SHM/RAM-disk percentages, script paths, and hardware specs JSON
   before delegating to the business logic layer.
 
@@ -155,7 +155,7 @@ def create_reservation(date: str, duration: int, computerId: int, containerId: i
       hardwareSpecs: JSON string mapping hardware spec IDs to amounts.
       adminReserveUserEmail: Email of the user to reserve for (admin only),
           or empty/None for self-reservation.
-      description: Optional short description (max 50 chars).
+      description: Optional short description (max 40 chars).
       shmSizePercent: Shared memory size as a percentage of RAM (0 -- 90).
       ramDiskSizePercent: RAM disk size as a percentage of RAM (0 -- 60).
       isLowPriority: Whether this is a low-priority reservation (default False).
@@ -197,8 +197,8 @@ def create_reservation(date: str, duration: int, computerId: int, containerId: i
   # Validate and sanitize description
   if description:
     description = str(description).strip()
-    if len(description) > 50:
-      return api_response(False, "Description too long (max 50 characters).")
+    if len(description) > 40:
+      return api_response(False, "Description too long (max 40 characters).")
     # Remove potentially harmful characters
     description = re.sub(r'[<>"\']', '', description)
 
@@ -294,7 +294,7 @@ def update_reservation_description(reservationId: int, description: str = "", to
 
   Args:
       reservationId: ID of the reservation to update.
-      description: New description text (max 50 chars after sanitization).
+      description: New description text (max 40 chars after sanitization).
       token: OAuth2 bearer token (injected by Depends).
 
   Returns:
@@ -304,8 +304,8 @@ def update_reservation_description(reservationId: int, description: str = "", to
 
   # Validate and sanitize description
   description = str(description).strip()
-  if len(description) > 50:
-    return api_response(False, "Description too long (max 50 characters).")
+  if len(description) > 40:
+    return api_response(False, "Description too long (max 40 characters).")
   description = re.sub(r'[<>"\']', '', description)
 
   return functionality.update_reservation_description(userId, reservationId, description)

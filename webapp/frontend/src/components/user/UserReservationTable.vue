@@ -94,17 +94,7 @@
               Save your work to mounted volumes to prevent data loss.
             </div>
           </v-tooltip>
-          <template v-if="item.description && item.description.trim()">
-            <v-tooltip v-if="item.description.trim().length > 40" location="top" max-width="320">
-              <template v-slot:activator="{ props }">
-                <span v-bind="props" class="text-medium-emphasis link-hint" style="font-size: 12px; font-style: italic; cursor: pointer;" @click="copyDescriptionText(item.description)">{{ truncateDescription(item.description, 40) }}</span>
-              </template>
-              <div style="font-weight: bold;">Reservation Description</div>
-              <div style="white-space: pre-wrap;">{{ item.description }}</div>
-              <div class="mt-3 text-caption" style="font-weight: bold;">Click to copy</div>
-            </v-tooltip>
-            <span v-else class="text-medium-emphasis" style="font-size: 12px; font-style: italic;">{{ item.description }}</span>
-          </template>
+          <span v-if="item.description && item.description.trim()" class="text-medium-emphasis" style="font-size: 12px; font-style: italic;">&ldquo;{{ item.description }}&rdquo;</span>
         </div>
       </template>
       <!-- Actions (Show Details + menu) -->
@@ -208,10 +198,6 @@
       }
     }),
     methods: {
-      truncateDescription(description, length) {
-        if (!description) return "";
-        return description.length > length ? description.substring(0, length) + "..." : description;
-      },
       getPorts(ports) {
         if (ports) {
           let portsString = ""
@@ -236,12 +222,6 @@
         if (!text) return;
         copyToClipboard(text).then(ok => {
           this.store.showMessage({ text: ok ? "Issue text copied to clipboard" : "Failed to copy to clipboard", color: ok ? "green" : "red" });
-        });
-      },
-      copyDescriptionText(text) {
-        if (!text) return;
-        copyToClipboard(text).then(ok => {
-          this.store.showMessage({ text: ok ? "Description copied to clipboard" : "Failed to copy to clipboard", color: ok ? "green" : "red" });
         });
       },
       copyResourcesInfo(item) {

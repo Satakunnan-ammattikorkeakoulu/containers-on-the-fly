@@ -660,15 +660,17 @@
       },
       async editDescription(reservationId, currentDescription) {
         let newDescription = await this.store.showPromptDialog({
-          title: 'Edit Description',
-          message: 'Enter a new description (max 50 characters):',
+          title: 'Edit Reservation Description',
+          message: 'Enter a new description (max 40 characters):',
           inputLabel: 'Description',
           defaultValue: currentDescription || '',
+          maxlength: 40,
+          counter: true,
         })
         if (newDescription === null) return;
 
-        if (newDescription.length > 50) {
-          this.store.showMessage({ text: "Description is too long (max 50 characters).", color: "red" })
+        if (newDescription.length > 40) {
+          this.store.showMessage({ text: "Description is too long (max 40 characters).", color: "red" })
           return;
         }
 

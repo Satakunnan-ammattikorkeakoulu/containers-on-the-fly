@@ -12,6 +12,7 @@
           <div v-if="primaryPort">
             <v-card variant="tonal" color="surface-variant" class="pa-4 mb-5 mt-2">
               <div class="text-body-2 text-medium-emphasis mb-3">
+                <v-icon size="small" class="mr-1">mdi-connection</v-icon>
                 {{ primaryPortTypeConfig.helpText || 'Connect to:' }}
               </div>
               <div class="d-flex align-center justify-space-between connection-string-box pa-3 rounded">
@@ -50,6 +51,7 @@
             <!-- Connection string card -->
             <v-card variant="tonal" color="surface-variant" class="pa-4 mb-5">
               <div class="text-body-2 text-medium-emphasis mb-3">
+                <v-icon size="small" class="mr-1">mdi-connection</v-icon>
                 {{ activeMethod.helpText }}
               </div>
               <div class="d-flex align-center justify-space-between connection-string-box pa-3 rounded">
@@ -73,14 +75,16 @@
                 <v-icon size="small" class="copy-icon ml-3" @click="copyText(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
               </div>
 
-              <v-alert v-if="details.hasSshPublicKey" type="info" variant="tonal" density="compact" class="mt-4">
-                Your SSH public key has been deployed to this container. You can also connect without a password.
-                <div v-if="details.computerName && details.sshPort" class="mt-2">
-                  If you've set up your SSH config, connect with: <code>ssh {{ details.computerName }} -p {{ details.sshPort }}</code>
-                  <a class="ml-2" style="font-size: 12px; font-weight: bold; text-decoration: underline;" @click="copyText(`ssh ${details.computerName} -p ${details.sshPort}`, 'SSH command')">Copy</a>
-                </div>
+              <v-alert v-if="activeMethod.id === 'terminal' && details.hasSshPublicKey && !$route.path.startsWith('/admin')" type="info" variant="tonal" density="compact" class="mt-4">
+                SSH key deployed.
+                <a
+                  v-if="details.computerName && details.sshPort"
+                  class="ml-2"
+                  style="font-weight: bold; text-decoration: underline;"
+                  @click="copyText(`ssh ${details.computerName} -p ${details.sshPort}`, 'SSH command')"
+                >Copy terminal command</a>
               </v-alert>
-              <p v-else-if="store.sshKeysEnabled && !$route.path.startsWith('/admin')" class="text-medium-emphasis" style="margin-top: 12px; font-size: 13px;">
+              <p v-else-if="activeMethod.id === 'terminal' && store.sshKeysEnabled && !$route.path.startsWith('/admin')" class="text-medium-emphasis" style="margin-top: 12px; font-size: 13px;">
                 <v-icon size="x-small" class="mr-1">mdi-information-outline</v-icon>
                 <v-tooltip location="bottom" max-width="300">
                   <template v-slot:activator="{ props }">
@@ -118,7 +122,10 @@
                     {{ method.name }}
                   </v-btn>
                 </div>
-                <div class="text-body-2 text-medium-emphasis mb-2">{{ activeMethod.helpText }}</div>
+                <div class="text-body-2 text-medium-emphasis mb-2">
+                  <v-icon size="small" class="mr-1">mdi-connection</v-icon>
+                  {{ activeMethod.helpText }}
+                </div>
                 <div class="d-flex align-center justify-space-between connection-string-box pa-3 rounded mb-3">
                   <code class="text-body-1">{{ renderedConnectionString }}</code>
                   <v-icon size="small" class="copy-icon ml-3" @click="copyText(renderedConnectionString, activeMethod.name)">mdi-content-copy</v-icon>
@@ -160,56 +167,33 @@
               </v-expansion-panel-text>
             </v-expansion-panel>
 
-            <!-- Container Details -->
-            <v-expansion-panel v-if="details.containerName">
+            <!-- General Instructions -->
+            <v-expansion-panel v-if="hasInstructions">
               <v-expansion-panel-title>
                 <div class="d-flex align-center">
-                  <v-icon class="mr-2" size="small">mdi-cube-outline</v-icon>
-                  <span class="text-subtitle-1 font-weight-medium">Container Details</span>
+                  <v-icon class="mr-2" size="small">mdi-information-outline</v-icon>
+                  <span class="text-subtitle-1 font-weight-medium">Instructions</span>
                 </div>
               </v-expansion-panel-title>
               <v-expansion-panel-text>
-                <v-text-field
-                  :model-value="details.containerName"
-                  label="Name"
-                  prepend-inner-icon="mdi-label-outline"
-                  readonly
-                  variant="outlined"
-                  density="compact"
-                  class="mb-2 mt-2"
-                ></v-text-field>
-
-                <v-text-field
-                  :model-value="details.containerImage"
-                  label="Image"
-                  prepend-inner-icon="mdi-docker"
-                  readonly
-                  variant="outlined"
-                  density="compact"
-                  class="mb-2"
-                ></v-text-field>
-
                 <v-textarea
-                  v-if="details.containerDescription"
-                  :model-value="details.containerDescription"
-                  label="Description"
-                  prepend-inner-icon="mdi-text"
+                  :model-value="details.instructions"
                   readonly
                   variant="outlined"
                   density="compact"
-                  rows="2"
+                  rows="3"
                   auto-grow
-                  class="mb-2"
+                  class="mt-2"
                 ></v-textarea>
               </v-expansion-panel-text>
             </v-expansion-panel>
 
-            <!-- Server Information -->
+            <!-- Server & Container -->
             <v-expansion-panel>
               <v-expansion-panel-title>
                 <div class="d-flex align-center">
                   <v-icon class="mr-2" size="small">mdi-server</v-icon>
-                  <span class="text-subtitle-1 font-weight-medium">Server Information</span>
+                  <span class="text-subtitle-1 font-weight-medium">Server &amp; Container</span>
                 </div>
               </v-expansion-panel-title>
               <v-expansion-panel-text>
@@ -237,26 +221,40 @@
                   density="compact"
                   class="mb-2"
                 ></v-text-field>
-              </v-expansion-panel-text>
-            </v-expansion-panel>
 
-            <!-- General Instructions -->
-            <v-expansion-panel v-if="hasInstructions">
-              <v-expansion-panel-title>
-                <div class="d-flex align-center">
-                  <v-icon class="mr-2" size="small">mdi-information-outline</v-icon>
-                  <span class="text-subtitle-1 font-weight-medium">Instructions</span>
-                </div>
-              </v-expansion-panel-title>
-              <v-expansion-panel-text>
-                <v-textarea
-                  :model-value="details.instructions"
+                <v-text-field
+                  v-if="details.containerName"
+                  :model-value="details.containerName"
+                  label="Container Name"
+                  prepend-inner-icon="mdi-label-outline"
                   readonly
                   variant="outlined"
                   density="compact"
-                  rows="3"
+                  class="mb-2"
+                ></v-text-field>
+
+                <v-text-field
+                  v-if="details.containerImage"
+                  :model-value="details.containerImage"
+                  label="Image Name"
+                  prepend-inner-icon="mdi-docker"
+                  readonly
+                  variant="outlined"
+                  density="compact"
+                  class="mb-2"
+                ></v-text-field>
+
+                <v-textarea
+                  v-if="details.containerDescription"
+                  :model-value="details.containerDescription"
+                  label="Description"
+                  prepend-inner-icon="mdi-text"
+                  readonly
+                  variant="outlined"
+                  density="compact"
+                  rows="2"
                   auto-grow
-                  class="mt-2"
+                  class="mb-2"
                 ></v-textarea>
               </v-expansion-panel-text>
             </v-expansion-panel>

@@ -121,7 +121,7 @@
               </a>
               <div class="mb-3"></div>
               <p class="text-caption mb-8">
-                Paste your SSH public key here. It will be automatically deployed to your containers on launch.
+                Paste your SSH public key here. It will be automatically deployed to your containers on launch. Works out of the box in terminal — for other IDEs like VS Code and other Remote-SSH tools you still might need to set the port in your SSH config each reservation, since it changes.
               </p>
               <v-textarea
                 v-model="sshPublicKey"
@@ -206,7 +206,7 @@
       <v-card class="pa-4">
         <v-card-title class="text-h6">SSH Configuration Guide</v-card-title>
         <v-card-text>
-          <p class="mb-4">Add the following to your <code>~/.ssh/config</code> file to enable key-based authentication with reservations</p>
+          <p class="mb-4">Add the following to your <code>~/.ssh/config</code> file to enable key-based authentication with reservations from the terminal.</p>
 
           <div v-if="sshConfigComputers.length > 0" class="ssh-config-block mb-2">
             <pre class="ssh-config-pre">{{ generatedSshConfig }}</pre>
@@ -242,6 +242,7 @@
             <div class="mb-1"><strong>User</strong> — the container username (usually "user")</div>
             <div class="mb-1"><strong>IdentityFile</strong> — path to your private key (matches the public key you added above)</div>
             <div class="mt-2">If servers are added or their addresses change, you will need to update this configuration.</div>
+            <div class="mt-2">This config works out of the box in terminal (where the port is passed via <code>-p</code>). For other IDEs like VS Code and other Remote-SSH tools, you might also need to add a <code>Port &lt;number&gt;</code> line — the port changes per reservation, so you'll have to update it each time.</div>
           </v-alert>
 
         </v-card-text>

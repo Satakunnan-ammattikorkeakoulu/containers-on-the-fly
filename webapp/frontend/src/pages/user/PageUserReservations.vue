@@ -307,8 +307,8 @@
       getStatusColor(status) {
         if (status == "reserved") return "primary"
         else if (status == "started") return "green"
-        else if (status == "stopped") return "red"
-        else if (status == "error") return "orange"
+        else if (status == "stopped") return "grey"
+        else if (status == "error") return "red"
         else if (status == "paused") return "warning"
       },
       /** Handles pagination/sort changes from the data table. */

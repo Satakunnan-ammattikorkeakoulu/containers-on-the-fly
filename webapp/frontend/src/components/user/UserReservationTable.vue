@@ -13,35 +13,30 @@
       class="elevation-1">
       <!-- Status -->
       <template v-slot:item.status="{item}">
-        <v-chip :color="getStatusColor(item.status)">{{ getStatusLabel(item.status) }}</v-chip>
-        <v-tooltip bottom v-if="item.isLowPriority">
+        <v-tooltip
+          v-if="(item.status === 'error' || item.status === 'restart_error') && item.reservedContainer.containerDockerErrorMessage"
+          location="top"
+          max-width="400"
+        >
           <template v-slot:activator="{ props }">
-            <v-chip v-bind="props" size="x-small" color="warning" style="margin-left: 4px;">Low Priority</v-chip>
+            <v-chip
+              v-bind="props"
+              :color="getStatusColor(item.status)"
+              variant="tonal"
+              prepend-icon="mdi-alert-circle"
+              class="link-hint"
+              style="cursor: pointer;"
+              @click="copyIssueText(item.reservedContainer.containerDockerErrorMessage)"
+            >{{ getStatusLabel(item.status) }}</v-chip>
           </template>
-          <div style="max-width: 250px;">
-            <strong>Low Priority</strong><br>
-            This container may be paused if resources are needed by other reservations.
-            It will automatically resume when resources become available.
-            Save your work to mounted volumes to prevent data loss.
-          </div>
+          <div style="white-space: pre-wrap;">{{ item.reservedContainer.containerDockerErrorMessage }}</div>
+          <div class="mt-3 text-caption" style="font-weight: bold;">Click to copy</div>
         </v-tooltip>
+        <v-chip v-else :color="getStatusColor(item.status)" variant="tonal">{{ getStatusLabel(item.status) }}</v-chip>
       </template>
       <!-- ID -->
       <template v-slot:item.reservationId="{item}">
         #{{ item.reservationId }}
-      </template>
-      <!-- Description -->
-      <template v-slot:item.description="{item}">
-        <span v-if="item.description && item.description.trim()">
-          <v-tooltip bottom v-if="item.description.length > 20">
-            <template v-slot:activator="{ props }">
-              <span v-bind="props" class="description-text">{{ truncateDescription(item.description) }}</span>
-            </template>
-            <span>{{ item.description }}</span>
-          </v-tooltip>
-          <span v-else class="description-text">{{ item.description }}</span>
-        </span>
-        <span v-else class="description-empty"></span>
       </template>
       <!-- Start date -->
       <template v-slot:item.startDate="{item}">
@@ -63,44 +58,56 @@
       </template>
       <!-- Resources -->
       <template v-slot:item.resourcesInfo="{item}">
-        <v-tooltip bottom>
-          <template v-slot:activator="{ props }">
-            <span v-bind="props" class="link-hint">{{ item.computerName }}</span>
-          </template>
-          <div style="max-width: 300px;">
-            <div><strong>Server:</strong> {{ item.computerName }}</div>
-            <div><strong>Resources:</strong> {{ getResources(item.reservedHardwareSpecs) }}</div>
-            <div><strong>SHM Size:</strong> {{ item.shmSizePercent || 50 }}% of RAM</div>
-            <div v-if="item.ramDiskSizePercent && item.ramDiskSizePercent > 0"><strong>RAM Disk:</strong> {{ item.ramDiskSizePercent }}% of RAM</div>
-            <div v-if="item.isLowPriority" style="color: #ff9800; font-weight: 500;">Low-Priority</div>
-            <div><strong>Container:</strong> {{ item.reservedContainer.container.imageName }}</div>
-            <div v-if="item.reservedContainer.reservedPorts && item.reservedContainer.reservedPorts.length > 0">
-              <strong>Ports:</strong><br>
-              <span v-html="getPorts(item.reservedContainer.reservedPorts)"></span>
+        <div class="d-flex align-center" style="gap: 8px;">
+          <v-tooltip bottom>
+            <template v-slot:activator="{ props }">
+              <span v-bind="props" class="link-hint" style="cursor: pointer;" @click="copyResourcesInfo(item)">{{ item.computerName }}</span>
+            </template>
+            <div style="max-width: 300px;">
+              <div><strong>Server:</strong> {{ item.computerName }}</div>
+              <div><strong>Resources:</strong> {{ getResources(item.reservedHardwareSpecs) }}</div>
+              <div><strong>SHM Size:</strong> {{ item.shmSizePercent || 50 }}% of RAM</div>
+              <div v-if="item.ramDiskSizePercent && item.ramDiskSizePercent > 0"><strong>RAM Disk:</strong> {{ item.ramDiskSizePercent }}% of RAM</div>
+              <div><strong>Container:</strong> {{ item.reservedContainer.container.imageName }}</div>
+              <div v-if="item.reservedContainer.reservedPorts && item.reservedContainer.reservedPorts.length > 0">
+                <strong>Ports:</strong><br>
+                <span v-html="getPorts(item.reservedContainer.reservedPorts)"></span>
+              </div>
+              <div class="mt-3 text-caption" style="font-weight: bold;">Click to copy</div>
             </div>
-          </div>
-        </v-tooltip>
+          </v-tooltip>
+          <v-tooltip v-if="item.isLowPriority" bottom max-width="260">
+            <template v-slot:activator="{ props }">
+              <span v-bind="props" class="link-hint ml-2" style="font-size: 12px;">
+                <v-icon size="x-small" class="mr-1">mdi-chevron-double-down</v-icon>Low Priority
+              </span>
+            </template>
+            <div>
+              <strong>Low Priority</strong><br>
+              This container may be paused if resources are needed by other reservations.
+              It will automatically resume when resources become available.
+              Save your work to mounted volumes to prevent data loss.
+            </div>
+          </v-tooltip>
+          <template v-if="item.description && item.description.trim()">
+            <v-tooltip v-if="item.description.trim().length > 40" location="top" max-width="320">
+              <template v-slot:activator="{ props }">
+                <span v-bind="props" class="text-medium-emphasis link-hint" style="font-size: 12px; font-style: italic; cursor: pointer;" @click="copyDescriptionText(item.description)">{{ truncateDescription(item.description, 40) }}</span>
+              </template>
+              <div style="font-weight: bold;">Reservation Description</div>
+              <div style="white-space: pre-wrap;">{{ item.description }}</div>
+              <div class="mt-3 text-caption" style="font-weight: bold;">Click to copy</div>
+            </v-tooltip>
+            <span v-else class="text-medium-emphasis" style="font-size: 12px; font-style: italic;">{{ item.description }}</span>
+          </template>
+        </div>
       </template>
-      <!-- Container Status -->
-      <template v-slot:item.containerStatus="{item}">
-        <span v-if="(item.status == 'error' || item.status == 'restart_error') && item.reservedContainer.containerDockerErrorMessage">
-          <span v-if="!readAll">{{ item.reservedContainer.containerDockerErrorMessage.slice(0, 10) }}...
-            <a class="issue-action" @click="readAll = true">Expand</a>
-          </span>
-          <span v-else>{{ item.reservedContainer.containerDockerErrorMessage }}
-            <a class="issue-action" @click="copyIssueText(item.reservedContainer.containerDockerErrorMessage)">Copy</a>
-            <a class="issue-action" @click="readAll = false">Collapse</a>
-          </span>
-        </span>
-      </template>
-      <!-- Details link -->
-      <template v-slot:item.details="{item}">
-        <a v-if="item.status === 'started'" @click="emitShowReservationDetails(item.reservationId)">
+      <!-- Actions (Show Details + menu) -->
+      <template v-slot:item.actions="{item}">
+        <div class="d-flex justify-end align-center" style="padding-right: 15px;">
+        <a v-if="item.status === 'started'" class="mr-5" @click="emitShowReservationDetails(item.reservationId)">
           Show Details
         </a>
-      </template>
-      <!-- Actions -->
-      <template v-slot:item.actions="{item}">
         <v-menu v-if="item.status === 'reserved' || item.status === 'started' || item.status === 'restart_error' || item.status === 'paused'">
           <template v-slot:activator="{ props }">
             <a v-bind="props">
@@ -127,6 +134,7 @@
             </v-list-item>
           </v-list>
         </v-menu>
+        </div>
       </template>
     </v-data-table-server>
   </div>
@@ -177,7 +185,6 @@
     },
     data: () => ({
       cancellingReservation: false,
-      readAll: false,
       table: {
         headers: [
           {
@@ -190,17 +197,14 @@
           { title: 'Starts', key: 'startDate' },
           { title: 'Ends', key: 'endDate' },
           { title: 'Resources', key: 'resourcesInfo', sortable: false },
-          { title: 'Description', key: 'description', sortable: false },
-          { title: 'Issues', key: 'containerStatus', sortable: false },
-          { title: '', key: 'details', sortable: false },
-          { title: '', key: 'actions', sortable: false },
+          { title: '', key: 'actions', sortable: false, align: 'end' },
         ],
       }
     }),
     methods: {
-      truncateDescription(description) {
-        if (!description) return "-";
-        return description.length > 20 ? description.substring(0, 20) + "..." : description;
+      truncateDescription(description, length) {
+        if (!description) return "";
+        return description.length > length ? description.substring(0, length) + "..." : description;
       },
       getPorts(ports) {
         if (ports) {
@@ -226,6 +230,36 @@
         if (!text) return;
         copyToClipboard(text).then(ok => {
           this.store.showMessage({ text: ok ? "Issue text copied to clipboard" : "Failed to copy to clipboard", color: ok ? "green" : "red" });
+        });
+      },
+      copyDescriptionText(text) {
+        if (!text) return;
+        copyToClipboard(text).then(ok => {
+          this.store.showMessage({ text: ok ? "Description copied to clipboard" : "Failed to copy to clipboard", color: ok ? "green" : "red" });
+        });
+      },
+      copyResourcesInfo(item) {
+        const lines = [
+          `Server: ${item.computerName}`,
+          `Resources: ${this.getResources(item.reservedHardwareSpecs)}`,
+          `SHM Size: ${item.shmSizePercent || 50}% of RAM`,
+        ];
+        if (item.ramDiskSizePercent && item.ramDiskSizePercent > 0) {
+          lines.push(`RAM Disk: ${item.ramDiskSizePercent}% of RAM`);
+        }
+        if (item.isLowPriority) {
+          lines.push("Low-Priority");
+        }
+        lines.push(`Container: ${item.reservedContainer.container.imageName}`);
+        if (item.reservedContainer.reservedPorts && item.reservedContainer.reservedPorts.length > 0) {
+          lines.push("Ports:");
+          for (const port of item.reservedContainer.reservedPorts) {
+            lines.push(`  ${port.localPort} → ${port.outsidePort} (${port.serviceName})`);
+          }
+        }
+        const text = lines.join("\n");
+        copyToClipboard(text).then(ok => {
+          this.store.showMessage({ text: ok ? "Resources info copied to clipboard" : "Failed to copy to clipboard", color: ok ? "green" : "red" });
         });
       },
       emitExtendReservation(reservationId) {
@@ -259,8 +293,9 @@
       getStatusColor(status) {
         if (status == "reserved") return "primary"
         else if (status == "started") return "green"
-        else if (status == "stopping") return "orange"
-        else if (status == "stopped") return "red"
+        else if (status == "stopping") return "grey"
+        else if (status == "stopped") return "grey"
+        else if (status == "error") return "red"
         else if (status == "restart_error") return "orange"
         else if (status == "paused") return "warning"
       },
@@ -290,19 +325,6 @@
 </script>
 
 <style scoped lang="scss">
-  .issue-action {
-    font-size: 12px;
-    margin-left: 4px;
-  }
-
-  .description-text {
-    font-size: 13px;
-  }
-
-  .description-empty {
-    color: #999;
-  }
-
   .cancel-action .v-list-item-title,
   .cancel-action .v-icon {
     color: #ef5350;

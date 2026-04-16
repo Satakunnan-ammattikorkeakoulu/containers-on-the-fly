@@ -23,7 +23,10 @@ class AdminReservationRequest(PaginationParams):
     """Request model for paginated, filtered admin reservation listing.
 
     Inherits page, itemsPerPage, sortBy, and filters from PaginationParams.
-    Supported filter keys: status, reservationId.
+    Supported filter keys: status, user, reservationId, computerId,
+    containerId, dateFrom, dateTo, reservationType ("normal" or
+    "lowPriority"), dockerContainer (partial match on the running
+    container's Docker ID or name).
     """
 
     pass

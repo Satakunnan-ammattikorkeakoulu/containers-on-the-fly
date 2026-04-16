@@ -55,11 +55,12 @@
 
     <!-- Filters row 1 -->
     <v-row class="text-center row-filters justify-center" v-if="!initialLoading && showFilters">
-      <v-col cols="12" md="2">
+      <v-col cols="12" md="2" class="py-1">
         <v-select
           :items="statusItems"
           label="Status"
           v-model="filters.status"
+          hide-details
           @update:model-value="onFilterChange"
         >
           <template v-slot:item="{ item, props }">
@@ -76,7 +77,16 @@
           </template>
         </v-select>
       </v-col>
-      <v-col cols="12" md="2">
+      <v-col cols="12" md="2" class="py-1">
+        <v-select
+          :items="reservationTypeItems"
+          label="Reservation Type"
+          v-model="filters.reservationType"
+          hide-details
+          @update:model-value="onFilterChange"
+        ></v-select>
+      </v-col>
+      <v-col cols="12" md="2" class="py-1">
         <v-select
           :items="computerItems"
           label="Computer"
@@ -84,10 +94,11 @@
           item-title="text"
           item-value="value"
           :clearable="!!filters.computerId"
+          hide-details
           @update:model-value="onDropdownClear('computerId')"
         ></v-select>
       </v-col>
-      <v-col cols="12" md="2">
+      <v-col cols="12" md="2" class="py-1">
         <v-select
           :items="containerItems"
           label="Container"
@@ -95,44 +106,58 @@
           item-title="text"
           item-value="value"
           :clearable="!!filters.containerId"
+          hide-details
           @update:model-value="onDropdownClear('containerId')"
         ></v-select>
       </v-col>
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="3" class="py-1">
         <v-text-field
           v-model="filters.user"
           label="User (email or name)"
           clearable
+          hide-details
           @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
     </v-row>
 
-    <!-- Filters row 2: date range -->
+    <!-- Filters row 2: ID / docker container / date range -->
     <v-row class="text-center row-filters-second justify-center" v-if="!initialLoading && showFilters">
-      <v-col cols="12" md="2">
+      <v-col cols="12" md="2" class="py-1">
         <v-text-field
           v-model="filters.reservationId"
           label="Reservation ID"
           clearable
+          hide-details
           @update:model-value="onTextFilterChange"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="3" class="py-1">
+        <v-text-field
+          v-model="filters.dockerContainer"
+          label="Container ID / Name"
+          clearable
+          hide-details
+          @update:model-value="onTextFilterChange"
+        ></v-text-field>
+      </v-col>
+      <v-col cols="12" md="3" class="py-1">
         <v-text-field
           v-model="filters.dateFrom"
           label="Reservation Date From"
           type="date"
           clearable
+          hide-details
           @update:model-value="onFilterChange"
         ></v-text-field>
       </v-col>
-      <v-col cols="12" md="3">
+      <v-col cols="12" md="3" class="py-1">
         <v-text-field
           v-model="filters.dateTo"
           label="Reservation Date To"
           type="date"
           clearable
+          hide-details
           @update:model-value="onFilterChange"
         ></v-text-field>
       </v-col>
@@ -179,7 +204,7 @@
     </v-row>
 
     <!-- Filter summary (always visible) -->
-    <v-row v-if="!initialLoading" class="justify-center" style="margin-top: 8px; margin-bottom: 24px;">
+    <v-row v-if="!initialLoading" class="justify-center" style="margin-top: 16px; margin-bottom: 24px;">
       <v-col cols="12" md="9" class="text-center">
         <span class="filter-summary-text">Showing <strong>{{ reservations.length }}</strong> of <strong>{{ totalItems }}</strong> items for <strong v-if="dateRangeDays !== null">{{ dateRangeDays }} {{ dateRangeDays === 1 ? 'day' : 'days' }}</strong><strong v-else>all time</strong>.</span>
         <a v-if="hasActiveFilters" class="filter-summary-action" @click="resetFilters">Reset Filters</a>
@@ -258,14 +283,17 @@
       availableContainers: [],
       filters: {
         status: "All",
+        reservationType: "All",
         user: '',
         reservationId: '',
         computerId: '',
         containerId: '',
+        dockerContainer: '',
         dateFrom: '',
         dateTo: '',
       },
       statusCounts: {},
+      reservationTypeCounts: {},
       stats: {
         total: 0,
         started: 0,
@@ -302,6 +330,15 @@
         ];
         return items;
       },
+      reservationTypeItems() {
+        const normal = this.reservationTypeCounts.normal || 0;
+        const lowPriority = this.reservationTypeCounts.lowPriority || 0;
+        return [
+          { title: `All (${normal + lowPriority})`, value: 'All' },
+          { title: `Normal (${normal})`, value: 'normal' },
+          { title: `Low-Priority (${lowPriority})`, value: 'lowPriority' },
+        ];
+      },
       computerItems() {
         const items = [{ text: 'All', value: '' }];
         items.push(...this.availableComputers.map(c => ({ text: c.name, value: c.id })));
@@ -323,8 +360,10 @@
       hasActiveFilters() {
         return !!(
           (this.filters.status && this.filters.status !== 'All') ||
+          (this.filters.reservationType && this.filters.reservationType !== 'All') ||
           this.filters.user || this.filters.reservationId ||
           this.filters.computerId || this.filters.containerId ||
+          this.filters.dockerContainer ||
           this.filters.dateFrom || this.filters.dateTo
         );
       }
@@ -405,10 +444,12 @@
       /** Reset all filters to defaults. */
       resetFilters() {
         this.filters.status = 'All';
+        this.filters.reservationType = 'All';
         this.filters.user = '';
         this.filters.reservationId = '';
         this.filters.computerId = '';
         this.filters.containerId = '';
+        this.filters.dockerContainer = '';
         this.filters.dateFrom = '';
         this.filters.dateTo = '';
         this.tableOptions.page = 1;
@@ -467,10 +508,12 @@
             sortBy: _this.tableOptions.sortBy,
             filters: {
               status: _this.filters.status === 'All' ? '' : (_this.filters.status || ''),
+              reservationType: _this.filters.reservationType === 'All' ? '' : (_this.filters.reservationType || ''),
               user: _this.filters.user || '',
               reservationId: _this.filters.reservationId || '',
               computerId: _this.filters.computerId || '',
               containerId: _this.filters.containerId || '',
+              dockerContainer: _this.filters.dockerContainer || '',
               dateFrom: _this.filters.dateFrom || '',
               dateTo: _this.filters.dateTo || '',
             }
@@ -482,6 +525,7 @@
               _this.reservations = response.data.data.reservations
               _this.totalItems = response.data.data.totalItems
               _this.statusCounts = response.data.data.statusCounts || {}
+              _this.reservationTypeCounts = response.data.data.reservationTypeCounts || {}
               _this.stats = response.data.data.stats || _this.stats
               _this.availableComputers = response.data.data.availableComputers || []
               _this.availableContainers = response.data.data.availableContainers || []
@@ -688,11 +732,19 @@
   .row-filters {
     margin-top: 30px;
     margin-bottom: 0px;
+
+    .v-col {
+      max-width: 250px;
+    }
   }
 
   .row-filters-second {
     margin-top: 0px;
     margin-bottom: 0px;
+
+    .v-col {
+      max-width: 250px;
+    }
   }
 
   .filter-summary-text {

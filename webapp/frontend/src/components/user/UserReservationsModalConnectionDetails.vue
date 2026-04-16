@@ -32,24 +32,25 @@
           <div v-if="details.sshPort && isSSHPrimary">
 
             <!-- Connection method toggle -->
-            <div class="text-body-2 text-medium-emphasis mb-2 mt-2">How do you want to connect?</div>
-            <div class="d-flex mb-4 flex-wrap" style="gap: 8px;">
-              <v-btn
+            <v-tabs
+              v-model="selectedMethodIndex"
+              color="primary"
+              grow
+              height="56"
+              class="mb-2"
+            >
+              <v-tab
                 v-for="(method, i) in sshMethods"
                 :key="method.id"
-                :variant="selectedMethodIndex === i ? 'flat' : 'outlined'"
-                :color="selectedMethodIndex === i ? 'primary' : undefined"
-                density="compact"
-                class="flex-grow-1"
-                @click="selectedMethodIndex = i"
+                :value="i"
               >
                 <v-icon start size="small">{{ method.icon }}</v-icon>
                 {{ method.name }}
-              </v-btn>
-            </div>
+              </v-tab>
+            </v-tabs>
 
             <!-- Connection string card -->
-            <v-card variant="tonal" color="surface-variant" class="pa-4 mb-5">
+            <v-card variant="tonal" color="surface-variant" class="pa-4 mb-5" style="margin-top: -8px;">
               <div class="text-body-2 text-medium-emphasis mb-3">
                 <v-icon size="small" class="mr-1">mdi-connection</v-icon>
                 {{ activeMethod.helpText }}
@@ -75,15 +76,20 @@
                 <v-icon size="small" class="copy-icon ml-3" @click="copyText(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
               </div>
 
-              <v-alert v-if="activeMethod.id === 'terminal' && details.hasSshPublicKey && !$route.path.startsWith('/admin')" type="info" variant="tonal" density="compact" class="mt-4" style="font-size: 14px;">
+              <div v-if="activeMethod.id === 'terminal' && details.hasSshPublicKey && !$route.path.startsWith('/admin')" class="text-medium-emphasis mt-3" style="font-size: 14px;">
                 SSH key deployed.
-                <a
-                  v-if="details.computerName && details.sshPort"
-                  class="ml-2"
-                  style="font-size: 14px; font-weight: bold; text-decoration: underline;"
-                  @click="copyText(`ssh ${details.computerName} -p ${details.sshPort}`, 'SSH command')"
-                >Copy terminal command</a>
-              </v-alert>
+                <v-tooltip v-if="details.computerName && details.sshPort" location="top">
+                  <template v-slot:activator="{ props }">
+                    <a
+                      v-bind="props"
+                      class="ml-1"
+                      style="font-weight: bold; text-decoration: underline;"
+                      @click="copyText(`ssh ${details.computerName} -p ${details.sshPort}`, 'SSH command')"
+                    ><v-icon size="small" class="mr-1">mdi-content-copy</v-icon>Copy command</a>
+                  </template>
+                  <span><code>ssh {{ details.computerName }} -p {{ details.sshPort }}</code></span>
+                </v-tooltip>
+              </div>
               <p v-else-if="activeMethod.id === 'terminal' && store.sshKeysEnabled && !$route.path.startsWith('/admin')" class="text-medium-emphasis" style="margin-top: 12px; font-size: 13px;">
                 <v-icon size="x-small" class="mr-1">mdi-information-outline</v-icon>
                 <v-tooltip location="bottom" max-width="300">
@@ -108,20 +114,22 @@
                 </div>
               </v-expansion-panel-title>
               <v-expansion-panel-text>
-                <div class="d-flex mb-4 flex-wrap" style="gap: 8px;">
-                  <v-btn
+                <v-tabs
+                  v-model="selectedMethodIndex"
+                  color="primary"
+                  grow
+                  height="56"
+                  class="mb-3"
+                >
+                  <v-tab
                     v-for="(method, i) in sshMethods"
                     :key="method.id"
-                    :variant="selectedMethodIndex === i ? 'flat' : 'outlined'"
-                    :color="selectedMethodIndex === i ? 'primary' : undefined"
-                    density="compact"
-                    class="flex-grow-1"
-                    @click="selectedMethodIndex = i"
+                    :value="i"
                   >
                     <v-icon start size="small">{{ method.icon }}</v-icon>
                     {{ method.name }}
-                  </v-btn>
-                </div>
+                  </v-tab>
+                </v-tabs>
                 <div class="text-body-2 text-medium-emphasis mb-2">
                   <v-icon size="small" class="mr-1">mdi-connection</v-icon>
                   {{ activeMethod.helpText }}
@@ -439,6 +447,11 @@
 </script>
 
 <style scoped lang="scss">
+  // Remove default v-tab button margin so it stays inside the tabs row
+  // and doesn't visually overlap the content card below.
+  :deep(.v-tabs .v-tab.v-btn) {
+    margin: 0;
+  }
   // Uniform 15px text throughout the modal body (overrides Vuetify typography utilities)
   :deep(.v-card-text) {
     font-size: 15px;

@@ -63,7 +63,7 @@
                 >mdi-content-copy</v-icon>
               </div>
 
-              <v-divider class="my-4"></v-divider>
+              <div class="mt-4"></div>
 
               <!-- Password -->
               <div class="text-body-2 text-medium-emphasis mb-3">
@@ -75,12 +75,12 @@
                 <v-icon size="small" class="copy-icon ml-3" @click="copyText(details.sshPassword, 'SSH password')">mdi-content-copy</v-icon>
               </div>
 
-              <v-alert v-if="activeMethod.id === 'terminal' && details.hasSshPublicKey && !$route.path.startsWith('/admin')" type="info" variant="tonal" density="compact" class="mt-4">
+              <v-alert v-if="activeMethod.id === 'terminal' && details.hasSshPublicKey && !$route.path.startsWith('/admin')" type="info" variant="tonal" density="compact" class="mt-4" style="font-size: 14px;">
                 SSH key deployed.
                 <a
                   v-if="details.computerName && details.sshPort"
                   class="ml-2"
-                  style="font-weight: bold; text-decoration: underline;"
+                  style="font-size: 14px; font-weight: bold; text-decoration: underline;"
                   @click="copyText(`ssh ${details.computerName} -p ${details.sshPort}`, 'SSH command')"
                 >Copy terminal command</a>
               </v-alert>
@@ -270,8 +270,6 @@
 
         <Loading style="margin: 60px 0px;" v-if="isLoading"></Loading>
 
-        <v-divider></v-divider>
-
         <v-card-actions>
           <v-spacer></v-spacer>
           <v-btn color="primary" variant="text" @click="isOpen = false">Close</v-btn>
@@ -441,6 +439,18 @@
 </script>
 
 <style scoped lang="scss">
+  // Uniform 15px text throughout the modal body (overrides Vuetify typography utilities)
+  :deep(.v-card-text) {
+    font-size: 15px;
+
+    .text-body-1,
+    .text-body-2,
+    .text-caption,
+    .text-subtitle-1,
+    code {
+      font-size: 15px;
+    }
+  }
   .copy-icon {
     cursor: pointer;
     opacity: 0.6;

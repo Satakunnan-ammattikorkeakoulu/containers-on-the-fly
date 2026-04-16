@@ -78,9 +78,14 @@
           </v-tooltip>
           <v-tooltip v-if="item.isLowPriority" bottom max-width="260">
             <template v-slot:activator="{ props }">
-              <span v-bind="props" class="link-hint ml-2" style="font-size: 12px;">
-                <v-icon size="x-small" class="mr-1">mdi-chevron-double-down</v-icon>Low Priority
-              </span>
+              <v-chip
+                v-bind="props"
+                size="x-small"
+                color="grey"
+                variant="tonal"
+                prepend-icon="mdi-chevron-double-down"
+                class="ml-2"
+              >Low Priority</v-chip>
             </template>
             <div>
               <strong>Low Priority</strong><br>
@@ -105,13 +110,13 @@
       <!-- Actions (Show Details + menu) -->
       <template v-slot:item.actions="{item}">
         <div class="d-flex justify-end align-center" style="padding-right: 15px;">
-        <a v-if="item.status === 'started'" class="mr-5" @click="emitShowReservationDetails(item.reservationId)">
-          Show Details
+        <a v-if="item.status === 'started'" class="mr-8" @click="emitShowReservationDetails(item.reservationId)">
+          <v-icon size="small" class="mr-1">mdi-eye-outline</v-icon>Show Details
         </a>
         <v-menu v-if="item.status === 'reserved' || item.status === 'started' || item.status === 'restart_error' || item.status === 'paused'">
           <template v-slot:activator="{ props }">
             <a v-bind="props">
-              Actions <v-icon size="small">mdi-chevron-down</v-icon>
+              <v-icon size="small" class="mr-1">mdi-cog-outline</v-icon>Actions <v-icon size="small">mdi-chevron-down</v-icon>
             </a>
           </template>
           <v-list density="compact">

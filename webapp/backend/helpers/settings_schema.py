@@ -110,6 +110,11 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.FILE, SettingType.TEXT, required=True,
         description="Docker registry address for container images"
     ),
+    "docker.registryScheme": SettingSetting(
+        SettingSource.FILE, SettingType.TEXT, default="http",
+        allowed_values=["http", "https"],
+        description="Scheme used by the backend when querying the Docker registry HTTP API (http or https)"
+    ),
     "docker.serverName": SettingSetting(
         SettingSource.FILE, SettingType.TEXT, required=True,
         description="Name identifier for this container server"

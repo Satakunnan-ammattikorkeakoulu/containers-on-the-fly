@@ -1,5 +1,8 @@
 """Integration tests for /api/admin endpoints."""
 
+import datetime
+from unittest.mock import patch
+
 import database as db
 from sqlalchemy import select
 
@@ -253,6 +256,344 @@ class TestAdminContainers:
         )
         assert resp.status_code == 200
         assert resp.json()["status"] is True
+
+
+class TestAdminSaveContainer:
+    """save_container rename guard and registry overwrite confirmation."""
+
+    @staticmethod
+    def _builder_payload(
+        *,
+        container_id=-1,
+        image_name="new-image",
+        confirm_overwrite=False,
+        managed_externally=False,
+    ):
+        data = {
+            "name": "New Container",
+            "imageName": image_name,
+            "description": "",
+            "public": True,
+            "managedExternally": managed_externally,
+            "dockerfileCommands": "RUN echo hi",
+            "baseImage": "ubuntu:24.04",
+            "containerUsername": "user",
+            "passwordCommand": "",
+            "sshKeyDeployCommands": "",
+            "containerCmd": '["/bin/bash"]',
+            "ports": [{"serviceName": "SSH", "port": 22, "portType": "SSH"}],
+            "removedPorts": [],
+        }
+        if confirm_overwrite:
+            data["confirmOverwrite"] = True
+        return {"containerId": container_id, "data": data}
+
+    # -- Create path -------------------------------------------------------
+
+    def test_create_triggers_overwrite_confirmation_on_registry_collision(
+        self, test_client, admin_token
+    ):
+        with patch(
+            "endpoints.responses.admin.image_exists_in_registry",
+            return_value=True,
+        ):
+            resp = test_client.post(
+                "/api/admin/save_container",
+                json=self._builder_payload(image_name="collision-image"),
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] is False
+        assert body["data"]["needsOverwriteConfirmation"] is True
+        assert body["data"]["imageName"] == "collision-image"
+        # The container must not have been saved.
+        with db.Session() as session:
+            rows = session.execute(
+                select(db.Container).where(db.Container.imageName == "collision-image")
+            ).scalars().all()
+            assert rows == []
+
+    def test_create_bypasses_registry_check_with_confirm_overwrite(
+        self, test_client, admin_token
+    ):
+        with patch(
+            "endpoints.responses.admin.image_exists_in_registry",
+            return_value=True,
+        ) as mock_check:
+            resp = test_client.post(
+                "/api/admin/save_container",
+                json=self._builder_payload(
+                    image_name="confirmed-image", confirm_overwrite=True
+                ),
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] is True
+        # Registry helper must NOT be called when confirmOverwrite is true.
+        assert mock_check.call_count == 0
+        # Audit log has the overwrite-confirmed entry.
+        with db.Session() as session:
+            logs = session.execute(
+                select(db.AuditLog).where(
+                    db.AuditLog.action == "CONTAINER_IMAGE_OVERWRITE_CONFIRMED"
+                )
+            ).scalars().all()
+            assert len(logs) == 1
+
+    def test_create_without_collision_succeeds(self, test_client, admin_token):
+        with patch(
+            "endpoints.responses.admin.image_exists_in_registry",
+            return_value=False,
+        ):
+            resp = test_client.post(
+                "/api/admin/save_container",
+                json=self._builder_payload(image_name="fresh-image"),
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_create_when_registry_unreachable_succeeds(
+        self, test_client, admin_token
+    ):
+        with patch(
+            "endpoints.responses.admin.image_exists_in_registry",
+            return_value=None,
+        ):
+            resp = test_client.post(
+                "/api/admin/save_container",
+                json=self._builder_payload(image_name="unknown-image"),
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_create_externally_managed_skips_registry_check(
+        self, test_client, admin_token
+    ):
+        payload = self._builder_payload(
+            image_name="external-image", managed_externally=True
+        )
+        with patch(
+            "endpoints.responses.admin.image_exists_in_registry",
+            return_value=True,
+        ) as mock_check:
+            resp = test_client.post(
+                "/api/admin/save_container",
+                json=payload,
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+        assert mock_check.call_count == 0
+
+    # -- Edit path (rename guard) ------------------------------------------
+
+    def _make_builder_container(self, *, built=False, building=False):
+        with db.Session() as session:
+            container = db.Container(
+                public=True,
+                name="Existing",
+                imageName="existing-image",
+                description="",
+                managedExternally=False,
+                dockerfileCommands="RUN echo hi",
+                baseImage="ubuntu:24.04",
+                containerUsername="user",
+                containerCmd='["/bin/bash"]',
+                buildStatus="building" if building else ("success" if built else None),
+                lastBuiltAt=datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+                if built else None,
+            )
+            container.containerPorts.append(
+                db.ContainerPort(serviceName="SSH", port=22, portType="SSH")
+            )
+            session.add(container)
+            session.commit()
+            return container.containerId
+
+    def test_rename_of_built_container_is_rejected(self, test_client, admin_token):
+        container_id = self._make_builder_container(built=True)
+        payload = self._builder_payload(
+            container_id=container_id, image_name="renamed-image"
+        )
+        resp = test_client.post(
+            "/api/admin/save_container",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] is False
+        assert "locked" in body["message"].lower() or "cannot be changed" in body["message"].lower()
+        # Name unchanged in DB.
+        with db.Session() as session:
+            container = session.get(db.Container, container_id)
+            assert container.imageName == "existing-image"
+
+    def test_rename_during_active_build_is_rejected(self, test_client, admin_token):
+        container_id = self._make_builder_container(building=True)
+        payload = self._builder_payload(
+            container_id=container_id, image_name="renamed-image"
+        )
+        resp = test_client.post(
+            "/api/admin/save_container",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is False
+
+    def test_rename_of_never_built_container_is_accepted(
+        self, test_client, admin_token
+    ):
+        container_id = self._make_builder_container(built=False, building=False)
+        payload = self._builder_payload(
+            container_id=container_id, image_name="renamed-image"
+        )
+        # Edit path now runs the same registry check; mock no collision.
+        with patch(
+            "endpoints.responses.admin.image_exists_in_registry",
+            return_value=False,
+        ) as mock_check:
+            resp = test_client.post(
+                "/api/admin/save_container",
+                json=payload,
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+        assert mock_check.call_count == 1
+        with db.Session() as session:
+            container = session.get(db.Container, container_id)
+            assert container.imageName == "renamed-image"
+
+    def test_edit_without_rename_of_built_container_is_accepted(
+        self, test_client, admin_token
+    ):
+        container_id = self._make_builder_container(built=True)
+        # Keep the same imageName; only change description-ish fields.
+        payload = self._builder_payload(
+            container_id=container_id, image_name="existing-image"
+        )
+        payload["data"]["description"] = "Updated description"
+        resp = test_client.post(
+            "/api/admin/save_container",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+    def test_rename_allowed_when_switching_to_externally_managed(
+        self, test_client, admin_token
+    ):
+        container_id = self._make_builder_container(built=True)
+        payload = self._builder_payload(
+            container_id=container_id,
+            image_name="external-renamed",
+            managed_externally=True,
+        )
+        resp = test_client.post(
+            "/api/admin/save_container",
+            json=payload,
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] is True
+        with db.Session() as session:
+            container = session.get(db.Container, container_id)
+            assert container.imageName == "external-renamed"
+            assert container.managedExternally is True
+
+    def test_rename_of_unbuilt_container_with_collision_prompts_confirmation(
+        self, test_client, admin_token
+    ):
+        container_id = self._make_builder_container(built=False, building=False)
+        payload = self._builder_payload(
+            container_id=container_id, image_name="colliding-new-name"
+        )
+        with patch(
+            "endpoints.responses.admin.image_exists_in_registry",
+            return_value=True,
+        ):
+            resp = test_client.post(
+                "/api/admin/save_container",
+                json=payload,
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] is False
+        assert body["data"]["needsOverwriteConfirmation"] is True
+        assert body["data"]["imageName"] == "colliding-new-name"
+        # Rename was NOT committed.
+        with db.Session() as session:
+            container = session.get(db.Container, container_id)
+            assert container.imageName == "existing-image"
+
+    def test_rename_of_unbuilt_triggers_rebuild(self, test_client, admin_token):
+        container_id = self._make_builder_container(built=False, building=False)
+        # Simulate prior failed build.
+        with db.Session() as session:
+            container = session.get(db.Container, container_id)
+            container.buildStatus = "failed"
+            container.buildLog = "old failure"
+            session.commit()
+
+        payload = self._builder_payload(
+            container_id=container_id, image_name="renamed-retry"
+        )
+        with patch(
+            "endpoints.responses.admin.image_exists_in_registry",
+            return_value=False,
+        ):
+            resp = test_client.post(
+                "/api/admin/save_container",
+                json=payload,
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+        with db.Session() as session:
+            container = session.get(db.Container, container_id)
+            assert container.imageName == "renamed-retry"
+            assert container.buildStatus == "pending"
+            assert container.buildLog == ""
+
+    def test_edit_with_confirm_overwrite_logs_audit(
+        self, test_client, admin_token
+    ):
+        container_id = self._make_builder_container(built=False, building=False)
+        payload = self._builder_payload(
+            container_id=container_id,
+            image_name="confirmed-rename",
+            confirm_overwrite=True,
+        )
+        with patch(
+            "endpoints.responses.admin.image_exists_in_registry",
+            return_value=True,
+        ) as mock_check:
+            resp = test_client.post(
+                "/api/admin/save_container",
+                json=payload,
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+        # Registry must NOT be consulted when confirmOverwrite is true.
+        assert mock_check.call_count == 0
+        with db.Session() as session:
+            logs = session.execute(
+                select(db.AuditLog).where(
+                    db.AuditLog.action == "CONTAINER_IMAGE_OVERWRITE_CONFIRMED",
+                    db.AuditLog.resourceId == container_id,
+                )
+            ).scalars().all()
+            assert len(logs) == 1
 
 
 class TestAdminRoles:

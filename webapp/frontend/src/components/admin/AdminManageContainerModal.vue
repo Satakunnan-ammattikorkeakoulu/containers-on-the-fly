@@ -35,7 +35,24 @@
                 <v-text-field type="text" id="name" :rules="[rules.required]" v-model="data.name" label="Name*" hint="Visible in the reservation container dropdown listing." class="mb-10"></v-text-field>
 
                 <!-- IMAGE NAME -->
-                <v-text-field type="text" :rules="[rules.required, rules.imageName]" v-model="data.imageName" label="Image name*" hint="Only lowercase letters, digits, dots, hyphens, underscores, and forward slashes. Used as the image tag in the registry." class="mb-10"></v-text-field>
+                <v-tooltip location="top" :disabled="!imageNameLocked" text="Image name is locked after the image has been built. Delete and recreate this container to use a different name.">
+                  <template v-slot:activator="{ props }">
+                    <div v-bind="imageNameLocked ? props : {}">
+                      <v-text-field
+                        type="text"
+                        :rules="[rules.required, rules.imageName]"
+                        v-model="data.imageName"
+                        label="Image name*"
+                        :disabled="imageNameLocked"
+                        :hint="imageNameLocked
+                          ? 'Image name is locked after the image has been built. Delete and recreate this container to use a different name.'
+                          : 'Only lowercase letters, digits, dots, hyphens, underscores, and forward slashes. Used as the image tag in the registry.'"
+                        persistent-hint
+                        class="mb-10"
+                      ></v-text-field>
+                    </div>
+                  </template>
+                </v-tooltip>
 
                 <!-- DESCRIPTION -->
                 <v-textarea v-model="data.description" label="Description" hint="Visible in the reservation page after selecting the container." class="mb-5"></v-textarea>
@@ -388,6 +405,28 @@
       @emitClose="onBuildLogClose"
       @emitEditContainer="onBuildLogEditContainer"
     />
+
+    <!-- Overwrite Confirmation Dialog -->
+    <v-dialog v-model="showOverwriteDialog" persistent max-width="560px">
+      <v-card>
+        <v-card-title class="text-h6">Image already exists in registry</v-card-title>
+        <v-card-text>
+          <p>
+            An image with the name
+            <strong>{{ overwriteDialogImageName }}</strong>
+            already exists in the Docker registry. Building this container will overwrite it.
+          </p>
+          <p class="mt-3 text-body-2 text-muted">
+            This can happen if the image was pushed manually or if a previously removed container left an orphan in the registry.
+          </p>
+        </v-card-text>
+        <v-card-actions class="mx-4 mb-3">
+          <v-spacer></v-spacer>
+          <v-btn color="grey" variant="text" @click="cancelOverwrite">Cancel</v-btn>
+          <v-btn color="warning" variant="flat" @click="confirmOverwriteAndSave">Overwrite</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-form>
 </template>
 
@@ -459,6 +498,8 @@
         removedPorts: [],
         dataName: "container",
         showBuildLogDialog: false,
+        showOverwriteDialog: false,
+        overwriteDialogImageName: "",
         rules: {
           required: value => !!value || "Required",
           imageName: value => {
@@ -494,6 +535,7 @@
         if (this.isCreatingNew) return true;
         if (!this.originalImageFields) return false;
         return (
+          this.data.imageName !== this.originalImageFields.imageName ||
           this.data.dockerfileCommands !== this.originalImageFields.dockerfileCommands ||
           this.data.baseImage !== this.originalImageFields.baseImage ||
           this.data.containerUsername !== this.originalImageFields.containerUsername ||
@@ -533,6 +575,14 @@
       buildStatusLabel() {
         const labels = { pending: 'Build Queued', building: 'Building...', success: 'Built', failed: 'Build Failed' };
         return labels[this.data.buildStatus] || this.data.buildStatus;
+      },
+      /** Whether the image name field is locked (built or currently building).
+       *  When switching to externally-managed, the user takes ownership of
+       *  the image so the lock no longer applies. */
+      imageNameLocked() {
+        if (this.isCreatingNew) return false;
+        if (this.isExternallyManaged) return false;
+        return !!this.data.lastBuiltAt || this.data.buildStatus === 'building';
       },
     },
     created() {
@@ -752,12 +802,18 @@
               _this.closeDialog();
               _this.isSubmitting = false
             }
+            // Registry collision — ask for confirmation before silently overwriting
+            else if (response.data.data && response.data.data.needsOverwriteConfirmation) {
+              _this.overwriteDialogImageName = response.data.data.imageName || _this.data.imageName;
+              _this.showOverwriteDialog = true;
+              _this.isSubmitting = false;
+            }
             // Fail
             else {
               console.log("Failed saving "+_this.dataName+" information...")
               _this.store.showMessage({ text: response.data.message || "There was an error saving "+_this.dataName+" information.", color: "red" })
+              _this.isSubmitting = false
             }
-            _this.isSubmitting = false
         })
         .catch(function (error) {
             // Error
@@ -770,6 +826,17 @@
             }
             _this.isSubmitting = false
         });
+      },
+      /** User confirmed the registry overwrite — resubmit with the confirmOverwrite flag. */
+      confirmOverwriteAndSave() {
+        this.showOverwriteDialog = false;
+        this.data.confirmOverwrite = true;
+        this.submit();
+      },
+      /** User cancelled the registry overwrite dialog — keep the form open untouched. */
+      cancelOverwrite() {
+        this.showOverwriteDialog = false;
+        this.data.confirmOverwrite = false;
       },
       fetchData() {
         let _this = this
@@ -802,6 +869,7 @@
               }
               // Store original image-related fields for rebuild detection
               _this.originalImageFields = {
+                imageName: _this.data.imageName,
                 dockerfileCommands: _this.data.dockerfileCommands,
                 baseImage: _this.data.baseImage,
                 containerUsername: _this.data.containerUsername,

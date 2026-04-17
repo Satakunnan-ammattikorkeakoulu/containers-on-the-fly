@@ -20,6 +20,7 @@ from helpers.pagination import apply_pagination, get_total_count
 from helpers.logger import log
 from helpers.auth import hash_password, is_correct_password
 from helpers.tables.audit_log import log_action, get_audit_logs as get_audit_logs_helper
+from helpers.docker_registry import image_exists_in_registry
 import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
@@ -302,6 +303,7 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
   with Session() as session:
     # Check for duplicate image name
     new_image_name = containerEdit.data.get("imageName")
+    confirm_overwrite = bool(containerEdit.data.get("confirmOverwrite", False))
     existing = session.execute(
       select(Container).where(Container.imageName == new_image_name)
     ).scalar_one_or_none()
@@ -376,6 +378,18 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
 
     # If new, create a new container
     if containerEdit.containerId == -1:
+      # Registry collision check — only on create with Image Builder, since
+      # rebuild of an existing container is intentional overwrite and rename
+      # of a built container is blocked below.
+      if (not new_managed_externally and new_dockerfile_commands
+          and new_image_name and not confirm_overwrite):
+        exists = image_exists_in_registry(new_image_name)
+        if exists is True:
+          return api_response(
+            False,
+            "An image with this name already exists in the Docker registry. Confirm overwrite to proceed.",
+            {"needsOverwriteConfirmation": True, "imageName": new_image_name}
+          )
       container = Container()
       container.public = containerEdit.data.get("public", False)
       container.name = containerEdit.data.get("name")
@@ -414,6 +428,35 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
       if container is None:
         return api_response(False, "Container not found.")
       else:
+        image_name_changed = bool(new_image_name and new_image_name != container.imageName)
+
+        # Rename guard — once an image has been built, its name is locked for
+        # Image Builder containers. The admin must delete the container
+        # (which cleans up the image via the existing remove flow) and
+        # create a new one to use a different name. When the new mode is
+        # externally-managed, the user takes over ownership of the image,
+        # so the guard no longer applies.
+        if (image_name_changed and not new_managed_externally
+            and (container.lastBuiltAt is not None or container.buildStatus == "building")):
+          return api_response(
+            False,
+            "Image name cannot be changed after the image has been built. "
+            "Delete the container and create a new one to use a different name."
+          )
+
+        # Registry collision check on rename — if the container is unbuilt
+        # and the admin is renaming to a name that already exists in the
+        # Docker registry, surface the same overwrite prompt as on create.
+        if (image_name_changed and not new_managed_externally and new_dockerfile_commands
+            and not confirm_overwrite):
+          exists = image_exists_in_registry(new_image_name)
+          if exists is True:
+            return api_response(
+              False,
+              "An image with this name already exists in the Docker registry. Confirm overwrite to proceed.",
+              {"needsOverwriteConfirmation": True, "imageName": new_image_name}
+            )
+
         # Check if Dockerfile-related fields changed — if so, queue a rebuild
         dockerfile_changed = (new_dockerfile_commands != container.dockerfileCommands)
         base_image_changed = (new_base_image != container.baseImage)
@@ -433,8 +476,13 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
         container.containerCmd = new_cmd
         container.updatedAt = datetime.datetime.now(datetime.timezone.utc)
 
-        # Queue rebuild if using Image Builder and Dockerfile-related fields changed
-        if not new_managed_externally and new_dockerfile_commands and (dockerfile_changed or base_image_changed or username_changed or cmd_changed):
+        # Queue rebuild if using Image Builder and any image-affecting field changed.
+        # Includes imageName — renaming an unbuilt container should trigger a
+        # build under the new name, otherwise a prior failed build would stay
+        # stuck until the admin manually clicked Rebuild.
+        if not new_managed_externally and new_dockerfile_commands and (
+            dockerfile_changed or base_image_changed or username_changed or cmd_changed or image_name_changed
+        ):
           container.buildStatus = "pending"
           container.buildLog = ""
         # If switching to externally managed, clear build status
@@ -510,6 +558,13 @@ def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> 
       "container", saved_container_id,
       {"name": containerEdit.data.get("name"), "imageName": containerEdit.data.get("imageName")}
   )
+  if confirm_overwrite and not new_managed_externally and new_dockerfile_commands and new_image_name:
+    log_action(
+        actor_user_id,
+        "CONTAINER_IMAGE_OVERWRITE_CONFIRMED",
+        "container", saved_container_id,
+        {"imageName": new_image_name}
+    )
   return api_response(True, "Container saved successfully", {"containerId": saved_container_id})
 
 def get_container_remove_info(container_id: int) -> object:

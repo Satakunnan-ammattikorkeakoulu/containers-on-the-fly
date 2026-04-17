@@ -943,9 +943,16 @@ def report_image_removed(container_id: int, data, computer_id: int):
 
         container.buildStatus = data.buildStatus
         container.imageSize = None
+        # Rename the imageName to a sentinel so the original name is freed
+        # for reuse in new container definitions. Done only now — after the
+        # daemon confirms the real Docker image is gone — so any earlier
+        # removal task could still locate the image by its real tag.
+        original_image_name = container.imageName
+        if original_image_name and not original_image_name.startswith("__removed_"):
+            container.imageName = f"__removed_{container_id}__{original_image_name}"
         session.commit()
 
-        log.info(f"Image removed for container {container_id} ({container.imageName})")
+        log.info(f"Image removed for container {container_id} ({original_image_name})")
         return api_response(True, "Image removal recorded")
 
 

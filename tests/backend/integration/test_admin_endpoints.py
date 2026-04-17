@@ -564,6 +564,142 @@ class TestAdminSaveContainer:
             assert container.buildStatus == "pending"
             assert container.buildLog == ""
 
+    def _create_via_endpoint(self, test_client, admin_token, image_name):
+        resp = test_client.post(
+            "/api/admin/save_container",
+            json=self._builder_payload(image_name=image_name),
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        return resp.json()
+
+    def test_rename_of_removed_rows_imagename_does_not_block_reuse(
+        self, test_client, admin_token
+    ):
+        # Create + remove an externally-managed container, then create a new
+        # one with the same imageName. Externally-managed is renamed to a
+        # sentinel immediately, so the name is free right away.
+        with db.Session() as session:
+            container = db.Container(
+                public=True,
+                name="ExternalOld",
+                imageName="reusable-name",
+                description="",
+                managedExternally=True,
+            )
+            container.containerPorts.append(
+                db.ContainerPort(serviceName="SSH", port=22, portType="SSH")
+            )
+            session.add(container)
+            session.commit()
+            removed_id = container.containerId
+
+        resp = test_client.post(
+            f"/api/admin/remove_container?containerId={removed_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+        # Verify the removed row's imageName was rewritten to the sentinel.
+        with db.Session() as session:
+            removed = session.get(db.Container, removed_id)
+            assert removed.removed is True
+            assert removed.imageName == f"__removed_{removed_id}__reusable-name"
+
+        # Now the name is free — a fresh container can claim it.
+        with patch(
+            "endpoints.responses.admin.image_exists_in_registry",
+            return_value=False,
+        ):
+            body = self._create_via_endpoint(test_client, admin_token, "reusable-name")
+        assert body["status"] is True
+
+    def test_image_builder_remove_defers_rename_until_daemon_ack(
+        self, test_client, admin_token
+    ):
+        # Image Builder containers keep the original imageName until the
+        # daemon confirms the real Docker image has been removed, because
+        # the daemon needs the name to locate the image.
+        container_id = self._make_builder_container(built=True)
+
+        resp = test_client.post(
+            f"/api/admin/remove_container?containerId={container_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+        with db.Session() as session:
+            container = session.get(db.Container, container_id)
+            assert container.removed is True
+            assert container.buildStatus == "removing"
+            # imageName NOT yet renamed — daemon still needs it.
+            assert container.imageName == "existing-image"
+
+        # Simulate the daemon's report_image_removed callback.
+        resp = test_client.post(
+            f"/api/daemon/container/{container_id}/image-removed",
+            json={"buildStatus": "removed"},
+            headers={
+                "X-Daemon-Api-Key": "test-daemon-api-key",
+                "X-Daemon-Server-Name": "server1",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+        with db.Session() as session:
+            container = session.get(db.Container, container_id)
+            assert container.imageName == f"__removed_{container_id}__existing-image"
+            assert container.buildStatus == "removed"
+
+    def test_rebuild_refuses_removed_container(self, test_client, admin_token):
+        container_id = self._make_builder_container(built=True)
+        # Mark removed directly in DB.
+        with db.Session() as session:
+            container = session.get(db.Container, container_id)
+            container.removed = True
+            session.commit()
+
+        resp = test_client.post(
+            f"/api/admin/rebuild_container_image?containerId={container_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] is False
+        assert "removed" in body["message"].lower()
+
+    def test_sentinel_rename_is_idempotent(self, test_client, admin_token):
+        # Calling remove_container twice on the same externally-managed
+        # container must not double-prefix the sentinel.
+        with db.Session() as session:
+            container = db.Container(
+                public=True,
+                name="Ext",
+                imageName="ext-img",
+                description="",
+                managedExternally=True,
+            )
+            container.containerPorts.append(
+                db.ContainerPort(serviceName="SSH", port=22, portType="SSH")
+            )
+            session.add(container)
+            session.commit()
+            cid = container.containerId
+
+        for _ in range(2):
+            resp = test_client.post(
+                f"/api/admin/remove_container?containerId={cid}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+            assert resp.status_code == 200
+
+        with db.Session() as session:
+            c = session.get(db.Container, cid)
+            assert c.imageName == f"__removed_{cid}__ext-img"
+
     def test_edit_with_confirm_overwrite_logs_audit(
         self, test_client, admin_token
     ):

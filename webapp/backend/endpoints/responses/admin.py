@@ -627,9 +627,19 @@ def remove_container(containerId : int, actor_user_id: int = None) -> object:
       container_image = container.imageName
       container.removed = True
       container.public = False
-      # Queue image removal for non-externally managed containers
+      # Queue image removal for non-externally managed containers. The
+      # imageName is renamed to a sentinel later in report_image_removed
+      # once the daemon has confirmed the real Docker image is gone —
+      # renaming now would leave the daemon unable to locate the image.
       if container.managedExternally == False:
         container.buildStatus = "removing"
+      else:
+        # Externally-managed containers don't involve the daemon, so the
+        # name can be freed immediately by renaming to a sentinel. The
+        # unique constraint is preserved (containerId is unique) and
+        # future creates can reuse the original name.
+        if container_image and not container_image.startswith("__removed_"):
+          container.imageName = f"__removed_{containerId}__{container_image}"
       session.commit()
 
   log_action(actor_user_id, "CONTAINER_DELETE", "container", containerId,
@@ -656,6 +666,8 @@ def rebuild_container_image(container_id: int, actor_user_id: int = None) -> obj
     ).scalar_one_or_none()
     if container is None:
       return api_response(False, "Container not found.")
+    if container.removed:
+      return api_response(False, "Cannot rebuild a removed container.")
     if not container.dockerfileCommands:
       return api_response(False, "This container has no Dockerfile commands. Cannot build.")
     if container.buildStatus == "building":

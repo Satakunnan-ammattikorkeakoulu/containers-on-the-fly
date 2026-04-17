@@ -1265,6 +1265,13 @@ def remove_computer(computerId : int, actor_user_id: int = None) -> object:
       computer_name = computer.name
       computer.removed = True
       computer.public = False
+      # Rename to a sentinel so the original name is freed for reuse in new
+      # computer definitions. Computer.name has a DB unique constraint, so
+      # without this an admin cannot recreate a server with a previously
+      # used name. The unique constraint is preserved (computerId is
+      # unique). Skipped if already prefixed, so double-remove is safe.
+      if computer_name and not computer_name.startswith("__removed_"):
+        computer.name = f"__removed_{computerId}__{computer_name}"
       session.commit()
 
   log_action(actor_user_id, "COMPUTER_DELETE", "computer", computerId, {"name": computer_name})

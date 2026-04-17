@@ -907,6 +907,106 @@ class TestAdminSaveComputer:
         assert resp.status_code == 401
 
 
+class TestAdminRemoveComputer:
+    """remove_computer sentinel rename — frees the name for reuse."""
+
+    @staticmethod
+    def _new_computer_payload(name="reusable-server"):
+        return {
+            "computerId": -1,
+            "data": {
+                "name": name,
+                "public": True,
+                "ip": "127.0.0.9",
+                "hardware": {
+                    "cpu": {
+                        "maximumAmount": 4, "minimumAmount": 1,
+                        "maximumAmountForUser": 4,
+                        "maximumAmountForUserLowPriority": 4,
+                        "defaultAmountForUser": 1,
+                    },
+                    "ram": {
+                        "maximumAmount": 8, "minimumAmount": 1,
+                        "maximumAmountForUser": 8,
+                        "maximumAmountForUserLowPriority": 8,
+                        "defaultAmountForUser": 2,
+                    },
+                    "gpu": {
+                        "maximumAmountForUser": 1,
+                        "maximumAmountForUserLowPriority": 1,
+                    },
+                    "gpus": [],
+                },
+            },
+        }
+
+    def _make_computer(self, name):
+        with db.Session() as session:
+            computer = db.Computer(name=name, ip="127.0.0.9", public=True)
+            session.add(computer)
+            session.commit()
+            return computer.computerId
+
+    def test_remove_renames_name_to_sentinel(self, test_client, admin_token):
+        computer_id = self._make_computer("removable-server")
+        resp = test_client.post(
+            f"/api/admin/remove_computer?computerId={computer_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+        with db.Session() as session:
+            computer = session.get(db.Computer, computer_id)
+            assert computer.removed is True
+            assert computer.public is False
+            assert computer.name == f"__removed_{computer_id}__removable-server"
+
+    def test_name_is_reusable_after_removal(self, test_client, admin_token):
+        computer_id = self._make_computer("reusable-server")
+        resp = test_client.post(
+            f"/api/admin/remove_computer?computerId={computer_id}",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.json()["status"] is True
+
+        # Create a fresh computer with the freed name.
+        resp = test_client.post(
+            "/api/admin/save_computer",
+            json=self._new_computer_payload(name="reusable-server"),
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is True
+
+        with db.Session() as session:
+            rows = session.execute(
+                select(db.Computer).where(
+                    db.Computer.name.in_([
+                        "reusable-server",
+                        f"__removed_{computer_id}__reusable-server",
+                    ])
+                )
+            ).scalars().all()
+            names = sorted(r.name for r in rows)
+            assert names == [
+                f"__removed_{computer_id}__reusable-server",
+                "reusable-server",
+            ]
+
+    def test_remove_is_idempotent(self, test_client, admin_token):
+        computer_id = self._make_computer("idempotent-server")
+        for _ in range(2):
+            resp = test_client.post(
+                f"/api/admin/remove_computer?computerId={computer_id}",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+            assert resp.status_code == 200
+        with db.Session() as session:
+            computer = session.get(db.Computer, computer_id)
+            # Sentinel must not be double-prefixed.
+            assert computer.name == f"__removed_{computer_id}__idempotent-server"
+
+
 class TestAdminEditReservation:
 
     def _create_reservation_for_admin_test(self):

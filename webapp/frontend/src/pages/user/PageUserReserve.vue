@@ -185,10 +185,39 @@
                     :class="{ 'selected-card': container === containerItem.value }"
                     @click="selectContainer(containerItem.value)"
                     hover
-                    style="cursor: pointer; min-height: 260px;"
+                    style="cursor: pointer; min-height: 260px; position: relative;"
                     :outlined="container !== containerItem.value"
                     :color="container === containerItem.value ? 'primary' : ''"
                   >
+                    <v-tooltip
+                      v-if="getContainerPortsById(containerItem.value).length > 0"
+                      location="top"
+                      max-width="320"
+                    >
+                      <template v-slot:activator="{ props }">
+                        <v-icon
+                          v-bind="props"
+                          class="container-ports-icon"
+                          size="20"
+                          @click.stop
+                        >mdi-lan</v-icon>
+                      </template>
+                      <div>
+                        <div style="font-weight: bold; margin-bottom: 6px;">Services exposed</div>
+                        <div
+                          v-for="port in getContainerPortsById(containerItem.value)"
+                          :key="port.containerPortId"
+                          class="d-flex align-center"
+                          style="gap: 6px; margin: 3px 0;"
+                        >
+                          <v-icon size="small">{{ getPortIcon(port.portType) }}</v-icon>
+                          <span>
+                            <strong>{{ port.serviceName }}</strong>
+                            &mdash; port {{ port.port }}<span v-if="port.portType"> ({{ port.portType }})</span>
+                          </span>
+                        </div>
+                      </div>
+                    </v-tooltip>
                     <v-card-body class="pa-4" style="height: 100%;">
                       <div class="d-flex flex-column h-100" style="padding: 15px;">
                         <div class="text-center mb-3">
@@ -1482,6 +1511,32 @@
         return true // Default to public if not found
       },
       /**
+       * Gets the exposed service-port definitions for a container image.
+       * @param {number} containerId The container ID
+       * @returns {Array} List of { containerPortId, serviceName, port, portType }
+       */
+      getContainerPortsById(containerId) {
+        if (this.allContainers) {
+          let container = this.allContainers.find(x => x.containerId == containerId)
+          if (container && container.containerPorts) return container.containerPorts
+        }
+        return []
+      },
+      /**
+       * Maps a ContainerPort type to its corresponding mdi icon name.
+       * @param {string|null} portType Port type (SSH, HTTP, HTTPS, VNC, or null)
+       * @returns {string} mdi icon name
+       */
+      getPortIcon(portType) {
+        const icons = {
+          SSH: 'mdi-console',
+          HTTP: 'mdi-web',
+          HTTPS: 'mdi-lock',
+          VNC: 'mdi-monitor',
+        }
+        return icons[portType] || 'mdi-lan'
+      },
+      /**
        * Gets the hardware specs for a specific computer ID
        * @param {number} computerId The computer ID to get the hardware specs for
        * @returns {Array} The hardware specs array
@@ -1905,6 +1960,19 @@
     box-shadow: 0 0 12px rgba(33, 150, 243, 0.3) !important;
     transform: translateY(-2px);
     transition: all 0.3s ease;
+  }
+
+  .container-ports-icon {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    opacity: 0.6;
+    cursor: help;
+    z-index: 2;
+
+    &:hover {
+      opacity: 1;
+    }
   }
 
   .v-card:hover {

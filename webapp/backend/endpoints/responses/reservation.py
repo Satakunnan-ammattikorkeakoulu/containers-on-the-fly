@@ -109,7 +109,9 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
     if not is_admin:
       computer_query = computer_query.where(Computer.public.is_(True))
     all_computers = session.execute(computer_query).unique().scalars().all()
-    all_containers = session.execute(select(Container)).scalars().all()
+    all_containers = session.execute(
+      select(Container).options(joinedload(Container.containerPorts))
+    ).unique().scalars().all()
 
     # All reserved hardware specs for the given time period will be listed here
     removable_hardware_specs = {}
@@ -149,6 +151,15 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
       # Strip build-related fields not needed by regular users
       container_dict.pop("dockerfileCommands", None)
       container_dict.pop("buildLog", None)
+      container_dict["containerPorts"] = [
+        {
+          "containerPortId": p.containerPortId,
+          "serviceName": p.serviceName,
+          "port": p.port,
+          "portType": p.portType,
+        }
+        for p in container.containerPorts
+      ]
       containers.append(container_dict)
 
     # Get user's roles and their hardware limits (in the same session)

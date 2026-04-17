@@ -103,10 +103,10 @@
           </div>
 
           <!-- Collapsible sections -->
-          <v-expansion-panels variant="accordion" class="mt-4">
+          <v-expansion-panels v-model="openPanel" variant="accordion" class="mt-4">
 
             <!-- SSH (when not primary but exists) -->
-            <v-expansion-panel v-if="details.sshPort && !isSSHPrimary">
+            <v-expansion-panel v-if="details.sshPort && !isSSHPrimary" value="ssh">
               <v-expansion-panel-title>
                 <div class="d-flex align-center">
                   <v-icon class="mr-2" size="small">mdi-console</v-icon>
@@ -149,7 +149,7 @@
             </v-expansion-panel>
 
             <!-- Other Services -->
-            <v-expansion-panel v-if="hasOtherPorts">
+            <v-expansion-panel v-if="hasOtherPorts" value="other">
               <v-expansion-panel-title>
                 <div class="d-flex align-center">
                   <v-icon class="mr-2" size="small">mdi-lan</v-icon>
@@ -176,7 +176,7 @@
             </v-expansion-panel>
 
             <!-- General Instructions -->
-            <v-expansion-panel v-if="hasInstructions">
+            <v-expansion-panel v-if="hasInstructions" value="instructions">
               <v-expansion-panel-title>
                 <div class="d-flex align-center">
                   <v-icon class="mr-2" size="small">mdi-information-outline</v-icon>
@@ -197,7 +197,7 @@
             </v-expansion-panel>
 
             <!-- Server & Container -->
-            <v-expansion-panel>
+            <v-expansion-panel value="server">
               <v-expansion-panel-title>
                 <div class="d-flex align-center">
                   <v-icon class="mr-2" size="small">mdi-server</v-icon>
@@ -335,6 +335,7 @@
       connectionText: "",
       isLoading: true,
       selectedMethodIndex: 0,
+      openPanel: "other",
     }),
     computed: {
       containerUsername() {

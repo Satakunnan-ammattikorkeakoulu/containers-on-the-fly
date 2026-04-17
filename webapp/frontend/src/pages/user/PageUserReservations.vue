@@ -96,7 +96,7 @@
     <v-row v-if="viewMode === 'activity'" class="justify-center" style="margin-top: 8px; margin-bottom: 0;">
       <v-col cols="12" md="9" class="text-center">
         <span class="filter-summary-text">
-          Showing events for your reservations.<template v-if="retentionDescription"> {{ retentionDescription }}</template>
+          Showing events for your reservations.<template v-if="retentionDescription">{{ ' ' + retentionDescription }}</template>
         </span>
       </v-col>
     </v-row>

@@ -239,7 +239,9 @@ def get_reservations(request: AdminReservationRequest) -> object:
             res["reservedContainer"]["container"] = container_dict
 
             res["reservedContainer"]["reservedPorts"] = []
-            if reservation.status == "started":
+            # Paused LP reservations keep their port allocations so they can
+            # resume on the same outside ports; expose them to the UI too.
+            if reservation.status in ("started", "paused"):
                 for reserved_port in reservation.reservedContainer.reservedContainerPorts:
                     port_obj = orm_to_dict(reserved_port)
                     port_obj["localPort"] = reserved_port.containerPort.port

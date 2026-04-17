@@ -72,11 +72,14 @@
               <div v-if="item.reservedContainer.reservedPorts && item.reservedContainer.reservedPorts.length > 0">
                 <strong>Ports:</strong><br>
                 <span v-html="getPorts(item.reservedContainer.reservedPorts)"></span>
+                <div v-if="item.status === 'paused'" class="text-caption mt-1" style="font-style: italic;">
+                  Ports held for resume &mdash; may change if the server runs out of ports.
+                </div>
               </div>
               <div class="mt-3 text-caption" style="font-weight: bold;">Click to copy</div>
             </div>
           </v-tooltip>
-          <v-tooltip v-if="item.isLowPriority" bottom max-width="260">
+          <v-tooltip v-if="item.isLowPriority" bottom max-width="280">
             <template v-slot:activator="{ props }">
               <v-chip
                 v-bind="props"
@@ -89,9 +92,9 @@
             </template>
             <div>
               <strong>Low Priority</strong><br>
-              This container may be paused if resources are needed by other reservations.
-              It will automatically resume when resources become available.
-              Save your work to mounted volumes to prevent data loss.
+              This container may be paused if resources are needed by other reservations, and will automatically resume when resources become available.
+              When paused, the container is recreated &mdash; only files on mounted volumes persist.
+              Outside ports are held and normally restored on resume.
             </div>
           </v-tooltip>
           <span v-if="item.description && item.description.trim()" class="text-medium-emphasis" style="font-size: 12px; font-style: italic;">&ldquo;{{ item.description }}&rdquo;</span>

@@ -58,7 +58,13 @@
               density="compact"
               class="mb-4 text-left"
             >
-              Low-priority reservations may be paused when resources are needed by other users, and resumed automatically when resources become available. If multiple low-priority reservations are running, older ones take priority &mdash; they are paused last and resumed first. Save your work to mounted volumes.
+              <p class="mb-2">
+                Low-priority reservations may pause when other users need the resources and resume automatically (oldest pauses last, resumes first).
+              </p>
+              <ul class="mb-0 ps-5">
+                <li><strong>Container:</strong> stopped and recreated on resume. Only mounted volumes persist &mdash; packages, processes, <code>/tmp</code>, and in-memory state are lost.</li>
+                <li><strong>Ports:</strong> held across pause/resume so your SSH config keeps working. In rare cases, if the server runs out of ports, you may come back on new ones &mdash; hover the server name in your reservation list to check.</li>
+              </ul>
             </v-alert>
           </div>
           <v-row justify="center">

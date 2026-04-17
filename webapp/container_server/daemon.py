@@ -16,7 +16,7 @@ from helpers.utils import create_password
 
 from docker.containers import start_container, stop_container, restart_container, run_stop_script
 from docker.monitoring import collect_server_metrics, collect_server_logs
-from docker.ports import get_available_port
+from docker.ports import get_available_port, is_port_in_use
 from docker.image_builder import build_and_push_image, remove_image, update_all_image_sizes
 from docker.ssh_host_keys import ensure_host_keys
 
@@ -513,18 +513,86 @@ def start_docker_container(res, tasks):
     time_now_parsed = time_now().strftime('%m_%d_%Y_%H_%M_%S')
     container_name = f"reservation-{reservation_id}-{image_name.replace(':', '').replace('/', '')}-{time_now_parsed}"
 
-    # Build port mappings
+    # Detect resume: containerStatus is still "paused" on the ReservedContainer
+    # even though the reservation was flipped back to "reserved". On a resume
+    # we prefer to restart the container on the *same* outside ports it had
+    # before the pause, so users' existing SSH configs and tunnels keep
+    # working.
+    rc_data = res.get("reservedContainer", {}) or {}
+    is_resume = rc_data.get("containerStatus") == "paused"
+    existing_ports = rc_data.get("reservedContainerPorts", []) or []
+
+    # Held ports from paused LP reservations on this computer. The allocator
+    # soft-excludes these so normal reservations don't casually grab them;
+    # if the port range is genuinely exhausted, the allocator falls back
+    # and returns stolen=True for the entries it had to take.
+    held_entries = tasks.get("heldLowPriorityPorts", []) or []
+    # A resume's own held ports are its reservedContainerPorts — don't soft-
+    # exclude against ourselves, since we want to reuse those.
+    own_port_ids = {ep.get("reservedContainerPortId") for ep in existing_ports}
+    held_by_port: dict[int, dict] = {
+        e["outsidePort"]: e
+        for e in held_entries
+        if e.get("reservedContainerPortId") not in own_port_ids
+    }
+
     ports = []
-    ports_taken: set[int] = set()
-    for port_def in container_data.get("containerPorts", []):
-        outside_port = get_available_port(exclude=ports_taken)
-        ports_taken.add(outside_port)
-        ports.append({
-            "containerPortId": port_def["containerPortId"],
-            "serviceName": port_def["serviceName"],
-            "localPort": port_def["port"],
-            "outsidePort": outside_port,
-        })
+    stolen_port_ids: list[int] = []
+    reuse_existing_ports = False
+
+    # Resume fast path: if every previously held outside port is still free
+    # at the OS level, restart on those exact ports. All-or-nothing — any
+    # conflict falls through to full reallocation (which is today's
+    # behavior and is still handled correctly by the backend).
+    if is_resume and existing_ports:
+        can_reuse_all = all(not is_port_in_use(ep["outsidePort"]) for ep in existing_ports)
+        if can_reuse_all:
+            # Build the same shape the allocation loop produces, but from
+            # the preserved mappings instead of fresh allocations.
+            port_def_by_id = {
+                pd["containerPortId"]: pd
+                for pd in container_data.get("containerPorts", [])
+            }
+            for ep in existing_ports:
+                pd = port_def_by_id.get(ep["containerPortId"])
+                if pd is None:
+                    # The container definition changed since the pause
+                    # (e.g. a port was removed in the admin UI). Give up
+                    # on reuse and fall through to fresh allocation.
+                    ports = []
+                    reuse_existing_ports = False
+                    break
+                ports.append({
+                    "containerPortId": pd["containerPortId"],
+                    "serviceName": pd["serviceName"],
+                    "localPort": pd["port"],
+                    "outsidePort": ep["outsidePort"],
+                })
+            else:
+                reuse_existing_ports = True
+
+    # Fresh allocation path (new start, or resume where reuse failed).
+    if not reuse_existing_ports:
+        ports = []
+        ports_taken: set[int] = set()
+        soft_exclude = set(held_by_port.keys())
+        for port_def in container_data.get("containerPorts", []):
+            result = get_available_port(
+                exclude=ports_taken,
+                soft_exclude=soft_exclude - ports_taken,
+            )
+            outside_port = result["port"]
+            ports_taken.add(outside_port)
+            if result["stolen"]:
+                held = held_by_port.get(outside_port)
+                if held:
+                    stolen_port_ids.append(held["reservedContainerPortId"])
+            ports.append({
+                "containerPortId": port_def["containerPortId"],
+                "serviceName": port_def["serviceName"],
+                "localPort": port_def["port"],
+                "outsidePort": outside_port,
+            })
 
     # Build GPU string
     gpus_string = ""
@@ -579,13 +647,24 @@ def start_docker_container(res, tasks):
     result = start_container(details)
 
     if result["started"]:
-        log.info(f"Container started for reservation {reservation_id}, user={res.get('userId')}, image={image_name}, docker_name={result['containerName']}")
+        log.info(f"Container started for reservation {reservation_id}, user={res.get('userId')}, image={image_name}, docker_name={result['containerName']}, resume_reused_ports={reuse_existing_ports}, stolen_ports={len(stolen_port_ids)}")
+        # When reusing existing port rows on a resume, don't resend the
+        # `ports` list — the backend keeps the existing rows and re-inserts
+        # would violate the uniqueness constraint on (reservedContainerId,
+        # outsidePort).
+        ports_payload = (
+            []
+            if reuse_existing_ports
+            else [{"containerPortId": p["containerPortId"], "outsidePort": p["outsidePort"]} for p in ports]
+        )
         api.report_started(reservation_id, {
             "containerDockerName": container_name,
             "sshPassword": result["password"],
             "containerDockerId": result["containerId"] or "",
-            "ports": [{"containerPortId": p["containerPortId"], "outsidePort": p["outsidePort"]} for p in ports],
+            "ports": ports_payload,
             "nonCriticalErrors": result["nonCriticalErrors"] or "",
+            "stolenReservedContainerPortIds": stolen_port_ids,
+            "reuseExistingPorts": reuse_existing_ports,
         })
     else:
         log.error(f"Failed to start container for reservation {reservation_id}: {result['error']}")

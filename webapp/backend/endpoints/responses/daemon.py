@@ -79,6 +79,17 @@ def _serialize_reservation(res, include_container=False, include_user=False,
             "ramDiskSizePercent": rc.ramDiskSizePercent,
             "startScriptPath": rc.startScriptPath if feature_flags.get("startScriptsEnabled", True) else None,
             "stopScriptPath": rc.stopScriptPath if feature_flags.get("stopScriptsEnabled", True) else None,
+            # Existing port allocations (populated when the container is
+            # paused so the daemon can reuse them on resume). Safe to
+            # always include — cheap and useful for diagnostics.
+            "reservedContainerPorts": [
+                {
+                    "reservedContainerPortId": p.reservedContainerPortId,
+                    "outsidePort": p.outsidePort,
+                    "containerPortId": p.containerPortForeign,
+                }
+                for p in rc.reservedContainerPorts
+            ],
         }
     else:
         data["reservedContainer"] = None
@@ -207,6 +218,7 @@ def get_tasks(computer_id: int):
             select(Reservation)
             .options(
                 joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container).joinedload(Container.containerPorts),
+                joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
                 joinedload(Reservation.reservedHardwareSpecs).joinedload(ReservedHardwareSpec.hardwareSpec),
                 joinedload(Reservation.user).joinedload(User.roles).joinedload(Role.mounts),
                 joinedload(Reservation.computer),
@@ -327,6 +339,25 @@ def get_tasks(computer_id: int):
         # Sort paused by createdAt ascending (FIFO)
         paused_reservations.sort(key=lambda r: r.get("createdAt", ""))
 
+        # Collect ports held by currently-paused low-priority reservations
+        # on this computer. The daemon passes these as soft excludes when
+        # allocating ports for new containers, preserving port continuity
+        # across pause/resume cycles. Expired paused reservations are
+        # filtered out because stop_finished_servers will clean them up
+        # this same cycle.
+        held_low_priority_ports = []
+        for res in all_reservations:
+            if (res.status == "paused"
+                    and res.isLowPriority
+                    and res.endDate > now
+                    and res.reservedContainer):
+                for p in res.reservedContainer.reservedContainerPorts:
+                    held_low_priority_ports.append({
+                        "reservationId": res.reservationId,
+                        "reservedContainerPortId": p.reservedContainerPortId,
+                        "outsidePort": p.outsidePort,
+                    })
+
         # Computer hardware capacity
         computer = session.execute(
             select(Computer)
@@ -393,6 +424,7 @@ def get_tasks(computer_id: int):
             "containersToBuild": containers_to_build,
             "containersToRemove": containers_to_remove,
             "everyoneMounts": everyone_mounts,
+            "heldLowPriorityPorts": held_low_priority_ports,
             "startScriptTimeoutSeconds": feature_flags.get("startScriptTimeoutSeconds", 40),
             "stopScriptTimeoutSeconds": feature_flags.get("stopScriptTimeoutSeconds", 40),
         })
@@ -444,19 +476,50 @@ def report_started(reservation_id: int, data, computer_id: int):
         rc.containerDockerId = data.containerDockerId
         rc.containerStatus = "running"
 
-        # On resume, clear old port mappings before creating new ones
-        # (the container was fully stopped and restarted with new ports)
-        if is_resume:
+        reuse_existing_ports = getattr(data, "reuseExistingPorts", False)
+
+        # On resume without reuse, clear old port mappings before creating new
+        # ones (the container was fully stopped and restarted with new ports).
+        # When reuse_existing_ports is True the daemon verified all held
+        # ports are still free at the OS level and restarted on the same
+        # host ports, so we keep the rows.
+        if is_resume and not reuse_existing_ports:
             for old_port in list(rc.reservedContainerPorts):
                 session.delete(old_port)
             session.flush()
 
-        # Create port mappings
-        for port in data.ports:
-            rc.reservedContainerPorts.append(ReservedContainerPort(
-                outsidePort=port.outsidePort,
-                containerPortForeign=port.containerPortId,
-            ))
+        # Create port mappings (skip when reusing — rows already exist)
+        if not reuse_existing_ports:
+            for port in data.ports:
+                rc.reservedContainerPorts.append(ReservedContainerPort(
+                    outsidePort=port.outsidePort,
+                    containerPortForeign=port.containerPortId,
+                ))
+
+        # Handle stolen held ports: a normal reservation took a port that
+        # was being held for a paused low-priority reservation because the
+        # computer's port range was exhausted. Delete the held row and
+        # audit the steal; the victim LP will reallocate that slot when
+        # it eventually resumes.
+        stolen_audit_entries = []
+        stolen_ids = getattr(data, "stolenReservedContainerPortIds", []) or []
+        for stolen_id in stolen_ids:
+            victim_port = session.execute(
+                select(ReservedContainerPort)
+                .options(joinedload(ReservedContainerPort.reservedContainer).joinedload(ReservedContainer.reservation))
+                .where(ReservedContainerPort.reservedContainerPortId == stolen_id)
+            ).unique().scalar_one_or_none()
+            if victim_port is None:
+                continue
+            victim_reservation = (
+                victim_port.reservedContainer.reservation
+                if victim_port.reservedContainer else None
+            )
+            stolen_audit_entries.append({
+                "victimReservationId": victim_reservation.reservationId if victim_reservation else None,
+                "outsidePort": victim_port.outsidePort,
+            })
+            session.delete(victim_port)
 
         session.commit()
 
@@ -470,15 +533,28 @@ def report_started(reservation_id: int, data, computer_id: int):
         email_is_low_priority = reservation.isLowPriority
         log_user_id = reservation.userId
 
-        # Build port list for email (include portType for type-aware rendering)
+        # Build port list for email. On the reuse path, data.ports is
+        # empty and we rebuild from the preserved ReservedContainerPort
+        # rows so the resumed-container email shows the right outside
+        # ports (which match what the user had before the pause).
         email_ports = []
-        for port in data.ports:
-            # Find the service name, local port, and port type from the container's port definitions
+        email_source = (
+            [
+                {"containerPortId": p.containerPortForeign, "outsidePort": p.outsidePort}
+                for p in rc.reservedContainerPorts
+            ]
+            if reuse_existing_ports
+            else [
+                {"containerPortId": p.containerPortId, "outsidePort": p.outsidePort}
+                for p in data.ports
+            ]
+        )
+        for port in email_source:
             service_name = "Unknown"
             local_port = None
             port_type = None
             for cp in container_obj.containerPorts:
-                if cp.containerPortId == port.containerPortId:
+                if cp.containerPortId == port["containerPortId"]:
                     service_name = cp.serviceName
                     local_port = cp.port
                     port_type = cp.portType
@@ -486,9 +562,9 @@ def report_started(reservation_id: int, data, computer_id: int):
             email_ports.append({
                 "serviceName": service_name,
                 "localPort": local_port,
-                "outsidePort": port.outsidePort,
+                "outsidePort": port["outsidePort"],
                 "portType": port_type,
-                "containerPortId": port.containerPortId,
+                "containerPortId": port["containerPortId"],
             })
 
         email_primary_port_id = container_obj.primaryConnectionPortId
@@ -518,6 +594,15 @@ def report_started(reservation_id: int, data, computer_id: int):
         {"computerName": audit_computer_name, "imageName": email_image_name,
          "isLowPriority": email_is_low_priority},
     )
+
+    # One audit entry per stolen port so the victim LP is easy to find.
+    for entry in stolen_audit_entries:
+        log_action(
+            None, "LP_PORT_STOLEN", "reservation", entry["victimReservationId"],
+            {"outsidePort": entry["outsidePort"],
+             "stolenByReservationId": reservation_id,
+             "computerName": audit_computer_name},
+        )
 
     log.info(f"Container started for reservation {reservation_id}, user={log_user_id}, docker_name={data.containerDockerName}, resume={is_resume}")
     return api_response(True, "Reservation marked as started")

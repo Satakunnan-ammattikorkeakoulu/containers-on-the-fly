@@ -25,6 +25,14 @@ class ReservationStartedRequest(BaseModel):
     containerDockerId: str
     ports: List[PortMapping]
     nonCriticalErrors: str = ""
+    # IDs of held ReservedContainerPort rows that the daemon stole during
+    # allocation because the configured port range was otherwise exhausted.
+    # The backend deletes these rows and writes LP_PORT_STOLEN audit entries.
+    stolenReservedContainerPortIds: List[int] = []
+    # Set by the daemon on a resume path when all previously held ports are
+    # still free at the OS level. When True, the backend keeps the existing
+    # ReservedContainerPort rows untouched and ignores `ports` for inserts.
+    reuseExistingPorts: bool = False
 
 
 class ReservationStartFailedRequest(BaseModel):

@@ -24,26 +24,36 @@ def is_port_in_use(port: int) -> bool:
         return s.connect_ex(('localhost', port)) == 0
 
 
-def get_available_port(exclude: set[int] | None = None) -> int:
+def get_available_port(
+    exclude: set[int] | None = None,
+    soft_exclude: set[int] | None = None,
+) -> dict:
     """Find an available port within the configured port range.
 
-    Builds a list of all ports in the configured range and randomly
-    selects one that is not bound on the host and not in `exclude`.
+    Two-pass allocation: the first pass avoids both ``exclude`` and
+    ``soft_exclude``. If that pass finds no usable port, a second pass
+    drops ``soft_exclude`` and may return a port from it — this is the
+    "steal" fallback used when paused low-priority reservations are
+    holding ports that the computer can no longer afford to set aside.
 
     Args:
-        exclude: Optional set of port numbers to skip. Used by callers
-            allocating multiple ports in a single pass to avoid
-            returning a port they have already claimed but not yet
-            bound to a running container.
+        exclude: Hard exclude. Ports already claimed by the current
+            allocation batch (or otherwise unavailable). Never returned.
+        soft_exclude: Soft exclude. Ports held for paused low-priority
+            reservations. Avoided when possible; only returned (with
+            ``stolen=True``) if the configured range is otherwise
+            exhausted.
 
     Returns:
-        int: An available port number.
+        dict: ``{"port": int, "stolen": bool}``. ``stolen`` is True iff
+        the returned port was in the original ``soft_exclude`` set.
 
     Raises:
         RuntimeError: If no ports remain in the configured range after
-            applying the exclude set.
+            applying ``exclude`` (the second pass also fails).
     """
     exclude = exclude or set()
+    soft_exclude = soft_exclude or set()
     min_port = settings_handler.get_setting("docker.port_range_start")
     max_port = settings_handler.get_setting("docker.port_range_end")
 
@@ -57,19 +67,36 @@ def get_available_port(exclude: set[int] | None = None) -> int:
     if min_port >= max_port:
         raise RuntimeError(f"Port range start ({min_port}) must be less than end ({max_port})")
 
-    available_ports = [p for p in range(min_port, max_port) if p not in exclude]
+    def _try_pass(excluded: set[int]) -> int | None:
+        candidates = [p for p in range(min_port, max_port) if p not in excluded]
+        if not candidates:
+            return None
+        for _ in range(50):
+            rand_port = secrets.choice(candidates)
+            if not is_port_in_use(rand_port):
+                return rand_port
+        return None
 
-    if not available_ports:
+    # First pass: respect both excludes
+    port = _try_pass(exclude | soft_exclude)
+    if port is not None:
+        return {"port": port, "stolen": False}
+
+    # Second pass: ignore the soft exclude (steal a held port if needed)
+    if soft_exclude:
+        port = _try_pass(exclude)
+        if port is not None:
+            return {"port": port, "stolen": port in soft_exclude}
+
+    # Last resort: pick any non-hard-excluded port even if probing said it
+    # was busy — preserves the previous behavior of always returning a port
+    # rather than raising in a transient OS-busy scenario.
+    fallback_candidates = [p for p in range(min_port, max_port) if p not in exclude]
+    if not fallback_candidates:
         raise RuntimeError(
             f"No ports left in range {min_port}-{max_port} after "
             f"excluding {len(exclude)} already-assigned ports."
         )
-
-    # Try to bind to a random available port 50 times
-    for _ in range(50):
-        rand_port = secrets.choice(available_ports)
-        if not is_port_in_use(rand_port):
-            return rand_port
-
-    log.warning("Did not find an available port after 50 attempts. Randomly assigning one.")
-    return secrets.choice(available_ports)
+    log.warning("Did not find an available port after 50 attempts in either pass. Randomly assigning one.")
+    chosen = secrets.choice(fallback_candidates)
+    return {"port": chosen, "stolen": chosen in soft_exclude}

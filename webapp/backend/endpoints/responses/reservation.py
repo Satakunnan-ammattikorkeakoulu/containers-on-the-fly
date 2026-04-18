@@ -6,7 +6,7 @@ with role-based limits, calendar timeline views, and connection detail
 retrieval for active reservations.
 """
 
-from database import Session, Computer, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec
+from database import Session, Computer, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, ServerStatus
 from helpers.email_notifications import generate_connection_text
 from helpers.server import api_response, orm_to_dict
 from helpers.logger import log
@@ -105,7 +105,11 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
         (Reservation.status == "reserved") | (Reservation.status == "started")
       )
     ).unique().scalars().all()
-    computer_query = select(Computer).options(joinedload(Computer.hardwareSpecs)).where(Computer.removed.isnot(True))
+    computer_query = (
+      select(Computer)
+      .options(joinedload(Computer.hardwareSpecs), joinedload(Computer.status))
+      .where(Computer.removed.isnot(True))
+    )
     if not is_admin:
       computer_query = computer_query.where(Computer.public.is_(True))
     all_computers = session.execute(computer_query).unique().scalars().all()
@@ -136,6 +140,9 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
         else:
           removable_hardware_specs[int_key] += val
 
+    threshold_minutes = int(get_setting("docker.serverOnlineThresholdMinutes"))
+    now_utc = datetime.datetime.now(timezone.utc)
+
     computers = []
 
     for computer in all_computers:
@@ -143,6 +150,22 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
       comp_dict["hardwareSpecs"] = []
       for spec in computer.hardwareSpecs:
         comp_dict["hardwareSpecs"].append(orm_to_dict(spec))
+
+      status = computer.status
+      raw_last_ping = status.lastUpdatedAt if status else None
+      if raw_last_ping is not None:
+        # DateTime(timezone=True) may come back naive from MariaDB; normalize
+        # to tz-aware UTC only for the age comparison. The ISO string we
+        # return mirrors get_server_monitoring, which emits raw .isoformat()
+        # so the frontend's "append Z" convention continues to work.
+        aware_last_ping = raw_last_ping if raw_last_ping.tzinfo is not None else raw_last_ping.replace(tzinfo=timezone.utc)
+        age_seconds = (now_utc - aware_last_ping).total_seconds()
+        comp_dict["lastPingAt"] = raw_last_ping.isoformat()
+        comp_dict["isOnline"] = age_seconds < threshold_minutes * 60
+      else:
+        comp_dict["lastPingAt"] = None
+        comp_dict["isOnline"] = False
+
       computers.append(comp_dict)
 
     containers = []
@@ -270,7 +293,11 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
   if reducable_specs is None and all_fully_booked:
     return api_response(False, "No public computer has enough resources for the requested time slot.")
 
-  return api_response(True, "Hardware resources fetched.", { "computers": computers, "containers": containers })
+  return api_response(True, "Hardware resources fetched.", {
+    "computers": computers,
+    "containers": containers,
+    "onlineThresholdMinutes": threshold_minutes,
+  })
 
 def get_own_reservations(userId: int, request: UserReservationRequest) -> object:
   """Retrieve paginated reservations belonging to a specific user.

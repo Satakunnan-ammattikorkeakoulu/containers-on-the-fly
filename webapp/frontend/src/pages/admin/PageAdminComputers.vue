@@ -25,6 +25,7 @@
             v-bind:propMonitoringData="monitoringData"
             v-bind:propActiveServers="activeServers"
             v-bind:propLastUpdateTime="lastUpdateTime"
+            v-bind:propOnlineThresholdMinutes="onlineThresholdMinutes"
           />
         </div>
         <p v-else class="dim text-center">No computers.</p>
@@ -78,6 +79,7 @@
       monitoringData: {},
       activeServers: {},
       lastUpdateTime: {},
+      onlineThresholdMinutes: 7,
     }),
     mounted () {
       this.isFetching = true
@@ -168,6 +170,9 @@
             // Success
             if (response.data.status == true) {
               _this.data = response.data.data[_this.tableName]
+              if (typeof response.data.data.onlineThresholdMinutes === "number") {
+                _this.onlineThresholdMinutes = response.data.data.onlineThresholdMinutes
+              }
               // Check server status after data is loaded
               _this.checkServerStatus()
             }
@@ -195,7 +200,8 @@
       
       /**
        * Polls each server's monitoring endpoint to determine active/inactive status.
-       * A server is considered active if its last data update was within 7 minutes.
+       * A server is considered active if its last data update was within the
+       * ``docker.serverOnlineThresholdMinutes`` setting returned by get_computers.
        */
       async checkServerStatus() {
         // Get monitoring data for all servers to check their status
@@ -249,11 +255,11 @@
               // Store the last update time
               if (lastUpdated) {
                 _this.lastUpdateTime[server.computerId] = lastUpdated;
-                
-                // Consider active if data is less than 7 minutes old
+
+                // Consider active if data is within the configured threshold
                 const timeDiff = Date.now() - lastUpdated;
-                
-                if (timeDiff < 7 * 60 * 1000) {
+
+                if (timeDiff < _this.onlineThresholdMinutes * 60 * 1000) {
                   _this.activeServers[server.computerId] = true;
                 }
               }
@@ -344,7 +350,7 @@
             if (lastUpdated) {
               _this.lastUpdateTime[computerId] = lastUpdated;
               const timeDiff = Date.now() - lastUpdated;
-              if (timeDiff < 7 * 60 * 1000) {
+              if (timeDiff < _this.onlineThresholdMinutes * 60 * 1000) {
                 _this.activeServers[computerId] = true;
               }
             } else if (data.metrics) {

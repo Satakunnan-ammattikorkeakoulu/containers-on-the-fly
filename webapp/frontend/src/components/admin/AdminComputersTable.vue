@@ -33,7 +33,7 @@
             <span v-if="lastUpdateTime[item.computerId]">
               Last update: {{ formatDirectTimestamp(lastUpdateTime[item.computerId]) }} ({{ store.appTimezone || 'UTC' }})
               <br>
-              Status: {{ getStatusColor(item) === 'green' ? 'Online (< 7 min ago)' : 'Offline (> 7 min ago)' }}
+              Status: {{ getStatusColor(item) === 'green' ? `Online (< ${propOnlineThresholdMinutes} min ago)` : `Offline (> ${propOnlineThresholdMinutes} min ago)` }}
             </span>
             <span v-else>
               No monitoring data received
@@ -436,6 +436,10 @@
       propLastUpdateTime: {
         type: Object,
         default: () => ({})
+      },
+      propOnlineThresholdMinutes: {
+        type: Number,
+        default: 7,
       }
     },
     data: () => ({

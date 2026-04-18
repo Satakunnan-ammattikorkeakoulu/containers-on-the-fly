@@ -1038,7 +1038,9 @@ def get_computers() -> object:
 
   Returns:
       Response with a list of computer dicts, each including a
-      hardwareSpecs list of associated hardware specifications.
+      hardwareSpecs list of associated hardware specifications, and
+      the current ``onlineThresholdMinutes`` setting so the admin UI
+      can consistently flag servers whose heartbeat has gone stale.
   """
 
   data = []
@@ -1052,8 +1054,13 @@ def get_computers() -> object:
       for spec in computer.hardwareSpecs:
         addable["hardwareSpecs"].append(orm_to_dict(spec))
       data.append(addable)
-  
-  return api_response(True, "Data fetched.", { "computers": data })
+
+  from helpers.settings_handler import get_setting
+  threshold_minutes = int(get_setting("docker.serverOnlineThresholdMinutes"))
+  return api_response(True, "Data fetched.", {
+    "computers": data,
+    "onlineThresholdMinutes": threshold_minutes,
+  })
 
 def get_computer(computerId : int) -> object:
   """Retrieve a single computer by ID with structured hardware details.

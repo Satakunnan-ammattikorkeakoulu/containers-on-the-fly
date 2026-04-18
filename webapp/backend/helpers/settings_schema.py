@@ -143,6 +143,11 @@ SETTINGS_SCHEMA: Dict[str, SettingSetting] = {
         SettingSource.FILE, SettingType.TEXT, default="data/ssh_host_keys",
         description="Directory for persistent SSH host keys injected into containers to prevent known_hosts conflicts"
     ),
+    "docker.serverOnlineThresholdMinutes": SettingSetting(
+        SettingSource.DATABASE, SettingType.INTEGER, default=7,
+        min_value=1, max_value=60,
+        description="Minutes since a container server's last heartbeat before it is considered offline/unresponsive in the UI"
+    ),
 
     # Daemon Configuration
     "daemon.apiKey": SettingSetting(

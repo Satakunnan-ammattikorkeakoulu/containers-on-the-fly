@@ -325,17 +325,16 @@
                   md="4"
                 >
                   <v-card
-                    :class="{ 'selected-card': computer === computerItem.value }"
+                    :class="['computer-card', { 'selected-card': computer === computerItem.value, 'computer-card-disabled': computerItem.fullyBooked }]"
                     @click="computerItem.fullyBooked ? null : (computer = computerItem.value, computerChanged())"
                     :disabled="computerItem.fullyBooked"
                     hover
-                    :style="{ cursor: computerItem.fullyBooked ? 'not-allowed' : 'pointer', minHeight: '290px' }"
                     :outlined="computer !== computerItem.value"
                     :color="computer === computerItem.value ? 'primary' : ''"
                   >
-                    <v-card-body class="pa-4" style="height: 100%;">
-                      <div class="d-flex flex-column h-100" style="padding: 15px;">
-                        <div class="text-center mb-3">
+                    <v-card-body class="pa-4 computer-card-body">
+                      <div class="d-flex flex-column h-100 computer-card-inner">
+                        <div class="text-center computer-card-header">
                           <v-icon
                             size="32"
                             class="mb-2"
@@ -349,9 +348,31 @@
                           >
                             {{ computerItem.text }}
                           </div>
-                          <v-chip v-if="!computerItem.public" size="x-small" color="red" class="mt-1">Not Public</v-chip>
+                          <div class="computer-card-chips">
+                            <v-chip v-if="!computerItem.public" size="x-small" color="red" class="mr-1">Not Public</v-chip>
+                            <v-tooltip v-if="!computerItem.isOnline" location="top">
+                              <template v-slot:activator="{ props }">
+                                <v-chip
+                                  v-bind="props"
+                                  size="x-small"
+                                  color="warning"
+                                >
+                                  <v-icon start size="x-small">mdi-alert</v-icon>
+                                  May be offline
+                                </v-chip>
+                              </template>
+                              <span v-if="computerItem.lastPingAt">
+                                Last heartbeat {{ parseRelativeTime(computerItem.lastPingAt) }} ({{ parseDateTime(computerItem.lastPingAt) }}).
+                                Your container may fail to start if the server is unresponsive.
+                              </span>
+                              <span v-else>
+                                This server has never reported a heartbeat.
+                                Your container may fail to start if the server is unresponsive.
+                              </span>
+                            </v-tooltip>
+                          </div>
                         </div>
-                        <div class="flex-grow-1">
+                        <div>
                           <div
                             class="font-weight-medium mb-2"
                             :style="{
@@ -671,6 +692,7 @@
   import relativeTime from 'dayjs/plugin/relativeTime'
   import CalendarReservations from '/src/components/user/CalendarReservations.vue';
   import Loading from '/src/components/global/Loading.vue';
+  import { RelativeTime, DisplayTime } from '/src/helpers/time.js';
 
   import { useMainStore } from '@/store/store'
 
@@ -769,6 +791,22 @@
       }
     },
     methods: {
+      /**
+       * Format an ISO timestamp as a relative-time string (e.g. "3 minutes ago").
+       * @param {string} timestamp - ISO 8601 timestamp.
+       * @returns {string} Relative time string.
+       */
+      parseRelativeTime(timestamp) {
+        return RelativeTime(timestamp)
+      },
+      /**
+       * Format an ISO timestamp as a human-readable absolute time in the app timezone.
+       * @param {string} timestamp - ISO 8601 timestamp.
+       * @returns {string} Formatted absolute time string.
+       */
+      parseDateTime(timestamp) {
+        return DisplayTime(timestamp)
+      },
       /**
        * Validates the selected duration and advances to the Time panel.
        * If the duration changed from a previously confirmed value, invalidates downstream data.
@@ -1182,6 +1220,8 @@
                   "text": computer.name,
                   "fullyBooked": computer.fullyBooked === true,
                   "public": computer.public,
+                  "isOnline": computer.isOnline === true,
+                  "lastPingAt": computer.lastPingAt || null,
                 })
               });
               _this.computers = computers
@@ -2007,6 +2047,39 @@
   .panel-title-content {
     flex: 1;
     text-align: left;
+  }
+
+  .computer-card {
+    cursor: pointer;
+    min-height: 270px;
+  }
+
+  .computer-card-disabled {
+    cursor: not-allowed;
+  }
+
+  .computer-card-body {
+    height: 100%;
+  }
+
+  .computer-card-inner {
+    padding: 20px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+
+  .computer-card-header {
+    margin-bottom: 7px;
+  }
+
+  .computer-card-chips {
+    margin-top: 3px;
+    min-height: 22px;
+  }
+
+  .computer-card-chips :deep(.v-chip) {
+    padding-left: 12px;
+    padding-right: 12px;
   }
 
   .spec-tile-row {

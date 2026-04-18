@@ -57,7 +57,7 @@
           </v-toolbar-title>
         </v-toolbar>
       </v-sheet>
-      <v-sheet height="600">
+      <v-sheet height="600" class="calendar-sheet">
         <v-calendar
           ref="calendar"
           v-model="focus"
@@ -66,6 +66,7 @@
           :event-color="getEventColor"
           :type="type"
           :weekdays="weekdays"
+          :first-day-of-week="1"
           @click:time="selectSlot"
           event-overlap-mode="column"
           first-interval="0"
@@ -74,19 +75,37 @@
           :interval-format="intervalFormat"
         >
           <template #event="event">
-            <div v-if="event.eventParsed.input.isNowIndicator" class="now-indicator-event">
-              <strong>► Now</strong>
-            </div>
-            <div v-else-if="event.eventParsed.input.type === 'availability'" class="availability-event-content">
-              <div class="server-header">
-                <strong>{{event.eventParsed.input.computerName}}</strong>
+            <v-tooltip location="top" open-delay="150" max-width="320" content-class="calendar-event-tooltip">
+              <template v-slot:activator="{ props }">
+                <div
+                  v-bind="props"
+                  :class="event.eventParsed.input.type === 'availability' ? 'availability-event-content' : 'reservation-event-content'"
+                >
+                  <template v-if="event.eventParsed.input.type === 'availability'">
+                    <div class="server-header">
+                      <strong>{{event.eventParsed.input.computerName}}</strong>
+                    </div>
+                    <div class="resource-list" v-html="formatResourcesWithIndicators(event.eventParsed.input)" />
+                  </template>
+                  <template v-else>
+                    <p><b>{{event.eventParsed.input.name}}</b></p>
+                    <p v-if="event.eventParsed.input.isLowPriority" class="low-priority-label">Low-Priority</p>
+                    <p v-html="getReservationSpecs(event.eventParsed.input.reservationId)" />
+                  </template>
+                </div>
+              </template>
+              <div class="calendar-tooltip-content">
+                <template v-if="event.eventParsed.input.type === 'availability'">
+                  <div style="font-weight: bold; margin-bottom: 4px;">{{event.eventParsed.input.computerName}}</div>
+                  <div v-html="formatResourcesWithIndicators(event.eventParsed.input)" />
+                </template>
+                <template v-else>
+                  <div style="font-weight: bold; margin-bottom: 4px;">{{event.eventParsed.input.name}}</div>
+                  <div v-if="event.eventParsed.input.isLowPriority" class="low-priority-label" style="margin-bottom: 4px;">Low-Priority</div>
+                  <div v-html="getReservationSpecs(event.eventParsed.input.reservationId)" />
+                </template>
               </div>
-              <div class="resource-list" v-html="formatResourcesWithIndicators(event.eventParsed.input)" />
-            </div>
-            <div v-else class="reservation-event-content">
-              <p><b>{{event.eventParsed.input.name}}</b></p>
-              <p v-html="getReservationSpecs(event.eventParsed.input.reservationId)" />
-            </div>
+            </v-tooltip>
           </template>
         </v-calendar>
         <v-menu v-model="selectedOpen" :close-on-content-click="false" :activator="selectedElement" offset-x>
@@ -177,13 +196,24 @@
       reservationColorMap: {},
       nowIndicatorInterval: null,
     }),
+    computed: {
+      /** Only draw the "now" line on time-grid views (not month). */
+      showNowLine() {
+        return this.type !== 'month'
+      },
+    },
     mounted () {
       if (this.$refs.calendar) {
         this.$refs.calendar.checkChange()
       }
-      // Update the "now" indicator event every minute
+      this.$nextTick(() => {
+        this.updateNowLine()
+        this.scrollToNow()
+      })
+      // Refresh displayed events and the "now" indicator line each minute.
       this.nowIndicatorInterval = setInterval(() => {
         this.updateDisplayedEvents()
+        this.updateNowLine()
       }, 60000)
     },
     beforeUnmount() {
@@ -432,27 +462,71 @@
         }
       },
       /**
-       * Creates a "now" indicator event for the calendar.
-       * @returns {Object} A calendar event marking the current time
+       * Inserts or repositions a "now" indicator line inside the calendar's
+       * scrollable pane so it scrolls together with the time grid. Called on
+       * mount, on each minute tick, and when the view type/focus changes.
        */
-      createNowEvent() {
-        const now = new Date()
-        return {
-          id: 'now-indicator',
-          name: 'Now',
-          start: now,
-          end: new Date(now.getTime() + 15 * 60 * 1000), // 15-minute bar for visibility
-          color: '#F44336',
-          timed: true,
-          isNowIndicator: true,
-        }
+      updateNowLine() {
+        this.$nextTick(() => {
+          const calEl = this.$refs.calendar?.$el
+          if (!calEl) return
+          const pane = calEl.querySelector('.v-calendar-daily__pane, [class*="__pane"]')
+
+          // Clean up when switching to month view or any state that hides the line.
+          if (!this.showNowLine || !pane) {
+            const existing = calEl.querySelector('.now-line')
+            if (existing) existing.remove()
+            return
+          }
+
+          // Ensure the pane can host an absolutely-positioned child.
+          const paneStyle = window.getComputedStyle(pane)
+          if (paneStyle.position === 'static') pane.style.position = 'relative'
+
+          let line = pane.querySelector('.now-line')
+          if (!line) {
+            line = document.createElement('div')
+            line.className = 'now-line'
+            pane.appendChild(line)
+          }
+
+          const now = new Date()
+          const minutesFromMidnight = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60
+          const fraction = minutesFromMidnight / 1440
+          line.style.top = (pane.offsetHeight * fraction) + 'px'
+        })
+      },
+      /** Scrolls the calendar so the previous 30-min mark is near the top on open. */
+      scrollToNow() {
+        if (!this.showNowLine) return
+        this.$nextTick(() => {
+          const cal = this.$refs.calendar
+          if (!cal) return
+          const now = new Date()
+          const alignedMinute = now.getMinutes() - (now.getMinutes() % 30)
+          const hh = String(now.getHours()).padStart(2, '0')
+          const mm = String(alignedMinute).padStart(2, '0')
+          if (typeof cal.scrollToTime === 'function') {
+            cal.scrollToTime(`${hh}:${mm}`)
+          }
+          // Nudge upward so the aligned mark has a little breathing room above.
+          // scrollAreaRef is the scrollable pane; Vuetify may expose it as a ref object.
+          requestAnimationFrame(() => {
+            const rawRef = cal.scrollAreaRef
+            const pane = rawRef && rawRef.value !== undefined ? rawRef.value : rawRef
+            const target = pane && pane.scrollTop !== undefined
+              ? pane
+              : cal.$el.querySelector('.v-calendar-daily__scroll-area, [class*="scroll-area"]')
+            if (target && target.scrollTop >= 10) {
+              target.scrollTop -= 10
+            }
+          })
+        })
       },
       /** Switches the calendar events array between reservation and availability data based on viewMode. */
       updateDisplayedEvents() {
-        const nowEvent = this.createNowEvent()
-
         if (this.viewMode === 'availability') {
-          this.events = [...this.availabilityEvents, nowEvent]
+          this.events = [...this.availabilityEvents]
         } else {
           // Show reservation events
           let events = []
@@ -469,8 +543,9 @@
 
             const eventData = {
               id: `reservation-${res.reservationId}`,
-              name: res.isLowPriority ? "Reservation #" + res.reservationId + " (LP)" : "Reservation #" + res.reservationId,
+              name: "Reservation #" + res.reservationId,
               reservationId: res.reservationId,
+              isLowPriority: res.isLowPriority,
               start: startDate.toDate(),
               end: endDate.toDate(),
               color: res.isLowPriority ? 'amber darken-2' : color,
@@ -478,7 +553,6 @@
             }
             events.push(eventData)
           })
-          events.push(nowEvent)
           this.events = events
         }
       },
@@ -515,6 +589,7 @@
             if (this.viewMode === 'availability') {
               this.fetchAvailabilityData()
             }
+            this.updateNowLine()
           })
         }
       },
@@ -525,6 +600,8 @@
             if (this.viewMode === 'availability') {
               this.fetchAvailabilityData()
             }
+            this.updateNowLine()
+            this.scrollToNow()
           })
         }
       },
@@ -605,12 +682,8 @@
   }
 }
 
-.now-indicator-event {
-  padding: 1px 4px;
-  font-size: 11px;
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
-  white-space: nowrap;
+.calendar-sheet {
+  position: relative;
 }
 
 .reservation-event-content {
@@ -623,6 +696,12 @@
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
 }
+
+.low-priority-label {
+  font-size: 10px;
+  font-style: italic;
+  opacity: 0.85;
+}
 </style>
 
 <style lang="scss">
@@ -633,6 +712,37 @@
   &:hover {
     background-color: rgba(var(--v-theme-primary), 0.08);
   }
+}
+
+// Calendar event tooltip — dark background so white indicators/specs stay readable.
+// Match Vuetify's own selector specificity (.v-tooltip > .v-overlay__content) and
+// add our content-class so we win against the layered component rule.
+.v-tooltip > .v-overlay__content.calendar-event-tooltip {
+  background: rgba(30, 30, 30, 0.95) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+// "Now" indicator line — injected via JS into the calendar pane, so CSS must
+// live in the non-scoped block to apply to a plain DOM element.
+.now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #F44336;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.now-line::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #F44336;
 }
 
 // Global styles for dynamically generated resource indicators

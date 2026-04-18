@@ -55,11 +55,20 @@
                 </v-tooltip>
 
                 <!-- DESCRIPTION -->
-                <v-textarea v-model="data.description" label="Description" hint="Visible in the reservation page after selecting the container." class="mb-5"></v-textarea>
+                <v-textarea
+                  v-model="data.description"
+                  label="Description"
+                  counter="130"
+                  persistent-hint
+                  hint="Visible in the reservation page after selecting the container. Text over 130 characters is truncated on the card with a 'Read more' link showing the full text on hover."
+                  class="mb-5"
+                ></v-textarea>
               </v-col>
 
               <!-- CONTAINER CARD PREVIEW -->
               <v-col cols="12" v-if="data.name">
+                <h2 style="margin-top: 20px; margin-bottom: 3px;">Preview</h2>
+                <p class="text-muted" style="margin-bottom: 12px; margin-top: 0px;">How this container appears on the reservation page.</p>
                 <v-card
                   style="min-height: 200px; max-width: 320px;"
                   variant="outlined"
@@ -73,30 +82,84 @@
                         </div>
                         <div
                           class="text-body-2 mt-1"
-                          style="color: rgba(255,255,255,0.7); font-size: 12px; font-family: monospace;"
+                          style="color: rgba(255,255,255,0.7); font-size: 12px;"
                         >
-                          {{ data.imageName || 'image-name' }}
-                        </div>
-                        <div
-                          v-if="!data.public"
-                          class="text-body-2 mt-1"
-                          style="color: rgba(255,165,0,0.9); font-size: 11px; font-weight: 500;"
-                        >
-                          Private
+                          <span style="font-family: monospace;">
+                            {{ data.imageName || 'image-name' }}
+                          </span>
+                          <template v-if="(data.ports || []).length > 0">
+                            &nbsp;
+                            <v-tooltip location="top" max-width="320">
+                              <template v-slot:activator="{ props }">
+                                <v-chip
+                                  v-bind="props"
+                                  size="x-small"
+                                  variant="tonal"
+                                  style="cursor: help;"
+                                >
+                                  {{ data.ports.length }} service{{ data.ports.length === 1 ? '' : 's' }}
+                                </v-chip>
+                              </template>
+                              <div>
+                                <div style="font-weight: bold; margin-bottom: 6px;">Services exposed</div>
+                                <div
+                                  v-for="(port, idx) in portsPreview"
+                                  :key="idx"
+                                  class="d-flex align-center"
+                                  style="gap: 6px; margin: 3px 0;"
+                                >
+                                  <v-icon size="small">{{ getPortIcon(port.portType) }}</v-icon>
+                                  <span>
+                                    <strong>{{ port.serviceName || '(unnamed)' }}</strong>
+                                    &mdash; port {{ port.port || '?' }}<span v-if="port.portType"> ({{ port.portType }})</span>
+                                  </span>
+                                </div>
+                                <div style="margin-top: 8px; font-size: 12px; opacity: 0.8;">
+                                  These are the container's internal ports &mdash; an external port is assigned to each when your container starts.
+                                </div>
+                              </div>
+                            </v-tooltip>
+                          </template>
+                          <template v-if="!data.public">
+                            &nbsp;
+                            <v-tooltip location="top" max-width="280">
+                              <template v-slot:activator="{ props }">
+                                <v-chip
+                                  v-bind="props"
+                                  size="x-small"
+                                  color="warning"
+                                  variant="tonal"
+                                  style="cursor: help;"
+                                >Private</v-chip>
+                              </template>
+                              Only admins can see and select this container. Regular users won't see it on the reservation page.
+                            </v-tooltip>
+                          </template>
                         </div>
                       </div>
                       <div class="flex-grow-1 text-center">
                         <div
+                          v-if="data.description"
                           class="text-body-2"
                           style="color: rgba(255,255,255,0.8); font-size: 13px; line-height: 1.3;"
                         >
-                          {{ data.description || 'No description available' }}
+                          {{ descriptionPreview.text }}
+                          <template v-if="descriptionPreview.isTruncated">
+                            &nbsp;<v-tooltip location="top" max-width="400">
+                              <template v-slot:activator="{ props }">
+                                <span
+                                  v-bind="props"
+                                  class="admin-read-more-hint"
+                                >Read more</span>
+                              </template>
+                              <div style="white-space: pre-wrap;">{{ descriptionPreview.full }}</div>
+                            </v-tooltip>
+                          </template>
                         </div>
                       </div>
                     </div>
                   </v-card-text>
                 </v-card>
-                <p class="text-body-2 mt-2 mb-3 text-muted" style="font-size: 13px;">Preview — how this container appears on the reservation page.</p>
               </v-col>
 
               <!-- PORTS -->
@@ -524,6 +587,29 @@
       }
     },
     computed: {
+      /** Truncated description preview matching the reservation card behavior. */
+      descriptionPreview() {
+        const full = this.data.description || ''
+        const maxLen = 130
+        if (full.length <= maxLen) return { text: full, isTruncated: false, full }
+        let cutAt = full.lastIndexOf(' ', maxLen)
+        if (cutAt < maxLen * 0.7) cutAt = maxLen
+        return { text: full.slice(0, cutAt).trimEnd() + '…', isTruncated: true, full }
+      },
+      /**
+       * Ports ordered for the preview tooltip: primary-selected port first,
+       * falling back to the first SSH port, matching the reservation page.
+       */
+      portsPreview() {
+        const ports = this.data.ports || []
+        if (ports.length <= 1) return ports
+        let primaryIndex = this.primaryPortIndex
+        if (primaryIndex == null || primaryIndex < 0 || primaryIndex >= ports.length) {
+          primaryIndex = ports.findIndex(p => p.portType === 'SSH')
+        }
+        if (primaryIndex <= 0) return ports
+        return [ports[primaryIndex], ...ports.slice(0, primaryIndex), ...ports.slice(primaryIndex + 1)]
+      },
       isExternallyManaged() {
         // null = legacy container, treat as externally managed
         return this.data.managedExternally === true || this.data.managedExternally === null;
@@ -603,6 +689,16 @@
     mounted() {
     },
     methods: {
+      /** Maps a ContainerPort type to its corresponding mdi icon name. */
+      getPortIcon(portType) {
+        const icons = {
+          SSH: 'mdi-console',
+          HTTP: 'mdi-web',
+          HTTPS: 'mdi-lock',
+          VNC: 'mdi-monitor',
+        }
+        return icons[portType] || 'mdi-lan'
+      },
       /** Check if a port at the given index is the primary connection method. */
       isPrimaryPort(index) {
         return this.primaryPortIndex === index;
@@ -934,6 +1030,12 @@
 <style scoped lang="scss">
   .title {
     margin-top: 40px;
+  }
+
+  .admin-read-more-hint {
+    cursor: help;
+    text-decoration: underline;
+    font-size: 12px;
   }
 
   .dockerfile-textarea :deep(textarea),

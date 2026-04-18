@@ -182,44 +182,14 @@
                   md="4"
                 >
                   <v-card
-                    :class="{ 'selected-card': container === containerItem.value }"
+                    :class="['container-card', { 'selected-card': container === containerItem.value }]"
                     @click="selectContainer(containerItem.value)"
                     hover
-                    style="cursor: pointer; min-height: 260px; position: relative;"
                     :outlined="container !== containerItem.value"
                     :color="container === containerItem.value ? 'primary' : ''"
                   >
-                    <v-tooltip
-                      v-if="getContainerPortsById(containerItem.value).length > 0"
-                      location="top"
-                      max-width="320"
-                    >
-                      <template v-slot:activator="{ props }">
-                        <v-icon
-                          v-bind="props"
-                          class="container-ports-icon"
-                          size="20"
-                          @click.stop
-                        >mdi-lan</v-icon>
-                      </template>
-                      <div>
-                        <div style="font-weight: bold; margin-bottom: 6px;">Services exposed</div>
-                        <div
-                          v-for="port in getContainerPortsById(containerItem.value)"
-                          :key="port.containerPortId"
-                          class="d-flex align-center"
-                          style="gap: 6px; margin: 3px 0;"
-                        >
-                          <v-icon size="small">{{ getPortIcon(port.portType) }}</v-icon>
-                          <span>
-                            <strong>{{ port.serviceName }}</strong>
-                            &mdash; port {{ port.port }}<span v-if="port.portType"> ({{ port.portType }})</span>
-                          </span>
-                        </div>
-                      </div>
-                    </v-tooltip>
-                    <v-card-body class="pa-4" style="height: 100%;">
-                      <div class="d-flex flex-column h-100" style="padding: 15px;">
+                    <v-card-body class="pa-4 container-card-body">
+                      <div class="d-flex flex-column h-100 container-card-inner">
                         <div class="text-center mb-3">
                           <v-icon
                             size="32"
@@ -238,26 +208,68 @@
                             class="text-body-2 mt-1"
                             :style="{
                               color: container === containerItem.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.7)',
-                              fontSize: '12px',
-                              fontFamily: 'monospace'
+                              fontSize: '12px'
                             }"
                           >
-                            {{ getContainerImageById(containerItem.value) || 'No image specified' }}
-                          </div>
-                          <div
-                            v-if="!getContainerPublicById(containerItem.value) && isAdmin()"
-                            class="text-body-2 mt-1"
-                            :style="{
-                              color: container === containerItem.value ? 'rgba(255,255,255,0.9)' : 'rgba(255,165,0,0.9)',
-                              fontSize: '11px',
-                              fontWeight: '500'
-                            }"
-                          >
-                            Private
+                            <span style="font-family: monospace;">
+                              {{ getContainerImageById(containerItem.value) || 'No image specified' }}
+                            </span>
+                            <template v-if="getContainerPortsById(containerItem.value).length > 0">
+                              &nbsp;
+                              <v-tooltip location="top" max-width="320">
+                                <template v-slot:activator="{ props }">
+                                  <v-chip
+                                    v-bind="props"
+                                    size="x-small"
+                                    variant="tonal"
+                                    class="services-exposed-chip"
+                                    @click.stop
+                                  >
+                                    {{ getContainerPortsById(containerItem.value).length }}
+                                    service{{ getContainerPortsById(containerItem.value).length === 1 ? '' : 's' }}
+                                  </v-chip>
+                                </template>
+                                <div>
+                                  <div style="font-weight: bold; margin-bottom: 6px;">Services exposed</div>
+                                  <div
+                                    v-for="port in getContainerPortsById(containerItem.value)"
+                                    :key="port.containerPortId"
+                                    class="d-flex align-center"
+                                    style="gap: 6px; margin: 3px 0;"
+                                  >
+                                    <v-icon size="small">{{ getPortIcon(port.portType) }}</v-icon>
+                                    <span>
+                                      <strong>{{ port.serviceName }}</strong>
+                                      &mdash; port {{ port.port }}<span v-if="port.portType"> ({{ port.portType }})</span>
+                                    </span>
+                                  </div>
+                                  <div style="margin-top: 8px; font-size: 12px; opacity: 0.8;">
+                                    These are the container's internal ports &mdash; an external port is assigned to each when your container starts.
+                                  </div>
+                                </div>
+                              </v-tooltip>
+                            </template>
+                            <template v-if="!getContainerPublicById(containerItem.value) && isAdmin()">
+                              &nbsp;
+                              <v-tooltip location="top" max-width="280">
+                                <template v-slot:activator="{ props }">
+                                  <v-chip
+                                    v-bind="props"
+                                    size="x-small"
+                                    color="warning"
+                                    variant="tonal"
+                                    style="cursor: help;"
+                                    @click.stop
+                                  >Private</v-chip>
+                                </template>
+                                Only admins can see and select this container. Regular users won't see it on the reservation page.
+                              </v-tooltip>
+                            </template>
                           </div>
                         </div>
                         <div class="flex-grow-1">
                           <div
+                            v-if="getContainerDescriptionById(containerItem.value)"
                             class="text-body-2"
                             :style="{
                               color: container === containerItem.value ? 'white' : 'rgba(255,255,255,0.8)',
@@ -265,7 +277,19 @@
                               lineHeight: '1.3'
                             }"
                           >
-                            {{ getContainerDescriptionById(containerItem.value) || 'No description available' }}
+                            {{ getContainerDescriptionDisplay(containerItem.value).text }}
+                            <template v-if="getContainerDescriptionDisplay(containerItem.value).isTruncated">
+                              &nbsp;<v-tooltip location="top" max-width="400">
+                                <template v-slot:activator="{ props }">
+                                  <span
+                                    v-bind="props"
+                                    class="read-more-hint"
+                                    @click.stop
+                                  >Read more</span>
+                                </template>
+                                <div style="white-space: pre-wrap;">{{ getContainerDescriptionDisplay(containerItem.value).full }}</div>
+                              </v-tooltip>
+                            </template>
                           </div>
                         </div>
                       </div>
@@ -1527,6 +1551,20 @@
         return ""
       },
       /**
+       * Returns description info for card display: truncates at ~130 chars and
+       * breaks at a word boundary when possible.
+       * @param {number} containerId The container ID
+       * @param {number} [maxLen=130] Max length before truncation
+       * @returns {{ text: string, isTruncated: boolean, full: string }}
+       */
+      getContainerDescriptionDisplay(containerId, maxLen = 130) {
+        const full = this.getContainerDescriptionById(containerId) || ''
+        if (full.length <= maxLen) return { text: full, isTruncated: false, full }
+        let cutAt = full.lastIndexOf(' ', maxLen)
+        if (cutAt < maxLen * 0.7) cutAt = maxLen
+        return { text: full.slice(0, cutAt).trimEnd() + '…', isTruncated: true, full }
+      },
+      /**
        * Gets the container image name for a specific container ID
        * @param {number} containerId The container ID to get the image name for
        * @returns {string} The container image name
@@ -1556,11 +1594,22 @@
        * @returns {Array} List of { containerPortId, serviceName, port, portType }
        */
       getContainerPortsById(containerId) {
-        if (this.allContainers) {
-          let container = this.allContainers.find(x => x.containerId == containerId)
-          if (container && container.containerPorts) return container.containerPorts
+        if (!this.allContainers) return []
+        const container = this.allContainers.find(x => x.containerId == containerId)
+        if (!container || !container.containerPorts) return []
+        const ports = container.containerPorts
+        // Hoist the primary (favorite) port so users see it first.
+        // Falls back to the first SSH-typed port when primaryConnectionPortId is null,
+        // matching the backend convention (see Container.primaryConnectionPortId).
+        let primaryIndex = -1
+        if (container.primaryConnectionPortId != null) {
+          primaryIndex = ports.findIndex(p => p.containerPortId === container.primaryConnectionPortId)
         }
-        return []
+        if (primaryIndex === -1) {
+          primaryIndex = ports.findIndex(p => p.portType === 'SSH')
+        }
+        if (primaryIndex <= 0) return ports
+        return [ports[primaryIndex], ...ports.slice(0, primaryIndex), ...ports.slice(primaryIndex + 1)]
       },
       /**
        * Maps a ContainerPort type to its corresponding mdi icon name.
@@ -2002,19 +2051,6 @@
     transition: all 0.3s ease;
   }
 
-  .container-ports-icon {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    opacity: 0.6;
-    cursor: help;
-    z-index: 2;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-
   .v-card:hover {
     transform: translateY(-1px);
     transition: all 0.3s ease;
@@ -2070,6 +2106,32 @@
 
   .computer-card-header {
     margin-bottom: 7px;
+  }
+
+  .services-exposed-chip {
+    cursor: help;
+  }
+
+  .read-more-hint {
+    cursor: help;
+    text-decoration: underline;
+    font-size: 12px;
+  }
+
+  .container-card {
+    cursor: pointer;
+    min-height: 220px;
+    position: relative;
+  }
+
+  .container-card-body {
+    height: 100%;
+  }
+
+  .container-card-inner {
+    padding: 25px;
+    padding-top: 0;
+    padding-bottom: 0;
   }
 
   .computer-card-chips {

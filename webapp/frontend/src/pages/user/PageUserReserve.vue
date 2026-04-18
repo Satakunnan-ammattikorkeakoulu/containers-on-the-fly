@@ -172,7 +172,7 @@
             </v-col>
           </v-row>
           <v-row justify="center" v-if="containers && containers.length">
-            <v-col cols="10">
+            <v-col cols="12">
               <v-row style="justify-content: center !important;">
                 <v-col
                   v-for="containerItem in containers"
@@ -180,6 +180,7 @@
                   cols="12"
                   sm="6"
                   md="4"
+                  xl="3"
                 >
                   <v-card
                     :class="['container-card', { 'selected-card': container === containerItem.value }]"
@@ -2121,7 +2122,14 @@
   .container-card {
     cursor: pointer;
     min-height: 220px;
+    height: 100%;
     position: relative;
+  }
+
+  @media (min-width: 1020px) {
+    .container-card {
+      min-width: 280px;
+    }
   }
 
   .container-card-body {

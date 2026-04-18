@@ -32,7 +32,7 @@
                 ></v-switch>
 
                 <!-- NAME -->
-                <v-text-field type="text" id="name" :rules="[rules.required]" v-model="data.name" label="Name*" hint="Visible in the reservation container dropdown listing." class="mb-10"></v-text-field>
+                <v-text-field type="text" id="name" :rules="[rules.required]" v-model="data.name" label="Name*" placeholder="For example: Ubuntu 24 Base" hint="Visible in the reservation container dropdown listing." class="mb-10"></v-text-field>
 
                 <!-- IMAGE NAME -->
                 <v-tooltip location="top" :disabled="!imageNameLocked" text="Image name is locked after the image has been built. Delete and recreate this container to use a different name.">
@@ -43,6 +43,7 @@
                         :rules="[rules.required, rules.imageName]"
                         v-model="data.imageName"
                         label="Image name*"
+                        placeholder="For example: ubuntu-24-base"
                         :disabled="imageNameLocked"
                         :hint="imageNameLocked
                           ? 'Image name is locked after the image has been built. Delete and recreate this container to use a different name.'

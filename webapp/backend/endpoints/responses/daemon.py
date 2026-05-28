@@ -24,6 +24,15 @@ from helpers.logger import log
 from helpers.tables.audit_log import log_action
 
 
+# Reservation statuses the daemon can still act on. Terminal statuses
+# ("stopped", "error") are excluded from the /tasks query because no
+# consumer in get_tasks() reads them — loading them would only inflate
+# the result set (and the joinedload Cartesian product) for no benefit.
+ACTIVE_RESERVATION_STATUSES = (
+    "reserved", "started", "restart", "restart_error", "paused", "stopping",
+)
+
+
 def _time_now():
     """Return the current UTC datetime as a naive datetime.
 
@@ -213,7 +222,10 @@ def get_tasks(computer_id: int):
     }
 
     with Session() as session:
-        # Load all reservations for this computer with relevant relations
+        # Load only reservations the daemon can still act on. Filtering by
+        # status keeps the result set (and the joinedload Cartesian product
+        # across roles/mounts/ports/hardware) bounded by currently-active
+        # reservations instead of growing with full historical volume.
         all_reservations = session.execute(
             select(Reservation)
             .options(
@@ -223,7 +235,10 @@ def get_tasks(computer_id: int):
                 joinedload(Reservation.user).joinedload(User.roles).joinedload(Role.mounts),
                 joinedload(Reservation.computer),
             )
-            .where(Reservation.computerId == computer_id)
+            .where(
+                Reservation.computerId == computer_id,
+                Reservation.status.in_(ACTIVE_RESERVATION_STATUSES),
+            )
         ).unique().scalars().all()
 
         # Also load the "everyone" role mounts for this computer

@@ -16,7 +16,9 @@
 SERVER_IP_ADDRESS="YOUR_IP_HERE"
 
 # Main server web interface host (domain or IP, without http/https)
-# Only main server, separate container servers can leave this empty.
+# Main server uses this to configure it's visible address etc.
+# If configuring a separate container server, then this address is
+# used by the container server to communicate with the main server.
 # Examples: "yourdomain.com", "localhost", "192.168.1.100"
 MAIN_SERVER_WEB_HOST="YOUR_IP_OR_DOMAIN_HERE"
 

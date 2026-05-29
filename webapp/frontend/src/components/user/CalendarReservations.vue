@@ -487,13 +487,14 @@
           if (!line) {
             line = document.createElement('div')
             line.className = 'now-line'
-            pane.appendChild(line)
+            pane.insertBefore(line, pane.firstChild)
           }
 
           const now = new Date()
           const minutesFromMidnight = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60
           const fraction = minutesFromMidnight / 1440
           line.style.top = (pane.offsetHeight * fraction) + 'px'
+          line.style.zIndex = '0'
         })
       },
       /** Scrolls the calendar so the previous 30-min mark is near the top on open. */
@@ -756,7 +757,6 @@
   height: 2px;
   background: #F44336;
   pointer-events: none;
-  z-index: 3;
 }
 
 .now-line::before {

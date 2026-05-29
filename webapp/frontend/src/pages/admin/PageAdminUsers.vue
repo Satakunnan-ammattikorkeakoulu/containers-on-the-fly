@@ -11,7 +11,13 @@
       <v-col cols="12">
         <v-btn color="green" @click="addUser">Create New User</v-btn>
         <br>
-        <a v-if="!showFilters" style="margin-top: 12px; margin-bottom: 24px; display: inline-block; font-size: 14px;" @click="showFilters = true">Show Filters</a>
+        <span style="margin-top: 12px; margin-bottom: 16px; display: inline-flex; align-items: center; gap: 16px; font-size: 14px;">
+          <a v-if="!showFilters" @click="showFilters = true">Show Filters</a>
+          <span style="display: inline-flex; align-items: center; gap: 8px;">
+            <v-icon size="x-small" color="green">mdi-circle</v-icon>
+            {{ onlineCount }} {{ onlineCount === 1 ? 'user' : 'users' }} online
+          </span>
+        </span>
       </v-col>
     </v-row>
 
@@ -54,6 +60,16 @@
           clearable
           @update:model-value="onTextFilterChange"
         ></v-text-field>
+      </v-col>
+      <v-col cols="12" md="3">
+        <v-select
+          :items="onlineStatusItems"
+          label="Online Status"
+          v-model="filters.onlineStatus"
+          item-title="text"
+          item-value="value"
+          @update:model-value="onFilterChange"
+        ></v-select>
       </v-col>
     </v-row>
 
@@ -177,8 +193,10 @@ export default {
       userId: '',
       name: '',
       email: '',
-      role: 'All'
+      role: 'All',
+      onlineStatus: 'All',
     },
+    serverOnlineCount: 0,
     tableOptions: {
       page: 1,
       itemsPerPage: 10,
@@ -197,6 +215,18 @@ export default {
     },
   }),
   computed: {
+    /** Online user count returned by the server (all users, not just current page). */
+    onlineCount() {
+      return this.serverOnlineCount
+    },
+    /** Online status filter dropdown items. */
+    onlineStatusItems() {
+      return [
+        { text: 'All', value: 'All' },
+        { text: 'Online', value: 'Online' },
+        { text: 'Offline', value: 'Offline' },
+      ]
+    },
     /** Builds role filter dropdown items with user counts per role. */
     roleItems() {
       const items = [{text: `All`, value: 'All'}];
@@ -326,6 +356,7 @@ export default {
             name: _this.filters.name || '',
             email: _this.filters.email || '',
             userId: _this.filters.userId || '',
+            onlineStatus: _this.filters.onlineStatus === 'All' ? '' : (_this.filters.onlineStatus || ''),
           }
         },
         headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
@@ -335,6 +366,7 @@ export default {
           _this.users = response.data.data.users;
           _this.totalItems = response.data.data.totalItems;
           _this.availableRoles = response.data.data.availableRoles || [];
+          _this.serverOnlineCount = response.data.data.onlineCount ?? 0;
         } else {
           console.log("Failed getting users...");
           _this.store.showMessage({ text: "There was an error getting users.", color: "red" });

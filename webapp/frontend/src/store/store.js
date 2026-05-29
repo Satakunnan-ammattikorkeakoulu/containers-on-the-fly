@@ -257,6 +257,7 @@ export const useMainStore = defineStore('main', {
             _this.user.stopScriptPath = response.data.data.stopScriptPath || ""
             localStorage.setItem("user", JSON.stringify(_this.user))
             identifyUser({ email: _this.user.email, name: _this.user.name })
+            _this._startHeartbeat()
             if (_this.initializing) _this.initializing = false
             return payload.callback({ success: true, message: "Login token OK!" });
           }
@@ -287,6 +288,10 @@ export const useMainStore = defineStore('main', {
     /** Clear all user state from the store and remove the session from localStorage. */
     logoutUser() {
       clearUserIdentity()
+      if (this._heartbeatInterval) {
+        clearInterval(this._heartbeatInterval)
+        this._heartbeatInterval = null
+      }
       localStorage.removeItem("user")
       this.user.loginToken = ""
       this.user.email = ""
@@ -294,6 +299,21 @@ export const useMainStore = defineStore('main', {
       this.user.role = ""
       this.user.roles = []
       this.user.loggedinAt = null
+    },
+
+    /** Send a heartbeat to keep the user's lastSeenAt timestamp current. */
+    _sendHeartbeat() {
+      if (!this.isLoggedIn) return
+      axios.post(AppSettings.APIServer.user.heartbeat, {}, {
+        headers: { Authorization: `Bearer ${this.user.loginToken}` }
+      }).catch(() => {})
+    },
+
+    /** Start the 60-second heartbeat interval. Idempotent — clears any existing interval first. */
+    _startHeartbeat() {
+      if (this._heartbeatInterval) clearInterval(this._heartbeatInterval)
+      this._sendHeartbeat()
+      this._heartbeatInterval = setInterval(() => { this._sendHeartbeat() }, 60000)
     },
 
     /**

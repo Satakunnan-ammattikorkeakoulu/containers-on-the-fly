@@ -151,6 +151,21 @@ class UpdateScriptPathsRequest(BaseModel):
   startScriptPath: Optional[str] = None
   stopScriptPath: Optional[str] = None
 
+@router.post("/heartbeat")
+def heartbeat(token: str = Depends(oauth2_scheme)):
+  """Update the authenticated user's lastSeenAt timestamp.
+
+  Called by the frontend every 60 seconds to track active session presence.
+
+  Args:
+      token: OAuth2 bearer token (injected by Depends).
+
+  Returns:
+      Success API response.
+  """
+  force_authentication(token)
+  return functionality.update_heartbeat(token)
+
 @router.post("/update_script_paths")
 def update_script_paths(request: UpdateScriptPathsRequest, token: str = Depends(oauth2_scheme)):
   """Store or clear the authenticated user's container start/stop script paths.

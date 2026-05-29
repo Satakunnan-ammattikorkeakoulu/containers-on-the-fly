@@ -46,6 +46,7 @@ class User(Base):
   stopScriptPath = Column(Text, nullable = True)
   removed = Column(Boolean, nullable = True)
   activityLastSeenAt = Column(DateTime, nullable = True)
+  lastSeenAt = Column(DateTime, nullable = True)
 
   roles = relationship("Role", secondary = "UserRole", back_populates = "users", single_parent=True)
   reservations = relationship("Reservation", back_populates = "user")

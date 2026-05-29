@@ -307,6 +307,26 @@ def update_ssh_key(token, ssh_public_key):
     session.commit()
     return api_response(True, "SSH public key updated successfully.")
 
+def update_heartbeat(token):
+  """Update the user's lastSeenAt timestamp to the current UTC time.
+
+  Called by the frontend every 60 seconds while the user is logged in.
+  Used to track active session presence for the admin users table.
+
+  Args:
+      token: The user's login token.
+
+  Returns:
+      Response indicating success or failure.
+  """
+  with Session() as session:
+    user = session.execute(select(User).where(User.loginToken == token)).scalar_one_or_none()
+    if user is None:
+      return api_response(False, "User not found.")
+    user.lastSeenAt = datetime.now(timezone.utc)
+    session.commit()
+    return api_response(True, "OK", {})
+
 SCRIPT_PATH_REGEX = re.compile(r'^/[a-zA-Z0-9._/\-]+$')
 
 def validate_script_path(path):

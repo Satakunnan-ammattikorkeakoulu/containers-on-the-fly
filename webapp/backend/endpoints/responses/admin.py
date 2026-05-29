@@ -772,6 +772,7 @@ def get_users(request: AdminUsersRequest) -> object:
     name_filter = filters.get("name", "")
     email_filter = filters.get("email", "")
     user_id_filter = filters.get("userId", "")
+    online_status_filter = filters.get("onlineStatus", "")
 
     allowed_sort_keys = {
         "userId": User.userId,
@@ -779,6 +780,7 @@ def get_users(request: AdminUsersRequest) -> object:
         "name": User.name,
         "createdAt": User.userCreatedAt,
         "hasPassword": User.password,
+        "lastSeenAt": User.lastSeenAt,
     }
 
     with Session() as session:
@@ -794,6 +796,14 @@ def get_users(request: AdminUsersRequest) -> object:
             base_stmt = base_stmt.where(User.email.ilike(f"%{email_filter}%"))
         if user_id_filter:
             base_stmt = base_stmt.where(cast(User.userId, String).like(f"%{user_id_filter}%"))
+        if online_status_filter == "Online":
+            online_threshold = datetime.datetime.utcnow() - timedelta(minutes=2)
+            base_stmt = base_stmt.where(User.lastSeenAt >= online_threshold)
+        elif online_status_filter == "Offline":
+            online_threshold = datetime.datetime.utcnow() - timedelta(minutes=2)
+            base_stmt = base_stmt.where(
+                (User.lastSeenAt == None) | (User.lastSeenAt < online_threshold)
+            )
 
         # Get total count of filtered results
         total_items = get_total_count(session, base_stmt)
@@ -817,6 +827,7 @@ def get_users(request: AdminUsersRequest) -> object:
                 "roles": [role.name for role in user.roles],
                 "createdAt": user.userCreatedAt,
                 "hasPassword": user.password is not None and user.password != "",
+                "lastSeenAt": user.lastSeenAt,
             })
 
     # Get available roles with user counts (always unfiltered)
@@ -835,10 +846,19 @@ def get_users(request: AdminUsersRequest) -> object:
     for role in available_roles:
         role["userCount"] = role_user_counts.get(role["name"], 0)
 
+    online_threshold = datetime.datetime.utcnow() - timedelta(minutes=2)
+    with Session() as session:
+        online_count = session.execute(
+            select(func.count()).select_from(User)
+            .where(User.removed.isnot(True))
+            .where(User.lastSeenAt >= online_threshold)
+        ).scalar()
+
     return api_response(True, "Users fetched successfully", {
         "users": data,
         "totalItems": total_items,
         "availableRoles": available_roles,
+        "onlineCount": online_count,
     })
 
 def get_user(userId: int) -> object:

@@ -53,6 +53,26 @@
         <v-icon v-if="item.hasPassword" color="green">mdi-check</v-icon>
         <v-icon v-else color="red">mdi-close</v-icon>
       </template>
+
+      <!-- User ID with online indicator -->
+      <template v-slot:item.userId="{item}">
+        <v-tooltip :text="isOnline(item) ? 'Online' : 'Offline'" location="bottom">
+          <template v-slot:activator="{ props }">
+            <v-icon v-bind="props" :color="isOnline(item) ? 'green' : 'grey'" size="x-small" style="vertical-align: middle; margin-right: 4px;">mdi-circle</v-icon>
+          </template>
+        </v-tooltip>
+        {{ item.userId }}
+      </template>
+
+      <!-- Last Seen -->
+      <template v-slot:item.lastSeenAt="{item}">
+        <v-tooltip v-if="item.lastSeenAt" location="bottom" :text="parseTime(item.lastSeenAt)">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.lastSeenAt) }}</span>
+          </template>
+        </v-tooltip>
+        <span v-else>Never</span>
+      </template>
     </v-data-table-server>
   </div>
 </template>
@@ -93,6 +113,10 @@ export default {
       type: Array,
       default: () => [{key: 'userId', order: 'desc'}],
     },
+    propOnlineThresholdMinutes: {
+      type: Number,
+      default: 2,
+    },
   },
   data: () => ({
     table: {
@@ -103,6 +127,7 @@ export default {
         { title: 'Roles', key: 'roles', sortable: false },
         { title: 'Password Set', key: 'hasPassword' },
         { title: 'Created', key: 'createdAt' },
+        { title: 'Last Seen', key: 'lastSeenAt' },
         { title: '', key: 'actions', sortable: false },
       ],
     }
@@ -124,6 +149,11 @@ export default {
     },
     onOptionsUpdate(options) {
       this.$emit('update:options', options)
+    },
+    isOnline(item) {
+      if (!item.lastSeenAt) return false
+      const ts = item.lastSeenAt.endsWith('Z') || item.lastSeenAt.includes('+') ? item.lastSeenAt : item.lastSeenAt + 'Z'
+      return (Date.now() - new Date(ts).getTime()) < this.propOnlineThresholdMinutes * 60 * 1000
     },
   },
 }

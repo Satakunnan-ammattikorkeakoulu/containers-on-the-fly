@@ -89,7 +89,6 @@
                     <div class="resource-list" v-html="formatResourcesWithIndicators(event.eventParsed.input)" />
                   </template>
                   <template v-else>
-                    <p><b>{{event.eventParsed.input.name}}</b></p>
                     <p v-if="event.eventParsed.input.isLowPriority" class="low-priority-label">Low-Priority</p>
                     <p v-html="getReservationSpecs(event.eventParsed.input.reservationId)" />
                   </template>
@@ -101,7 +100,7 @@
                   <div v-html="formatResourcesWithIndicators(event.eventParsed.input)" />
                 </template>
                 <template v-else>
-                  <div style="font-weight: bold; margin-bottom: 4px;">{{event.eventParsed.input.name}}</div>
+                  <div style="font-weight: bold; margin-bottom: 4px;">Reservation {{event.eventParsed.input.name}}</div>
                   <div v-if="event.eventParsed.input.isLowPriority" class="low-priority-label" style="margin-bottom: 4px;">Low-Priority</div>
                   <div v-html="getReservationSpecs(event.eventParsed.input.reservationId)" />
                 </template>

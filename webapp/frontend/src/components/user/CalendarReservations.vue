@@ -191,7 +191,7 @@
       viewMode: 'reservations',
       availabilityEvents: [],
       colors: ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue',
-               'teal', 'green', 'amber darken-2', 'orange darken-3', 'deep-orange', 'brown', 'grey', 'blue-grey'],
+               'teal', 'green', 'orange darken-3', 'deep-orange', 'brown', 'grey', 'blue-grey'],
       reservationColorMap: {},
       nowIndicatorInterval: null,
     }),
@@ -548,7 +548,7 @@
               isLowPriority: res.isLowPriority,
               start: startDate.toDate(),
               end: endDate.toDate(),
-              color: res.isLowPriority ? 'amber darken-2' : color,
+              color: res.isLowPriority ? 'orange darken-3' : color,
               timed: true,
             }
             events.push(eventData)

@@ -634,6 +634,9 @@
   padding: 2px 4px;
   font-size: 11px;
   line-height: 1.2;
+  overflow: hidden;
+  white-space: normal;
+  word-wrap: break-word;
   
   .server-header {
     margin-bottom: 3px;
@@ -689,11 +692,16 @@
 .reservation-event-content {
   padding: 2px 4px;
   font-size: 11px;
+  overflow: hidden;
+  white-space: normal;
+  word-wrap: break-word;
 
   p {
     margin: 1px 0;
     color: rgba(255, 255, 255, 0.95);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    white-space: normal;
+    word-wrap: break-word;
   }
 }
 

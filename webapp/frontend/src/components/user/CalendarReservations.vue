@@ -80,6 +80,7 @@
                 <div
                   v-bind="props"
                   :class="event.eventParsed.input.type === 'availability' ? 'availability-event-content' : 'reservation-event-content'"
+                  style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden;"
                 >
                   <template v-if="event.eventParsed.input.type === 'availability'">
                     <div class="server-header">
@@ -543,7 +544,7 @@
 
             const eventData = {
               id: `reservation-${res.reservationId}`,
-              name: "Reservation #" + res.reservationId,
+              name: "#" + res.reservationId,
               reservationId: res.reservationId,
               isLowPriority: res.isLowPriority,
               start: startDate.toDate(),
@@ -713,6 +714,23 @@
 </style>
 
 <style lang="scss">
+// Clip event block content so text never floats outside the colored box.
+.v-event {
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+// Pin the tooltip activator (and its content wrapper) to the event block's bounds.
+.v-event .reservation-event-content,
+.v-event .availability-event-content {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden !important;
+}
+
 // Calendar time slot interactivity
 .v-calendar-daily__day-interval {
   cursor: pointer;

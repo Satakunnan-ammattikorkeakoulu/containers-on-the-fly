@@ -20,12 +20,13 @@ def _hw_spec(spec_id, amount):
 
 def _reservation(res_id, specs, *, is_lp=False, container_name=None,
                  image_name="img", computer_name="srv", created_at="2025-01-01",
-                 stop_script=None, container_username="user"):
+                 stop_script=None, container_username="user", status="started"):
     res = {
         "reservationId": res_id,
         "reservedHardwareSpecs": [_hw_spec(s, a) for s, a in specs],
         "isLowPriority": is_lp,
         "createdAt": created_at,
+        "status": status,
         "container": {"imageName": image_name, "containerUsername": container_username},
         "computer": {"name": computer_name},
     }
@@ -185,17 +186,19 @@ class TestPauseLowPriorityForNormalReservations:
     @patch("daemon.api")
     def test_pauses_newest_lp_first(self, mock_api, mock_settings, mock_stop, mock_run_stop):
         mock_settings.get_setting.return_value = True
-        lp_old = _reservation(10, [("cpu", 4)], is_lp=True, container_name="r-10", created_at="2025-01-01")
+        # Realistic state: total used == capacity (8 of 8). Pending normal
+        # needs 4, deficit = 4. Newest LP alone (4 CPU) covers the deficit,
+        # so older LP must NOT be paused.
+        lp_old = _reservation(10, [("cpu", 2)], is_lp=True, container_name="r-10", created_at="2025-01-01")
         lp_new = _reservation(11, [("cpu", 4)], is_lp=True, container_name="r-11", created_at="2025-06-01")
-        # non-LP uses 6 of 8 CPUs -> deficit for normal needing 4
         tasks = _tasks(
             computerCapacity=_capacity([("cpu", 8)]),
-            allActiveReservations=[_reservation(99, [("cpu", 6)]), lp_old, lp_new],
-            normalPendingReservations=[_reservation(1, [("cpu", 4)])],
+            allActiveReservations=[_reservation(99, [("cpu", 2)]), lp_old, lp_new],
+            normalPendingReservations=[_reservation(1, [("cpu", 4)], status="reserved")],
             lowPriorityRunning=[lp_old, lp_new],
         )
         pause_low_priority_for_normal_reservations(tasks)
-        # Should pause the newest one first (r-11), which frees enough resources
+        # Should pause only the newest (r-11), since 4 CPU covers the deficit
         mock_stop.assert_called_once_with("r-11")
 
     @patch("daemon.run_stop_script")
@@ -204,40 +207,23 @@ class TestPauseLowPriorityForNormalReservations:
     @patch("daemon.api")
     def test_stops_pausing_once_deficit_resolved(self, mock_api, mock_settings, mock_stop, mock_run_stop):
         mock_settings.get_setting.return_value = True
+        # Realistic state: 4 (non-LP) + 4 (lp1) + 4 (lp2) = 12 of 12.
+        # Pending normal needs 4 CPU, deficit = 4. Pausing the newest LP
+        # alone (lp2, 4 CPU) zeroes the deficit, so lp1 must NOT be paused.
         lp1 = _reservation(10, [("cpu", 4)], is_lp=True, container_name="r-10", created_at="2025-01-01")
         lp2 = _reservation(11, [("cpu", 4)], is_lp=True, container_name="r-11", created_at="2025-06-01")
         tasks = _tasks(
             computerCapacity=_capacity([("cpu", 12)]),
-            allActiveReservations=[lp1, lp2],
-            normalPendingReservations=[_reservation(1, [("cpu", 4)])],
-            lowPriorityRunning=[lp1, lp2],
-        )
-        pause_low_priority_for_normal_reservations(tasks)
-        # Only 1 LP needs to be paused to free 4 CPUs (12 capacity - 0 non-lp used = 12 avail, need 4)
-        # Actually non-LP used = 0, available = 12, need 4 -> resources_ok is True, no pauses needed
-        # Let me fix: make capacity tighter
-        tasks = _tasks(
-            computerCapacity=_capacity([("cpu", 8)]),
-            allActiveReservations=[lp1, lp2],
-            normalPendingReservations=[_reservation(1, [("cpu", 4)])],
-            lowPriorityRunning=[lp1, lp2],
-        )
-        pause_low_priority_for_normal_reservations(tasks)
-        # non-lp used = 0, capacity = 8, available = 8, need 4 -> resources_ok is True
-        # Need a non-LP reservation eating resources
-        tasks = _tasks(
-            computerCapacity=_capacity([("cpu", 8)]),
             allActiveReservations=[
-                _reservation(99, [("cpu", 6)]),  # non-LP using 6
+                _reservation(99, [("cpu", 4)]),  # non-LP using 4
                 lp1, lp2,
             ],
-            normalPendingReservations=[_reservation(1, [("cpu", 4)])],
+            normalPendingReservations=[_reservation(1, [("cpu", 4)], status="reserved")],
             lowPriorityRunning=[lp1, lp2],
         )
         pause_low_priority_for_normal_reservations(tasks)
-        # non-lp used = 6, available = 2, need 4, deficit = 2
-        # Pause newest (lp2, 4 cpu) -> deficit resolved, stop
         assert mock_stop.call_count == 1
+        mock_stop.assert_called_with("r-11")
 
 
 # ---------------------------------------------------------------------------

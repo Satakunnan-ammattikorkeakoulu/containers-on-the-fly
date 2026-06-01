@@ -101,10 +101,11 @@
                 variant="tonal"
                 prepend-icon="mdi-chevron-double-down"
                 class="ml-2"
-              >Low Priority</v-chip>
+              >{{ lowPriorityChipLabel(item) }}</v-chip>
             </template>
             <div>
               <strong>Low Priority</strong><br>
+              {{ lowPriorityLevelDescription(item) }}<br><br>
               This container may be paused if resources are needed by other reservations, and will automatically resume when resources become available.
               When paused, the container is recreated &mdash; only files on mounted volumes persist.
               Outside ports are held and normally restored on resume.
@@ -211,6 +212,20 @@
       }
     }),
     methods: {
+      lowPriorityChipLabel(item) {
+        const level = item.lowPriorityLevel || 1
+        return `Low Priority (${level})`
+      },
+      lowPriorityLevelDescription(item) {
+        const level = item.lowPriorityLevel || 1
+        const labels = { 1: "Standard", 2: "Background", 3: "Idle" }
+        const descriptions = {
+          1: "Pauses only for normal reservations.",
+          2: "Pauses for normal and Standard low-priority reservations.",
+          3: "Pauses for all other reservations \u2014 runs only when the server is otherwise free.",
+        }
+        return `${labels[level] || "Standard"} (${level}): ${descriptions[level] || descriptions[1]}`
+      },
       /** Returns an HTML string listing all port mappings (local -> outside) for a reservation tooltip. */
       getPorts(ports) {
         if (ports) {

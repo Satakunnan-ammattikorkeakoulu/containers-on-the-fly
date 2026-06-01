@@ -140,7 +140,7 @@ def get_own_reservation_details(reservationId: int, token: str = Depends(oauth2_
   return functionality.get_own_reservation_details(reservationId, userId)
 
 @router.post("/create_reservation")
-def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, startScriptPath: str = "", stopScriptPath: str = "", token: str = Depends(oauth2_scheme)):
+def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, lowPriorityLevel: int = 1, startScriptPath: str = "", stopScriptPath: str = "", token: str = Depends(oauth2_scheme)):
   """Create a new container reservation after validating all inputs.
 
   Validates date, duration, IDs, email format, description length (max 40),
@@ -159,6 +159,9 @@ def create_reservation(date: str, duration: int, computerId: int, containerId: i
       shmSizePercent: Shared memory size as a percentage of RAM (0 -- 90).
       ramDiskSizePercent: RAM disk size as a percentage of RAM (0 -- 60).
       isLowPriority: Whether this is a low-priority reservation (default False).
+      lowPriorityLevel: Sub-priority for low-priority reservations (1 = Standard,
+          2 = Background, 3 = Idle). Only meaningful when isLowPriority is True;
+          silently normalized to 1 otherwise.
       startScriptPath: Absolute path to a start script inside the container
           (optional, overrides user profile default).
       stopScriptPath: Absolute path to a stop script inside the container
@@ -210,6 +213,13 @@ def create_reservation(date: str, duration: int, computerId: int, containerId: i
   if not isinstance(ramDiskSizePercent, int) or ramDiskSizePercent < 0 or ramDiskSizePercent > 60:
     return api_response(False, "RAM disk size percentage must be between 0 and 60.")
 
+  # Validate low-priority level. Silently normalize to 1 when not low-priority.
+  if not isLowPriority:
+    lowPriorityLevel = 1
+  else:
+    if not isinstance(lowPriorityLevel, int) or lowPriorityLevel < 1 or lowPriorityLevel > 3:
+      return api_response(False, "Low-priority level must be 1, 2, or 3.")
+
   # Validate script paths
   if startScriptPath:
     startScriptPath = str(startScriptPath).strip()
@@ -241,7 +251,7 @@ def create_reservation(date: str, duration: int, computerId: int, containerId: i
     return api_response(False, "Invalid hardware specs JSON format.")
 
   userId = get_authenticated_user_id(token)
-  return functionality.create_reservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description, shmSizePercent, ramDiskSizePercent, isLowPriority, startScriptPath, stopScriptPath)
+  return functionality.create_reservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description, shmSizePercent, ramDiskSizePercent, isLowPriority, lowPriorityLevel, startScriptPath, stopScriptPath)
 
 @router.get("/get_current_reservations")
 def get_current_reservations(token: str = Depends(oauth2_scheme)):

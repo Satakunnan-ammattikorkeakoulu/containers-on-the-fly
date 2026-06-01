@@ -196,6 +196,7 @@ erDiagram
         datetime updatedAt
         text status
         bool isLowPriority
+        int lowPriorityLevel
     }
     ReservedContainerPort {
         int reservedContainerPortId PK

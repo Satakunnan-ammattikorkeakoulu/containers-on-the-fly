@@ -70,6 +70,7 @@ def _serialize_reservation(res, include_container=False, include_user=False,
         "startDate": res.startDate.isoformat() if res.startDate else None,
         "endDate": res.endDate.isoformat() if res.endDate else None,
         "isLowPriority": res.isLowPriority,
+        "lowPriorityLevel": res.lowPriorityLevel,
         "createdAt": res.createdAt.isoformat() if res.createdAt else None,
     }
 
@@ -268,14 +269,20 @@ def get_tasks(computer_id: int):
         running_reservations = []
         paused_reservations = []
         normal_pending = []
+        lp_pending = []
         lp_running = []
         all_active = []
         future_normal = []
+        future_low_priority = []
 
         for res in all_reservations:
             # To start: status=reserved, startDate < now
             if res.status == "reserved" and res.startDate < now:
                 if res.isLowPriority:
+                    lp_pending.append(
+                        _serialize_reservation(res, include_hardware=True,
+                                               feature_flags=feature_flags)
+                    )
                     reservations_to_start.append(
                         _serialize_reservation(res, include_container=True, include_user=True,
                                                include_hardware=True, include_mounts=True,
@@ -347,6 +354,18 @@ def get_tasks(computer_id: int):
                     and res.startDate < look_ahead_end
                     and res.endDate > now):
                 future_normal.append(
+                    _serialize_reservation(res, include_hardware=True,
+                                           feature_flags=feature_flags)
+                )
+
+            # Future LP: for LP resume look-ahead — a paused LP at level N
+            # should not resume if a higher-priority LP (level < N) is about
+            # to start. Same "reserved-only" rule as future_normal.
+            if (res.isLowPriority
+                    and res.status == "reserved"
+                    and res.startDate < look_ahead_end
+                    and res.endDate > now):
+                future_low_priority.append(
                     _serialize_reservation(res, include_hardware=True,
                                            feature_flags=feature_flags)
                 )
@@ -432,9 +451,11 @@ def get_tasks(computer_id: int):
             "runningReservations": running_reservations,
             "pausedReservations": paused_reservations,
             "normalPendingReservations": normal_pending,
+            "lowPriorityPendingReservations": lp_pending,
             "lowPriorityRunning": lp_running,
             "allActiveReservations": all_active,
             "futureNormalReservations": future_normal,
+            "futureLowPriorityReservations": future_low_priority,
             "computerCapacity": computer_capacity,
             "containersToBuild": containers_to_build,
             "containersToRemove": containers_to_remove,
@@ -546,6 +567,7 @@ def report_started(reservation_id: int, data, computer_id: int):
         email_end_date = reservation.endDate
         email_username = container_obj.containerUsername or "user"
         email_is_low_priority = reservation.isLowPriority
+        email_low_priority_level = reservation.lowPriorityLevel
         log_user_id = reservation.userId
 
         # Build port list for email. On the reuse path, data.ports is
@@ -602,12 +624,18 @@ def report_started(reservation_id: int, data, computer_id: int):
             is_low_priority=email_is_low_priority,
         )
 
+    log_details = {
+        "computerName": audit_computer_name,
+        "imageName": email_image_name,
+        "isLowPriority": email_is_low_priority,
+    }
+    if email_is_low_priority:
+        log_details["lowPriorityLevel"] = email_low_priority_level
     log_action(
         None,
         "RESERVATION_RESUMED" if is_resume else "RESERVATION_STARTED",
         "reservation", reservation_id,
-        {"computerName": audit_computer_name, "imageName": email_image_name,
-         "isLowPriority": email_is_low_priority},
+        log_details,
     )
 
     # One audit entry per stolen port so the victim LP is easy to find.
@@ -787,6 +815,7 @@ def report_paused(reservation_id: int, data, computer_id: int):
 
         # Collect email data while still in session scope
         email_recipient = reservation.user.email
+        paused_level = reservation.lowPriorityLevel
 
     # Send notification email outside session to avoid holding DB connection during SMTP I/O
     send_container_paused_email(
@@ -796,7 +825,8 @@ def report_paused(reservation_id: int, data, computer_id: int):
 
     log_action(
         None, "RESERVATION_PAUSED", "reservation", reservation_id,
-        {"computerName": data.computerName, "imageName": data.imageName},
+        {"computerName": data.computerName, "imageName": data.imageName,
+         "lowPriorityLevel": paused_level},
     )
 
     log.info(f"Low-priority reservation {reservation_id} paused")

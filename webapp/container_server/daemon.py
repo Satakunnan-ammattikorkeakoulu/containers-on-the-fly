@@ -52,6 +52,7 @@ def main():
                     continue
 
                 pause_low_priority_for_normal_reservations(tasks)
+                pause_lower_lp_for_higher_lp(tasks)
                 pause_overcommitted_low_priority(tasks)
                 stop_finished_servers(tasks)
                 start_new_servers(tasks)
@@ -163,7 +164,15 @@ def process_image_removals(tasks):
 
 
 def pause_low_priority_for_normal_reservations(tasks):
-    """Pause running low-priority containers to free resources for normal reservations."""
+    """Pause running low-priority containers to free resources for normal reservations.
+
+    For each pending normal reservation, compute resources used by every other
+    active reservation (LP + normal, started + reserved) and pause LP if the
+    pending normal would otherwise overcommit. Same accounting as
+    _are_resources_available(), so the pause happens in the same cycle as the
+    start — avoiding the brief overcommit window that would otherwise be
+    cleaned up by pause_overcommitted_low_priority one cycle later.
+    """
     if not settings_handler.get_setting("docker.enabled"):
         return
 
@@ -179,44 +188,44 @@ def pause_low_priority_for_normal_reservations(tasks):
     all_active = tasks.get("allActiveReservations", [])
 
     try:
-        # Build total capacity map
         total_capacity = {}
         for spec in computer_capacity.get("hardwareSpecs", []):
             total_capacity[spec["hardwareSpecId"]] = spec["maximumAmount"]
-
-        # Calculate resources used by non-LP active reservations
-        non_lp_used = {}
-        for res in all_active:
-            if not res.get("isLowPriority", False):
-                for spec in res.get("reservedHardwareSpecs", []):
-                    sid = spec["hardwareSpecId"]
-                    non_lp_used[sid] = non_lp_used.get(sid, 0) + spec["amount"]
 
         for normal_res in normal_pending:
             needed = {}
             for spec in normal_res.get("reservedHardwareSpecs", []):
                 needed[spec["hardwareSpecId"]] = spec["amount"]
 
-            # Check if resources are already available
-            resources_ok = True
-            for sid, amount in needed.items():
-                available = total_capacity.get(sid, 0) - non_lp_used.get(sid, 0)
-                if amount > available:
-                    resources_ok = False
-                    break
+            # Used by every other active reservation, including LP. Excluding
+            # self avoids double-counting the pending normal's own demand
+            # against itself in the deficit formula.
+            used = {}
+            for res in all_active:
+                if res.get("reservationId") == normal_res.get("reservationId"):
+                    continue
+                for spec in res.get("reservedHardwareSpecs", []):
+                    sid = spec["hardwareSpecId"]
+                    used[sid] = used.get(sid, 0) + spec["amount"]
 
-            if resources_ok:
-                continue
-
-            # Build deficit map
             deficit = {}
             for sid, amount in needed.items():
-                available = total_capacity.get(sid, 0) - non_lp_used.get(sid, 0)
+                available = total_capacity.get(sid, 0) - used.get(sid, 0)
                 if amount > available:
                     deficit[sid] = amount - available
 
-            # Pause LP containers (newest first = LIFO)
-            lp_sorted = sorted(lp_running, key=lambda r: r.get("createdAt", ""), reverse=True)
+            if not deficit:
+                continue
+
+            # Pause LP containers. Order: lowest priority first (highest
+            # lowPriorityLevel number), then newest first within the same
+            # level (LIFO). This makes idle/background LP get paused before
+            # standard LP when a normal reservation needs resources.
+            lp_sorted = sorted(
+                lp_running,
+                key=lambda r: (r.get("lowPriorityLevel", 1), r.get("createdAt", "")),
+                reverse=True,
+            )
             to_pause = []
 
             for lp_res in lp_sorted:
@@ -257,9 +266,11 @@ def pause_low_priority_for_normal_reservations(tasks):
                     api.report_paused(lp_res["reservationId"], image_name, computer_name)
                     log.info(f"Low-priority reservation {lp_res['reservationId']} paused for normal reservation {normal_res['reservationId']}")
 
-                    # Remove from running list
+                    # Remove from running list and active list so resource
+                    # checks later in this cycle see the freed capacity.
                     if lp_res in lp_running:
                         lp_running.remove(lp_res)
+                    _remove_from_active(tasks, lp_res["reservationId"])
 
                 except Exception as e:
                     log.error(f"Error pausing low-priority reservation {lp_res['reservationId']}: {e}")
@@ -302,9 +313,16 @@ def pause_overcommitted_low_priority(tasks):
         for spec in computer_capacity.get("hardwareSpecs", []):
             total_capacity[spec["hardwareSpecId"]] = spec["maximumAmount"]
 
-        # Calculate total resource usage across ALL active reservations
+        # Calculate total resource usage across actually-running reservations.
+        # Pending ("reserved") reservations are excluded — they aren't consuming
+        # resources yet, so counting them would falsely flag overcommit and
+        # cause the older running LP to be paused for a newer pending LP.
+        # Pending LPs that can't fit are blocked by _are_resources_available
+        # at start time instead.
         total_used = {}
         for res in all_active:
+            if res.get("status") != "started":
+                continue
             for spec in res.get("reservedHardwareSpecs", []):
                 sid = spec["hardwareSpecId"]
                 total_used[sid] = total_used.get(sid, 0) + spec["amount"]
@@ -321,8 +339,14 @@ def pause_overcommitted_low_priority(tasks):
 
         log.warning(f"Resource overcommit detected: {overcommit}")
 
-        # Pause LP containers (newest first) until overcommit resolved
-        lp_sorted = sorted(lp_running, key=lambda r: r.get("createdAt", ""), reverse=True)
+        # Pause LP containers until overcommit resolved. Order matches
+        # pause_low_priority_for_normal_reservations: lowest priority
+        # (highest lowPriorityLevel) first, then newest first within tier.
+        lp_sorted = sorted(
+            lp_running,
+            key=lambda r: (r.get("lowPriorityLevel", 1), r.get("createdAt", "")),
+            reverse=True,
+        )
         to_pause = []
 
         for lp_res in lp_sorted:
@@ -365,12 +389,169 @@ def pause_overcommitted_low_priority(tasks):
 
                 if lp_res in lp_running:
                     lp_running.remove(lp_res)
+                _remove_from_active(tasks, lp_res["reservationId"])
 
             except Exception as e:
                 log.error(f"Error pausing overcommitted LP reservation {lp_res['reservationId']}: {e}")
 
     except Exception as e:
         log.error(f"Error in pause_overcommitted_low_priority: {e}")
+
+
+def pause_lower_lp_for_higher_lp(tasks):
+    """Pause running low-priority containers to free resources for higher-priority
+    low-priority reservations.
+
+    Mirrors pause_low_priority_for_normal_reservations(), but operates within
+    the low-priority class: an LP at level N preempts running LP at level > N.
+    This is what lets an "Idle" LLM reservation (level 3) yield when a
+    "Standard" low-priority job (level 1) needs the server.
+
+    Candidates considered: pending (status="reserved") LPs and paused LPs.
+    Paused higher-priority LPs are included so they can preempt lower-priority
+    running LPs and then be resumed by resume_paused_containers later in the
+    same cycle — otherwise a paused Standard LP would sit forever while
+    lower-priority Idle LPs hold the resources it needs.
+
+    Args:
+        tasks: The task bundle from the backend API containing
+            lowPriorityPendingReservations, pausedReservations,
+            lowPriorityRunning, computerCapacity, and allActiveReservations.
+    """
+    if not settings_handler.get_setting("docker.enabled"):
+        return
+
+    lp_pending = tasks.get("lowPriorityPendingReservations", [])
+    paused_lp = [
+        p for p in tasks.get("pausedReservations", [])
+        if p.get("isLowPriority", False)
+    ]
+    candidates = list(lp_pending) + paused_lp
+    if not candidates:
+        return
+
+    lp_running = tasks.get("lowPriorityRunning", [])
+    if not lp_running:
+        return
+
+    computer_capacity = tasks.get("computerCapacity", {})
+    all_active = tasks.get("allActiveReservations", [])
+
+    try:
+        # Process highest-priority (lowest level number) candidate first
+        candidates_sorted = sorted(
+            candidates,
+            key=lambda r: (r.get("lowPriorityLevel", 1), r.get("createdAt", "")),
+        )
+
+        total_capacity = {}
+        for spec in computer_capacity.get("hardwareSpecs", []):
+            total_capacity[spec["hardwareSpecId"]] = spec["maximumAmount"]
+
+        for candidate_res in candidates_sorted:
+            candidate_level = candidate_res.get("lowPriorityLevel", 1)
+
+            # Lower-priority LP still running that this candidate can preempt
+            preemptable = [
+                r for r in lp_running
+                if r.get("lowPriorityLevel", 1) > candidate_level
+            ]
+            if not preemptable:
+                continue
+
+            # Compute current usage from actually-running reservations only.
+            # Pending ("reserved") reservations — including the pending higher-
+            # priority LP itself — are excluded so the deficit formula
+            # (needed + used - capacity) doesn't double-count `needed` into
+            # `used` and over-pause lower-priority LP.
+            used = {}
+            for res in all_active:
+                if res.get("status") != "started":
+                    continue
+                for spec in res.get("reservedHardwareSpecs", []):
+                    sid = spec["hardwareSpecId"]
+                    used[sid] = used.get(sid, 0) + spec["amount"]
+
+            needed = {}
+            for spec in candidate_res.get("reservedHardwareSpecs", []):
+                needed[spec["hardwareSpecId"]] = spec["amount"]
+
+            resources_ok = True
+            for sid, amount in needed.items():
+                available = total_capacity.get(sid, 0) - used.get(sid, 0)
+                if amount > available:
+                    resources_ok = False
+                    break
+            if resources_ok:
+                continue
+
+            deficit = {}
+            for sid, amount in needed.items():
+                available = total_capacity.get(sid, 0) - used.get(sid, 0)
+                if amount > available:
+                    deficit[sid] = amount - available
+
+            # Pause lower-priority LP: lowest priority (highest level)
+            # first, newest first within the same level.
+            preemptable_sorted = sorted(
+                preemptable,
+                key=lambda r: (r.get("lowPriorityLevel", 1), r.get("createdAt", "")),
+                reverse=True,
+            )
+            to_pause = []
+
+            for lp_res in preemptable_sorted:
+                if not deficit:
+                    break
+                lp_specs = {}
+                for spec in lp_res.get("reservedHardwareSpecs", []):
+                    lp_specs[spec["hardwareSpecId"]] = spec["amount"]
+
+                has_overlap = any(sid in lp_specs for sid in deficit)
+                if not has_overlap:
+                    continue
+
+                to_pause.append(lp_res)
+                for sid in list(deficit.keys()):
+                    if sid in lp_specs:
+                        deficit[sid] -= lp_specs[sid]
+                        if deficit[sid] <= 0:
+                            del deficit[sid]
+
+            for lp_res in to_pause:
+                try:
+                    rc = lp_res.get("reservedContainer", {})
+                    container_docker_name = rc.get("containerDockerName") if rc else None
+                    if container_docker_name:
+                        stop_script = rc.get("stopScriptPath")
+                        if stop_script:
+                            container_data = lp_res.get("container", {})
+                            container_username = (container_data.get("containerUsername") or "user") if container_data else "user"
+                            run_stop_script(container_docker_name, stop_script, container_username, tasks.get("stopScriptTimeoutSeconds", 40))
+                        stop_container(container_docker_name)
+
+                    container_data = lp_res.get("container", {})
+                    image_name = container_data.get("imageName", "unknown") if container_data else "unknown"
+                    computer_name = lp_res.get("computer", {}).get("name", "unknown")
+
+                    api.report_paused(lp_res["reservationId"], image_name, computer_name)
+                    log.info(
+                        f"Low-priority reservation {lp_res['reservationId']} (level "
+                        f"{lp_res.get('lowPriorityLevel', 1)}) paused for higher-priority "
+                        f"low-priority reservation {candidate_res['reservationId']} "
+                        f"(level {candidate_level})"
+                    )
+
+                    if lp_res in lp_running:
+                        lp_running.remove(lp_res)
+                    _remove_from_active(tasks, lp_res["reservationId"])
+
+                except Exception as e:
+                    log.error(f"Error pausing LP-vs-LP reservation {lp_res['reservationId']}: {e}")
+
+    except Exception as e:
+        log.error(f"Error in pause_lower_lp_for_higher_lp: {e}")
+
 
 
 def resume_paused_containers(tasks):
@@ -386,6 +567,7 @@ def resume_paused_containers(tasks):
         computer_capacity = tasks.get("computerCapacity", {})
         all_active = tasks.get("allActiveReservations", [])
         future_normal = tasks.get("futureNormalReservations", [])
+        future_low_priority = tasks.get("futureLowPriorityReservations", [])
 
         total_capacity = {}
         for spec in computer_capacity.get("hardwareSpecs", []):
@@ -397,7 +579,14 @@ def resume_paused_containers(tasks):
                 sid = spec["hardwareSpecId"]
                 used[sid] = used.get(sid, 0) + spec["amount"]
 
-        for paused_res in paused:
+        # Resume in priority order: highest priority (lowest level number)
+        # first, then oldest first within the same level (FIFO).
+        paused_sorted = sorted(
+            paused,
+            key=lambda r: (r.get("lowPriorityLevel", 1), r.get("createdAt", "")),
+        )
+
+        for paused_res in paused_sorted:
             needed = {}
             for spec in paused_res.get("reservedHardwareSpecs", []):
                 needed[spec["hardwareSpecId"]] = spec["amount"]
@@ -413,9 +602,21 @@ def resume_paused_containers(tasks):
             if not resources_ok:
                 continue
 
-            # Look-ahead: check for conflicts with future normal reservations
+            my_level = paused_res.get("lowPriorityLevel", 1)
+
+            # Look-ahead: don't resume if a higher-priority reservation is
+            # about to need these resources. Normal reservations always
+            # outrank LP. Future LP only outrank this candidate if their
+            # level is strictly lower than mine.
+            higher_priority_future = list(future_normal)
+            for future_lp in future_low_priority:
+                if future_lp.get("reservationId") == paused_res.get("reservationId"):
+                    continue
+                if future_lp.get("lowPriorityLevel", 1) < my_level:
+                    higher_priority_future.append(future_lp)
+
             would_conflict = False
-            for future_res in future_normal:
+            for future_res in higher_priority_future:
                 for f_spec in future_res.get("reservedHardwareSpecs", []):
                     f_sid = f_spec["hardwareSpecId"]
                     if f_sid in needed:
@@ -428,7 +629,7 @@ def resume_paused_containers(tasks):
                     break
 
             if would_conflict:
-                log.debug(f"Skipping resume of paused reservation {paused_res['reservationId']}: would conflict with upcoming normal reservation")
+                log.debug(f"Skipping resume of paused reservation {paused_res['reservationId']}: would conflict with upcoming higher-priority reservation")
                 continue
 
             # Resume
@@ -717,6 +918,17 @@ def restart_docker_container(res):
     except Exception as e:
         log.error(f"Error restarting container for reservation {reservation_id}: {e}")
         api.report_restarted(reservation_id, success=False, error_message=str(e))
+
+
+def _remove_from_active(tasks, reservation_id):
+    """Remove a reservation from the in-memory active/running views.
+
+    Called immediately after a pause so subsequent resource checks in
+    the same cycle see the freed capacity. The backend authoritative
+    state is updated separately via api.report_paused().
+    """
+    active = tasks.get("allActiveReservations", [])
+    tasks["allActiveReservations"] = [r for r in active if r.get("reservationId") != reservation_id]
 
 
 def _are_resources_available(res, tasks):

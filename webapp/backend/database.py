@@ -214,6 +214,7 @@ class Reservation(Base):
   updatedAt = Column(DateTime(timezone=True), onupdate=func.now())
   status = Column(Text, nullable = False) # reserved, started, stopping, stopped, error, restart, restart_error, paused
   isLowPriority = Column(Boolean, nullable=False, default=False)
+  lowPriorityLevel = Column(Integer, nullable=False, default=1)
 
   user = relationship("User", back_populates = "reservations")
   reservedContainer = relationship("ReservedContainer", back_populates = "reservation")

@@ -680,12 +680,13 @@ def get_current_reservations() -> object:
         "computerName": reservation.computer.name,
         "hardwareSpecs": specs,
         "isLowPriority": reservation.isLowPriority,
+        "lowPriorityLevel": reservation.lowPriorityLevel,
       }
       reservations.append(res)
 
   return api_response(True, "Current reservations fetched.", { "reservations": reservations })
 
-def create_reservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, startScriptPath: str = "", stopScriptPath: str = ""):
+def create_reservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, lowPriorityLevel: int = 1, startScriptPath: str = "", stopScriptPath: str = ""):
   """Create a new container reservation with hardware resource allocation.
 
   Validates all inputs including duration limits, resource availability,
@@ -709,6 +710,10 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
           RAM (0-60, default 0).
       isLowPriority: Whether this is a low-priority reservation that
           can be paused when normal reservations need resources.
+      lowPriorityLevel: Sub-priority for LP reservations (1 = Standard,
+          2 = Background, 3 = Idle). Higher numbers yield to lower
+          numbers within the LP class. Forced to 1 when isLowPriority
+          is False.
       startScriptPath: Absolute path to a start script inside the
           container (overrides user profile default if set).
       stopScriptPath: Absolute path to a stop script inside the
@@ -718,6 +723,11 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       Response indicating success with informByEmail flag, or an error
       message describing validation failure.
   """
+  # Normalize: lowPriorityLevel is only meaningful when isLowPriority is True.
+  if not isLowPriority:
+    lowPriorityLevel = 1
+  if not isinstance(lowPriorityLevel, int) or lowPriorityLevel < 1 or lowPriorityLevel > 3:
+    return api_response(False, "Low-priority level must be 1, 2, or 3.")
   # Validate description length if provided
   if description and len(description) > 40:
     return api_response(False, "Description must be 40 characters or less.")
@@ -855,6 +865,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       "computerId": computerId,
       "status": "reserved",
       "isLowPriority": isLowPriority,
+      "lowPriorityLevel": lowPriorityLevel,
     }
 
     # Only add description if it's provided and not empty
@@ -974,7 +985,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
                 "containerImage": container.imageName, "duration": duration,
                 "description": description, "hardwareSpecs": reserved_specs_summary,
                 "shmSizePercent": shmSizePercent, "ramDiskSizePercent": ramDiskSizePercent,
-                "isLowPriority": isLowPriority})
+                "isLowPriority": isLowPriority, "lowPriorityLevel": lowPriorityLevel})
     return api_response(True, "Reservation created succesfully!", { "informByEmail": inform_by_email })
 
 def cancel_reservation(userId : int, reservationId: int):
@@ -1462,6 +1473,7 @@ def get_all_reservations_for_calendar(startDate: str, endDate: str) -> object:
         "hardwareSpecs": specs,
         "status": reservation.status,
         "isLowPriority": reservation.isLowPriority,
+        "lowPriorityLevel": reservation.lowPriorityLevel,
       })
     
   return api_response(True, "All reservations fetched.", {"reservations": reservations})

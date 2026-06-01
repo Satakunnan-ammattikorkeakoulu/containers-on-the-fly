@@ -371,7 +371,7 @@ def get_user_reservation_activity(user_id, request):
         # the full JSON details blob.
         user_visible_detail_keys = {
             "cancelledBy", "duration", "success",
-            "resumeFailure", "isLowPriority",
+            "resumeFailure", "isLowPriority", "lowPriorityLevel",
             "oldEndDate", "newEndDate",
         }
 
@@ -501,6 +501,7 @@ def _build_reservation_summaries(session, user_id, reservation_ids):
             "shmSizePercent": shm_size_percent,
             "ramDiskSizePercent": ram_disk_size_percent,
             "isLowPriority": bool(res.isLowPriority),
+            "lowPriorityLevel": res.lowPriorityLevel,
             "imageName": image_name,
             "ports": ports,
         }

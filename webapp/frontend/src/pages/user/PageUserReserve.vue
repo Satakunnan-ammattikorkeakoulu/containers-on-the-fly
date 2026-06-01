@@ -65,6 +65,32 @@
                 <li><strong>Container:</strong> stopped and recreated on resume. Only mounted volumes persist &mdash; packages, processes, <code>/tmp</code>, and in-memory state are lost.</li>
                 <li><strong>Ports:</strong> held across pause/resume so your SSH config keeps working. In rare cases, if the server runs out of ports, you may come back on new ones &mdash; hover the server name in your reservation list to check.</li>
               </ul>
+              <div class="mt-3">
+                <a href="#" @click.prevent="showLowPriorityLevelOptions = !showLowPriorityLevelOptions">
+                  <v-icon size="small" class="mr-1">mdi-tune-variant</v-icon>
+                  {{ showLowPriorityLevelOptions ? 'Hide Priority Level' : 'Change Priority Level (Advanced)' }}
+                  <v-icon size="small" class="ml-1">{{ showLowPriorityLevelOptions ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                </a>
+                <div v-if="showLowPriorityLevelOptions" class="mt-2">
+                  <v-radio-group v-model="lowPriorityLevel" hide-details density="compact">
+                    <v-radio :value="1">
+                      <template #label>
+                        <span><strong>Standard (1)</strong> &mdash; default. Pauses only for normal reservations.</span>
+                      </template>
+                    </v-radio>
+                    <v-radio :value="2">
+                      <template #label>
+                        <span><strong>Background (2)</strong> &mdash; pauses for normal and Standard low-priority reservations.</span>
+                      </template>
+                    </v-radio>
+                    <v-radio :value="3">
+                      <template #label>
+                        <span><strong>Idle (3)</strong> &mdash; pauses for all other reservations. Suitable for LLM/idle workloads that should only run when the server is otherwise free.</span>
+                      </template>
+                    </v-radio>
+                  </v-radio-group>
+                </div>
+              </div>
             </v-alert>
           </div>
           <v-row justify="center">
@@ -771,6 +797,8 @@
       reserveDurationHours: null,
       initializingDefaults: false,
       isLowPriority: false,
+      lowPriorityLevel: 1,
+      showLowPriorityLevelOptions: false,
       showReservedGpus: false,
       shmSizePercent: 50,
       ramDiskSizePercent: 0,
@@ -1433,6 +1461,7 @@
           "shmSizePercent": this.shmSizePercent,
           "ramDiskSizePercent": this.ramDiskSizePercent,
           "isLowPriority": this.isLowPriority,
+          "lowPriorityLevel": this.isLowPriority ? this.lowPriorityLevel : 1,
           "startScriptPath": this.reservationStartScriptPath && this.reservationStartScriptPath.trim() ? this.reservationStartScriptPath.trim() : "",
           "stopScriptPath": this.reservationStopScriptPath && this.reservationStopScriptPath.trim() ? this.reservationStopScriptPath.trim() : ""
         }
@@ -1963,6 +1992,10 @@
             if (!spec) return true
             return (spec.reservedAmount || 0) === 0
           })
+          // Reset advanced priority back to Standard so a user who once
+          // picked Idle and then unchecked LP doesn't carry that over.
+          this.lowPriorityLevel = 1
+          this.showLowPriorityLevelOptions = false
         }
       },
       /**

@@ -57,10 +57,38 @@ fi
 
 echo "Running with sudo privileges."
 
+# Prompt: should this script install/manage NVIDIA GPU drivers?
+# Skipping is useful when the user has their own pinned NVIDIA driver version installed.
+echo ""
+echo ""
+echo -e "${GREEN}NVIDIA DRIVER MANAGEMENT${RESET}"
+echo "Install nvidia:570-server-open? This PURGES existing NVIDIA packages and adds"
+echo "ppa:graphics-drivers/ppa."
+echo ""
+echo -e "  ${GREEN}y${RESET} - Yes, install/reinstall drivers"
+echo "      (recommended for fresh setups with no previous nvidia GPU installation)"
+echo -e "  ${GREEN}n${RESET} - No, skip"
+echo "      (use your own drivers, or already installed via this script)"
+echo ""
+echo "nvidia-container-toolkit and Docker NVIDIA runtime are installed either way."
+echo -n "Choice (y/n): "
+read NVIDIA_CHOICE
+echo ""
+if [ "$NVIDIA_CHOICE" = "n" ] || [ "$NVIDIA_CHOICE" = "N" ]; then
+    INSTALL_NVIDIA_DRIVERS=false
+    echo -e "${YELLOW}Skipping NVIDIA driver installation. You are responsible for managing the drivers yourself.${RESET}"
+else
+    INSTALL_NVIDIA_DRIVERS=true
+    echo -e "${GREEN}NVIDIA drivers will be installed/managed by this script.${RESET}"
+fi
+echo ""
+
 # Update and install initial packages
 sudo apt update -qq
-sudo rm /etc/apt/sources.list.d/nvidia-*.list 2>/dev/null
-sudo apt-get purge -y -qq '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*' 2>/dev/null
+if [ "$INSTALL_NVIDIA_DRIVERS" = "true" ]; then
+    sudo rm /etc/apt/sources.list.d/nvidia-*.list 2>/dev/null
+    sudo apt-get purge -y -qq '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*' 2>/dev/null
+fi
 
 
 
@@ -75,7 +103,9 @@ curl -fsSL https://nvidia.github.io/nvidia-container-runtime/gpgkey | \
 curl -fsSL https://nvidia.github.io/nvidia-docker/gpgkey | \
   gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/nvidia-docker.gpg > /dev/null
 
-sudo add-apt-repository ppa:graphics-drivers/ppa -y
+if [ "$INSTALL_NVIDIA_DRIVERS" = "true" ]; then
+    sudo add-apt-repository ppa:graphics-drivers/ppa -y
+fi
 sudo apt update -qq
 
 sudo apt install -y -qq python3-pip libsasl2-dev libldap2-dev libssl-dev acl
@@ -89,13 +119,17 @@ else
     echo -e "${GREEN}Group 'containerfly' already exists.${RESET}"
 fi
 
-# Install NVIDIA GPU drivers if ubuntu-drivers is available
-if command -v ubuntu-drivers >/dev/null 2>&1; then
-    sudo ubuntu-drivers install nvidia:570-server-open
+# Install NVIDIA GPU drivers if ubuntu-drivers is available (unless user opted out)
+if [ "$INSTALL_NVIDIA_DRIVERS" = "true" ]; then
+    if command -v ubuntu-drivers >/dev/null 2>&1; then
+        sudo ubuntu-drivers install nvidia:570-server-open
+    else
+        echo -e "${YELLOW}Warning: ubuntu-drivers not found. NVIDIA GPU driver was not installed.${RESET}"
+        echo "This may mean your system has no NVIDIA GPU or is running an unsupported architecture."
+        echo "GPU support in containers will not be available. You can ignore this if you don't need GPUs."
+    fi
 else
-    echo -e "${YELLOW}Warning: ubuntu-drivers not found. NVIDIA GPU driver was not installed.${RESET}"
-    echo "This may mean your system has no NVIDIA GPU or is running an unsupported architecture."
-    echo "GPU support in containers will not be available. You can ignore this if you don't need GPUs."
+    echo -e "${YELLOW}Skipping NVIDIA driver installation (user opted to manage drivers manually).${RESET}"
 fi
 
 # Add Docker's official GPG key if it's not already added

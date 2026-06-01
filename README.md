@@ -60,6 +60,7 @@ This project has been featured in the following academic publications:
    * [Additional Tasks](#additional-tasks)
       * [Creating Reservable Containers](#creating-reservable-containers)
       * [LDAP Authentication Setup](#ldap-authentication-setup)
+      * [Custom Docker Storage Location](#custom-docker-storage-location)
    * [Testing](#testing)
    * [Technical Details](#technical-details)
       * [Frontend](#frontend)
@@ -277,6 +278,59 @@ And that's it. Now you should be able to reserve the container!
 ### LDAP Authentication Setup
 
 If you wish to use LDAP for the login, then configure the LDAP in the ``user_config/settings`` file. Example settings are commented in the file.
+
+### Custom Docker Storage Location
+
+By default Docker stores all container data (images, volumes, container filesystems) in `/var/lib/docker`. If you want to use a separate volume or disk for this, follow the steps below.
+
+> [!IMPORTANT]
+> The recommended time to do this is **before running the setup scripts**, so Docker starts with the correct location from the beginning. If you have already run the setup scripts, follow the [migration steps](#migrating-existing-docker-data) further below instead.
+
+**Option A — daemon.json** (simpler, recommended):
+
+Add the following to `/etc/docker/daemon.json` (create the file if it does not exist), then restart Docker:
+
+```bash
+sudo nano /etc/docker/daemon.json
+```
+```json
+{
+  "data-root": "/mnt/your-volume/docker"
+}
+```
+```bash
+sudo systemctl restart docker
+```
+
+**Option B — fstab** (OS-level mount, survives Docker reinstalls):
+
+Mount a local disk or a network share to `/var/lib/docker` via `/etc/fstab`, then run `mount -a` before starting Docker with ``sudo systemctl restart docker``. This approach is useful when you want to:
+- Use a dedicated local disk with special filesystem options (e.g. ZFS, btrfs, XFS)
+- Store Docker data on a **shared network drive or another computer's storage** (e.g. NFS, SMB/CIFS)
+
+For NFS setup between servers, see [additional_documentation/file_sharing_between_servers.md](additional_documentation/file_sharing_between_servers.md). Note that NFS by default uses port 2049, which conflicts with the default container port range — the linked guide covers how to reconfigure NFS to avoid this.
+
+#### Migrating existing Docker data
+
+If Docker has already been set up and running, follow these steps to move its data to the new location without losing existing images or containers:
+
+```bash
+# 1. Stop Docker
+sudo systemctl stop docker
+
+# 2. Copy all existing Docker data to the new location
+sudo rsync -a /var/lib/docker/ /mnt/your-volume/docker/
+
+# 3. Configure the new storage location (pick one option above)
+#    Option A: edit /etc/docker/daemon.json and set "data-root"
+#    Option B: mount the volume to /var/lib/docker via /etc/fstab and run mount -a
+
+# 4. Start Docker again
+sudo systemctl start docker
+```
+
+> [!WARNING]
+> Do not skip step 2. If Docker starts pointing at a new empty location, all previously pulled images and containers will be invisible to it (the data remains at the old path but Docker will not use it).
 
 ## Testing
 

@@ -1,13 +1,32 @@
-import Vue from 'vue';
-import Vuetify from 'vuetify/lib/framework';
+/**
+ * Vuetify plugin configuration.
+ * Initialises Vuetify 3 with the dark theme and Material Design Icons.
+ * @module plugins/vuetify
+ */
 
-Vue.use(Vuetify);
+import 'vuetify/styles'
+import { createVuetify } from 'vuetify'
+import '@mdi/font/css/materialdesignicons.css'
 
-export default new Vuetify({
+export default createVuetify({
   theme: {
-    dark: true,
-    options: {
-      customProperties: true,
+    defaultTheme: 'dark',
+  },
+  defaults: {
+    VTextField: {
+      variant: 'outlined',
+      persistentHint: true,
+    },
+    VTextarea: {
+      variant: 'outlined',
+      persistentHint: true,
+    },
+    VSelect: {
+      variant: 'outlined',
+      persistentHint: true,
+    },
+    VSwitch: {
+      persistentHint: true,
     },
   },
 })

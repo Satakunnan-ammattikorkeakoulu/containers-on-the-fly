@@ -1,7 +1,7 @@
 <template>
   <v-dialog v-model="isOpen" persistent max-width="1200px">
     <v-card>
-      <v-card-title>
+      <v-card-title class="pt-6">
         <span class="headline">Manage Role Mounts - {{ roleName }}</span>
       </v-card-title>
       
@@ -23,7 +23,7 @@
               <li><code>&#123;userid&#125;</code> - User's database ID (e.g., "123")</li>
             </ul>
           </div>
-          <div class="mt-2 text-caption grey--text">
+          <div class="mt-2 text-caption" style="color: rgba(255, 255, 255, 0.75);">
             Example: <code>/data/users/&#123;email&#125;</code> → <code>/home/user/persistent</code>
           </div>
         </v-alert>
@@ -44,10 +44,10 @@
                 v-for="computer in computers"
                 :key="computer.computerId"
               >
-                <v-expansion-panel-header>
+                <v-expansion-panel-title>
                   {{ getComputerTitle(computer) }}
-                </v-expansion-panel-header>
-                <v-expansion-panel-content>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
                   <!-- Add new mount form -->
                   <v-form 
                     :ref="`mountForm-${computer.computerId}`"
@@ -107,9 +107,9 @@
                       </v-chip>
                     </template>
                     <template v-slot:item.actions="{ item }">
-                      <v-btn 
-                        small 
-                        color="red" 
+                      <v-btn
+                        size="small"
+                        color="red"
                         @click="removeMount(computer.computerId, item)"
                         :loading="isSubmitting"
                       >
@@ -122,7 +122,7 @@
                       </div>
                     </template>
                   </v-data-table>
-                </v-expansion-panel-content>
+                </v-expansion-panel-text>
               </v-expansion-panel>
             </v-expansion-panels>
           </template>
@@ -130,18 +130,36 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="blue darken-1" text @click="close">Close</v-btn>
+        <v-btn color="blue darken-1" variant="text" @click="close">Close</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 </template>
 
 <script>
-const axios = require('axios').default;
+/**
+ * Modal dialog for managing host-to-container volume mounts for a specific role.
+ * Displays an expansion panel per computer where admins can add or remove mounts
+ * with host path, container path, and read-only settings. Supports template
+ * variables ({email}, {userid}) for per-user mount paths.
+ *
+ * Props:
+ *   roleId   - The ID of the role being configured.
+ *   roleName - The display name of the role (shown in the header).
+ *
+ * Emits:
+ *   emitModalClose - When the modal is closed.
+ */
+import axios from 'axios';
 import Loading from '/src/components/global/Loading.vue';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: 'AdminRoleMountsModal',
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
   components: {
     Loading
   },
@@ -164,10 +182,10 @@ export default {
     computerForms: {},
     mounts: [], // All mounts for this role
     mountsHeaders: [
-      { text: 'Host Path', value: 'hostPath' },
-      { text: 'Container Path', value: 'containerPath' },
-      { text: 'Access', value: 'readOnly' },
-      { text: 'Actions', value: 'actions', sortable: false }
+      { title: 'Host Path', key: 'hostPath' },
+      { title: 'Container Path', key: 'containerPath' },
+      { title: 'Access', key: 'readOnly' },
+      { title: 'Actions', key: 'actions', sortable: false }
     ],
     rules: {
       required: v => !!v || 'This field is required'
@@ -180,12 +198,12 @@ export default {
     async fetchData() {
       try {
         this.isFetching = true;
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         
         // Fetch computers
         const computersResponse = await axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_computers,
+          url: this.$appSettings.APIServer.admin.get_computers,
           headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
         });
 
@@ -194,18 +212,18 @@ export default {
           
           // Initialize form data for each computer
           this.computers.forEach(computer => {
-            this.$set(this.computerForms, computer.computerId, {
+            this.computerForms[computer.computerId] = {
               valid: false,
               hostPath: '',
               containerPath: '',
               readOnly: false
-            });
+            };
           });
 
           // Fetch existing mounts for this role
           const mountsResponse = await axios({
             method: "get",
-            url: this.AppSettings.APIServer.admin.get_role_mounts,
+            url: this.$appSettings.APIServer.admin.get_role_mounts,
             params: { roleId: this.roleId },
             headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
           });
@@ -217,14 +235,14 @@ export default {
             this.mounts = [];
           }
         } else {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: "Failed to fetch computers", 
             color: "error" 
           });
         }
       } catch (error) {
         console.error(error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error fetching data", 
           color: "error" 
         });
@@ -233,10 +251,12 @@ export default {
       }
     },
 
+    /** Filters the full mounts list to only those belonging to the given computer. */
     getMountsForComputer(computerId) {
       return this.mounts.filter(mount => mount.computerId === computerId);
     },
 
+    /** Validates the form, appends the new mount, and saves all mounts to the backend. */
     async addMount(computerId) {
       if (!this.$refs[`mountForm-${computerId}`][0].validate()) return;
       
@@ -252,10 +272,10 @@ export default {
         const updatedMounts = [...this.mounts, newMount];
         
         // Save all mounts to backend
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         const response = await axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_role_mounts,
+          url: this.$appSettings.APIServer.admin.save_role_mounts,
           data: {
             roleId: this.roleId,
             mounts: updatedMounts
@@ -276,19 +296,19 @@ export default {
           };
           this.$refs[`mountForm-${computerId}`][0].resetValidation();
           
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: "Mount added successfully", 
             color: "success" 
           });
         } else {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: response.data.message || "Failed to add mount", 
             color: "error" 
           });
         }
       } catch (error) {
         console.error(error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error adding mount", 
           color: "error" 
         });
@@ -297,9 +317,15 @@ export default {
       }
     },
 
+    /** Confirms removal, removes the mount locally, and persists the updated list to the backend. */
     async removeMount(computerId, mountToRemove) {
-      const confirm = window.confirm("Are you sure you want to remove this mount?");
-      if (!confirm) return;
+      const confirmed = await this.store.showConfirmDialog({
+        title: 'Remove Mount',
+        message: 'Are you sure you want to remove this mount?',
+        confirmText: 'Remove',
+        confirmColor: 'red',
+      })
+      if (!confirmed) return;
 
       this.isSubmitting = true;
       try {
@@ -311,10 +337,10 @@ export default {
         );
         
         // Save updated mounts to backend
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         const response = await axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_role_mounts,
+          url: this.$appSettings.APIServer.admin.save_role_mounts,
           data: {
             roleId: this.roleId,
             mounts: updatedMounts
@@ -326,19 +352,19 @@ export default {
           // Update local state
           this.mounts = updatedMounts;
           
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: "Mount removed successfully", 
             color: "success" 
           });
         } else {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: response.data.message || "Failed to remove mount", 
             color: "error" 
           });
         }
       } catch (error) {
         console.error(error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error removing mount", 
           color: "error" 
         });
@@ -351,6 +377,7 @@ export default {
       this.$emit('emitModalClose');
     },
 
+    /** Returns the computer name with mount count appended, e.g. "Server1 (3 mounts)". */
     getComputerTitle(computer) {
       const mountCount = this.getMountsForComputer(computer.computerId).length;
       if (mountCount > 0) {

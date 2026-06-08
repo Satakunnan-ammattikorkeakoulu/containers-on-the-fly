@@ -5,6 +5,7 @@
 ################################################################################
 
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 RED='\033[0;31m'
 RESET='\033[0m'
 CURRENT_DIR=$(pwd)
@@ -56,10 +57,38 @@ fi
 
 echo "Running with sudo privileges."
 
+# Prompt: should this script install/manage NVIDIA GPU drivers?
+# Skipping is useful when the user has their own pinned NVIDIA driver version installed.
+echo ""
+echo ""
+echo -e "${GREEN}NVIDIA DRIVER MANAGEMENT${RESET}"
+echo "Install nvidia:570-server-open? This PURGES existing NVIDIA packages and adds"
+echo "ppa:graphics-drivers/ppa."
+echo ""
+echo -e "  ${GREEN}y${RESET} - Yes, install/reinstall drivers"
+echo "      (recommended for fresh setups with no previous nvidia GPU installation)"
+echo -e "  ${GREEN}n${RESET} - No, skip"
+echo "      (use your own drivers, or already installed via this script)"
+echo ""
+echo "nvidia-container-toolkit and Docker NVIDIA runtime are installed either way."
+echo -n "Choice (y/n): "
+read NVIDIA_CHOICE
+echo ""
+if [ "$NVIDIA_CHOICE" = "n" ] || [ "$NVIDIA_CHOICE" = "N" ]; then
+    INSTALL_NVIDIA_DRIVERS=false
+    echo -e "${YELLOW}Skipping NVIDIA driver installation. You are responsible for managing the drivers yourself.${RESET}"
+else
+    INSTALL_NVIDIA_DRIVERS=true
+    echo -e "${GREEN}NVIDIA drivers will be installed/managed by this script.${RESET}"
+fi
+echo ""
+
 # Update and install initial packages
 sudo apt update -qq
-sudo rm /etc/apt/sources.list.d/nvidia-*.list 2>/dev/null
-sudo apt-get purge -y -qq '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*' 2>/dev/null
+if [ "$INSTALL_NVIDIA_DRIVERS" = "true" ]; then
+    sudo rm /etc/apt/sources.list.d/nvidia-*.list 2>/dev/null
+    sudo apt-get purge -y -qq '^nvidia-.*' '^libnvidia-.*' '^cuda-.*' '^libcuda.*' '^nv.*' 2>/dev/null
+fi
 
 
 
@@ -74,7 +103,9 @@ curl -fsSL https://nvidia.github.io/nvidia-container-runtime/gpgkey | \
 curl -fsSL https://nvidia.github.io/nvidia-docker/gpgkey | \
   gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/nvidia-docker.gpg > /dev/null
 
-sudo add-apt-repository ppa:graphics-drivers/ppa -y
+if [ "$INSTALL_NVIDIA_DRIVERS" = "true" ]; then
+    sudo add-apt-repository ppa:graphics-drivers/ppa -y
+fi
 sudo apt update -qq
 
 sudo apt install -y -qq python3-pip libsasl2-dev libldap2-dev libssl-dev acl
@@ -88,7 +119,18 @@ else
     echo -e "${GREEN}Group 'containerfly' already exists.${RESET}"
 fi
 
-sudo ubuntu-drivers install nvidia:570-server-open #-qq >/dev/null 2>&1
+# Install NVIDIA GPU drivers if ubuntu-drivers is available (unless user opted out)
+if [ "$INSTALL_NVIDIA_DRIVERS" = "true" ]; then
+    if command -v ubuntu-drivers >/dev/null 2>&1; then
+        sudo ubuntu-drivers install nvidia:570-server-open
+    else
+        echo -e "${YELLOW}Warning: ubuntu-drivers not found. NVIDIA GPU driver was not installed.${RESET}"
+        echo "This may mean your system has no NVIDIA GPU or is running an unsupported architecture."
+        echo "GPU support in containers will not be available. You can ignore this if you don't need GPUs."
+    fi
+else
+    echo -e "${YELLOW}Skipping NVIDIA driver installation (user opted to manage drivers manually).${RESET}"
+fi
 
 # Add Docker's official GPG key if it's not already added
 if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
@@ -124,6 +166,31 @@ if ! command -v pm2 > /dev/null; then
     sudo npm install pm2 -g
     pm2 startup
 fi
+
+# Ensure PM2_LOG_RETAIN_DAYS exists in settings file
+if ! grep -q "^PM2_LOG_RETAIN_DAYS=" "$CURRENT_DIR/user_config/settings"; then
+    echo '' >> "$CURRENT_DIR/user_config/settings"
+    echo '' >> "$CURRENT_DIR/user_config/settings"
+    echo '# Number of rotated pm2 log files to retain (with daily rotation, this equals days)' >> "$CURRENT_DIR/user_config/settings"
+    echo '# Default: 90' >> "$CURRENT_DIR/user_config/settings"
+    echo 'PM2_LOG_RETAIN_DAYS=90' >> "$CURRENT_DIR/user_config/settings"
+    source "$CURRENT_DIR/user_config/settings"
+fi
+
+# Install and configure pm2-logrotate for log retention management
+if ! pm2 describe pm2-logrotate > /dev/null 2>&1; then
+    echo "Installing pm2-logrotate..."
+    pm2 install pm2-logrotate
+fi
+
+# Configure pm2-logrotate settings (suppress verbose output)
+pm2 set pm2-logrotate:max_size 500M > /dev/null 2>&1
+pm2 set pm2-logrotate:retain ${PM2_LOG_RETAIN_DAYS:-90} > /dev/null 2>&1
+pm2 set pm2-logrotate:compress true > /dev/null 2>&1
+pm2 set pm2-logrotate:workerInterval 60 > /dev/null 2>&1
+pm2 set pm2-logrotate:rotateInterval '0 0 * * *' > /dev/null 2>&1
+pm2 set pm2-logrotate:rotateModule true > /dev/null 2>&1
+echo -e "${GREEN}pm2-logrotate configured (retention: ${PM2_LOG_RETAIN_DAYS:-90} days).${RESET}"
 
 # Exit immediately if a command exits with a non-zero status.
 set -e
@@ -257,25 +324,41 @@ echo "Starting private (local) docker registry (only on main server)"
 IS_MAIN_SERVER=$(cat "${CURRENT_DIR}/.server_type" 2>/dev/null || echo "false")
 if [ "$IS_MAIN_SERVER" = "true" ]; then
     echo "This is main server, starting private (local) docker registry..."
+    REGISTRY_OK=true
     if [ ! "$(sudo -u $CURRENT_USER docker ps -q -f name=registry)" ]; then
         if [ "$(sudo -u $CURRENT_USER docker ps -aq -f status=exited -f name=registry)" ]; then
             # Cleanup any exited registry container
             sudo -u $CURRENT_USER docker rm registry
         fi
         # Start the Docker registry container
-        sudo -u $CURRENT_USER docker run -d -p ${DOCKER_REGISTRY_PORT}:5000 --restart=always --name registry registry:2
+        if ! sudo -u $CURRENT_USER docker run -d -p ${DOCKER_REGISTRY_PORT}:5000 --restart=always --name registry registry:2; then
+            echo -e "${RED}Warning: Could not start Docker registry container.${RESET}"
+            echo "This can happen when running inside a Docker container (Docker-in-Docker)."
+            echo "The registry can be started manually later. Continuing with setup..."
+            REGISTRY_OK=false
+        fi
     fi
 
-    # Wait a moment for registry to start
-    echo "Waiting for registry to be ready..."
-    sleep 5
+    if [ "$REGISTRY_OK" = "true" ]; then
+        # Wait a moment for registry to start
+        echo "Waiting for registry to be ready..."
+        sleep 5
 
-    # Build base-ubuntu image to be used as an example with default setup
-    sudo -u $CURRENT_USER docker build -t $INSECURE_REGISTRY/ubuntu-base:latest -f DockerfileContainerExample .
-    sudo -u $CURRENT_USER docker push $INSECURE_REGISTRY/ubuntu-base:latest
+        # Smoke-test the registry with a tiny image
+        sudo -u $CURRENT_USER docker tag hello-world $INSECURE_REGISTRY/hello-world:latest || \
+            echo -e "${RED}Warning: Could not tag hello-world image. You can test the registry manually later.${RESET}"
+        sudo -u $CURRENT_USER docker push $INSECURE_REGISTRY/hello-world:latest || \
+            echo -e "${RED}Warning: Could not push to registry. You can test it manually later.${RESET}"
+    fi
 else
     echo "Container server detected - skipping Docker registry setup (will connect to main server registry)"
 fi
 
 echo "Docker daemon configuration updated and Docker service is running."
 echo "You need to restart the machine before the Nvidia drivers will work."
+
+# Install Python dependencies
+echo "Installing Python dependencies..."
+sudo -u "$CURRENT_USER" pip3 install -r "$CURRENT_DIR/webapp/backend/requirements.txt" --break-system-packages --ignore-installed --no-warn-script-location -qq
+sudo -u "$CURRENT_USER" pip3 install -r "$CURRENT_DIR/webapp/container_server/requirements.txt" --break-system-packages --ignore-installed --no-warn-script-location -qq
+echo -e "${GREEN}Python dependencies installed.${RESET}"

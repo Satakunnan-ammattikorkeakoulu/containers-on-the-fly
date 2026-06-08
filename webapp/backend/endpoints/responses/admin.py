@@ -1,263 +1,925 @@
-from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs
+"""Response handlers for admin management endpoints.
+
+Provides business logic for administrative operations including reservation
+management, container and computer (server) CRUD, user management, role and
+permission management, server monitoring, and general application settings.
+"""
+
+from database import Session, Computer, ContainerPort, User, Reservation, Container, ReservedContainer, ReservedContainerPort, ReservedHardwareSpec, HardwareSpec, UserRole, Role, ServerStatus, ServerLogs, AuditLog, UserWhitelist, UserBlacklist
 from dateutil import parser
 from dateutil.relativedelta import *
 from datetime import timezone, timedelta
-from helpers.server import Response, ORMObjectToDict
+from helpers.server import api_response, orm_to_dict
 import datetime
 from endpoints.models.admin import ContainerEdit, ComputerEdit
-from endpoints.models.reservation import ReservationFilters
+from endpoints.models.reservation import ReservationFilters, AdminReservationRequest, UserReservationRequest
+from endpoints.models.admin import AdminUsersRequest
 from sqlalchemy.orm import joinedload
-from logger import log
-from helpers.auth import HashPassword, IsCorrectPassword
+from sqlalchemy import cast, String
+from helpers.pagination import apply_pagination, get_total_count
+from helpers.logger import log
+from helpers.auth import hash_password, is_correct_password
+from helpers.tables.audit_log import log_action, get_audit_logs as get_audit_logs_helper
+from helpers.docker_registry import image_exists_in_registry
 import base64
 from endpoints.models.admin import UserEdit
 from database import UserRole, Role
-from helpers.tables.Role import getRoles, getRoleById, addRole as addRoleHelper, editRole as editRoleHelper, removeRole as removeRoleHelper
-from sqlalchemy import func
+from helpers.tables.role import get_roles, get_role_by_id, add_role as add_role_helper, edit_role as edit_role_helper, remove_role as remove_role_helper
+from sqlalchemy import select, delete, update, func, case
+import re
 
-def getReservations(filters : ReservationFilters) -> object:
-  '''
-  Returns a list of all reservations.
+# Valid Linux username pattern
+_VALID_USERNAME_RE = re.compile(r'^[a-z_][a-z0-9_-]{0,31}$')
+_RESERVED_USERNAMES = {"root", "daemon", "bin", "sys", "nobody", "www-data", "mail", "sshd"}
+
+# Valid Docker image name pattern (lowercase, digits, dots, hyphens, underscores, slashes)
+_VALID_IMAGE_NAME_RE = re.compile(r'^[a-z0-9][a-z0-9._/\-]{0,127}$')
+
+# Valid port types for the portType column on ContainerPort
+_VALID_PORT_TYPES = {"SSH", "HTTP", "HTTPS", "VNC"}
+
+def _add_default_ssh_port(container):
+  """Add a default SSH port for newly created containers.
+
+  Pre-fills the container with an SSH port on port 22. This is a convenience
+  default — admins can remove it if the container doesn't need SSH.
 
   Args:
-    filters (ReservationFilters): The filters to apply to the query.
+      container: Container ORM object to add the default port to.
+  """
+  container.containerPorts.append(
+    ContainerPort(serviceName="SSH", port=22, portType="SSH")
+  )
+
+def get_reservations(request: AdminReservationRequest) -> object:
+  """Retrieve paginated reservations with server-side filtering and sorting.
+
+  Fetches reservations from the last 90 days (or with future end dates),
+  with pagination and filtering support. Returns filter-aware status
+  counts and statistics for the dashboard cards.
+
+  Args:
+      request: Pagination, sorting, and filter parameters. Supported
+          filter keys: status, user, reservationId, computerId,
+          containerId, dateFrom, dateTo, reservationType
+          ("normal" or "lowPriority"), dockerContainer (partial match
+          on containerDockerId or containerDockerName).
 
   Returns:
-    object: Response object with status, message and data.
-  '''
-  reservations = []
-  status_counts = {"reserved": 0, "started": 0, "stopped": 0, "error": 0}
+      Response with paginated reservations, totalItems, statusCounts,
+      reservationTypeCounts, and stats.
+  """
+  filters = request.filters
+  status_filter = filters.get("status", "")
+  user_filter = str(filters.get("user", "")).strip()
+  reservation_id_filter = str(filters.get("reservationId", "")).strip()
+  computer_id_filter = filters.get("computerId", "")
+  container_id_filter = filters.get("containerId", "")
+  date_from_filter = str(filters.get("dateFrom", "")).strip()
+  date_to_filter = str(filters.get("dateTo", "")).strip()
+  reservation_type_filter = str(filters.get("reservationType", "")).strip()
+  docker_container_filter = str(filters.get("dockerContainer", "")).strip()
 
-  # Limit listing to 90 days
-  def timeNow(): return datetime.datetime.now(datetime.timezone.utc)
-  minStartDate = timeNow() - timedelta(days=90)
+  allowed_sort_keys = {
+      "reservationId": Reservation.reservationId,
+      "status": Reservation.status,
+      "userEmail": User.email,
+      "startDate": Reservation.startDate,
+      "endDate": Reservation.endDate,
+  }
+
+  def time_now(): return datetime.datetime.now(datetime.timezone.utc)
+  min_start_date = time_now() - timedelta(days=90)
+  time_scope = (Reservation.startDate > min_start_date) | (Reservation.endDate > time_now())
 
   with Session() as session:
-    # First get all reservations for counting
-    count_query = session.query(Reservation)\
-      .filter((Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()) )
-    
-    # Count statuses
-    for reservation in count_query:
-      if reservation.status in status_counts:
-        status_counts[reservation.status] += 1
-    
-    # Now get filtered reservations with all the joins
-    query = session.query(Reservation)\
-      .options(
-        joinedload(Reservation.reservedHardwareSpecs),
-        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
-        joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
-        joinedload(Reservation.computer)
-      )\
-      .filter((Reservation.startDate > minStartDate) | (Reservation.endDate > timeNow()) )
-    if filters.filters["status"] != "":
-      query = query.filter( Reservation.status == filters.filters["status"] )
-    session.close()
 
-  for reservation in query:
-    res = ORMObjectToDict(reservation)
-    res["userEmail"] = reservation.user.email
-    res["computerName"] = reservation.computer.name
-    res["reservedContainer"] = ORMObjectToDict(reservation.reservedContainer)
-    res["reservedContainer"]["container"] = ORMObjectToDict(reservation.reservedContainer.container)
-    
-    # Add all reserved ports
-    res["reservedContainer"]["reservedPorts"] = []
-    # Only add ports if the reservation is started as the ports are unbound after the reservation is stopped
-    if reservation.status == "started":
-      for reservedPort in reservation.reservedContainer.reservedContainerPorts:
-        portObj = ORMObjectToDict(reservedPort)
-        portObj["localPort"] = reservedPort.containerPort.port
-        portObj["serviceName"] = reservedPort.containerPort.serviceName
-        res["reservedContainer"]["reservedPorts"].append(portObj)
-    
-    # Add all reserved hardware specs
-    res["reservedHardwareSpecs"] = []
-    for spec in reservation.reservedHardwareSpecs:
-      # Add only specs over 0
-      if spec.amount > 0:
-          # Add also internalId for GPUs
-          if spec.hardwareSpec.type == "gpu":
-            format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
-          else:
-            format = spec.hardwareSpec.format
+    def _apply_status_filter(query):
+        if status_filter:
+            if status_filter == "error":
+                query = query.where(Reservation.status.in_(["error", "restart_error"]))
+            else:
+                query = query.where(Reservation.status == status_filter)
+        return query
 
-          res["reservedHardwareSpecs"].append({
-            "type": spec.hardwareSpec.type,
-            "format": format,
-            "internalId": spec.hardwareSpec.format,
-            "amount": spec.amount
-          })
-    reservations.append(res)
-    
-  return Response(True, "Reservations fetched.", { "reservations": reservations, "statusCounts": status_counts })
+    def _apply_reservation_type_filter(query):
+        if reservation_type_filter == "normal":
+            query = query.where(Reservation.isLowPriority == False)
+        elif reservation_type_filter == "lowPriority":
+            query = query.where(Reservation.isLowPriority == True)
+        return query
 
-def saveContainer(containerEdit : ContainerEdit) -> object:
-  '''
-  Edits the given container.
+    def _apply_common_filters(query):
+        """Apply every filter except status and reservation type."""
+        if user_filter:
+            query = query.where(
+                User.email.ilike(f"%{user_filter}%") | User.name.ilike(f"%{user_filter}%")
+            )
+        if reservation_id_filter:
+            query = query.where(
+                cast(Reservation.reservationId, String).like(f"%{reservation_id_filter}%")
+            )
+        if computer_id_filter:
+            try:
+                query = query.where(Reservation.computerId == int(computer_id_filter))
+            except (ValueError, TypeError):
+                pass
+        if container_id_filter:
+            try:
+                query = query.where(Reservation.reservedContainer.has(
+                    ReservedContainer.containerId == int(container_id_filter)
+                ))
+            except (ValueError, TypeError):
+                pass
+        if docker_container_filter:
+            query = query.where(Reservation.reservedContainer.has(
+                ReservedContainer.containerDockerId.ilike(f"%{docker_container_filter}%")
+                | ReservedContainer.containerDockerName.ilike(f"%{docker_container_filter}%")
+            ))
+        if date_from_filter:
+            try:
+                query = query.where(Reservation.startDate >= parser.parse(date_from_filter))
+            except (ValueError, TypeError):
+                pass
+        if date_to_filter:
+            try:
+                query = query.where(Reservation.startDate < parser.parse(date_to_filter) + timedelta(days=1))
+            except (ValueError, TypeError):
+                pass
+        return query
 
-  Parameters:
-    containerId: id of the container to edit.
-    data: New data for the container.
-  
+    def _apply_all_filters(query):
+        query = _apply_status_filter(query)
+        query = _apply_reservation_type_filter(query)
+        query = _apply_common_filters(query)
+        return query
+
+    # Status counts — apply every filter except status itself, so the
+    # dropdown reflects what each status count would be within the other
+    # active filters.
+    status_counts = {"reserved": 0, "started": 0, "stopping": 0, "stopped": 0, "error": 0, "paused": 0}
+    counts_query = select(Reservation.status, func.count())\
+        .where(time_scope)\
+        .join(User, Reservation.userId == User.userId)\
+        .group_by(Reservation.status)
+    counts_query = _apply_reservation_type_filter(counts_query)
+    counts_query = _apply_common_filters(counts_query)
+    count_rows = session.execute(counts_query).all()
+    for s, c in count_rows:
+        if s == "restart_error":
+            status_counts["error"] += c
+        elif s in status_counts:
+            status_counts[s] = c
+
+    # Reservation-type counts — apply every filter except reservation type.
+    reservation_type_counts = {"normal": 0, "lowPriority": 0}
+    type_query = select(Reservation.isLowPriority, func.count())\
+        .where(time_scope)\
+        .join(User, Reservation.userId == User.userId)\
+        .group_by(Reservation.isLowPriority)
+    type_query = _apply_status_filter(type_query)
+    type_query = _apply_common_filters(type_query)
+    for is_low, c in session.execute(type_query).all():
+        if is_low:
+            reservation_type_counts["lowPriority"] = c
+        else:
+            reservation_type_counts["normal"] = c
+
+    total_all_statuses = sum(status_counts.values())
+    stats = {
+        "total": total_all_statuses,
+        "started": status_counts.get("started", 0),
+        "stopped": status_counts.get("stopped", 0),
+        "error": status_counts.get("error", 0),
+    }
+
+    # Build filtered base query (for counting and pagination)
+    base_filtered = select(Reservation).where(time_scope)
+    # Need join to User for userEmail sorting — always join since it's lightweight
+    base_filtered = base_filtered.join(User, Reservation.userId == User.userId)
+    base_filtered = _apply_all_filters(base_filtered)
+
+    # Total count of filtered results
+    total_items = get_total_count(session, base_filtered)
+
+    # Paginate IDs first (subquery pattern to avoid joinedload + LIMIT issues)
+    # Rebuild ID query with same filters and joins to avoid cartesian product
+    id_stmt = select(Reservation.reservationId).where(time_scope)\
+        .join(User, Reservation.userId == User.userId)
+    id_stmt = _apply_all_filters(id_stmt)
+    id_stmt = apply_pagination(
+        id_stmt, request.sortBy, request.page,
+        request.itemsPerPage, allowed_sort_keys
+    )
+    paginated_ids = [row[0] for row in session.execute(id_stmt).all()]
+
+    # Load full reservation objects for the paginated IDs
+    reservations = []
+    if paginated_ids:
+        # Re-apply sort order to the full query
+        full_stmt = select(Reservation)\
+            .options(
+                joinedload(Reservation.reservedHardwareSpecs),
+                joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.reservedContainerPorts),
+                joinedload(Reservation.reservedContainer).joinedload(ReservedContainer.container),
+                joinedload(Reservation.computer),
+            )\
+            .where(Reservation.reservationId.in_(paginated_ids))
+        full_stmt = apply_pagination(full_stmt, request.sortBy, 1, -1, allowed_sort_keys)
+        query = session.execute(full_stmt).unique().scalars().all()
+
+        for reservation in query:
+            res = orm_to_dict(reservation)
+            res["userEmail"] = reservation.user.email
+            res["userName"] = reservation.user.name
+            res["computerName"] = reservation.computer.name
+            res["reservedContainer"] = orm_to_dict(reservation.reservedContainer)
+            container_dict = orm_to_dict(reservation.reservedContainer.container)
+            # Strip buildLog from reservation listings to avoid large payloads
+            container_dict.pop("buildLog", None)
+            res["reservedContainer"]["container"] = container_dict
+
+            res["reservedContainer"]["reservedPorts"] = []
+            # Paused LP reservations keep their port allocations so they can
+            # resume on the same outside ports; expose them to the UI too.
+            if reservation.status in ("started", "paused"):
+                for reserved_port in reservation.reservedContainer.reservedContainerPorts:
+                    port_obj = orm_to_dict(reserved_port)
+                    port_obj["localPort"] = reserved_port.containerPort.port
+                    port_obj["serviceName"] = reserved_port.containerPort.serviceName
+                    res["reservedContainer"]["reservedPorts"].append(port_obj)
+
+            res["reservedHardwareSpecs"] = []
+            for spec in reservation.reservedHardwareSpecs:
+                if spec.amount > 0:
+                    if spec.hardwareSpec.type == "gpu":
+                        format = f"{spec.hardwareSpec.format} (id: {spec.hardwareSpec.internalId})"
+                    else:
+                        format = spec.hardwareSpec.format
+                    res["reservedHardwareSpecs"].append({
+                        "type": spec.hardwareSpec.type,
+                        "format": format,
+                        "internalId": spec.hardwareSpec.internalId,
+                        "amount": spec.amount,
+                    })
+            reservations.append(res)
+
+  # Fetch available computers and containers for filter dropdowns
+  with Session() as session:
+    computers_list = session.execute(
+        select(Computer.computerId, Computer.name).where(Computer.removed.isnot(True))
+    ).all()
+    containers_list = session.execute(
+        select(Container.containerId, Container.name).where(Container.removed.isnot(True))
+    ).all()
+
+  return api_response(True, "Reservations fetched.", {
+      "reservations": reservations,
+      "totalItems": total_items,
+      "statusCounts": status_counts,
+      "reservationTypeCounts": reservation_type_counts,
+      "stats": stats,
+      "availableComputers": [{"id": c[0], "name": c[1]} for c in computers_list],
+      "availableContainers": [{"id": c[0], "name": c[1]} for c in containers_list],
+  })
+
+def save_container(containerEdit : ContainerEdit, actor_user_id: int = None) -> object:
+  """Create or update a container definition.
+
+  For new containers (containerId == -1), creates a new Container record
+  with the given name, image, description, and ports. For existing
+  containers, updates the fields and handles port additions, removals,
+  and edits. Validates that the image name is unique across containers.
+
+  Args:
+      containerEdit: ContainerEdit model containing containerId and a
+          data dict with name, imageName, description, public flag,
+          ports, and removedPorts.
+
   Returns:
-    object: Response object with status, message and data.
-
-  '''
+      Response indicating success or failure with an appropriate message.
+  """
 
   with Session() as session:
+    # Check for duplicate image name
+    new_image_name = containerEdit.data.get("imageName")
+    confirm_overwrite = bool(containerEdit.data.get("confirmOverwrite", False))
+    existing = session.execute(
+      select(Container).where(Container.imageName == new_image_name)
+    ).scalar_one_or_none()
+    if existing and existing.containerId != containerEdit.containerId:
+      return api_response(False, "A container with this image name already exists.")
+    if new_image_name and not _VALID_IMAGE_NAME_RE.match(new_image_name):
+      return api_response(False, "Invalid image name. Use only lowercase letters, digits, dots, hyphens, underscores, and forward slashes.")
+
+    new_managed_externally = containerEdit.data.get("managedExternally", True)
+    new_dockerfile_commands = containerEdit.data.get("dockerfileCommands", None)
+    new_base_image = containerEdit.data.get("baseImage", None)
+    new_username = containerEdit.data.get("containerUsername", None)
+    new_password_command = containerEdit.data.get("passwordCommand", None)
+    new_ssh_key_commands = containerEdit.data.get("sshKeyDeployCommands", None)
+    new_cmd = containerEdit.data.get("containerCmd", None)
+
+    # For externally managed containers, clear image builder fields
+    if new_managed_externally:
+      new_dockerfile_commands = None
+      new_base_image = None
+      new_username = None
+      new_password_command = None
+      new_ssh_key_commands = None
+      new_cmd = None
+
+    # Type-check string fields
+    for field_name, field_val in [("dockerfileCommands", new_dockerfile_commands), ("baseImage", new_base_image),
+                                   ("containerUsername", new_username), ("passwordCommand", new_password_command),
+                                   ("sshKeyDeployCommands", new_ssh_key_commands), ("containerCmd", new_cmd)]:
+      if field_val is not None and not isinstance(field_val, str):
+        return api_response(False, f"{field_name} must be a string.")
+
+    # Normalize empty strings to None
+    if new_dockerfile_commands is not None and not new_dockerfile_commands.strip():
+      new_dockerfile_commands = None
+    if new_base_image is not None and not new_base_image.strip():
+      new_base_image = None
+    if new_password_command is not None and not new_password_command.strip():
+      new_password_command = None
+    if new_ssh_key_commands is not None and not new_ssh_key_commands.strip():
+      new_ssh_key_commands = None
+    if new_cmd is not None and not new_cmd.strip():
+      new_cmd = None
+
+    # Validate username
+    if new_username is not None and new_username.strip():
+      new_username = new_username.strip()
+      if not _VALID_USERNAME_RE.match(new_username):
+        return api_response(False, "Invalid username. Must be 1-32 lowercase letters, digits, hyphens, or underscores, starting with a letter or underscore.")
+      if new_username in _RESERVED_USERNAMES:
+        return api_response(False, f"Username '{new_username}' is reserved and cannot be used.")
+    else:
+      new_username = None  # Will default to "user" at runtime
+
+    # Validate ports (integers 1-65535, no duplicates)
+    new_ports = containerEdit.data.get("ports", [])
+    port_numbers = []
+    for port in new_ports:
+      try:
+        port_num = int(port.get("port", 0))
+      except (ValueError, TypeError):
+        return api_response(False, "Port must be an integer.")
+      if port_num < 1 or port_num > 65535:
+        return api_response(False, f"Port {port_num} is out of range. Must be between 1 and 65535.")
+      if port_num in port_numbers:
+        return api_response(False, f"Duplicate port {port_num}. Each port can only be used once.")
+      port_numbers.append(port_num)
+      # Validate portType
+      port_type = port.get("portType")
+      if port_type is not None and port_type not in _VALID_PORT_TYPES:
+        return api_response(False, f"Invalid port type '{port_type}'. Must be one of: {', '.join(sorted(_VALID_PORT_TYPES))}, or empty.")
+
     # If new, create a new container
     if containerEdit.containerId == -1:
+      # Registry collision check — only on create with Image Builder, since
+      # rebuild of an existing container is intentional overwrite and rename
+      # of a built container is blocked below.
+      if (not new_managed_externally and new_dockerfile_commands
+          and new_image_name and not confirm_overwrite):
+        exists = image_exists_in_registry(new_image_name)
+        if exists is True:
+          return api_response(
+            False,
+            "An image with this name already exists in the Docker registry. Confirm overwrite to proceed.",
+            {"needsOverwriteConfirmation": True, "imageName": new_image_name}
+          )
       container = Container()
       container.public = containerEdit.data.get("public", False)
       container.name = containerEdit.data.get("name")
-      container.imageName = containerEdit.data.get("imageName")
+      container.imageName = new_image_name
       container.description = containerEdit.data.get("description", "")
+      container.managedExternally = new_managed_externally
+      container.dockerfileCommands = new_dockerfile_commands
+      container.baseImage = new_base_image
+      container.containerUsername = new_username
+      container.passwordCommand = new_password_command
+      container.sshKeyDeployCommands = new_ssh_key_commands
+      container.containerCmd = new_cmd
+      # Queue build if using Image Builder
+      if not new_managed_externally and new_dockerfile_commands:
+        container.buildStatus = "pending"
+        container.buildLog = ""
       # Add ports
       for port in containerEdit.data.get("ports", []):
-        container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
+        container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"], portType=port.get("portType")))
+      # Add default SSH port if no ports were provided (new container convenience default)
+      if not containerEdit.data.get("ports"):
+        _add_default_ssh_port(container)
       session.add(container)
+      session.flush()
+      # Set primary connection port
+      primary_port_id = containerEdit.data.get("primaryConnectionPortId")
+      if primary_port_id is not None:
+        valid_port_ids = [p.containerPortId for p in container.containerPorts]
+        if primary_port_id in valid_port_ids:
+          container.primaryConnectionPortId = primary_port_id
       session.commit()
+      saved_container_id = container.containerId
     # Otherwise, edit container
     else:
-      container = session.query(Container).filter(Container.containerId == containerEdit.containerId).first()
+      container = session.execute(select(Container).where(Container.containerId == containerEdit.containerId)).scalar_one_or_none()
       if container is None:
-        return Response(False, "Container not found.")
+        return api_response(False, "Container not found.")
       else:
+        image_name_changed = bool(new_image_name and new_image_name != container.imageName)
+
+        # Rename guard — once an image has been built, its name is locked for
+        # Image Builder containers. The admin must delete the container
+        # (which cleans up the image via the existing remove flow) and
+        # create a new one to use a different name. When the new mode is
+        # externally-managed, the user takes over ownership of the image,
+        # so the guard no longer applies.
+        if (image_name_changed and not new_managed_externally
+            and (container.lastBuiltAt is not None or container.buildStatus == "building")):
+          return api_response(
+            False,
+            "Image name cannot be changed after the image has been built. "
+            "Delete the container and create a new one to use a different name."
+          )
+
+        # Registry collision check on rename — if the container is unbuilt
+        # and the admin is renaming to a name that already exists in the
+        # Docker registry, surface the same overwrite prompt as on create.
+        if (image_name_changed and not new_managed_externally and new_dockerfile_commands
+            and not confirm_overwrite):
+          exists = image_exists_in_registry(new_image_name)
+          if exists is True:
+            return api_response(
+              False,
+              "An image with this name already exists in the Docker registry. Confirm overwrite to proceed.",
+              {"needsOverwriteConfirmation": True, "imageName": new_image_name}
+            )
+
+        # Check if Dockerfile-related fields changed — if so, queue a rebuild
+        dockerfile_changed = (new_dockerfile_commands != container.dockerfileCommands)
+        base_image_changed = (new_base_image != container.baseImage)
+        username_changed = (new_username != container.containerUsername)
+        cmd_changed = (new_cmd != container.containerCmd)
+
         container.public = containerEdit.data.get("public", False)
         container.name = containerEdit.data.get("name")
-        container.imageName = containerEdit.data.get("imageName")
+        container.imageName = new_image_name
         container.description = containerEdit.data.get("description", "")
+        container.managedExternally = new_managed_externally
+        container.dockerfileCommands = new_dockerfile_commands
+        container.baseImage = new_base_image
+        container.containerUsername = new_username
+        container.passwordCommand = new_password_command
+        container.sshKeyDeployCommands = new_ssh_key_commands
+        container.containerCmd = new_cmd
         container.updatedAt = datetime.datetime.now(datetime.timezone.utc)
-        # Remove all removable ports
-        for port in containerEdit.data.get("removedPorts", []):
-          session.query(ContainerPort).filter(ContainerPort.containerPortId == port).delete()
+
+        # Queue rebuild if using Image Builder and any image-affecting field changed.
+        # Includes imageName — renaming an unbuilt container should trigger a
+        # build under the new name, otherwise a prior failed build would stay
+        # stuck until the admin manually clicked Rebuild.
+        if not new_managed_externally and new_dockerfile_commands and (
+            dockerfile_changed or base_image_changed or username_changed or cmd_changed or image_name_changed
+        ):
+          container.buildStatus = "pending"
+          container.buildLog = ""
+        # If switching to externally managed, clear build status
+        if new_managed_externally:
+          container.buildStatus = None
+          container.buildLog = None
+        # Remove ports
+        removed_port_ids = containerEdit.data.get("removedPorts", [])
+        for port_id in removed_port_ids:
+          port_to_remove = session.execute(
+            select(ContainerPort).where(ContainerPort.containerPortId == port_id)
+          ).scalar_one_or_none()
+          if port_to_remove:
+            # Block removal if any active reservation references this port
+            active_ref_count = session.execute(
+              select(func.count()).select_from(ReservedContainerPort).join(
+                ReservedContainer, ReservedContainerPort.reservedContainerId == ReservedContainer.reservedContainerId
+              ).join(
+                Reservation, Reservation.reservedContainerId == ReservedContainer.reservedContainerId
+              ).where(
+                ReservedContainerPort.containerPortForeign == port_id,
+                Reservation.status.in_(["reserved", "started", "stopping", "restart", "restart_error"])
+              )
+            ).scalar() or 0
+            if active_ref_count > 0:
+              return api_response(
+                False,
+                f"Cannot remove port {port_to_remove.port} ({port_to_remove.serviceName}): "
+                f"it is used by {active_ref_count} active reservation(s). "
+                f"Cancel or wait for those reservations to end first."
+              )
+            # Clean up historical ReservedContainerPort records before deleting the port
+            session.execute(
+              delete(ReservedContainerPort).where(ReservedContainerPort.containerPortForeign == port_id)
+            )
+            session.execute(delete(ContainerPort).where(ContainerPort.containerPortId == port_id))
+        # Nullify primaryConnectionPortId if the primary port was removed
+        if container.primaryConnectionPortId in removed_port_ids:
+          container.primaryConnectionPortId = None
         # Add all new ports
         for port in containerEdit.data.get("ports", []):
           if "containerPortId" not in port:
-            container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
+            container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"], portType=port.get("portType")))
         # Edit changed ports
         for port in containerEdit.data.get("ports", []):
           if "containerPortId" in port:
-            oldPort = session.query(ContainerPort).filter(ContainerPort.containerPortId == port["containerPortId"]).first()
-            if oldPort.port != port["port"] or oldPort.serviceName != port["serviceName"]:
-              oldPort.port = port["port"]
-              oldPort.serviceName = port["serviceName"]
-              oldPort.updatedAt = datetime.datetime.now(datetime.timezone.utc)
-
-        #for port in containerEdit.data.get("ports", []):
-        #  container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
+            old_port = session.execute(select(ContainerPort).where(ContainerPort.containerPortId == port["containerPortId"])).scalar_one_or_none()
+            if old_port:
+              changed = False
+              if old_port.port != port["port"] or old_port.serviceName != port["serviceName"]:
+                old_port.port = port["port"]
+                old_port.serviceName = port["serviceName"]
+                changed = True
+              new_port_type = port.get("portType")
+              if old_port.portType != new_port_type:
+                old_port.portType = new_port_type
+                changed = True
+              if changed:
+                old_port.updatedAt = datetime.datetime.now(datetime.timezone.utc)
+        # Set primary connection port
+        primary_port_id = containerEdit.data.get("primaryConnectionPortId")
+        if primary_port_id is not None:
+          valid_port_ids = [p.containerPortId for p in container.containerPorts]
+          container.primaryConnectionPortId = primary_port_id if primary_port_id in valid_port_ids else None
+        else:
+          container.primaryConnectionPortId = None
         session.commit()
-  return Response(True, "Container saved successfully")
+        saved_container_id = container.containerId
+  is_new = containerEdit.containerId == -1
+  log_action(
+      actor_user_id,
+      "CONTAINER_CREATE" if is_new else "CONTAINER_UPDATE",
+      "container", saved_container_id,
+      {"name": containerEdit.data.get("name"), "imageName": containerEdit.data.get("imageName")}
+  )
+  if confirm_overwrite and not new_managed_externally and new_dockerfile_commands and new_image_name:
+    log_action(
+        actor_user_id,
+        "CONTAINER_IMAGE_OVERWRITE_CONFIRMED",
+        "container", saved_container_id,
+        {"imageName": new_image_name}
+    )
+  return api_response(True, "Container saved successfully", {"containerId": saved_container_id})
 
-def removeContainer(containerId : int) -> object:
-  '''
-  Removes the given container.
+def get_container_remove_info(container_id: int) -> object:
+  """Get information for the container removal confirmation dialog.
 
-  Parameters:
-    containerId: id of the container to remove.
-  
+  Returns active reservation count, image management mode, and image name
+  so the frontend can show an informative confirmation dialog.
+
+  Args:
+      container_id: Database ID of the container to check.
+
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with activeReservations, managedExternally, and imageName.
+  """
+  with Session() as session:
+    container = session.execute(
+      select(Container).where(Container.containerId == container_id)
+    ).scalar_one_or_none()
+    if container is None:
+      return api_response(False, "Container not found.")
+
+    # Count active reservations (reserved or started) using this container
+    from database import Reservation, ReservedContainer
+    active_count = session.execute(
+      select(func.count()).select_from(Reservation).join(
+        ReservedContainer, Reservation.reservedContainerId == ReservedContainer.reservedContainerId
+      ).where(
+        ReservedContainer.containerId == container_id,
+        Reservation.status.in_(["reserved", "started", "stopping"])
+      )
+    ).scalar() or 0
+
+    return api_response(True, "Remove info fetched.", {
+      "activeReservations": active_count,
+      "managedExternally": container.managedExternally if container.managedExternally is not None else True,
+      "imageName": container.imageName,
+    })
+
+def remove_container(containerId : int, actor_user_id: int = None) -> object:
+  """Soft-delete a container by marking it as removed and non-public.
+
+  For containers managed by the Image Builder, queues the Docker image
+  for removal by setting buildStatus to "removing". The daemon will
+  clean up the image on its next polling cycle.
+
+  Args:
+      containerId: The ID of the container to remove.
+      actor_user_id: The userId of the admin performing the action.
+
+  Returns:
+      Response indicating success or failure with an appropriate message.
+  """
 
   with Session() as session:
-    container = session.query(Container).filter(Container.containerId == containerId).first()
+    container = session.execute(select(Container).where(Container.containerId == containerId)).scalar_one_or_none()
     if container is None:
-      return Response(False, "Container not found.")
+      return api_response(False, "Container not found.")
     else:
+      container_name = container.name
+      container_image = container.imageName
       container.removed = True
       container.public = False
+      # Queue image removal for non-externally managed containers. The
+      # imageName is renamed to a sentinel later in report_image_removed
+      # once the daemon has confirmed the real Docker image is gone —
+      # renaming now would leave the daemon unable to locate the image.
+      if container.managedExternally == False:
+        container.buildStatus = "removing"
+      else:
+        # Externally-managed containers don't involve the daemon, so the
+        # name can be freed immediately by renaming to a sentinel. The
+        # unique constraint is preserved (containerId is unique) and
+        # future creates can reuse the original name.
+        if container_image and not container_image.startswith("__removed_"):
+          container.imageName = f"__removed_{containerId}__{container_image}"
       session.commit()
-  
-  return Response(True, "Container removed successfully")
 
-def getUsers() -> object:
-    '''
-    Returns a list of all users and available roles.
+  log_action(actor_user_id, "CONTAINER_DELETE", "container", containerId,
+             {"name": container_name, "imageName": container_image})
+  return api_response(True, "Container removed successfully")
+
+def rebuild_container_image(container_id: int, actor_user_id: int = None) -> object:
+  """Queue a container image for rebuild by setting buildStatus to "pending".
+
+  The container server daemon will pick this up on its next polling cycle
+  and perform the actual build. Refuses if the container has no Dockerfile
+  commands or if a build is already in progress.
+
+  Args:
+      container_id: Database ID of the container to rebuild.
+      actor_user_id: The userId of the admin performing the action.
+
+  Returns:
+      Response indicating success or failure with an appropriate message.
+  """
+  with Session() as session:
+    container = session.execute(
+      select(Container).where(Container.containerId == container_id)
+    ).scalar_one_or_none()
+    if container is None:
+      return api_response(False, "Container not found.")
+    if container.removed:
+      return api_response(False, "Cannot rebuild a removed container.")
+    if not container.dockerfileCommands:
+      return api_response(False, "This container has no Dockerfile commands. Cannot build.")
+    if container.buildStatus == "building":
+      return api_response(False, "A build is already in progress for this container.")
+    container.buildStatus = "pending"
+    container.buildLog = ""
+    session.commit()
+  log_action(actor_user_id, "CONTAINER_REBUILD", "container", container_id)
+  return api_response(True, "Image build queued. The container server daemon will build it shortly.")
+
+def get_container_defaults(username: str = "user") -> object:
+  """Get default values for container creation fields.
+
+  Returns the default Dockerfile body, CMD, password command, and SSH key
+  deploy commands. Used by the frontend to pre-fill the container creation
+  form and for the "Reset to Defaults" button.
+
+  Args:
+      username: Linux username to interpolate into the defaults.
+
+  Returns:
+      Response with default field values.
+  """
+  # Validate username before interpolating into Dockerfile template
+  if not _VALID_USERNAME_RE.match(username):
+    return api_response(False, "Invalid username.")
+  if username in _RESERVED_USERNAMES:
+    return api_response(False, f"Username '{username}' is reserved.")
+
+  from helpers.container_defaults import get_default_dockerfile_body, DEFAULT_CMD, DEFAULT_PASSWORD_COMMAND, DEFAULT_SSH_KEY_DEPLOY_COMMANDS
+
+  return api_response(True, "Defaults fetched.", {
+    "dockerfileBody": get_default_dockerfile_body(username),
+    "containerCmd": DEFAULT_CMD,
+    "passwordCommand": DEFAULT_PASSWORD_COMMAND,
+    "sshKeyDeployCommands": DEFAULT_SSH_KEY_DEPLOY_COMMANDS,
+    "containerUsername": username,
+  })
+
+def get_container_templates(username: str = "user") -> object:
+  """Get pre-made container image templates.
+
+  Returns a list of template objects loaded from JSON files in the
+  ``container_templates/`` directory. Each template contains all Image
+  Builder fields needed to populate the creation form.
+
+  Args:
+      username: Linux username to interpolate into template Dockerfile bodies.
+
+  Returns:
+      Response with a list of template dicts.
+  """
+  # Validate username before interpolating into templates
+  if not _VALID_USERNAME_RE.match(username):
+    return api_response(False, "Invalid username.")
+  if username in _RESERVED_USERNAMES:
+    return api_response(False, f"Username '{username}' is reserved.")
+
+  from helpers.container_templates import get_container_templates as load_templates
+
+  return api_response(True, "Templates fetched.", {
+    "templates": load_templates(username),
+  })
+
+def get_container_build_status(container_id: int) -> object:
+  """Get the current build status and log for a container image.
+
+  Args:
+      container_id: Database ID of the container to check.
+
+  Returns:
+      Response with buildStatus and buildLog fields.
+  """
+  with Session() as session:
+    container = session.execute(
+      select(Container).where(Container.containerId == container_id)
+    ).scalar_one_or_none()
+    if container is None:
+      return api_response(False, "Container not found.")
+    return api_response(True, "Build status fetched.", {
+      "buildStatus": container.buildStatus,
+      "buildLog": container.buildLog or ""
+    })
+
+def get_users(request: AdminUsersRequest) -> object:
+    """Retrieve paginated users with server-side filtering and sorting.
+
+    Returns a page of users matching the given filters, along with the
+    total count of matching users and available roles with user counts
+    (always unfiltered so the role dropdown shows accurate totals).
+
+    Args:
+        request: Pagination, sorting, and filter parameters. Supported
+            filter keys: role, email, userId.
 
     Returns:
-        object: Response object with status, message and data.
-    '''
-    data = []
-    role_user_counts = {}
+        Response with paginated users list, totalItems count, and
+        availableRoles list.
+    """
+    filters = request.filters
+    role_filter = filters.get("role", "")
+    name_filter = filters.get("name", "")
+    email_filter = filters.get("email", "")
+    user_id_filter = filters.get("userId", "")
+    online_status_filter = filters.get("onlineStatus", "")
+
+    allowed_sort_keys = {
+        "userId": User.userId,
+        "email": User.email,
+        "name": User.name,
+        "createdAt": User.userCreatedAt,
+        "hasPassword": User.password,
+        "lastSeenAt": User.lastSeenAt,
+    }
 
     with Session() as session:
-        query = session.query(User)
-        for user in query:
-            addable = {}
-            addable["userId"] = user.userId
-            addable["email"] = user.email
-            addable["roles"] = [role.name for role in user.roles]
-            addable["createdAt"] = user.userCreatedAt  # Added createdAt field
-            addable["hasPassword"] = user.password is not None and user.password != ""
-            data.append(addable)
-            
-            # Count users per role
-            for role in user.roles:
-                if role.name not in role_user_counts:
-                    role_user_counts[role.name] = 0
-                role_user_counts[role.name] += 1
+        # Build base filtered query (exclude anonymized users)
+        base_stmt = select(User).where(User.removed.isnot(True))
+        if role_filter:
+            base_stmt = base_stmt.join(UserRole, User.userId == UserRole.userId)\
+                .join(Role, UserRole.roleId == Role.roleId)\
+                .where(Role.name == role_filter)
+        if name_filter:
+            base_stmt = base_stmt.where(User.name.ilike(f"%{name_filter}%"))
+        if email_filter:
+            base_stmt = base_stmt.where(User.email.ilike(f"%{email_filter}%"))
+        if user_id_filter:
+            base_stmt = base_stmt.where(cast(User.userId, String).like(f"%{user_id_filter}%"))
+        if online_status_filter == "Online":
+            online_threshold = datetime.datetime.utcnow() - timedelta(minutes=2)
+            base_stmt = base_stmt.where(User.lastSeenAt >= online_threshold)
+        elif online_status_filter == "Offline":
+            online_threshold = datetime.datetime.utcnow() - timedelta(minutes=2)
+            base_stmt = base_stmt.where(
+                (User.lastSeenAt == None) | (User.lastSeenAt < online_threshold)
+            )
 
-    # Get available roles
-    from helpers.tables.Role import getRolesWithMountCounts
-    availableRoles = getRolesWithMountCounts()
-    
-    # Add user counts to each role
-    for role in availableRoles:
+        # Get total count of filtered results
+        total_items = get_total_count(session, base_stmt)
+
+        # Apply sorting and pagination
+        paginated_stmt = apply_pagination(
+            base_stmt, request.sortBy, request.page,
+            request.itemsPerPage, allowed_sort_keys
+        )
+
+        # Fetch paginated users with their roles eager-loaded
+        paginated_stmt = paginated_stmt.options(joinedload(User.roles))
+        users = session.execute(paginated_stmt).unique().scalars().all()
+
+        data = []
+        for user in users:
+            data.append({
+                "userId": user.userId,
+                "email": user.email,
+                "name": user.name,
+                "roles": [role.name for role in user.roles],
+                "createdAt": user.userCreatedAt,
+                "hasPassword": user.password is not None and user.password != "",
+                "lastSeenAt": user.lastSeenAt,
+            })
+
+    # Get available roles with user counts (always unfiltered)
+    role_user_counts = {}
+    with Session() as session:
+        role_counts = session.execute(
+            select(Role.name, func.count(UserRole.userId))
+            .outerjoin(UserRole, Role.roleId == UserRole.roleId)
+            .group_by(Role.name)
+        ).all()
+        for role_name, count in role_counts:
+            role_user_counts[role_name] = count
+
+    from helpers.tables.role import get_roles_with_mount_counts
+    available_roles = get_roles_with_mount_counts()
+    for role in available_roles:
         role["userCount"] = role_user_counts.get(role["name"], 0)
 
-    return Response(True, "Users fetched successfully", {"users": data, "availableRoles": availableRoles})
+    online_threshold = datetime.datetime.utcnow() - timedelta(minutes=2)
+    with Session() as session:
+        online_count = session.execute(
+            select(func.count()).select_from(User)
+            .where(User.removed.isnot(True))
+            .where(User.lastSeenAt >= online_threshold)
+        ).scalar()
 
-def getUser(userId: int) -> object:
-    '''
-    Returns a single user.
+    return api_response(True, "Users fetched successfully", {
+        "users": data,
+        "totalItems": total_items,
+        "availableRoles": available_roles,
+        "onlineCount": online_count,
+    })
 
-    Parameters:
-        userId: id of the user to fetch.
+def get_user(userId: int) -> object:
+    """Retrieve a single user by ID.
+
+    Args:
+        userId: The ID of the user to fetch.
 
     Returns:
-        object: Response object with status, message and data.
-    '''
+        Response with user details (userId, email, roles, createdAt),
+        or an error if the user is not found.
+    """
     data = {}
 
     with Session() as session:
-        user = session.query(User).filter(User.userId == userId).first()
-        if user is None:
-            return Response(False, "User not found")
-        
+        user = session.execute(
+            select(User).options(joinedload(User.roles)).where(User.userId == userId)
+        ).unique().scalar_one_or_none()
+        if user is None or user.removed is True:
+            return api_response(False, "User not found")
+
         data = {
             "userId": user.userId,
             "email": user.email,
-            "roles": [role.name for role in user.roles],  # Changed from role.role to role.name
+            "name": user.name,
+            "roles": [role.name for role in user.roles],
             "createdAt": user.userCreatedAt
         }
 
-    return Response(True, "User fetched successfully", {"user": data})
+    return api_response(True, "User fetched successfully", {"user": data})
 
-def saveUser(userId: int, data: dict) -> object:
-    '''
-    Saves user data.
+def save_user(userId: int, data: dict, actor_user_id: int = None) -> object:
+    """Create or update a user account.
 
-    Parameters:
-        userId: id of the user to save (-1 for new user)
-        data: dictionary containing user data to save
+    For new users (userId == -1), creates a new User with hashed password.
+    For existing users, updates email and optionally password or clears it.
+    Also handles role assignment by replacing existing roles with the
+    provided list. Validates email uniqueness across all users.
+
+    Args:
+        userId: The ID of the user to update, or -1 to create a new user.
+        data: Dictionary containing email, password (optional),
+            clearPassword (optional bool), and roles (list of role names).
+        actor_user_id: The userId of the admin performing the action.
 
     Returns:
-        object: Response object with status and message
-    '''
+        Response indicating success or failure with an appropriate message.
+    """
     with Session() as session:
         # Check if email already exists
-        existing_user = session.query(User).filter(User.email == data["email"]).first()
+        existing_user = session.execute(select(User).where(User.email == data["email"])).scalar_one_or_none()
         if existing_user is not None and (userId == -1 or existing_user.userId != userId):
-            return Response(False, "A user with this email already exists")
+            return api_response(False, "A user with this email already exists")
 
         if userId == -1:
             # Create new user
-            hash = HashPassword(data["password"])
+            hash = hash_password(data["password"])
+            raw_name = data.get("name")
             user = User(
                 email=data["email"],
+                name=raw_name[:200] if raw_name else raw_name,
                 password=base64.b64encode(hash["hashedPassword"]).decode('utf-8'),
                 passwordSalt=base64.b64encode(hash["salt"]).decode('utf-8')
             )
@@ -266,12 +928,16 @@ def saveUser(userId: int, data: dict) -> object:
             
         else:
             # Update existing user
-            user = session.query(User).filter(User.userId == userId).first()
+            user = session.execute(select(User).where(User.userId == userId)).scalar_one_or_none()
             if user is None:
-                return Response(False, "User not found")
-            
+                return api_response(False, "User not found")
+            if user.removed is True:
+                return api_response(False, "Cannot edit an anonymized user.")
+
             user.email = data["email"]
-            
+            new_name = data.get("name", user.name)
+            user.name = new_name[:200] if new_name else new_name
+
             # Check if we should clear the password
             if "clearPassword" in data and data["clearPassword"]:
                 # Clear both password and salt
@@ -279,7 +945,7 @@ def saveUser(userId: int, data: dict) -> object:
                 user.passwordSalt = ""
             elif "password" in data and data["password"]:
                 # Update password only if provided and not clearing
-                hash = HashPassword(data["password"])
+                hash = hash_password(data["password"])
                 user.password = base64.b64encode(hash["hashedPassword"]).decode('utf-8')
                 user.passwordSalt = base64.b64encode(hash["salt"]).decode('utf-8')
         
@@ -292,165 +958,203 @@ def saveUser(userId: int, data: dict) -> object:
         if "roles" in data:
             # Create a set of role names to ensure uniqueness
             role_names = set(data["roles"])
-            for roleName in role_names:
-                role = session.query(Role).filter(Role.name == roleName).first()
+            for role_name in role_names:
+                role = session.execute(select(Role).where(Role.name == role_name)).scalar_one_or_none()
                 if role and role not in user.roles:  # Check if role exists and isn't already assigned
                     user.roles.append(role)
         
         session.commit()
-        return Response(True, "User saved successfully")
+        is_new = userId == -1
+        audit_details = {"email": data.get("email"), "roles": data.get("roles", [])}
+        if not is_new:
+            if data.get("clearPassword"):
+                audit_details["passwordCleared"] = True
+            elif data.get("password"):
+                audit_details["passwordChanged"] = True
+        log_action(actor_user_id, "USER_CREATE" if is_new else "USER_UPDATE",
+                   "user", user.userId, audit_details)
+        return api_response(True, "User saved successfully")
 
-def getHardware() -> object:
-  '''
-  Returns a list of all hardware.
+def get_hardware() -> object:
+  """Retrieve all hardware specification records.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with a list of all HardwareSpec entries as dicts.
+  """
 
   data = []
 
   with Session() as session:
-    query = session.query(HardwareSpec)
+    query = session.execute(select(HardwareSpec)).scalars().all()
     for hardware in query:
       addable = {}
-      addable = ORMObjectToDict(hardware)
+      addable = orm_to_dict(hardware)
       data.append(addable)
   
-  return Response(True, "Data fetched.", { "hardware": data })
+  return api_response(True, "Data fetched.", { "hardware": data })
 
-def getContainers() -> object:
-  '''
-  Returns a list of all containers which have not been removed.
+def get_containers() -> object:
+  """Retrieve all active (non-removed) container definitions with their ports.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with a list of container dicts, each including a ports
+      list with containerPortId, port number, and serviceName.
+  """
 
   data = []
 
   with Session() as session:
     # Find all where Container.removed is not True
-    query = session.query(Container).filter(Container.removed.isnot(True))
+    query = session.execute(select(Container).where(Container.removed.isnot(True))).scalars().all()
     for container in query:
       addable = {}
-      addable = ORMObjectToDict(container)
+      addable = orm_to_dict(container)
+      # Strip buildLog from listing to avoid large payloads
+      addable.pop("buildLog", None)
       addable["ports"] = []
       for port in container.containerPorts:
         addable["ports"].append({
           "containerPortId": port.containerPortId,
           "port": port.port,
           "serviceName": port.serviceName,
+          "portType": port.portType,
         })
+      addable["primaryConnectionPortId"] = container.primaryConnectionPortId
       data.append(addable)
-  
-  return Response(True, "Data fetched.", { "containers": data })
 
-def getContainer(containerId : int) -> object:
-  '''
-  Returns the given container.
+  return api_response(True, "Data fetched.", { "containers": data })
 
-  Parameters:
-    containerId: id of the container to fetch.
+def get_container(containerId : int) -> object:
+  """Retrieve a single container definition by ID, including its ports.
+
+  Args:
+      containerId: The ID of the container to fetch.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with the container dict including its ports list.
+  """
 
   addable = {}
 
   with Session() as session:
-    query = session.query(Container).filter(Container.containerId == containerId).limit(1)
+    query = session.execute(select(Container).where(Container.containerId == containerId).limit(1)).scalars().all()
     for container in query:
       addable = {}
-      addable = ORMObjectToDict(container)
+      addable = orm_to_dict(container)
       addable["ports"] = []
       for port in container.containerPorts:
         addable["ports"].append({
           "containerPortId": port.containerPortId,
           "port": port.port,
           "serviceName": port.serviceName,
+          "portType": port.portType,
         })
-  
-  return Response(True, "Data fetched.", { "data": addable })
+      addable["primaryConnectionPortId"] = container.primaryConnectionPortId
 
-def getComputers() -> object:
-  '''
-  Returns a list of all computers.
+  return api_response(True, "Data fetched.", { "data": addable })
+
+def get_computers() -> object:
+  """Retrieve all active (non-removed) computers with their hardware specs.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with a list of computer dicts, each including a
+      hardwareSpecs list of associated hardware specifications, and
+      the current ``onlineThresholdMinutes`` setting so the admin UI
+      can consistently flag servers whose heartbeat has gone stale.
+  """
 
   data = []
 
   with Session() as session:
-    query = session.query(Computer).filter(Computer.removed.isnot(True))
+    query = session.execute(select(Computer).where(Computer.removed.isnot(True))).scalars().all()
     for computer in query:
       addable = {}
-      addable = ORMObjectToDict(computer)
+      addable = orm_to_dict(computer)
       addable["hardwareSpecs"] = []
       for spec in computer.hardwareSpecs:
-        addable["hardwareSpecs"].append(ORMObjectToDict(spec))
+        addable["hardwareSpecs"].append(orm_to_dict(spec))
       data.append(addable)
-  
-  return Response(True, "Data fetched.", { "computers": data })
 
-def getComputer(computerId : int) -> object:
-  '''
-  Returns a single computer.
+  from helpers.settings_handler import get_setting
+  threshold_minutes = int(get_setting("docker.serverOnlineThresholdMinutes"))
+  return api_response(True, "Data fetched.", {
+    "computers": data,
+    "onlineThresholdMinutes": threshold_minutes,
+  })
 
-  Parameters:
-    computerId: id of the computer to fetch.
+def get_computer(computerId : int) -> object:
+  """Retrieve a single computer by ID with structured hardware details.
+
+  Returns hardware organized into cpu, ram, gpu (aggregate), and gpus
+  (individual GPU list) sections.
+
+  Args:
+      computerId: The ID of the computer to fetch.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response with the computer dict including nested hardware details.
+  """
 
   data = {}
 
   with Session() as session:
-    query = session.query(Computer).filter( Computer.computerId == computerId ).limit(1)
+    query = session.execute(select(Computer).where( Computer.computerId == computerId ).limit(1)).scalars().all()
     for computer in query:
       addable = {}
-      addable = ORMObjectToDict(computer)
+      addable = orm_to_dict(computer)
       addable["hardware"] = {}
       addable["hardware"]["gpus"] = []
       for spec in computer.hardwareSpecs:
         if spec.type == "cpus":
-          addable["hardware"]["cpu"] = ORMObjectToDict(spec)
+          addable["hardware"]["cpu"] = orm_to_dict(spec)
         if spec.type == "ram":
-          addable["hardware"]["ram"] = ORMObjectToDict(spec)
+          addable["hardware"]["ram"] = orm_to_dict(spec)
         if spec.type == "gpus":
-          addable["hardware"]["gpu"] = ORMObjectToDict(spec)
+          addable["hardware"]["gpu"] = orm_to_dict(spec)
         if spec.type == "gpu":
-          addable["hardware"]["gpus"].append(ORMObjectToDict(spec))
-        #print(ORMObjectToDict(spec))
-        #addable["hardwareSpecs"].append(ORMObjectToDict(spec))
+          addable["hardware"]["gpus"].append(orm_to_dict(spec))
+        #print(orm_to_dict(spec))
+        #addable["hardwareSpecs"].append(orm_to_dict(spec))
       data = addable
 
-  return Response(True, "Data fetched.", { "data": data })
+  return api_response(True, "Data fetched.", { "data": data })
 
-def saveComputer(computerEdit : ComputerEdit) -> object:
-  '''
-  Edits the given computer.
+def save_computer(computerEdit : ComputerEdit, actor_user_id: int = None) -> object:
+  """Create or update a computer (server) and its hardware specifications.
 
-  Parameters:
-    computerId: id of the computer to edit.
-    data: New data for the computer.
-  
+  For new computers (computerId == -1), creates a Computer record with
+  CPU, RAM, and GPU hardware specs. For existing computers, updates the
+  fields, modifies hardware spec limits, and handles GPU additions,
+  removals, and edits.
+
+  Args:
+      computerEdit: ComputerEdit model containing computerId and a data
+          dict with name, ip, public flag, hardware (cpu, ram, gpu, gpus),
+          and removedGPUs list.
+
   Returns:
-    object: Response object with status, message and data.
-
-  '''
+      Response indicating success or failure with an appropriate message.
+  """
   
+  def _low_priority_or_normal(section):
+    """Pick the low-priority max from the payload, falling back to the normal max."""
+    value = section.get("maximumAmountForUserLowPriority")
+    if value is None:
+      value = section.get("maximumAmountForUser")
+    return value
+
+  import re
+  computer_name = computerEdit.data.get("name", "")
+  if not computer_name or not re.match(r'^[a-zA-Z0-9._-]+$', computer_name):
+    return Response(False, "Computer name can only contain letters, numbers, dots, underscores, and hyphens.")
+
   with Session() as session:
     # If new, create a new computer
     if computerEdit.computerId == -1:
       hardware = computerEdit.data.get("hardware")
       computer = Computer()
       computer.public = computerEdit.data.get("public", False)
-      computer.name = computerEdit.data.get("name")
+      computer.name = computer_name
       computer.ip = computerEdit.data.get("ip")
       # Add hardware specs
       cpu = HardwareSpec(
@@ -459,6 +1163,7 @@ def saveComputer(computerEdit : ComputerEdit) -> object:
         maximumAmount = hardware.get("cpu").get("maximumAmount"),
         minimumAmount = hardware.get("cpu").get("minimumAmount"),
         maximumAmountForUser = hardware.get("cpu").get("maximumAmountForUser"),
+        maximumAmountForUserLowPriority = _low_priority_or_normal(hardware.get("cpu")),
         defaultAmountForUser = hardware.get("cpu").get("defaultAmountForUser"),
       )
       computer.hardwareSpecs.append(cpu)
@@ -468,6 +1173,7 @@ def saveComputer(computerEdit : ComputerEdit) -> object:
         maximumAmount = hardware.get("ram").get("maximumAmount"),
         minimumAmount = hardware.get("ram").get("minimumAmount"),
         maximumAmountForUser = hardware.get("ram").get("maximumAmountForUser"),
+        maximumAmountForUserLowPriority = _low_priority_or_normal(hardware.get("ram")),
         defaultAmountForUser = hardware.get("ram").get("defaultAmountForUser"),
       )
       computer.hardwareSpecs.append(ram)
@@ -478,51 +1184,60 @@ def saveComputer(computerEdit : ComputerEdit) -> object:
         minimumAmount = 0,
         defaultAmountForUser = 0,
         maximumAmountForUser = hardware.get("gpu").get("maximumAmountForUser"),
+        maximumAmountForUserLowPriority = _low_priority_or_normal(hardware.get("gpu")),
       )
       computer.hardwareSpecs.append(gpus)
       # Add GPUs
       for gpu in hardware.get("gpus"):
-        gpuSpec = HardwareSpec(
+        gpu_spec = HardwareSpec(
           type = "gpu",
           format = gpu.get("format", ""),
           maximumAmount = 1,
           minimumAmount = 0,
           defaultAmountForUser = 0,
           maximumAmountForUser = 1,
+          maximumAmountForUserLowPriority = 1,
           internalId = gpu.get("internalId", ""))
-        computer.hardwareSpecs.append(gpuSpec)
+        computer.hardwareSpecs.append(gpu_spec)
       session.add(computer)
       session.commit()
+      saved_computer_id = computer.computerId
     # Otherwise, edit computer
     else:
       log.debug(computerEdit.data.get("hardware").get("gpus"))
-      computer = session.query(Computer).filter(Computer.computerId == computerEdit.computerId).first()
+      computer = session.execute(select(Computer).where(Computer.computerId == computerEdit.computerId)).scalar_one_or_none()
       if computer is None:
-        return Response(False, "Computer not found.")
+        return api_response(False, "Computer not found.")
       else:
         computer.public = computerEdit.data.get("public", False)
-        computer.name = computerEdit.data.get("name")
+        computer.name = computer_name
         computer.ip = computerEdit.data.get("ip")
         computer.updatedAt = datetime.datetime.now(datetime.timezone.utc)
         # Update hardware specs
         for spec in computer.hardwareSpecs:
           if spec.type == "cpus":
-            spec.maximumAmount = computerEdit.data.get("hardware").get("cpu").get("maximumAmount")
-            spec.minimumAmount = computerEdit.data.get("hardware").get("cpu").get("minimumAmount")
-            spec.maximumAmountForUser = computerEdit.data.get("hardware").get("cpu").get("maximumAmountForUser")
-            spec.defaultAmountForUser = computerEdit.data.get("hardware").get("cpu").get("defaultAmountForUser")
+            cpu_data = computerEdit.data.get("hardware").get("cpu")
+            spec.maximumAmount = cpu_data.get("maximumAmount")
+            spec.minimumAmount = cpu_data.get("minimumAmount")
+            spec.maximumAmountForUser = cpu_data.get("maximumAmountForUser")
+            spec.maximumAmountForUserLowPriority = _low_priority_or_normal(cpu_data)
+            spec.defaultAmountForUser = cpu_data.get("defaultAmountForUser")
           if spec.type == "ram":
-            spec.maximumAmount = computerEdit.data.get("hardware").get("ram").get("maximumAmount")
-            spec.minimumAmount = computerEdit.data.get("hardware").get("ram").get("minimumAmount")
-            spec.maximumAmountForUser = computerEdit.data.get("hardware").get("ram").get("maximumAmountForUser")
-            spec.defaultAmountForUser = computerEdit.data.get("hardware").get("ram").get("defaultAmountForUser")
+            ram_data = computerEdit.data.get("hardware").get("ram")
+            spec.maximumAmount = ram_data.get("maximumAmount")
+            spec.minimumAmount = ram_data.get("minimumAmount")
+            spec.maximumAmountForUser = ram_data.get("maximumAmountForUser")
+            spec.maximumAmountForUserLowPriority = _low_priority_or_normal(ram_data)
+            spec.defaultAmountForUser = ram_data.get("defaultAmountForUser")
           if spec.type == "gpus":
+            gpu_data = computerEdit.data.get("hardware").get("gpu")
             spec.maximumAmount = len(computerEdit.data.get("hardware").get("gpus"))
-            spec.maximumAmountForUser = computerEdit.data.get("hardware").get("gpu").get("maximumAmountForUser")
+            spec.maximumAmountForUser = gpu_data.get("maximumAmountForUser")
+            spec.maximumAmountForUserLowPriority = _low_priority_or_normal(gpu_data)
         # Remove all removable GPUs
         for spec in computerEdit.data.get("removedGPUs", []):
-          session.query(ReservedHardwareSpec).filter(ReservedHardwareSpec.hardwareSpecId == spec).delete()
-          session.query(HardwareSpec).filter(HardwareSpec.hardwareSpecId == spec).delete()
+          session.execute(delete(ReservedHardwareSpec).where(ReservedHardwareSpec.hardwareSpecId == spec))
+          session.execute(delete(HardwareSpec).where(HardwareSpec.hardwareSpecId == spec))
         # Add all new GPUs
         for gpu in computerEdit.data.get("hardware").get("gpus", []):
           if "hardwareSpecId" not in gpu:
@@ -534,251 +1249,302 @@ def saveComputer(computerEdit : ComputerEdit) -> object:
               minimumAmount = 0,
               defaultAmountForUser = 0,
               maximumAmountForUser = 1,
+              maximumAmountForUserLowPriority = 1,
             ))
         # Edit changed GPUs
         for gpu in computerEdit.data.get("hardware").get("gpus", []):
           if "hardwareSpecId" in gpu:
-            oldGPU = session.query(HardwareSpec).filter(HardwareSpec.hardwareSpecId == gpu["hardwareSpecId"]).first()
-            if oldGPU.format != gpu["format"] or oldGPU.internalId != gpu["internalId"]:
-              oldGPU.format = gpu["format"]
-              oldGPU.internalId = gpu["internalId"]
-              oldGPU.updatedAt = datetime.datetime.now(datetime.timezone.utc)
+            old_gpu = session.execute(select(HardwareSpec).where(HardwareSpec.hardwareSpecId == gpu["hardwareSpecId"])).scalar_one_or_none()
+            if old_gpu.format != gpu["format"] or old_gpu.internalId != gpu["internalId"]:
+              old_gpu.format = gpu["format"]
+              old_gpu.internalId = gpu["internalId"]
+              old_gpu.updatedAt = datetime.datetime.now(datetime.timezone.utc)
 
         #for port in containerEdit.data.get("ports", []):
         #  container.containerPorts.append(ContainerPort(port=port["port"], serviceName=port["serviceName"]))
         session.commit()
-  return Response(True, "Computer saved successfully")
+        saved_computer_id = computer.computerId
+  is_new = computerEdit.computerId == -1
+  log_action(
+      actor_user_id,
+      "COMPUTER_CREATE" if is_new else "COMPUTER_UPDATE",
+      "computer", saved_computer_id,
+      {"name": computerEdit.data.get("name"), "ip": computerEdit.data.get("ip")}
+  )
+  return api_response(True, "Computer saved successfully")
 
-def removeComputer(computerId : int) -> object:
-  '''
-  Removes the given computer.
+def remove_computer(computerId : int, actor_user_id: int = None) -> object:
+  """Soft-delete a computer by marking it as removed and non-public.
 
-  Parameters:
-    computerId: id of the computer to remove.
-  
+  Args:
+      computerId: The ID of the computer to remove.
+      actor_user_id: The userId of the admin performing the action.
+
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response indicating success or failure with an appropriate message.
+  """
 
   with Session() as session:
-    computer = session.query(Computer).filter(Computer.computerId == computerId).first()
+    computer = session.execute(select(Computer).where(Computer.computerId == computerId)).scalar_one_or_none()
     if computer is None:
-      return Response(False, "Computer not found.")
+      return api_response(False, "Computer not found.")
     else:
+      computer_name = computer.name
       computer.removed = True
       computer.public = False
+      # Rename to a sentinel so the original name is freed for reuse in new
+      # computer definitions. Computer.name has a DB unique constraint, so
+      # without this an admin cannot recreate a server with a previously
+      # used name. The unique constraint is preserved (computerId is
+      # unique). Skipped if already prefixed, so double-remove is safe.
+      if computer_name and not computer_name.startswith("__removed_"):
+        computer.name = f"__removed_{computerId}__{computer_name}"
       session.commit()
-  
-  return Response(True, "Computer removed successfully")
 
-def editReservation(reservationId : int, endDate : str) -> object:
-  '''
-  Edits the given reservation.
+  log_action(actor_user_id, "COMPUTER_DELETE", "computer", computerId, {"name": computer_name})
+  return api_response(True, "Computer removed successfully")
 
-  Parameters:
-    reservationId: id of the reservation to edit.
-    endDate: New end date for the reservation.
+def edit_reservation(reservationId : int, end_date_str : str, actor_user_id: int = None) -> object:
+  """Update a reservation's end date.
+
+  Parses the provided date string and sets it as the new end date
+  for the specified reservation.
+
+  Args:
+      reservationId: The ID of the reservation to edit.
+      end_date_str: The new end date as an ISO-format string.
+      actor_user_id: The userId of the admin performing the action.
 
   Returns:
-    object: Response object with status, message and data.
-  '''
+      Response indicating success or failure with an appropriate message.
+  """
   # Verify that the new end date is valid
   try:
-    endDate = parser.parse(endDate)
+    parsed_end_date = parser.parse(end_date_str)
   except:
-    return Response(False, "Invalid end date.")
+    return api_response(False, "Invalid end date.")
 
   with Session() as session:
-    reservation = session.query(Reservation).filter(Reservation.reservationId == reservationId).first()
+    reservation = session.execute(select(Reservation).where(Reservation.reservationId == reservationId)).scalar_one_or_none()
     if reservation is None:
-      return Response(False, "Reservation not found.")
+      return api_response(False, "Reservation not found.")
     else:
-      reservation.endDate = endDate
+      old_end_date = reservation.endDate.isoformat() if reservation.endDate else None
+      reservation.endDate = parsed_end_date
       session.commit()
 
-  return Response(True, "Reservation was edited succesfully.")
+  log_action(actor_user_id, "RESERVATION_ADMIN_EDIT", "reservation", reservationId,
+             {"oldEndDate": old_end_date, "newEndDate": end_date_str})
+  return api_response(True, "Reservation was edited succesfully.")
 
-def getAllRoles() -> object:
-    '''
-    Returns a list of all roles with mount counts.
+def get_all_roles() -> object:
+    """Retrieve all roles with their associated mount counts.
+
     Returns:
-        object: Response object with status, message and data.
-    '''
-    from helpers.tables.Role import getRolesWithMountCounts
-    data = getRolesWithMountCounts()
+        Response with a list of role dicts including mount count per role.
+    """
+    from helpers.tables.role import get_roles_with_mount_counts
+    data = get_roles_with_mount_counts()
     
-    return Response(True, "Roles fetched successfully.", {"roles": data})
+    return api_response(True, "Roles fetched successfully.", {"roles": data})
 
-def addRole(name: str) -> object:
-    '''
-    Adds a new role.
-    Parameters:
-        name: The name of the role
-    Returns:
-        object: Response object with status and message
-    '''
-    success, message, role_dict = addRoleHelper(name)
-    if not success:
-        return Response(False, message)
-    return Response(True, message, role_dict)
+def add_role(name: str, actor_user_id: int = None) -> object:
+    """Create a new role with the given name.
 
-def editRole(roleId: int, name: str) -> object:
-    '''
-    Edits an existing role.
-    Parameters:
-        roleId: The ID of the role to edit
-        name: The new name for the role
-    Returns:
-        object: Response object with status and message
-    '''
-    success, message, role_dict = editRoleHelper(roleId, name)
-    if not success:
-        return Response(False, message)
-    return Response(True, message, role_dict)
-
-def removeRole(roleId: int) -> object:
-    '''
-    Removes a role.
-    Parameters:
-        roleId: The ID of the role to remove
-    Returns:
-        object: Response object with status and message
-    '''
-    success, message = removeRoleHelper(roleId)
-    if not success:
-        return Response(False, message)
-    return Response(True, message)
-
-def getRoleMounts(roleId: int) -> object:
-    '''
-    Gets all mounts for a specific role.
-    
-    Parameters:
-        roleId: The ID of the role to get mounts for
-        
-    Returns:
-        object: Response object with status, message and data containing mounts
-    '''
-    try:
-        from helpers.tables.Role import getRoleMounts as getRoleMountsHelper
-        mounts = getRoleMountsHelper(roleId)
-        return Response(True, "Role mounts retrieved successfully", {"mounts": mounts})
-    except Exception as e:
-        return Response(False, f"Error retrieving role mounts: {str(e)}")
-
-def saveRoleMounts(roleId: int, mounts: list) -> object:
-    '''
-    Saves role mounts, replacing existing ones.
-    
-    Parameters:
-        roleId: The ID of the role
-        mounts: List of mount dictionaries
-        
-    Returns:
-        object: Response object with status and message
-    '''
-    try:
-        from helpers.tables.Role import saveRoleMounts as saveRoleMountsHelper
-        success, message = saveRoleMountsHelper(roleId, mounts)
-        return Response(success, message)
-    except Exception as e:
-        return Response(False, f"Error saving role mounts: {str(e)}")
-
-def getRoleHardwareLimits(roleId: int) -> object:
-    '''
-    Retrieves hardware limits for a specific role.
-    
-    Parameters:
-        roleId: The ID of the role
-        
-    Returns:
-        object: Response object with hardware limits data
-    '''
-    try:
-        from helpers.tables.Role import getRoleHardwareLimits as getRoleHardwareLimitsHelper
-        limits = getRoleHardwareLimitsHelper(roleId)
-        return Response(True, "Role hardware limits retrieved successfully", {"hardwareLimits": limits})
-    except Exception as e:
-        return Response(False, f"Error retrieving role hardware limits: {str(e)}")
-
-def saveRoleHardwareLimits(roleId: int, hardwareLimits: list) -> object:
-    '''
-    Saves role hardware limits, replacing existing ones.
-    
-    Parameters:
-        roleId: The ID of the role
-        hardwareLimits: List of hardware limit dictionaries
-        
-    Returns:
-        object: Response object with status and message
-    '''
-    try:
-        from helpers.tables.Role import saveRoleHardwareLimits as saveRoleHardwareLimitsHelper
-        success, message = saveRoleHardwareLimitsHelper(roleId, hardwareLimits)
-        return Response(success, message)
-    except Exception as e:
-        return Response(False, f"Error saving role hardware limits: {str(e)}")
-
-def getRoleReservationLimits(roleId: int) -> object:
-    '''
-    Retrieves reservation limits for a specific role.
-    
-    Parameters:
-        roleId: The ID of the role
-        
-    Returns:
-        object: Response object with reservation limits data
-    '''
-    try:
-        from helpers.tables.Role import getRoleReservationLimits as getRoleReservationLimitsHelper
-        limits = getRoleReservationLimitsHelper(roleId)
-        return Response(True, "Role reservation limits retrieved successfully", {"reservationLimits": limits})
-    except Exception as e:
-        return Response(False, f"Error retrieving role reservation limits: {str(e)}")
-
-def saveRoleReservationLimits(roleId: int, reservationLimits: dict) -> object:
-    '''
-    Saves role reservation limits, replacing existing ones.
-    
-    Parameters:
-        roleId: The ID of the role
-        reservationLimits: Dictionary containing minDuration, maxDuration, and maxActiveReservations
-        
-    Returns:
-        object: Response object indicating success or failure
-    '''
-    try:
-        from helpers.tables.Role import saveRoleReservationLimits as saveRoleReservationLimitsHelper
-        success, message = saveRoleReservationLimitsHelper(roleId, reservationLimits)
-        return Response(success, message)
-    except Exception as e:
-        return Response(False, f"Error saving role reservation limits: {str(e)}")
-
-def getServerMonitoring(computer_id: int) -> object:
-    '''
-    Returns monitoring data (metrics and logs) for a specific server.
-    
     Args:
-        computer_id (int): The ID of the computer/server.
-        
+        name: The name for the new role.
+        actor_user_id: The userId of the admin performing the action.
+
     Returns:
-        object: Response object with server monitoring data.
-    '''
+        Response with the created role data, or an error if creation fails.
+    """
+    success, message, role_dict = add_role_helper(name)
+    if not success:
+        return api_response(False, message)
+    log_action(actor_user_id, "ROLE_CREATE", "role", role_dict.get("roleId"), {"name": name})
+    return api_response(True, message, role_dict)
+
+def edit_role(roleId: int, name: str, actor_user_id: int = None) -> object:
+    """Rename an existing role.
+
+    Args:
+        roleId: The ID of the role to edit.
+        name: The new name for the role.
+        actor_user_id: The userId of the admin performing the action.
+
+    Returns:
+        Response with the updated role data, or an error if the edit fails.
+    """
+    success, message, role_dict = edit_role_helper(roleId, name)
+    if not success:
+        return api_response(False, message)
+    log_action(actor_user_id, "ROLE_UPDATE", "role", roleId, {"newName": name})
+    return api_response(True, message, role_dict)
+
+def remove_role(roleId: int, actor_user_id: int = None) -> object:
+    """Delete a role by ID.
+
+    Args:
+        roleId: The ID of the role to remove.
+        actor_user_id: The userId of the admin performing the action.
+
+    Returns:
+        Response indicating success or failure with an appropriate message.
+    """
+    success, message = remove_role_helper(roleId)
+    if not success:
+        return api_response(False, message)
+    log_action(actor_user_id, "ROLE_DELETE", "role", roleId)
+    return api_response(True, message)
+
+def get_role_mounts(roleId: int) -> object:
+    """Retrieve all volume mount configurations for a specific role.
+
+    Args:
+        roleId: The ID of the role to get mounts for.
+
+    Returns:
+        Response with a list of mount dicts for the role.
+    """
+    try:
+        from helpers.tables.role import get_role_mounts as get_role_mounts_helper
+        mounts = get_role_mounts_helper(roleId)
+        return api_response(True, "Role mounts retrieved successfully", {"mounts": mounts})
+    except Exception as e:
+        return api_response(False, f"Error retrieving role mounts: {str(e)}")
+
+def save_role_mounts(roleId: int, mounts: list, actor_user_id: int = None) -> object:
+    """Replace all volume mount configurations for a role.
+
+    Deletes existing mounts and saves the provided list as the new
+    mount configuration for the specified role.
+
+    Args:
+        roleId: The ID of the role.
+        mounts: List of mount dicts, each containing host path,
+            container path, and read-only flag.
+        actor_user_id: The userId of the admin performing the action.
+
+    Returns:
+        Response indicating success or failure with an appropriate message.
+    """
+    try:
+        from helpers.tables.role import save_role_mounts as save_role_mounts_helper
+        success, message = save_role_mounts_helper(roleId, mounts)
+        if success:
+            log_action(actor_user_id, "ROLE_MOUNTS_UPDATE", "role", roleId,
+                       {"mountCount": len(mounts)})
+        return api_response(success, message)
+    except Exception as e:
+        return api_response(False, f"Error saving role mounts: {str(e)}")
+
+def get_role_hardware_limits(roleId: int) -> object:
+    """Retrieve hardware resource limits for a specific role.
+
+    Args:
+        roleId: The ID of the role.
+
+    Returns:
+        Response with a list of hardware limit dicts for the role.
+    """
+    try:
+        from helpers.tables.role import get_role_hardware_limits as get_role_hardware_limits_helper
+        limits = get_role_hardware_limits_helper(roleId)
+        return api_response(True, "Role hardware limits retrieved successfully", {"hardwareLimits": limits})
+    except Exception as e:
+        return api_response(False, f"Error retrieving role hardware limits: {str(e)}")
+
+def save_role_hardware_limits(roleId: int, hardwareLimits: list, actor_user_id: int = None) -> object:
+    """Replace all hardware resource limits for a role.
+
+    Deletes existing limits and saves the provided list as the new
+    hardware limit configuration for the specified role.
+
+    Args:
+        roleId: The ID of the role.
+        hardwareLimits: List of hardware limit dicts, each containing
+            hardwareSpecId and maximumAmountForRole.
+        actor_user_id: The userId of the admin performing the action.
+
+    Returns:
+        Response indicating success or failure with an appropriate message.
+    """
+    try:
+        from helpers.tables.role import save_role_hardware_limits as save_role_hardware_limits_helper
+        success, message = save_role_hardware_limits_helper(roleId, hardwareLimits)
+        if success:
+            log_action(actor_user_id, "ROLE_HARDWARE_LIMITS_UPDATE", "role", roleId)
+        return api_response(success, message)
+    except Exception as e:
+        return api_response(False, f"Error saving role hardware limits: {str(e)}")
+
+def get_role_reservation_limits(roleId: int) -> object:
+    """Retrieve reservation limits for a specific role.
+
+    Args:
+        roleId: The ID of the role.
+
+    Returns:
+        Response with reservation limits (minDuration, maxDuration,
+        maxActiveReservations) for the role.
+    """
+    try:
+        from helpers.tables.role import get_role_reservation_limits as get_role_reservation_limits_helper
+        limits = get_role_reservation_limits_helper(roleId)
+        return api_response(True, "Role reservation limits retrieved successfully", {"reservationLimits": limits})
+    except Exception as e:
+        return api_response(False, f"Error retrieving role reservation limits: {str(e)}")
+
+def save_role_reservation_limits(roleId: int, reservationLimits: dict, actor_user_id: int = None) -> object:
+    """Replace reservation limits for a role.
+
+    Args:
+        roleId: The ID of the role.
+        reservationLimits: Dictionary containing minDuration (hours),
+            maxDuration (hours), and maxActiveReservations.
+        actor_user_id: The userId of the admin performing the action.
+
+    Returns:
+        Response indicating success or failure with an appropriate message.
+    """
+    try:
+        from helpers.tables.role import save_role_reservation_limits as save_role_reservation_limits_helper
+        success, message = save_role_reservation_limits_helper(roleId, reservationLimits)
+        if success:
+            log_action(actor_user_id, "ROLE_RESERVATION_LIMITS_UPDATE", "role", roleId)
+        return api_response(success, message)
+    except Exception as e:
+        return api_response(False, f"Error saving role reservation limits: {str(e)}")
+
+def get_server_monitoring(computer_id: int) -> object:
+    """Retrieve monitoring data for a specific server.
+
+    Returns system metrics (CPU, memory, disk, Docker, load averages,
+    uptime) and logs for the specified server. Includes online status
+    and software version information.
+
+    Args:
+        computer_id: The ID of the computer/server to monitor.
+
+    Returns:
+        Response with computer info, online status, metrics dict,
+        version info, and logs dict keyed by log type.
+    """
     with Session() as session:
         # Check if computer exists
-        computer = session.query(Computer).filter(Computer.computerId == computer_id).first()
+        computer = session.execute(select(Computer).where(Computer.computerId == computer_id)).scalar_one_or_none()
         if not computer:
-            return Response(False, "Server not found")
-        
+            return api_response(False, "Server not found")
+
         # Get server status/metrics
-        status = session.query(ServerStatus).filter(
+        status = session.execute(select(ServerStatus).where(
             ServerStatus.computerId == computer_id
-        ).first()
-        
+        )).scalar_one_or_none()
+
         # Get server logs
-        logs = session.query(ServerLogs).filter(
+        logs = session.execute(select(ServerLogs).where(
             ServerLogs.computerId == computer_id
-        ).all()
+        )).scalars().all()
         
         # Build response
         monitoring_data = {
@@ -852,19 +1618,19 @@ def getServerMonitoring(computer_id: int) -> object:
                 "lastUpdated": log.lastUpdatedAt.isoformat() if log.lastUpdatedAt else None
             }
         
-        return Response(True, "Server monitoring data retrieved", monitoring_data)
+        return api_response(True, "Server monitoring data retrieved", monitoring_data)
 
-def getServersForMonitoring() -> object:
-    '''
-    Returns a list of all servers/computers available for monitoring.
-    
+def get_servers_for_monitoring() -> object:
+    """Retrieve all non-removed servers for the monitoring dashboard.
+
     Returns:
-        object: Response object with servers list.
-    '''
+        Response with a list of server dicts containing id, name,
+        address (IP), and public visibility flag.
+    """
     with Session() as session:
-        computers = session.query(Computer).filter(
+        computers = session.execute(select(Computer).where(
             (Computer.removed == False) | (Computer.removed.is_(None))
-        ).all()
+        )).scalars().all()
         
         servers_list = []
         for computer in computers:
@@ -875,18 +1641,24 @@ def getServersForMonitoring() -> object:
                 "public": computer.public
             })
         
-        return Response(True, "Servers retrieved successfully", {"servers": servers_list})
+        return api_response(True, "Servers retrieved successfully", {"servers": servers_list})
 
-def getGeneralSettings() -> object:
-    '''
-    Returns all general admin settings with default values if not set.
-    
+def get_general_settings() -> object:
+    """Retrieve all admin-configurable application settings.
+
+    Fetches settings from the database organized by section: general
+    (app name, timezone, instructions), access control (blacklist/whitelist),
+    email (SMTP configuration), notifications (alert settings), and
+    authentication (login type, session timeout, LDAP configuration).
+    Returns default values for any settings not yet configured.
+
     Returns:
-        object: Response object with all settings organized by section.
-    '''
+        Response with settings organized by section, including
+        blacklisted and whitelisted email lists.
+    """
     try:
-        from settings_handler import getSetting, getMultipleSettings
-        from helpers.tables.UserAccessControl import getBlacklistedEmails, getWhitelistedEmails
+        from helpers.settings_handler import get_setting, get_multiple_settings
+        from helpers.tables.user_access_control import get_blacklisted_emails, get_whitelisted_emails
         
         # Define all settings with their defaults
         setting_keys = [
@@ -916,15 +1688,47 @@ def getGeneralSettings() -> object:
             'auth.ldap.domain',
             'auth.ldap.searchMethod',
             'auth.ldap.accountField',
-            'auth.ldap.emailField'
+            'auth.ldap.emailField',
+            'auth.ldap.nameField',
+            'analytics.rybbitUrl',
+            'analytics.rybbitSiteId',
+            'analytics.googleAnalyticsId',
+            'legal.enabled',
+            'legal.organizationName',
+            'legal.contactEmail',
+            'legal.privacyPolicyContent',
+            'legal.termsOfServiceContent',
+            'legal.lastUpdated',
+            'connection.sshMethods',
+            'email.enableContainerStarted',
+            'email.enableContainerError',
+            'email.enableContainerPaused',
+            'email.enableContainerResumed',
+            'email.enableContainerResumeFailed',
+            'email.subjectContainerStarted',
+            'email.subjectContainerError',
+            'email.subjectContainerPaused',
+            'email.subjectContainerResumed',
+            'email.subjectContainerResumeFailed',
+            'email.bodyIntroContainerStarted',
+            'email.bodyIntroContainerError',
+            'email.bodyIntroContainerPaused',
+            'email.bodyIntroContainerResumed',
+            'email.bodyIntroContainerResumeFailed',
+            'email.lowPriorityNotice',
+            'features.startScriptsEnabled',
+            'features.stopScriptsEnabled',
+            'features.sshKeysEnabled',
+            'features.startScriptTimeoutSeconds',
+            'features.stopScriptTimeoutSeconds'
         ]
         
         # Get all settings
-        settings_dict = getMultipleSettings(setting_keys)
+        settings_dict = get_multiple_settings(setting_keys)
         
         # Get email lists
-        blacklisted_emails = getBlacklistedEmails()
-        whitelisted_emails = getWhitelistedEmails()
+        blacklisted_emails = get_blacklisted_emails()
+        whitelisted_emails = get_whitelisted_emails()
         
         # Get alert emails from JSON setting
         alert_emails = settings_dict.get('notifications.alertEmails', [])
@@ -977,150 +1781,325 @@ def getGeneralSettings() -> object:
                     "domain": settings_dict.get('auth.ldap.domain', ''),
                     "searchMethod": settings_dict.get('auth.ldap.searchMethod', ''),
                     "accountField": settings_dict.get('auth.ldap.accountField', ''),
-                    "emailField": settings_dict.get('auth.ldap.emailField', '')
+                    "emailField": settings_dict.get('auth.ldap.emailField', ''),
+                    "nameField": settings_dict.get('auth.ldap.nameField', '')
                 }
+            },
+            "analytics": {
+                "rybbitUrl": settings_dict.get('analytics.rybbitUrl', ''),
+                "rybbitSiteId": settings_dict.get('analytics.rybbitSiteId', ''),
+                "googleAnalyticsId": settings_dict.get('analytics.googleAnalyticsId', '')
+            },
+            "legal": {
+                "enabled": settings_dict.get('legal.enabled', False),
+                "organizationName": settings_dict.get('legal.organizationName', ''),
+                "contactEmail": settings_dict.get('legal.contactEmail', ''),
+                "privacyPolicyContent": settings_dict.get('legal.privacyPolicyContent', ''),
+                "termsOfServiceContent": settings_dict.get('legal.termsOfServiceContent', ''),
+                "lastUpdated": settings_dict.get('legal.lastUpdated', '')
+            },
+            "connection": {
+                "sshMethods": settings_dict.get('connection.sshMethods', [
+                    {"id": "vscode", "name": "VS Code", "icon": "mdi-microsoft-visual-studio-code",
+                     "template": "{username}@{ip}:{port}", "helpText": "Open the Remote SSH extension and connect to"},
+                    {"id": "terminal", "name": "Terminal", "icon": "mdi-console",
+                     "template": "ssh {username}@{ip} -p {port}", "helpText": "Run this command in your terminal"}
+                ])
+            },
+            "emailTemplates": {
+                "enableContainerStarted": settings_dict.get('email.enableContainerStarted', True),
+                "enableContainerError": settings_dict.get('email.enableContainerError', True),
+                "enableContainerPaused": settings_dict.get('email.enableContainerPaused', True),
+                "enableContainerResumed": settings_dict.get('email.enableContainerResumed', True),
+                "enableContainerResumeFailed": settings_dict.get('email.enableContainerResumeFailed', True),
+                "subjectContainerStarted": settings_dict.get('email.subjectContainerStarted', 'Server is ready to use!'),
+                "subjectContainerError": settings_dict.get('email.subjectContainerError', 'Server did not start'),
+                "subjectContainerPaused": settings_dict.get('email.subjectContainerPaused', 'Low-priority container paused'),
+                "subjectContainerResumed": settings_dict.get('email.subjectContainerResumed', 'Low-priority container resumed'),
+                "subjectContainerResumeFailed": settings_dict.get('email.subjectContainerResumeFailed', 'Low-priority container failed to resume'),
+                "bodyIntroContainerStarted": settings_dict.get('email.bodyIntroContainerStarted', ''),
+                "bodyIntroContainerError": settings_dict.get('email.bodyIntroContainerError', ''),
+                "bodyIntroContainerPaused": settings_dict.get('email.bodyIntroContainerPaused', ''),
+                "bodyIntroContainerResumed": settings_dict.get('email.bodyIntroContainerResumed', ''),
+                "bodyIntroContainerResumeFailed": settings_dict.get('email.bodyIntroContainerResumeFailed', ''),
+                "lowPriorityNotice": settings_dict.get('email.lowPriorityNotice', '')
+            },
+            "features": {
+                "startScriptsEnabled": settings_dict.get('features.startScriptsEnabled', True),
+                "stopScriptsEnabled": settings_dict.get('features.stopScriptsEnabled', True),
+                "sshKeysEnabled": settings_dict.get('features.sshKeysEnabled', True),
+                "startScriptTimeoutSeconds": settings_dict.get('features.startScriptTimeoutSeconds', 40),
+                "stopScriptTimeoutSeconds": settings_dict.get('features.stopScriptTimeoutSeconds', 40),
             }
         }
-        
-        return Response(True, "Settings retrieved successfully", response_data)
+
+        return api_response(True, "Settings retrieved successfully", response_data)
         
     except Exception as e:
-        return Response(False, f"Error retrieving settings: {str(e)}")
+        return api_response(False, f"Error retrieving settings: {str(e)}")
 
-def saveGeneralSettings(section: str, settings: dict) -> object:
-    '''
-    Saves general admin settings for a specific section.
-    
+def save_general_settings(section: str, settings: dict, actor_user_id: int = None) -> object:
+    """Save admin settings for a specific configuration section.
+
+    Persists settings to the database for the given section. Supported
+    sections: general, access, email, contact, emailEnable, notifications,
+    auth (including nested LDAP settings), auditLog, analytics, legal,
+    connection, emailTemplates, and features.
+
     Args:
-        section: The section to save (general, access, email, notifications, auth)
-        settings: Dictionary of settings to save
-        
+        section: The settings section name to save.
+        settings: Dictionary of key-value pairs for the section.
+        actor_user_id: The userId of the admin performing the action.
+
     Returns:
-        object: Response object indicating success/failure
-    '''
+        Response indicating success or failure with an appropriate message.
+    """
     try:
-        from settings_handler import setSetting
-        from helpers.tables.UserAccessControl import setBlacklistedEmails, setWhitelistedEmails
+        from helpers.settings_handler import set_setting
+        from helpers.tables.user_access_control import set_blacklisted_emails, set_whitelisted_emails
         
         if section == "general":
             # Save general application settings
             if 'applicationName' in settings:
-                setSetting('general.applicationName', settings['applicationName'])
+                set_setting('general.applicationName', settings['applicationName'])
             if 'timezone' in settings:
-                setSetting('general.timezone', settings['timezone'])
+                set_setting('general.timezone', settings['timezone'])
             
             # Save instruction settings using new naming scheme
             if 'loginPageInfo' in settings:
-                setSetting('instructions.login', settings['loginPageInfo'])
+                set_setting('instructions.login', settings['loginPageInfo'])
             if 'reservationPageInstructions' in settings:
-                setSetting('instructions.reservation', settings['reservationPageInstructions'])
+                set_setting('instructions.reservation', settings['reservationPageInstructions'])
             if 'emailInstructions' in settings:
-                setSetting('instructions.email', settings['emailInstructions'])
+                set_setting('instructions.email', settings['emailInstructions'])
             if 'usernameFieldLabel' in settings:
-                setSetting('instructions.usernameFieldLabel', settings['usernameFieldLabel'])
+                set_setting('instructions.usernameFieldLabel', settings['usernameFieldLabel'])
             if 'passwordFieldLabel' in settings:
-                setSetting('instructions.passwordFieldLabel', settings['passwordFieldLabel'])
+                set_setting('instructions.passwordFieldLabel', settings['passwordFieldLabel'])
                 
         elif section == "access":
             # Save access control settings
             if 'blacklistEnabled' in settings:
-                setSetting('access.blacklistEnabled', settings['blacklistEnabled'])
+                set_setting('access.blacklistEnabled', settings['blacklistEnabled'])
             if 'whitelistEnabled' in settings:
-                setSetting('access.whitelistEnabled', settings['whitelistEnabled'])
+                set_setting('access.whitelistEnabled', settings['whitelistEnabled'])
             if 'blacklistedEmails' in settings:
-                setBlacklistedEmails(settings['blacklistedEmails'])
+                set_blacklisted_emails(settings['blacklistedEmails'])
             if 'whitelistedEmails' in settings:
-                setWhitelistedEmails(settings['whitelistedEmails'])
+                set_whitelisted_emails(settings['whitelistedEmails'])
                 
         elif section == "email":
             # Save email configuration
             if 'smtpServer' in settings:
-                setSetting('email.smtpServer', settings['smtpServer'])
+                set_setting('email.smtpServer', settings['smtpServer'])
             if 'smtpPort' in settings:
-                setSetting('email.smtpPort', settings['smtpPort'])
+                set_setting('email.smtpPort', settings['smtpPort'])
             if 'smtpUsername' in settings:
-                setSetting('email.smtpUsername', settings['smtpUsername'])
+                set_setting('email.smtpUsername', settings['smtpUsername'])
             if 'smtpPassword' in settings:
-                setSetting('email.smtpPassword', settings['smtpPassword'])
+                set_setting('email.smtpPassword', settings['smtpPassword'])
             if 'fromEmail' in settings:
-                setSetting('email.fromEmail', settings['fromEmail'])
+                set_setting('email.fromEmail', settings['fromEmail'])
                 
         elif section == "contact":
             # Save contact email separately
             if 'contactEmail' in settings:
-                setSetting('email.contactEmail', settings['contactEmail'])
+                set_setting('email.contactEmail', settings['contactEmail'])
                 
         elif section == "emailEnable":
             # Save email enable setting
             if 'sendEmail' in settings:
-                setSetting('email.sendEmail', settings['sendEmail'])
+                set_setting('email.sendEmail', settings['sendEmail'])
                 
         elif section == "notifications":
             # Save notification settings
             if 'containerAlertsEnabled' in settings:
-                setSetting('notifications.containerAlertsEnabled', settings['containerAlertsEnabled'])
+                set_setting('notifications.containerAlertsEnabled', settings['containerAlertsEnabled'])
             if 'alertEmails' in settings:
-                setSetting('notifications.alertEmails', settings['alertEmails'])
+                set_setting('notifications.alertEmails', settings['alertEmails'])
         
         elif section == "auth":
             # Save authentication settings
             if 'loginType' in settings:
-                setSetting('auth.loginType', settings['loginType'])
+                set_setting('auth.loginType', settings['loginType'])
             if 'sessionTimeoutMinutes' in settings:
                 timeout = 1440 if not settings['sessionTimeoutMinutes'] else settings['sessionTimeoutMinutes']
-                setSetting('auth.sessionTimeoutMinutes', timeout)
+                set_setting('auth.sessionTimeoutMinutes', timeout)
                 
             # Save LDAP settings if they exist
             if 'ldap' in settings and isinstance(settings['ldap'], dict):
                 ldap_settings = settings['ldap']
                 if 'url' in ldap_settings:
-                    setSetting('auth.ldap.url', ldap_settings['url'])
+                    set_setting('auth.ldap.url', ldap_settings['url'])
                 if 'usernameFormat' in ldap_settings:
-                    setSetting('auth.ldap.usernameFormat', ldap_settings['usernameFormat'])
+                    set_setting('auth.ldap.usernameFormat', ldap_settings['usernameFormat'])
                 if 'passwordFormat' in ldap_settings:
-                    setSetting('auth.ldap.passwordFormat', ldap_settings['passwordFormat'])
+                    set_setting('auth.ldap.passwordFormat', ldap_settings['passwordFormat'])
                 if 'domain' in ldap_settings:
-                    setSetting('auth.ldap.domain', ldap_settings['domain'])
+                    set_setting('auth.ldap.domain', ldap_settings['domain'])
                 if 'searchMethod' in ldap_settings:
-                    setSetting('auth.ldap.searchMethod', ldap_settings['searchMethod'])
+                    set_setting('auth.ldap.searchMethod', ldap_settings['searchMethod'])
                 if 'accountField' in ldap_settings:
-                    setSetting('auth.ldap.accountField', ldap_settings['accountField'])
+                    set_setting('auth.ldap.accountField', ldap_settings['accountField'])
                 if 'emailField' in ldap_settings:
-                    setSetting('auth.ldap.emailField', ldap_settings['emailField'])
-                
-        else:
-            return Response(False, f"Unknown section: {section}")
-            
-        return Response(True, f"Settings for {section} saved successfully")
-        
-    except Exception as e:
-        return Response(False, f"Error saving settings: {str(e)}")
+                    set_setting('auth.ldap.emailField', ldap_settings['emailField'])
+                if 'nameField' in ldap_settings:
+                    set_setting('auth.ldap.nameField', ldap_settings['nameField'])
 
-def sendTestEmail(email: str) -> object:
-    '''
-    Sends a test email to verify SMTP configuration.
-    
+        elif section == "auditLog":
+            if 'retentionDays' in settings:
+                set_setting('auditLog.retentionDays', settings['retentionDays'])
+                # When set to -1 (disabled), purge all existing audit log entries
+                if settings['retentionDays'] == -1:
+                    from helpers.tables.audit_log import purge_all_logs
+                    purge_all_logs()
+
+        elif section == "analytics":
+            if 'rybbitUrl' in settings:
+                set_setting('analytics.rybbitUrl', settings['rybbitUrl'])
+            if 'rybbitSiteId' in settings:
+                set_setting('analytics.rybbitSiteId', settings['rybbitSiteId'])
+            if 'googleAnalyticsId' in settings:
+                set_setting('analytics.googleAnalyticsId', settings['googleAnalyticsId'])
+
+        elif section == "legal":
+            if 'enabled' in settings:
+                set_setting('legal.enabled', settings['enabled'])
+            if 'organizationName' in settings:
+                set_setting('legal.organizationName', settings['organizationName'])
+            if 'contactEmail' in settings:
+                set_setting('legal.contactEmail', settings['contactEmail'])
+            if 'privacyPolicyContent' in settings:
+                set_setting('legal.privacyPolicyContent', settings['privacyPolicyContent'])
+            if 'termsOfServiceContent' in settings:
+                set_setting('legal.termsOfServiceContent', settings['termsOfServiceContent'])
+            from datetime import datetime, timezone
+            set_setting('legal.lastUpdated', datetime.now(timezone.utc).isoformat())
+
+        elif section == "connection":
+            if 'sshMethods' in settings:
+                methods = settings['sshMethods']
+                if not isinstance(methods, list) or len(methods) == 0:
+                    return api_response(False, "At least one SSH connection method is required.")
+                required_keys = {"id", "name", "icon", "template", "helpText"}
+                seen_ids = set()
+                sanitized = []
+                for method in methods:
+                    if not isinstance(method, dict) or not required_keys.issubset(method.keys()):
+                        return api_response(False, f"Each SSH method must have: {', '.join(sorted(required_keys))}.")
+                    for field in required_keys:
+                        if not isinstance(method[field], str):
+                            return api_response(False, f"SSH method field '{field}' must be a string.")
+                        if len(method[field]) > 500:
+                            return api_response(False, f"SSH method field '{field}' is too long (max 500 characters).")
+                    if not method["id"].strip():
+                        return api_response(False, "Each SSH method must have a non-empty id.")
+                    if method["id"] in seen_ids:
+                        return api_response(False, f"Duplicate SSH method id: {method['id']}.")
+                    seen_ids.add(method["id"])
+                    sanitized.append({k: method[k] for k in required_keys})
+                set_setting('connection.sshMethods', sanitized)
+
+        elif section == "emailTemplates":
+            # Validate subject lines are not empty
+            subject_fields = [
+                'subjectContainerStarted', 'subjectContainerError',
+                'subjectContainerPaused', 'subjectContainerResumed',
+                'subjectContainerResumeFailed'
+            ]
+            for field in subject_fields:
+                if field in settings and not isinstance(settings[field], str):
+                    return api_response(False, "Subject lines must be text.")
+                if field in settings and not settings[field].strip():
+                    return api_response(False, "Subject lines cannot be empty.")
+
+            if 'enableContainerStarted' in settings:
+                set_setting('email.enableContainerStarted', settings['enableContainerStarted'])
+            if 'enableContainerError' in settings:
+                set_setting('email.enableContainerError', settings['enableContainerError'])
+            if 'enableContainerPaused' in settings:
+                set_setting('email.enableContainerPaused', settings['enableContainerPaused'])
+            if 'enableContainerResumed' in settings:
+                set_setting('email.enableContainerResumed', settings['enableContainerResumed'])
+            if 'enableContainerResumeFailed' in settings:
+                set_setting('email.enableContainerResumeFailed', settings['enableContainerResumeFailed'])
+            if 'subjectContainerStarted' in settings:
+                set_setting('email.subjectContainerStarted', settings['subjectContainerStarted'])
+            if 'subjectContainerError' in settings:
+                set_setting('email.subjectContainerError', settings['subjectContainerError'])
+            if 'subjectContainerPaused' in settings:
+                set_setting('email.subjectContainerPaused', settings['subjectContainerPaused'])
+            if 'subjectContainerResumed' in settings:
+                set_setting('email.subjectContainerResumed', settings['subjectContainerResumed'])
+            if 'subjectContainerResumeFailed' in settings:
+                set_setting('email.subjectContainerResumeFailed', settings['subjectContainerResumeFailed'])
+            if 'bodyIntroContainerStarted' in settings:
+                set_setting('email.bodyIntroContainerStarted', settings['bodyIntroContainerStarted'])
+            if 'bodyIntroContainerError' in settings:
+                set_setting('email.bodyIntroContainerError', settings['bodyIntroContainerError'])
+            if 'bodyIntroContainerPaused' in settings:
+                set_setting('email.bodyIntroContainerPaused', settings['bodyIntroContainerPaused'])
+            if 'bodyIntroContainerResumed' in settings:
+                set_setting('email.bodyIntroContainerResumed', settings['bodyIntroContainerResumed'])
+            if 'bodyIntroContainerResumeFailed' in settings:
+                set_setting('email.bodyIntroContainerResumeFailed', settings['bodyIntroContainerResumeFailed'])
+            if 'lowPriorityNotice' in settings:
+                set_setting('email.lowPriorityNotice', settings['lowPriorityNotice'])
+
+        elif section == "features":
+            if 'startScriptsEnabled' in settings:
+                set_setting('features.startScriptsEnabled', settings['startScriptsEnabled'])
+            if 'stopScriptsEnabled' in settings:
+                set_setting('features.stopScriptsEnabled', settings['stopScriptsEnabled'])
+            if 'sshKeysEnabled' in settings:
+                set_setting('features.sshKeysEnabled', settings['sshKeysEnabled'])
+            if 'startScriptTimeoutSeconds' in settings:
+                set_setting('features.startScriptTimeoutSeconds', settings['startScriptTimeoutSeconds'])
+            if 'stopScriptTimeoutSeconds' in settings:
+                set_setting('features.stopScriptTimeoutSeconds', settings['stopScriptTimeoutSeconds'])
+
+        else:
+            return api_response(False, f"Unknown section: {section}")
+
+        # Build audit details, excluding sensitive values
+        safe_keys = list(settings.keys())
+        audit_details = {"section": section, "keys": safe_keys}
+        if section == "email" and "smtpPassword" in settings:
+            audit_details["smtpPasswordChanged"] = True
+        log_action(actor_user_id, "SETTINGS_UPDATE", "settings", None, audit_details)
+        return api_response(True, f"Settings for {section} saved successfully")
+
+    except Exception as e:
+        return api_response(False, f"Error saving settings: {str(e)}")
+
+def send_test_email(email: str) -> object:
+    """Send a test email to verify SMTP configuration.
+
+    Uses the currently saved SMTP settings to send a test message.
+    Supports both SSL/TLS (port 465) and STARTTLS (other ports).
+
     Args:
-        email: Email address to send test to
-        
+        email: The recipient email address.
+
     Returns:
-        object: Response object indicating success/failure
-    '''
+        Response indicating whether the email was sent successfully
+        or describing the error that occurred.
+    """
     try:
-        from settings_handler import getSetting
+        from helpers.settings_handler import get_setting
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
         
         # Get SMTP settings
-        smtp_server = getSetting('email.smtpServer')
-        smtp_port = getSetting('email.smtpPort')
-        smtp_username = getSetting('email.smtpUsername')
-        smtp_password = getSetting('email.smtpPassword')
-        from_email = getSetting('email.fromEmail')
+        smtp_server = get_setting('email.smtpServer')
+        smtp_port = get_setting('email.smtpPort')
+        smtp_username = get_setting('email.smtpUsername')
+        smtp_password = get_setting('email.smtpPassword')
+        from_email = get_setting('email.fromEmail')
         
         if not all([smtp_server, smtp_port, smtp_username, smtp_password, from_email]):
-            return Response(False, "SMTP configuration is incomplete. Please configure all SMTP settings first.")
+            return api_response(False, "SMTP configuration is incomplete. Please configure all SMTP settings first.")
         
         # Create message
         msg = MIMEMultipart()
@@ -1149,7 +2128,381 @@ def sendTestEmail(email: str) -> object:
         server.send_message(msg)
         server.quit()
         
-        return Response(True, f"Test email sent successfully to {email}")
+        return api_response(True, f"Test email sent successfully to {email}")
         
     except Exception as e:
-        return Response(False, f"Failed to send test email: {str(e)}")
+        return api_response(False, f"Failed to send test email: {str(e)}")
+
+def test_ad_connection(username: str, password: str) -> object:
+    """Test AD/LDAP connection and return all attributes for the matched user.
+
+    Uses the currently saved LDAP settings to bind and search. Returns all
+    attributes from the LDAP response so the admin can verify the configuration.
+    Does not create users, check whitelists, or modify any database state.
+
+    Args:
+        username: The LDAP username to test with.
+        password: The LDAP password to test with.
+
+    Returns:
+        Response with full LDAP attributes on success, or error message on failure.
+    """
+    try:
+        import ldap
+        from helpers.settings_handler import get_setting
+
+        # Get LDAP settings from database
+        ldap_url = get_setting('auth.ldap.url')
+        username_format = get_setting('auth.ldap.usernameFormat')
+        password_format = get_setting('auth.ldap.passwordFormat')
+        ldap_domain = get_setting('auth.ldap.domain')
+        search_method = get_setting('auth.ldap.searchMethod')
+        account_field = get_setting('auth.ldap.accountField')
+        email_field = get_setting('auth.ldap.emailField')
+
+        # Check if LDAP is properly configured
+        if not all([ldap_url, username_format, password_format, ldap_domain, search_method, account_field, email_field]):
+            return api_response(False, "LDAP is not properly configured. Please fill in all LDAP settings and save before testing.")
+
+        # Disable certificate checks (mirrors get_ldap_user behavior)
+        ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+        conn = ldap.initialize(ldap_url)
+        conn.set_option(ldap.OPT_NETWORK_TIMEOUT, 6)
+        conn.set_option(ldap.OPT_TIMEOUT, 6)
+        conn.set_option(ldap.OPT_REFERRALS, ldap.OPT_OFF)
+
+        # Bind with provided credentials
+        bind_dn = username_format.replace("{username}", username)
+        bind_pw = password_format.replace("{password}", password)
+        conn.simple_bind_s(bind_dn, bind_pw)
+
+        # Search for the user, requesting ALL attributes
+        search_filter = search_method.replace("{username}", username)
+        result = conn.search_s(ldap_domain, ldap.SCOPE_SUBTREE, search_filter)
+
+        conn.unbind_s()
+
+        if not result or not result[0] or not result[0][1]:
+            return api_response(False, "LDAP bind succeeded but no user entry was found matching the search filter.")
+
+        # Decode all attributes from bytes to strings for JSON serialization
+        dn = result[0][0]
+        raw_attrs = result[0][1]
+        decoded_attrs = {}
+        for key, values in raw_attrs.items():
+            decoded_values = []
+            for v in values:
+                try:
+                    decoded_values.append(v.decode('utf-8'))
+                except (UnicodeDecodeError, AttributeError):
+                    decoded_values.append(base64.b64encode(v).decode('ascii'))
+            if len(decoded_values) == 1:
+                decoded_attrs[key] = decoded_values[0]
+            else:
+                decoded_attrs[key] = decoded_values
+
+        response_data = {
+            "dn": dn,
+            "attributes": decoded_attrs
+        }
+
+        return api_response(True, "LDAP connection test successful", response_data)
+
+    except ldap.INVALID_CREDENTIALS:
+        return api_response(False, "Invalid credentials: The username or password was rejected by the LDAP server.")
+    except ldap.SERVER_DOWN:
+        return api_response(False, "Server unreachable: Failed to connect to the LDAP server. Check the URL and ensure the server is running.")
+    except Exception as e:
+        return api_response(False, f"LDAP connection test failed: {str(e)}")
+
+def get_audit_logs(request) -> object:
+    """Retrieve paginated audit log entries with optional filtering.
+
+    Delegates to the audit_log helper which handles query building,
+    filtering, pagination, and response formatting.
+
+    Args:
+        request: AuditLogRequest with pagination, sorting, and filter params.
+
+    Returns:
+        Response with paginated logs, totalItems, and retentionDays.
+    """
+    return get_audit_logs_helper(request)
+
+
+def get_analytics(request) -> object:
+    """Retrieve usage analytics data aggregated from audit logs and reservations.
+
+    Runs five aggregation queries over the requested time range to produce
+    chart-ready datasets: daily activity trends, reservation status breakdown,
+    action type counts, top users by activity, and reservations per server.
+
+    Args:
+        request: AnalyticsRequest with a ``days`` field (0 = all time).
+
+    Returns:
+        Response with dailyActivity, reservationStatuses, actionCounts,
+        topUsers, reservationsByComputer, and retentionDays.
+    """
+    from helpers.settings_handler import settings_handler
+
+    now = datetime.datetime.now(timezone.utc)
+
+    # Parse date range filters
+    parsed_from = None
+    parsed_to = None
+    if request.dateFrom:
+        try:
+            parsed_from = parser.parse(request.dateFrom)
+        except (ValueError, TypeError):
+            return api_response(False, "Invalid dateFrom value.")
+    if request.dateTo:
+        try:
+            parsed_to = parser.parse(request.dateTo)
+        except (ValueError, TypeError):
+            return api_response(False, "Invalid dateTo value.")
+
+    def _apply_audit_date_filter(stmt, date_col):
+        """Apply dateFrom/dateTo filters to a statement."""
+        result = stmt
+        if parsed_from:
+            result = result.where(date_col >= parsed_from)
+        if parsed_to:
+            result = result.where(date_col < parsed_to + timedelta(days=1))
+        return result
+
+    reservation_actions = ["RESERVATION_CREATE", "RESERVATION_CANCEL",
+                           "RESERVATION_EXTEND", "RESERVATION_RESTART"]
+    login_actions = ["LOGIN", "LOGIN_FAILED"]
+
+    with Session() as session:
+        # --- Query 1: Daily activity (line chart) ---
+        daily_stmt = select(
+            func.date(AuditLog.createdAt).label("day"),
+            func.sum(case(
+                (AuditLog.action.in_(reservation_actions), 1),
+                else_=0
+            )).label("reservations"),
+            func.sum(case(
+                (AuditLog.action.in_(login_actions), 1),
+                else_=0
+            )).label("logins"),
+        )
+        daily_stmt = _apply_audit_date_filter(daily_stmt, AuditLog.createdAt)
+        daily_stmt = daily_stmt.group_by(func.date(AuditLog.createdAt)).order_by(func.date(AuditLog.createdAt))
+        daily_rows = session.execute(daily_stmt).all()
+
+        # Build a dict of existing days for gap-filling
+        daily_map = {}
+        for row in daily_rows:
+            day_str = str(row.day)
+            daily_map[day_str] = {
+                "day": day_str,
+                "reservations": int(row.reservations or 0),
+                "logins": int(row.logins or 0),
+            }
+
+        # Fill in zero-value days for gaps in the range
+        daily_activity = []
+        if parsed_from:
+            start_date = parsed_from.date()
+        elif daily_rows:
+            start_date = daily_rows[0].day
+        else:
+            start_date = now.date()
+
+        if parsed_to:
+            end_date = parsed_to.date()
+        else:
+            end_date = now.date()
+
+        current = start_date
+        while current <= end_date:
+            day_str = str(current)
+            if day_str in daily_map:
+                daily_activity.append(daily_map[day_str])
+            else:
+                daily_activity.append({"day": day_str, "reservations": 0, "logins": 0})
+            current += timedelta(days=1)
+
+        # --- Query 2: Reservation status breakdown (doughnut chart) ---
+        status_stmt = select(Reservation.status, func.count().label("count"))
+        status_stmt = _apply_audit_date_filter(status_stmt, Reservation.createdAt)
+        status_stmt = status_stmt.group_by(Reservation.status)
+        status_rows = session.execute(status_stmt).all()
+
+        reservation_statuses = {}
+        for row in status_rows:
+            reservation_statuses[row.status] = row.count
+
+        # --- Query 3: Action type counts (bar chart) ---
+        action_stmt = select(
+            AuditLog.action,
+            func.count().label("count")
+        )
+        action_stmt = _apply_audit_date_filter(action_stmt, AuditLog.createdAt)
+        action_stmt = action_stmt.group_by(AuditLog.action).order_by(func.count().desc())
+        action_rows = session.execute(action_stmt).all()
+
+        action_counts = [{"action": row.action, "count": row.count} for row in action_rows]
+
+        # --- Query 4: Top 10 users by activity (bar chart) ---
+        users_stmt = select(
+            User.email,
+            User.name,
+            func.count().label("count")
+        ).select_from(AuditLog).join(User, AuditLog.userId == User.userId)
+        users_stmt = _apply_audit_date_filter(users_stmt, AuditLog.createdAt)
+        users_stmt = users_stmt.group_by(AuditLog.userId, User.email, User.name).order_by(func.count().desc()).limit(10)
+        user_rows = session.execute(users_stmt).all()
+
+        top_users = [{"email": row.email, "name": row.name, "count": row.count} for row in user_rows]
+
+        # --- Query 5: Reservations by computer/server (bar chart) ---
+        computer_stmt = select(
+            Computer.name.label("computerName"),
+            func.count().label("count")
+        ).select_from(Reservation).join(Computer, Reservation.computerId == Computer.computerId)
+        computer_stmt = _apply_audit_date_filter(computer_stmt, Reservation.createdAt)
+        computer_stmt = computer_stmt.group_by(Reservation.computerId, Computer.name).order_by(func.count().desc())
+        computer_rows = session.execute(computer_stmt).all()
+
+        reservations_by_computer = [{"computerName": row.computerName, "count": row.count} for row in computer_rows]
+
+    retention_days = settings_handler.get_setting("auditLog.retentionDays")
+
+    return api_response(True, "Analytics data fetched.", {
+        "dailyActivity": daily_activity,
+        "reservationStatuses": reservation_statuses,
+        "actionCounts": action_counts,
+        "topUsers": top_users,
+        "reservationsByComputer": reservations_by_computer,
+        "retentionDays": retention_days,
+    })
+
+def get_user_anonymize_info(user_id: int) -> object:
+    """Get information for the user anonymization confirmation dialog.
+
+    Returns the user's email, name, active reservation count, audit log
+    entry count, and whether the user has an admin role so the frontend
+    can show an informative confirmation dialog before anonymizing.
+
+    Args:
+        user_id: Database ID of the user to check.
+
+    Returns:
+        Response with email, name, activeReservations, auditLogEntries,
+        and isAdmin, or an error if the user is not found.
+    """
+    with Session() as session:
+        user = session.execute(
+            select(User).options(joinedload(User.roles)).where(User.userId == user_id)
+        ).unique().scalar_one_or_none()
+        if user is None:
+            return api_response(False, "User not found.")
+        if user.removed is True:
+            return api_response(False, "User is already anonymized.")
+
+        active_count = session.execute(
+            select(func.count()).select_from(Reservation).where(
+                Reservation.userId == user_id,
+                Reservation.status.in_(["reserved", "started", "stopping"])
+            )
+        ).scalar() or 0
+
+        audit_count = session.execute(
+            select(func.count()).select_from(AuditLog).where(
+                AuditLog.userId == user_id
+            )
+        ).scalar() or 0
+
+        is_admin = any(role.name == "admin" for role in user.roles)
+
+        return api_response(True, "Anonymize info fetched.", {
+            "email": user.email,
+            "name": user.name,
+            "activeReservations": active_count,
+            "auditLogEntries": audit_count,
+            "isAdmin": is_admin,
+        })
+
+def anonymize_user(user_id: int, actor_user_id: int = None) -> object:
+    """Anonymize a user's personal data (GDPR soft-deletion).
+
+    Replaces all personally identifiable information with anonymous
+    placeholders while preserving referential integrity. Clears private
+    data from related tables (reservations, containers, audit logs).
+
+    Args:
+        user_id: The ID of the user to anonymize.
+        actor_user_id: The userId of the admin performing the action.
+
+    Returns:
+        Response indicating success or failure with an appropriate message.
+    """
+    if user_id == actor_user_id:
+        return api_response(False, "Cannot anonymize your own account.")
+
+    with Session() as session:
+        user = session.execute(
+            select(User).where(User.userId == user_id)
+        ).scalar_one_or_none()
+        if user is None:
+            return api_response(False, "User not found.")
+        if user.removed is True:
+            return api_response(False, "User is already anonymized.")
+
+        original_email = user.email
+
+        # Anonymize user record
+        user.removed = True
+        user.email = f"deleted_user_{user_id}@removed.local"
+        user.name = None
+        user.password = None
+        user.passwordSalt = None
+        user.loginToken = None
+        user.loginTokenCreatedAt = None
+        user.sshPublicKey = None
+        user.startScriptPath = None
+        user.stopScriptPath = None
+
+        # Clear reservation descriptions
+        session.execute(
+            update(Reservation).where(Reservation.userId == user_id)
+            .values(description=None)
+        )
+
+        # Clear SSH passwords on reserved containers linked to this user's reservations
+        user_reserved_container_ids = select(Reservation.reservedContainerId).where(
+            Reservation.userId == user_id
+        )
+        session.execute(
+            update(ReservedContainer).where(
+                ReservedContainer.reservedContainerId.in_(user_reserved_container_ids)
+            ).values(sshPassword=None)
+        )
+
+        # Scrub audit log entries (clear PII but keep the action record)
+        session.execute(
+            update(AuditLog).where(AuditLog.userId == user_id)
+            .values(ipAddress=None, details=None)
+        )
+
+        # Delete role assignments
+        session.execute(
+            delete(UserRole).where(UserRole.userId == user_id)
+        )
+
+        # Remove from whitelist and blacklist
+        session.execute(
+            delete(UserWhitelist).where(UserWhitelist.email == original_email)
+        )
+        session.execute(
+            delete(UserBlacklist).where(UserBlacklist.email == original_email)
+        )
+
+        session.commit()
+
+    log_action(actor_user_id, "USER_ANONYMIZE", "user", user_id,
+               {"userId": user_id})
+    return api_response(True, "User removed and data anonymized successfully.")

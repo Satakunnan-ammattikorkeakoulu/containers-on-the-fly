@@ -1,124 +1,221 @@
 <template>
   <div>
-    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Expand Issues" : "Collapse Issues" }}</a>
-    <v-data-table
+    <v-data-table-server
       :headers="table.headers"
-      :items="reservations"
-      :sort-by="'reservationId'"
-      :sort-desc="true"
+      :items="propReservations"
+      :items-length="totalItems"
+      :loading="loading"
+      :sort-by="sortBy"
+      :items-per-page="itemsPerPage"
+      :items-per-page-options="[10, 25, 50]"
+      :page="page"
+      @update:options="onOptionsUpdate"
       class="elevation-1">
       <!-- Status -->
       <template v-slot:item.status="{item}">
-        <v-chip :color="getStatusColor(item.status)">{{item.status}}</v-chip>
+        <v-tooltip
+          v-if="(item.status === 'error' || item.status === 'restart_error') && item.reservedContainer.containerDockerErrorMessage"
+          location="top"
+          max-width="400"
+        >
+          <template v-slot:activator="{ props }">
+            <v-chip
+              v-bind="props"
+              :color="getStatusColor(item.status)"
+              variant="tonal"
+              prepend-icon="mdi-alert-circle"
+              class="link-hint"
+              style="cursor: pointer;"
+              @click="copyIssueText(item.reservedContainer.containerDockerErrorMessage)"
+            >{{ getStatusLabel(item.status) }}</v-chip>
+          </template>
+          <div style="white-space: pre-wrap;">{{ item.reservedContainer.containerDockerErrorMessage }}</div>
+          <div class="mt-3 text-caption" style="font-weight: bold;">Click to copy</div>
+        </v-tooltip>
+        <v-chip v-else :color="getStatusColor(item.status)" variant="tonal">{{ getStatusLabel(item.status) }}</v-chip>
       </template>
       <!-- ID -->
       <template v-slot:item.reservationId="{item}">
         #{{ item.reservationId }}
       </template>
-      <!-- Description -->
-      <template v-slot:item.description="{item}">
-        <span v-if="item.description && item.description.trim()">
-          <v-tooltip bottom v-if="item.description.length > 20">
-            <template v-slot:activator="{ on, attrs }">
-              <span v-bind="attrs" v-on="on" class="description-text">{{ truncateDescription(item.description) }}</span>
-            </template>
-            <span>{{ item.description }}</span>
-          </v-tooltip>
-          <span v-else class="description-text">{{ item.description }}</span>
-        </span>
-        <span v-else class="description-empty"></span>
-      </template>
       <!-- Start date -->
       <template v-slot:item.startDate="{item}">
-        <v-tooltip bottom>
-          <template v-slot:activator="{ on, attrs }">
-            <span v-bind="attrs" v-on="on" class="resource-link">{{ parseTime(item.startDate) }}</span>
+        <v-tooltip location="bottom">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.startDate) }}</span>
           </template>
-          <span>Reserved: {{ parseTime(item.createdAt) }}</span>
+          <div>{{ parseTime(item.startDate) }}</div>
+          <div>Reserved: {{ parseTime(item.createdAt) }}</div>
         </v-tooltip>
       </template>
       <!-- End date -->
       <template v-slot:item.endDate="{item}">
-        {{ parseTime(item.endDate) }}
+        <v-tooltip location="bottom" :text="parseTime(item.endDate)">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.endDate) }}</span>
+          </template>
+        </v-tooltip>
       </template>
       <!-- Resources -->
       <template v-slot:item.resourcesInfo="{item}">
-        <v-tooltip bottom>
-          <template v-slot:activator="{ on, attrs }">
-            <span v-bind="attrs" v-on="on" class="resource-link">{{ item.computerName }}</span>
-          </template>
-          <div style="max-width: 300px;">
-            <div><strong>Server:</strong> {{ item.computerName }}</div>
-            <div><strong>Resources:</strong> {{ getResources(item.reservedHardwareSpecs) }}</div>
-            <div><strong>SHM Size:</strong> {{ item.shmSizePercent || 50 }}% of RAM</div>
-            <div v-if="item.ramDiskSizePercent && item.ramDiskSizePercent > 0"><strong>RAM Disk:</strong> {{ item.ramDiskSizePercent }}% of RAM</div>
-            <div><strong>Container:</strong> {{ item.reservedContainer.container.imageName }}</div>
-            <div v-if="item.reservedContainer.reservedPorts && item.reservedContainer.reservedPorts.length > 0">
-              <strong>Ports:</strong><br>
-              <span v-html="getPorts(item.reservedContainer.reservedPorts)"></span>
+        <div class="d-flex align-center" style="gap: 8px;">
+          <v-tooltip bottom>
+            <template v-slot:activator="{ props }">
+              <span v-bind="props" class="link-hint" style="cursor: pointer;" @click="copyResourcesInfo(item)">{{ item.computerName }}</span>
+            </template>
+            <div style="max-width: 300px;">
+              <div><strong>Server:</strong> {{ item.computerName }}</div>
+              <div><strong>Resources:</strong> {{ getResources(item.reservedHardwareSpecs) }}</div>
+              <div><strong>SHM Size:</strong> {{ item.shmSizePercent || 50 }}% of RAM</div>
+              <div v-if="item.ramDiskSizePercent && item.ramDiskSizePercent > 0"><strong>RAM Disk:</strong> {{ item.ramDiskSizePercent }}% of RAM</div>
+              <div><strong>Container:</strong> {{ item.reservedContainer.container.imageName }}</div>
+              <div v-if="item.reservedContainer.reservedPorts && item.reservedContainer.reservedPorts.length > 0">
+                <strong>Ports:</strong><br>
+                <span v-html="getPorts(item.reservedContainer.reservedPorts)"></span>
+                <div v-if="item.status === 'paused'" class="text-caption mt-1" style="font-style: italic;">
+                  Ports held for resume &mdash; may change if the server runs out of ports.
+                </div>
+              </div>
+              <div class="mt-3 text-caption" style="font-weight: bold;">Click to copy</div>
             </div>
-          </div>
-        </v-tooltip>
+          </v-tooltip>
+          <v-tooltip v-if="item.isLowPriority" bottom max-width="280">
+            <template v-slot:activator="{ props }">
+              <v-chip
+                v-bind="props"
+                size="x-small"
+                color="grey"
+                variant="tonal"
+                prepend-icon="mdi-chevron-double-down"
+                class="ml-2"
+              >{{ lowPriorityChipLabel(item) }}</v-chip>
+            </template>
+            <div>
+              <strong>Low Priority</strong><br>
+              {{ lowPriorityLevelDescription(item) }}<br><br>
+              This container may be paused if resources are needed by other reservations, and will automatically resume when resources become available.
+              When paused, the container is recreated &mdash; only files on mounted volumes persist.
+              Outside ports are held and normally restored on resume.
+            </div>
+          </v-tooltip>
+          <span v-if="item.description && item.description.trim()" class="text-medium-emphasis" style="font-size: 12px; font-style: italic;">&ldquo;{{ item.description }}&rdquo;</span>
+        </div>
       </template>
-      <!-- Container Status -->
-      <template v-slot:item.containerStatus="{item}">
-        {{ item.status == "error" && item.reservedContainer.containerDockerErrorMessage ? getText(item.reservedContainer.containerDockerErrorMessage) : item.reservedContainer.containerStatus }}
-      </template>
-      <!-- Actions -->
+      <!-- Actions (Show Details + menu) -->
       <template v-slot:item.actions="{item}">
-        <a class="link-action" v-if="item.status == 'reserved' || item.status == 'started'" @click="emitCancelReservation(item.reservationId)">Cancel Reservation</a>
-        <a class="link-action" v-if="item.status == 'started' && lessHoursThan(new Date(item.endDate), 24)" @click="emitExtendReservation(item.reservationId)">Extend Reservation</a>
-        <a class="link-action" v-if="item.status == 'started'" @click="emitRestartContainer(item.reservationId)">Restart Container</a>
-        <a class="link-action" v-if="item.status == 'started'" @click="emitShowReservationDetails(item.reservationId)">Show Details</a>
+        <div class="d-flex justify-end align-center" style="padding-right: 15px;">
+        <a v-if="item.status === 'started'" class="mr-8" @click="emitShowReservationDetails(item.reservationId)">
+          <v-icon size="small" class="mr-1">mdi-eye-outline</v-icon>Show Details
+        </a>
+        <v-menu v-if="item.status === 'reserved' || item.status === 'started' || item.status === 'restart_error' || item.status === 'paused'">
+          <template v-slot:activator="{ props }">
+            <a v-bind="props">
+              <v-icon size="small" class="mr-1">mdi-cog-outline</v-icon>Actions <v-icon size="small">mdi-chevron-down</v-icon>
+            </a>
+          </template>
+          <v-list density="compact">
+            <v-list-item v-if="item.status === 'started' && lessHoursThan(new Date(item.endDate), 24)" @click="emitExtendReservation(item.reservationId)">
+              <template v-slot:prepend><v-icon size="small">mdi-clock-plus-outline</v-icon></template>
+              <v-list-item-title>Extend Reservation</v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="emitEditDescription(item.reservationId, item.description)">
+              <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
+              <v-list-item-title>Edit Description</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="item.status === 'started' || item.status === 'restart_error'" @click="emitRestartContainer(item.reservationId)">
+              <template v-slot:prepend><v-icon size="small">mdi-restart</v-icon></template>
+              <v-list-item-title>Restart Container</v-list-item-title>
+            </v-list-item>
+            <v-divider class="my-1" />
+            <v-list-item @click="emitCancelReservation(item.reservationId)" class="cancel-action">
+              <template v-slot:prepend><v-icon size="small">mdi-cancel</v-icon></template>
+              <v-list-item-title>Cancel Reservation</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
+        </div>
       </template>
-    </v-data-table>
+    </v-data-table-server>
   </div>
 </template>
 
 <script>
-  import { DisplayTime } from '/src/helpers/time.js'
+  /**
+   * Server-side paginated data table listing the current user's reservations
+   * with status chips, resource tooltips, and an actions menu for show-details,
+   * extend, restart, edit description, and cancel operations.
+   * Emits pagination/sort changes and row actions to the parent.
+   */
+  import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
+  import { useMainStore } from '/src/store/store.js'
+  import { copyToClipboard } from '/src/helpers/clipboard.js'
 
   export default {
     name: 'UserReservationTable',
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     props: {
       propReservations: {
         type: Array,
         required: true,
-      }
+      },
+      totalItems: {
+        type: Number,
+        default: 0,
+      },
+      loading: {
+        type: Boolean,
+        default: false,
+      },
+      page: {
+        type: Number,
+        default: 1,
+      },
+      itemsPerPage: {
+        type: Number,
+        default: 10,
+      },
+      sortBy: {
+        type: Array,
+        default: () => [{key: 'reservationId', order: 'desc'}],
+      },
     },
     data: () => ({
-      reservations: [],
       cancellingReservation: false,
-      readAll: false,
-      hasLongItems: false,
       table: {
         headers: [
           {
-            text: 'Status',
+            title: 'Status',
             align: 'start',
             sortable: false,
-            value: 'status',
+            key: 'status',
+            width: '180px',
           },
-          { text: 'ID', value: 'reservationId' },
-          { text: 'Starts', value: 'startDate' },
-          { text: 'Ends', value: 'endDate' },
-          { text: 'Resources', value: 'resourcesInfo' },
-          { text: 'Description', value: 'description' },
-          { text: 'Issues', value: 'containerStatus' },
-          { text: 'actions', value: 'actions' },
+          { title: 'ID', key: 'reservationId', width: '100px' },
+          { title: 'Starts', key: 'startDate', width: '180px' },
+          { title: 'Ends', key: 'endDate', width: '180px' },
+          { title: 'Resources', key: 'resourcesInfo', sortable: false },
+          { title: '', key: 'actions', sortable: false, align: 'end' },
         ],
       }
     }),
-    mounted () {
-      this.reservations = this.propReservations
-    },
     methods: {
-      // Truncates description to 20 characters with ellipsis
-      truncateDescription(description) {
-        if (!description) return "-";
-        return description.length > 20 ? description.substring(0, 20) + "..." : description;
+      lowPriorityChipLabel(item) {
+        const level = item.lowPriorityLevel || 1
+        return `Low Priority (${level})`
       },
-      // Returns a string of all ports for a reservation
+      lowPriorityLevelDescription(item) {
+        const level = item.lowPriorityLevel || 1
+        const labels = { 1: "Standard", 2: "Background", 3: "Idle" }
+        const descriptions = {
+          1: "Pauses only for normal reservations.",
+          2: "Pauses for normal and Standard low-priority reservations.",
+          3: "Pauses for all other reservations \u2014 runs only when the server is otherwise free.",
+        }
+        return `${labels[level] || "Standard"} (${level}): ${descriptions[level] || descriptions[1]}`
+      },
       getPorts(ports) {
         if (ports) {
           let portsString = ""
@@ -130,25 +227,44 @@
         }
         return "No ports"
       },
-      // Checks if the given time is between the given time + hours
       lessHoursThan(time, hours) {
         let curDate = new Date()
         let afterUtc = new Date(time.getTime() - (time.getTimezoneOffset() * 60000))
-        
+
         let diff = afterUtc.getTime() - curDate.getTime()
         let diffHours = Math.ceil(diff / (1000 * 60 * 60))
         if (diffHours < 0) return false
         return diffHours <= hours
       },
-      toggleReadAll() {
-        this.readAll = !this.readAll;
+      copyIssueText(text) {
+        if (!text) return;
+        copyToClipboard(text).then(ok => {
+          this.store.showMessage({ text: ok ? "Issue text copied to clipboard" : "Failed to copy to clipboard", color: ok ? "green" : "red" });
+        });
       },
-      getText(text) {
-        if (this.readAll) return text;
-        else {
-          if (!this.hasLongItems) this.hasLongItems = true;
-          return text.slice(0,10) + "...";
+      copyResourcesInfo(item) {
+        const lines = [
+          `Server: ${item.computerName}`,
+          `Resources: ${this.getResources(item.reservedHardwareSpecs)}`,
+          `SHM Size: ${item.shmSizePercent || 50}% of RAM`,
+        ];
+        if (item.ramDiskSizePercent && item.ramDiskSizePercent > 0) {
+          lines.push(`RAM Disk: ${item.ramDiskSizePercent}% of RAM`);
         }
+        if (item.isLowPriority) {
+          lines.push("Low-Priority");
+        }
+        lines.push(`Container: ${item.reservedContainer.container.imageName}`);
+        if (item.reservedContainer.reservedPorts && item.reservedContainer.reservedPorts.length > 0) {
+          lines.push("Ports:");
+          for (const port of item.reservedContainer.reservedPorts) {
+            lines.push(`  ${port.localPort} → ${port.outsidePort} (${port.serviceName})`);
+          }
+        }
+        const text = lines.join("\n");
+        copyToClipboard(text).then(ok => {
+          this.store.showMessage({ text: ok ? "Resources info copied to clipboard" : "Failed to copy to clipboard", color: ok ? "green" : "red" });
+        });
       },
       emitExtendReservation(reservationId) {
         this.$emit('emitExtendReservation', reservationId)
@@ -162,13 +278,37 @@
       emitShowReservationDetails(reservationId) {
         this.$emit('emitShowReservationDetails', reservationId)
       },
+      emitEditDescription(reservationId, currentDescription) {
+        this.$emit('emitEditDescription', reservationId, currentDescription)
+      },
+      getStatusLabel(status) {
+        const labels = {
+          "reserved": "Reserved",
+          "started": "Running",
+          "stopping": "Stopping",
+          "stopped": "Stopped",
+          "error": "Startup Error",
+          "restart_error": "Error Restarting",
+          "restart": "Restarting",
+          "paused": "Paused",
+        }
+        return labels[status] || status
+      },
       getStatusColor(status) {
         if (status == "reserved") return "primary"
         else if (status == "started") return "green"
-        else if (status == "stopped") return "red"
+        else if (status == "stopping") return "grey"
+        else if (status == "stopped") return "grey"
+        else if (status == "error") return "red"
+        else if (status == "restart_error") return "orange"
+        else if (status == "paused") return "warning"
       },
       parseTime(timestamp) {
         return DisplayTime(timestamp)
+      },
+      parseRelativeTime(timestamp) {
+        if (!timestamp) return '-'
+        return RelativeTime(timestamp)
       },
       getResources(specs) {
         if (specs) {
@@ -181,44 +321,16 @@
         }
         return ""
       },
-    },
-    watch: {
-      propReservations: {
-        handler(newVal) {
-          this.reservations = newVal
-        },
-        immediate: true,
+      onOptionsUpdate(options) {
+        this.$emit('update:options', options)
       },
     },
   }
 </script>
 
 <style scoped lang="scss">
-  .link-action {
-    display: block;
-    min-width: 150px;
-    margin: 10px 0px;
-  }
-  
-  .link-toggle-read-all {
-    margin-bottom: 20px;
-    font-size: 14px;
-    display: inline-block;
-    padding-left: 15px;
-    width: auto;
-  }
-  
-  .resource-link {
-    cursor: help;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-  }
-  
-  .description-text {
-    font-size: 13px;
-  }
-  
-  .description-empty {
-    color: #999;
+  .cancel-action .v-list-item-title,
+  .cancel-action .v-icon {
+    color: #ef5350;
   }
 </style>

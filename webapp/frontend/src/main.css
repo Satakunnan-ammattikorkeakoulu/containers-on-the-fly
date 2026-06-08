@@ -8,10 +8,6 @@ body {
   }
 }
 
-.background-violet {
-  background: #453080 !important;
-}
-
 .color-violet {
   color: #885BF5
 }
@@ -20,62 +16,241 @@ body {
   opacity: .7;
 }
 
-.v-snack__content {
+.text-muted {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Vuetify 4 snackbar content */
+.v-snackbar__content {
   font-size: 16px !important;
   padding: 18px !important;
 }
 
-.v-toolbar__content a {
-  color: white !important;
-  margin: 0px 15px !important;
-  transition: 0.3s all ease;
-}
 
-.v-toolbar__content a:hover {
-  color: #2096f3 !important;
-}
 
 body .section {
   margin-bottom: 50px;
 }
 
-.v-event-timed {
-  word-break: break-all !important;
-  white-space: normal !important;
+/* Vuetify 4 data table row padding */
+.v-data-table tbody tr td {
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
 }
 
-.v-calendar-daily__day-interval {
-  transition: 0.3s all ease;
-}
-
-.v-calendar-daily__day-interval:hover {
-  cursor: pointer;
-  background: #5e5e5e;
-}
-
-.v-textarea.v-input--is-readonly .v-input__slot::before,
-.v-textarea.v-input--is-readonly .v-input__slot::after {
-  border: 0px !important;
-}
-
-.theme--dark.v-data-table>.v-data-table__wrapper>table>tbody>tr:hover:not(.v-data-table__expanded__content):not(.v-data-table__empty-wrapper) {
+/* Vuetify 4 data table hover */
+.v-data-table tbody tr:hover {
   background: #181818 !important;
 }
 
-.v-event-timed-container {
-  text-align: center;
+/* Vuetify 4 data table pagination buttons */
+.v-data-table-footer .v-btn {
+  padding: 0 8px;
+  margin: 0 2px;
+  min-width: 32px;
+  height: 32px;
 }
 
-.v-tooltip__content {
+/* Vuetify 4 data table footer alignment */
+.v-data-table-footer {
+  align-items: center !important;
+}
+
+/* Vuetify 4 data table footer label */
+.v-data-table-footer .v-data-table-footer__items-per-page {
+  font-size: 13px;
+  gap: 8px;
+  align-items: center;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Vuetify 4 data table items-per-page select */
+.v-data-table-footer .v-input {
+  margin-top: 0 !important;
+}
+
+.v-data-table-footer .v-select {
+  max-height: 26px;
+}
+
+.v-data-table-footer .v-field {
+  min-height: 26px !important;
+  height: 26px !important;
+  max-height: 26px !important;
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.v-data-table-footer .v-field__input {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  min-height: 26px !important;
+  height: 26px !important;
+  display: flex;
+  align-items: center;
+}
+
+.v-data-table-footer .v-field__append-inner {
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  align-self: center;
+}
+
+.v-data-table-footer .v-field__append-inner .v-icon {
+  font-size: 16px;
+}
+
+.v-data-table-footer .v-field__outline {
+  display: none !important;
+}
+
+.v-data-table-footer .v-field__append-inner {
+  padding-left: 0;
+}
+
+.v-data-table-footer .v-select__selection {
+  overflow: visible;
+}
+
+/* Vuetify 4 data table footer info text */
+.v-data-table-footer .v-data-table-footer__info {
+  font-size: 13px;
+}
+
+/* Vuetify 4 tooltip */
+.v-overlay--active .v-overlay__content {
   opacity: 1 !important;
-  background-color: #37393f !important;
-  color: white !important;
 }
 
 .v-text-field .v-label {
   font-size: .875rem;
 }
 
-.v-select__selection.v-select__selection--comma {
+.v-select .v-select__selection-text {
   font-size: .900rem;
+}
+
+/* Vuetify 4: slider thumb label padding */
+.v-slider-thumb__label {
+  padding: 4px 8px !important;
+  min-width: 40px;
+  white-space: nowrap;
+}
+
+/* Vuetify 4: restore cursor pointer on clickable elements */
+a,
+.v-btn,
+.v-list-item--link,
+.v-list-item[href],
+.v-list-item[onClick],
+.v-chip--link,
+.v-tab,
+[role="button"],
+[role="link"],
+[role="menuitem"] {
+  cursor: pointer;
+}
+
+.v-btn.v-btn--disabled {
+    background-color: hsla(0, 0%, 100%, .12) !important;
+    color: hsla(0, 0%, 100%, .3) !important;
+}
+
+.v-btn {
+  text-transform: uppercase;
+  padding: 20px;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+  font-weight: 500;
+  margin: 10px;
+}
+
+.v-btn__content > .v-icon {
+  margin-right: 7px;
+}
+
+/* Vuetify 4: fix icon-only button alignment — global .v-btn padding/margin
+   overrides Vuetify's defaults, so we restore them for icon buttons */
+.v-btn--icon {
+  padding: 0;
+  margin: 0;
+}
+
+.v-btn--icon .v-btn__content > .v-icon {
+  margin-right: 0;
+}
+
+.v-application a {
+    color: #2196f3;
+    text-decoration: none;
+    transition: 0.3s all ease;
+}
+
+.v-application a:hover {
+    color: #007cd6;
+    text-decoration: none;
+}
+
+/* Hoverable info hint — for <span> tooltip triggers and other non-anchor
+   elements that should look interactive. Inherits color from parent. */
+.link-hint {
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+}
+.link-hint:hover {
+    text-decoration-style: solid;
+}
+
+.v-card {
+    background-color: #1e1e1e;
+    color: #fff;
+    border: thin solid hsla(0, 0%, 100%, .12);
+}
+
+
+.m-0 {
+  margin: 0px;
+}
+
+.mb-40 {
+  margin-bottom: 40px;
+}
+
+.v-container .title {
+  margin-top: 0px !important;
+  margin-bottom: 0px;
+}
+
+/* Vuetify 4: dropdown menu font size */
+.v-list-item-title {
+  font-size: 0.9rem !important;
+}
+
+/* Vuetify 4: alert font size and hide icon */
+.v-alert {
+  font-size: 0.95rem;
+}
+
+.v-alert__prepend {
+  display: none;
+}
+
+.v-card-text {
+  padding: 1.5rem;
+}
+
+.v-input.v-input--horizontal.v-input--indent-details {
+  margin-top: 10px;
+}
+
+/* Help text below form fields */
+.help-text {
+  margin-top: -7px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
 }

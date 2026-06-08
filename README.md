@@ -1,6 +1,8 @@
 # Containers on the Fly
 > Instant Up. Timely Down. Simple web-based Docker container reservation platform.
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 <img width="200" alt="image 7" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/imgs/logo_medium.png">
 
 ## Description
@@ -37,6 +39,7 @@ This project has been featured in the following academic publications:
 </a>
 
 # Table of Contents
+   * [Prerequisites](#prerequisites)
    * [Getting Started](#getting-started)
       * [Installing Main Server](#installing-main-server)
          * [Updating Settings](#updating-settings)
@@ -46,18 +49,30 @@ This project has been featured in the following academic publications:
          * [Updating the Software](#updating-the-software-1)
       * [Automatic Installation: Main Server](#automatic-installation-main-server)
          * [Open Ports](#open-ports)
+         * [Install Required APT Packages](#install-required-apt-packages)
          * [Setup the Main Server](#setup-the-main-server)
          * [Start the Main Server](#start-the-main-server)
       * [Automatic Installation: Container Server](#automatic-installation-container-server)
-         * [Setup the Docker Utility](#setup-the-docker-utility)
-         * [Start Docker Utility](#start-docker-utility)
-            * [Start the Servers](#start-the-servers)
+         * [Open Ports](#open-ports-1)
+         * [Install Required APT Packages](#install-required-apt-packages-1)
+         * [Setup the Container Server](#setup-the-container-server)
+         * [Start The Container Server](#start-container-server)
    * [Additional Tasks](#additional-tasks)
       * [Creating Reservable Containers](#creating-reservable-containers)
       * [LDAP Authentication Setup](#ldap-authentication-setup)
+      * [Custom Docker Storage Location](#custom-docker-storage-location)
+   * [Testing](#testing)
    * [Technical Details](#technical-details)
       * [Frontend](#frontend)
       * [Backend](#backend)
+   * [Contributing](#contributing)
+   * [License](#license)
+
+## Prerequisites
+
+- **OS**: Ubuntu 24.04 (mandatory for automated installation)
+- **User**: A non-root user with sudo permissions
+- **APT packages**: `make`, `lsb-release`, `python3`, `python3-pip`, `python3-venv`, `software-properties-common`
 
 ## Getting Started
 
@@ -77,7 +92,7 @@ Main server contains the web interface, database, local docker registry. Follow 
 3. [Install the Container Server](#automatic-installation-container-server)
 4. [Create reservable containers (images)](#creating-reservable-containers)
 
-By default, the setting `ADD_TEST_DATA` is set to true (we recommend setting it like this), which sets up the server machine, adds default docker images and adds default admin and a regular user accounts to the system automatically. The default accounts are as follows:
+After starting the main server with `make start-main-server`, you will be prompted to seed test data. You can also run `make seed-data` at any time. This creates a server entry and default accounts:
 
 ```
 username: admin@foo.com
@@ -95,10 +110,19 @@ If you change any settings in the ``user_config/settings`` file, just run these 
 
 ```
 make start-main-server
-make start-docker-utility
+make start-container-server
 ```
 
 #### Updating the Software
+
+> [!IMPORTANT]
+> Before updating, take backups of both the **application directory** and the **database**:
+> 1. **Application directory** — copy the entire project folder to a safe location (e.g. `cp -r /path/to/containers-on-the-fly ~/containers_on_the_fly_backup`)
+> 2. **Database** — on the **main server**, run:
+>    ```
+>    make backup-database
+>    ```
+>    This saves a timestamped database dump (e.g. `backup_containers_fly_2026_04_04_12_30_00.sql`) to `~/` by default. To specify a custom directory or file path: `make backup-database DEST=/path/to/backups/`
 
 To update the software to latest version:
 
@@ -109,17 +133,17 @@ To update the software to latest version:
 In the main server, run these:
 ```
 sudo make setup-main-server
-sudo make setup-docker-utility
+sudo make setup-container-server
 make start-main-server
-make start-docker-utility
+make start-container-server
 ```
 
 ##### In each additional container server (if any)
 After that, update each additional container server (if any). On each additional container server (if any), run:
 ```
 git pull
-sudo make setup-docker-utility
-make start-docker-utility
+sudo make setup-container-server
+make start-container-server
 ```
 
 ### Installing Additional Container Servers
@@ -137,7 +161,7 @@ After the main server has been installed, it is possible to create more Ubuntu 2
 If you change any settings in the ``user_config/settings`` file, just run this command again to apply the settings and to restart the container server:
 
 ```
-make start-docker-utility
+make start-container-server
 ```
 
 #### Updating the Software
@@ -159,7 +183,6 @@ Suppose you have an external firewall in front of your server (for example, you 
 - `5000` (TCP/HTTP, for Docker Registry on the main server)
 - `80` and `443` for HTTP / HTTPS connection to the server web interface and possible Let's Encrypt SSL certificate renewal
 - `2000-3000` (default) or the range of ports from which you want to host the reserved servers, which can be configured in the settings file. These services can be any, usually SSH, but could be HTTP, HTTPS, etc...
-- `3306` (TCP, for MariaDB database connection to the main server from the container servers)
 
 #### Install Required APT Packages
 
@@ -209,37 +232,29 @@ Install required APT packages:
 sudo apt update && sudo apt install make lsb-release python3 python3-pip python3-venv software-properties-common
 ```
 
-#### Setup the Docker Utility
+#### Setup the Container Server
 
-Set up the docker utility with:
-
-```bash
-sudo make setup-docker-utility
-```
-
-> Note that after the initial setup the script asks you to review the ``user_config/settings`` file. You should do it before you finish the installation.
-
-It is required to restart the server after finishing the installation of the Docker utility.
-
-#### Start Docker Utility
-
-After the setup is complete and the server has been restarted, run the Docker utility with:
+Set up the container server with:
 
 ```bash
-make start-docker-utility
+sudo make setup-container-server
 ```
 
-That's it! If the container crashes or something happens to the utility, then you should only need to run the `make start-docker-utility` command again.
+> **Note:** If you are setting up the container server on a separate machine (not the main server), you will be prompted for the Daemon API Key during setup. This must match the `DAEMON_API_KEY` value from the main server's `user_config/settings` file.
 
-##### Start the Servers
+After the initial setup the script asks you to review the `user_config/settings` file. You should do it before you finish the installation.
 
-After the setup is complete, run the main server dependencies with:
+It is required to restart the server after finishing the installation of the container server.
+
+#### Start the Container Server
+
+After the setup is complete and the server has been restarted, run the container server with:
 
 ```bash
-make start-main-server
+make start-container-server
 ```
 
-That's it! Now you should be able to access the web interface using a browser. There will be more information printed on your console after running the `make start-main-server` command.
+That's it! If the container crashes or something happens to the container server, then you should only need to run the `make start-container-server` command again.
 
 ## Additional Tasks
 
@@ -264,22 +279,162 @@ And that's it. Now you should be able to reserve the container!
 
 If you wish to use LDAP for the login, then configure the LDAP in the ``user_config/settings`` file. Example settings are commented in the file.
 
+### Custom Docker Storage Location
+
+By default Docker stores all container data (images, volumes, container filesystems) in `/var/lib/docker`. If you want to use a separate volume or disk for this, follow the steps below.
+
+> [!IMPORTANT]
+> The recommended time to do this is **before running the setup scripts**, so Docker starts with the correct location from the beginning. If you have already run the setup scripts, follow the [migration steps](#migrating-existing-docker-data) further below instead.
+
+**Option A — daemon.json** (simpler, recommended):
+
+Add the following to `/etc/docker/daemon.json` (create the file if it does not exist), then restart Docker:
+
+```bash
+sudo nano /etc/docker/daemon.json
+```
+```json
+{
+  "data-root": "/mnt/your-volume/docker"
+}
+```
+```bash
+sudo systemctl restart docker
+```
+
+**Option B — fstab** (OS-level mount, survives Docker reinstalls):
+
+Mount a local disk or a network share to `/var/lib/docker` via `/etc/fstab`, then run `mount -a` before starting Docker with ``sudo systemctl restart docker``. This approach is useful when you want to:
+- Use a dedicated local disk with special filesystem options (e.g. ZFS, btrfs, XFS)
+- Store Docker data on a **shared network drive or another computer's storage** (e.g. NFS, SMB/CIFS)
+
+For NFS setup between servers, see [additional_documentation/file_sharing_between_servers.md](additional_documentation/file_sharing_between_servers.md). Note that NFS by default uses port 2049, which conflicts with the default container port range — the linked guide covers how to reconfigure NFS to avoid this.
+
+#### Migrating existing Docker data
+
+If Docker has already been set up and running, follow these steps to move its data to the new location without losing existing images or containers:
+
+```bash
+# 1. Stop Docker
+sudo systemctl stop docker
+
+# 2. Copy all existing Docker data to the new location
+sudo rsync -a /var/lib/docker/ /mnt/your-volume/docker/
+
+# 3. Configure the new storage location (pick one option above)
+#    Option A: edit /etc/docker/daemon.json and set "data-root"
+#    Option B: mount the volume to /var/lib/docker via /etc/fstab and run mount -a
+
+# 4. Start Docker again
+sudo systemctl start docker
+```
+
+> [!WARNING]
+> Do not skip step 2. If Docker starts pointing at a new empty location, all previously pulled images and containers will be invisible to it (the data remains at the old path but Docker will not use it).
+
+## Testing
+
+The project includes automated tests across four layers:
+
+```bash
+make test-all              # Run backend + container server + frontend tests
+make test-backend          # pytest (unit + integration)
+make test-frontend         # vitest (unit + component)
+make test-e2e              # Playwright E2E tests (requires running app)
+make test-api              # Bruno CLI API tests (requires running app)
+```
+
+| Layer | Framework | What it covers |
+|-------|-----------|----------------|
+| Backend unit | pytest | Password hashing, tokens, settings validation, email, helpers |
+| Backend integration | pytest + FastAPI TestClient | API endpoints (login, reservations, admin CRUD, roles) |
+| Frontend unit | vitest | Pinia store, time helpers, URL builder |
+| Frontend component | vitest + vue-test-utils | Loading, Snackbar components |
+| E2E | Playwright | Login flows, reservations, admin pages, navigation guards |
+| API | Bruno CLI | Manual API tests, now CLI-runnable |
+
+### Installing Test Dependencies
+
+```bash
+# Backend test deps
+pip install -r tests/backend/requirements-test.txt
+
+# Frontend (included in devDependencies)
+cd webapp/frontend && npm install
+
+# E2E
+cd tests/e2e && npm install && npx playwright install
+
+# Bruno CLI
+cd tests/api && npm install
+```
+
+### E2E & API Test Accounts
+
+E2E and API tests automatically create temporary test accounts (admin + user) with random passwords before running, and delete them afterward — even if tests fail. No real user accounts are used. This is handled by `make test-e2e` and `make test-api` automatically.
+
+### E2E with Docker Compose
+
+```bash
+docker compose -f tests/docker-compose.test.yml up -d
+make test-e2e
+docker compose -f tests/docker-compose.test.yml down
+```
+
 ## Technical Details
 
-* Click on the image to view full size
+The app is split into three components: frontend, backend, and container server. The frontend is located at `webapp/frontend`, the backend at `webapp/backend`, and the container server at `webapp/container_server`. The frontend and backend run on different ports. The container server is a separate daemon that handles starting, stopping, and monitoring reserved containers.
 
-<a href="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/architecture.png" target="_blank">
-  <img width="600" alt="Login interface" src="https://raw.githubusercontent.com/Satakunnan-ammattikorkeakoulu/containers-on-the-fly/main/additional_documentation/architecture.png">
-</a>
+```mermaid
+graph TB
+    subgraph MainServer["Main Server — Web servers, database, local Docker registry"]
+        Caddy["<b>Caddy Reverse Proxy</b><br/>Automatic HTTPS via Let's Encrypt<br/>Proxies HTTP/S requests to frontend and backend"]
 
-The app is split into two projects: frontend and backend. The frontend can be located from `webapp/frontend` and backend from `webapp/backend`. Both the frontend and backend will run on different ports. The backend also includes a separate script for starting and stopping the reserved containers, called `dockerUtil.py`.
+        Frontend["<b>Frontend</b><br/>Vue 3 + Vuetify 4 + Pinia<br/>Built with Vite<br/><br/><i>webapp/frontend</i>"]
+
+        Backend["<b>Backend</b><br/>FastAPI REST server<br/><br/><i>webapp/backend</i>"]
+
+        Registry["<b>Local Docker Registry</b><br/>Stores Docker images for containers<br/>Port 5000"]
+
+        DB[("<b>MariaDB</b>")]
+    end
+
+    subgraph ContainerServers["Container Servers — Manage reserved containers"]
+        ContainerServer["<b>Container Server Daemon</b><br/>Manages launch, stop, restart, and monitoring<br/>of Docker containers via the backend REST API<br/><br/><i>webapp/container_server</i>"]
+
+        Containers["Running Containers"]
+    end
+
+    User((User)) -->|HTTP/S| Caddy
+    Caddy -->|"Requests excluding /api"| Frontend
+    Caddy -->|"Requests to /api"| Backend
+    Backend <--> DB
+    ContainerServer -->|"REST API"| Backend
+    ContainerServer --> Containers
+    ContainerServer -->|"Pull images"| Registry
+```
 
 ### Frontend
 
-The frontend has been developed using Vue 2.
+- **Vue 3** with **Vuetify 4** component framework
+- **Pinia** for state management
+- **Vite** build tooling
+- **Day.js** for date/time handling
 
 ### Backend
 
-The backend has been developed using Python 3, SQLAlchemy and FastAPI.
+- **Python 3** with **FastAPI** web framework
+- **SQLAlchemy 2** ORM with **Alembic** migrations
+- **MariaDB** database
+- **Caddy** reverse proxy with automatic HTTPS via Let's Encrypt
+- **pm2** process management
 
-The backend also includes a tool called `dockerUtil.py` that handles starting and stopping the reserved containers.
+The container server (`webapp/container_server`) is a separate daemon that handles starting, stopping, and monitoring reserved containers via Docker.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for commit message format and documentation standards.
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

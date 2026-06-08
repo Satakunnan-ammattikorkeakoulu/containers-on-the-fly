@@ -5,7 +5,7 @@
   <v-container class="error-container" fill-height>
     <v-row justify="center" align="center">
       <v-col cols="12" sm="8" md="6" lg="4">
-        <v-card class="error-card pa-8" outlined>
+        <v-card class="error-card pa-8" variant="outlined">
           <div class="text-center">
             <!-- Error Icon -->
             <v-icon 
@@ -22,12 +22,12 @@
             </h2>
             
             <!-- Error Message -->
-            <p class="text-h6 mb-4 grey--text text--darken-1">
+            <p class="text-h6 mb-4 text-grey-darken-1">
               Unable to load application configuration
             </p>
             
             <!-- Error Description -->
-            <p class="body-1 mb-6 grey--text">
+            <p class="body-1 mb-6 text-grey">
               {{ errorMessage || 'The application could not connect to the server to load its configuration. Please check your internet connection and try again.' }}
             </p>
             
@@ -44,8 +44,8 @@
                 Refresh Page
               </v-btn>
               
-              <v-btn 
-                text 
+              <v-btn
+                variant="text"
                 color="primary"
                 @click="goToLogin"
               >
@@ -61,6 +61,10 @@
 </template>
 
 <script>
+/**
+ * Full-page error screen for critical failures (e.g., config loading errors).
+ * Offers a page refresh button and a link back to the login page.
+ */
 export default {
   name: 'ErrorTemplate',
   props: {

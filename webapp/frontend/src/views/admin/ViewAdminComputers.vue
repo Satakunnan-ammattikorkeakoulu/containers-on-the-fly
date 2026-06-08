@@ -9,6 +9,9 @@
 </template>
 
 <script>
+  /**
+   * View wrapper for the admin computers management page. Renders PageAdminComputers inside LayoutApp.
+   */
   import LayoutApp from '/src/layouts/LayoutApp'
   import PageAdminComputers from '/src/pages/admin/PageAdminComputers'
 

@@ -9,6 +9,9 @@
 </template>
 
 <script>
+  /**
+   * View wrapper for the admin hardware management page. Renders PageAdminHardware inside LayoutApp.
+   */
   import LayoutApp from '/src/layouts/LayoutApp'
   import PageAdminHardware from '/src/pages/admin/PageAdminHardware'
 

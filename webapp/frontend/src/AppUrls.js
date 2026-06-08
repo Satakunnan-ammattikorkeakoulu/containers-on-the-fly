@@ -1,4 +1,16 @@
-/* All URL addresses of the API endpoints. Used by the AppSettings.js script. */
+/**
+ * API endpoint URL builder.
+ * Constructs the full URL map for every backend endpoint, grouped by domain
+ * (user, reservation, admin, app). Consumed by AppSettings.js.
+ * @module AppUrls
+ */
+
+/**
+ * Build the complete API URL map from a base address.
+ * @param {string} baseAddress - The root API URL (e.g. "http://localhost/api/").
+ * @returns {Object} Nested object with keys `user`, `reservation`, `admin`, and `app`,
+ *   each containing named endpoint URLs as string properties.
+ */
 function createUrls(baseAddress) {
     let URLS = {}
     URLS.user = {}
@@ -10,16 +22,22 @@ function createUrls(baseAddress) {
     let baseUserUrl = baseUrl + "user/"
     URLS.user.login = baseUserUrl + "login"
     URLS.user.check_token = baseUserUrl + "check_token"
-    
+    URLS.user.heartbeat = baseUserUrl + "heartbeat"
+    URLS.user.update_name = baseUserUrl + "update_name"
+
     let baseReservationUrl = baseUrl + "reservation/"
     URLS.reservation.get_available_hardware = baseReservationUrl + "get_available_hardware"
     URLS.reservation.get_current_reservations = baseReservationUrl + "get_current_reservations"
     URLS.reservation.create_reservation = baseReservationUrl + "create_reservation"
     URLS.reservation.get_own_reservations = baseReservationUrl + "get_own_reservations"
+    URLS.reservation.get_own_activity = baseReservationUrl + "get_own_activity"
+    URLS.reservation.mark_activity_seen = baseReservationUrl + "mark_activity_seen"
     URLS.reservation.cancel_reservation = baseReservationUrl + "cancel_reservation"
     URLS.reservation.get_own_reservation_details = baseReservationUrl + "get_own_reservation_details"
     URLS.reservation.restart_container = baseReservationUrl + "restart_container"
     URLS.reservation.extend_reservation = baseReservationUrl + "extend_reservation"
+    URLS.reservation.update_reservation_description = baseReservationUrl + "update_reservation_description"
+    URLS.reservation.get_public_computers = baseReservationUrl + "get_public_computers"
 
     let baseAdminUrl = baseUrl + "admin/"
     URLS.admin.get_reservations = baseAdminUrl + "reservations"
@@ -33,15 +51,16 @@ function createUrls(baseAddress) {
     URLS.admin.save_computer = baseAdminUrl + "save_computer"
     URLS.admin.remove_container = baseAdminUrl + "remove_container"
     URLS.admin.remove_computer = baseAdminUrl + "remove_computer"
-    URLS.admin.get_ports = baseAdminUrl + "ports"
     URLS.admin.edit_reservation = baseAdminUrl + "edit_reservation"
     URLS.admin.get_user = baseAdminUrl + "user"
     URLS.admin.save_user = baseAdminUrl + "save_user"
+    URLS.admin.user_anonymize_info = baseAdminUrl + "user_anonymize_info"
+    URLS.admin.anonymize_user = baseAdminUrl + "anonymize_user"
     // Fixed endpoints - match actual backend routes
     URLS.admin.get_general_settings = baseAdminUrl + "general-settings"
     URLS.admin.save_general_settings = baseAdminUrl + "general-settings"
     URLS.admin.test_email = baseAdminUrl + "test-email"
-    URLS.admin.get_servers = baseAdminUrl + "servers"
+    URLS.admin.test_ad = baseAdminUrl + "test-ad"
     URLS.admin.get_server_monitoring = baseAdminUrl + "server"
     // Role management endpoints
     URLS.admin.get_roles = baseAdminUrl + "roles"
@@ -53,11 +72,23 @@ function createUrls(baseAddress) {
     URLS.admin.save_role_hardware_limits = baseAdminUrl + "save_role_hardware_limits"
     URLS.admin.get_role_reservation_limits = baseAdminUrl + "role_reservation_limits"
     URLS.admin.save_role_reservation_limits = baseAdminUrl + "save_role_reservation_limits"
+    URLS.admin.container_remove_info = baseAdminUrl + "container_remove_info"
+    URLS.admin.rebuild_container_image = baseAdminUrl + "rebuild_container_image"
+    URLS.admin.container_build_status = baseAdminUrl + "container_build_status"
+    URLS.admin.container_defaults = baseAdminUrl + "container_defaults"
+    URLS.admin.container_templates = baseAdminUrl + "container_templates"
+    URLS.admin.get_audit_logs = baseAdminUrl + "audit-logs"
+    URLS.admin.get_analytics = baseAdminUrl + "analytics"
 
     let baseAppUrl = baseUrl + "app/"
     URLS.app.get_config = baseAppUrl + "config"
 
+    URLS.legal = {}
+    let baseLegalUrl = baseUrl + "legal/"
+    URLS.legal.get_privacy_policy = baseLegalUrl + "privacy-policy"
+    URLS.legal.get_terms_of_service = baseLegalUrl + "terms-of-service"
+
     return URLS;
 }
 
-module.exports = createUrls;
+export default createUrls;

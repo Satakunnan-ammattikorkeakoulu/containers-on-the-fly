@@ -1,7 +1,7 @@
 <template>
   <v-dialog v-model="isOpen" persistent max-width="1200px">
     <v-card>
-      <v-card-title>
+      <v-card-title class="pt-6">
         <span class="headline">Hardware Limits - {{ roleName }}</span>
       </v-card-title>
       
@@ -16,7 +16,7 @@
             <strong>Hardware Limits</strong> allow you to override the default hardware allocation limits for users with this role.
             Leave fields empty to use the computer's default limits.
           </div>
-          <div class="mt-2 text-caption grey--text">
+          <div class="mt-2 text-caption" style="color: rgba(255, 255, 255, 0.75);">
             Note: These limits override the computer's default user limits but cannot exceed the system maximum.
           </div>
         </v-alert>
@@ -37,21 +37,21 @@
                 v-for="computer in computers"
                 :key="computer.computerId"
               >
-                <v-expansion-panel-header>
+                <v-expansion-panel-title>
                   <div>
-                    <v-icon small class="mr-2">mdi-server</v-icon>
+                    <v-icon size="small" class="mr-2">mdi-server</v-icon>
                     {{ computer.name }}
                     <v-chip
                       v-if="hasCustomLimits(computer.computerId)"
-                      x-small
+                      size="x-small"
                       color="primary"
                       class="ml-2"
                     >
                       Customized
                     </v-chip>
                   </div>
-                </v-expansion-panel-header>
-                <v-expansion-panel-content>
+                </v-expansion-panel-title>
+                <v-expansion-panel-text>
                   <v-row
                     v-for="spec in getFilteredHardwareSpecs(computer)"
                     :key="spec.hardwareSpecId"
@@ -60,13 +60,13 @@
                     <v-col cols="12">
                       <div class="hardware-spec-section">
                         <div class="hardware-spec-header">
-                          <v-icon small class="mr-1">{{ getHardwareIcon(spec.type) }}</v-icon>
+                          <v-icon size="small" class="mr-1">{{ getHardwareIcon(spec.type) }}</v-icon>
                           <span class="font-weight-medium">{{ spec.displayName || spec.type.toUpperCase() }}</span>
                         </div>
-                        <div class="hardware-spec-info text-caption grey--text">
-                          Current user max: {{ spec.maximumAmountForUser }} | System max: {{ getSystemMaximum(computer, spec) }}
+                        <div class="hardware-spec-info text-caption text-grey">
+                          Current user max: {{ spec.maximumAmountForUser }} | Low-priority user max: {{ spec.maximumAmountForUserLowPriority }} | System max: {{ getSystemMaximum(computer, spec) }}
                         </div>
-                        <div class="d-flex align-center mt-2">
+                        <div class="d-flex align-center flex-wrap mt-2">
                           <v-text-field
                             v-model.number="hardwareLimits[computer.computerId][spec.hardwareSpecId].maximum"
                             type="number"
@@ -77,32 +77,47 @@
                             dense
                             outlined
                             hide-details
+                            clearable
                             class="flex-grow-1 mr-2"
                             style="max-width: 300px;"
-                            @input="handleInputChange(computer.computerId, spec.hardwareSpecId, $event)"
                           >
                             <template v-slot:append>
                               <v-tooltip bottom>
-                                <template v-slot:activator="{ on }">
-                                  <v-icon v-on="on" small>mdi-information-outline</v-icon>
+                                <template v-slot:activator="{ props }">
+                                  <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
                                 </template>
-                                <span>Maximum amount users with this role can reserve (0-{{ getSystemMaximum(computer, spec) }})</span>
+                                <span>Maximum amount users with this role can reserve (0-{{ getSystemMaximum(computer, spec) }}). Leave blank to inherit the computer default.</span>
                               </v-tooltip>
                             </template>
                           </v-text-field>
-                          <v-btn
-                            icon
-                            small
-                            @click="resetHardwareLimit(computer.computerId, spec.hardwareSpecId)"
-                            :disabled="!hasCustomLimit(computer.computerId, spec.hardwareSpecId)"
+                          <v-text-field
+                            v-model.number="hardwareLimits[computer.computerId][spec.hardwareSpecId].maximumLowPriority"
+                            type="number"
+                            label="Override Low-Priority Max"
+                            :placeholder="spec.maximumAmountForUserLowPriority.toString()"
+                            :min="0"
+                            :max="getSystemMaximum(computer, spec)"
+                            dense
+                            outlined
+                            hide-details
+                            clearable
+                            class="flex-grow-1"
+                            style="max-width: 300px;"
                           >
-                            <v-icon small>mdi-restore</v-icon>
-                          </v-btn>
+                            <template v-slot:append>
+                              <v-tooltip bottom>
+                                <template v-slot:activator="{ props }">
+                                  <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                                </template>
+                                <span>Maximum amount users with this role can reserve in a low-priority reservation (0-{{ getSystemMaximum(computer, spec) }}). Leave blank to inherit the normal Override Max.</span>
+                              </v-tooltip>
+                            </template>
+                          </v-text-field>
                         </div>
                       </div>
                     </v-col>
                   </v-row>
-                </v-expansion-panel-content>
+                </v-expansion-panel-text>
               </v-expansion-panel>
             </v-expansion-panels>
           </template>
@@ -111,19 +126,36 @@
 
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="blue darken-1" text @click="close">Cancel</v-btn>
-        <v-btn color="blue darken-1" text @click="save" :loading="isSubmitting">Save</v-btn>
+        <v-btn color="blue darken-1" variant="text" @click="close">Cancel</v-btn>
+        <v-btn color="blue darken-1" variant="text" @click="save" :loading="isSubmitting">Save</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 </template>
 
 <script>
-const axios = require('axios').default;
+/**
+ * Modal dialog for configuring per-role hardware allocation limits on each computer.
+ * Displays an expansion panel per computer, allowing admins to override the default
+ * maximum CPU, RAM, and GPU amounts for users assigned to this role.
+ *
+ * Props:
+ *   roleId   - The ID of the role being configured.
+ *   roleName - The display name of the role (shown in the header).
+ *
+ * Emits:
+ *   emitModalClose - When the modal is closed; passes true on successful save.
+ */
+import axios from 'axios';
 import Loading from '../global/Loading.vue';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: "AdminRoleHardwareLimitsModal",
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
   components: {
     Loading
   },
@@ -154,12 +186,12 @@ export default {
     async fetchData() {
       this.isFetching = true;
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         
         // Fetch available computers
         const response = await axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_computers,
+          url: this.$appSettings.APIServer.admin.get_computers,
           headers: {
             'Authorization': `Bearer ${currentUser.loginToken}`
           }
@@ -173,21 +205,22 @@ export default {
             this.hardwareLimits[computer.computerId] = {};
             computer.hardwareSpecs.forEach(spec => {
               this.hardwareLimits[computer.computerId][spec.hardwareSpecId] = {
-                maximum: null
+                maximum: null,
+                maximumLowPriority: null
               };
             });
           });
-          
+
           // Fetch existing role hardware limits from backend
           const limitsResponse = await axios({
             method: "get",
-            url: this.AppSettings.APIServer.admin.get_role_hardware_limits,
+            url: this.$appSettings.APIServer.admin.get_role_hardware_limits,
             params: { roleId: this.roleId },
             headers: {
               'Authorization': `Bearer ${currentUser.loginToken}`
             }
           });
-          
+
           if (limitsResponse.data.status === true) {
             // Apply fetched limits to our structure
             const fetchedLimits = limitsResponse.data.data.hardwareLimits;
@@ -196,13 +229,14 @@ export default {
               const hardwareSpecId = limit.hardwareSpecId;
               if (this.hardwareLimits[computerId] && this.hardwareLimits[computerId][hardwareSpecId]) {
                 this.hardwareLimits[computerId][hardwareSpecId].maximum = limit.maximumAmountForRole;
+                this.hardwareLimits[computerId][hardwareSpecId].maximumLowPriority = limit.maximumAmountForRoleLowPriority;
               }
             });
           }
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error loading hardware limits", 
           color: "red" 
         });
@@ -213,11 +247,11 @@ export default {
     async save() {
       this.isSubmitting = true;
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         
         const response = await axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_role_hardware_limits,
+          url: this.$appSettings.APIServer.admin.save_role_hardware_limits,
           data: { 
             roleId: this.roleId,
             hardwareLimits: this.formatHardwareLimitsForBackend()
@@ -229,20 +263,20 @@ export default {
         });
 
         if (response.data.status === true) {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: "Hardware limits saved successfully", 
             color: "green" 
           });
           this.$emit('emitModalClose', true);
         } else {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: response.data.message, 
             color: "red" 
           });
         }
       } catch (error) {
         console.error('Error saving hardware limits:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error saving hardware limits", 
           color: "red" 
         });
@@ -263,41 +297,42 @@ export default {
       };
       return icons[type] || 'mdi-chip';
     },
+    /** Returns true if the given computer has any non-null override limits set. */
     hasCustomLimits(computerId) {
       const limits = this.hardwareLimits[computerId];
       if (!limits) return false;
-      return Object.values(limits).some(limit => limit.maximum !== null);
+      return Object.values(limits).some(limit => limit.maximum !== null || limit.maximumLowPriority !== null);
     },
-    hasCustomLimit(computerId, hardwareSpecId) {
-      const limit = this.hardwareLimits[computerId]?.[hardwareSpecId];
-      return limit && limit.maximum !== null;
-    },
-    resetHardwareLimit(computerId, hardwareSpecId) {
-      if (this.hardwareLimits[computerId] && this.hardwareLimits[computerId][hardwareSpecId]) {
-        this.hardwareLimits[computerId][hardwareSpecId] = {
-          maximum: null
-        };
-      }
-    },
+    /** Converts the nested hardwareLimits object into a flat array for the backend API. */
     formatHardwareLimitsForBackend() {
       const formattedLimits = [];
-      
+
+      const normalize = (value) => {
+        if (value === null || value === undefined || value === '') return null;
+        return parseInt(value);
+      };
+
       Object.entries(this.hardwareLimits).forEach(([computerId, specs]) => {
         Object.entries(specs).forEach(([hardwareSpecId, limits]) => {
-          if (limits.maximum !== null && limits.maximum !== '') {
-            formattedLimits.push({
-              computerId: parseInt(computerId),
-              hardwareSpecId: parseInt(hardwareSpecId),
-              maximumAmountForRole: limits.maximum === '' ? null : parseInt(limits.maximum)
-            });
-          }
+          const normal = normalize(limits.maximum);
+          const low = normalize(limits.maximumLowPriority);
+          if (normal === null && low === null) return;
+          formattedLimits.push({
+            computerId: parseInt(computerId),
+            hardwareSpecId: parseInt(hardwareSpecId),
+            maximumAmountForRole: normal,
+            maximumAmountForRoleLowPriority: low
+          });
         });
       });
-      
+
       return formattedLimits;
     },
+    /**
+     * Returns hardware specs for the computer, excluding individual GPU entries
+     * (those with internalId) since the aggregate GPU spec already represents them.
+     */
     getFilteredHardwareSpecs(computer) {
-      // Filter out GPU specs that have an internalId
       return computer.hardwareSpecs.filter(spec => {
         if (spec.type === 'gpu' && spec.internalId) {
           return false;
@@ -305,36 +340,29 @@ export default {
         return true;
       });
     },
+    /**
+     * Returns the system-wide maximum for a hardware spec.
+     * For GPUs, this is the total count of individual GPU entries on the computer.
+     * For CPU/RAM, this is the configured maximumAmount.
+     */
     getSystemMaximum(computer, spec) {
-      // For GPUs without internalId, count all GPU specs (including those with internalId)
       if (spec.type === 'gpu' && !spec.internalId) {
         return computer.hardwareSpecs.filter(s => s.type === 'gpu').length;
       }
-      // For other hardware types, use the regular maximumAmount
       return spec.maximumAmount;
     },
-    handleInputChange(computerId, hardwareSpecId, value) {
-      // Convert empty string to null
-      if (value === '' || value === null || value === undefined) {
-        this.hardwareLimits[computerId][hardwareSpecId].maximum = null;
-      } else {
-        this.hardwareLimits[computerId][hardwareSpecId].maximum = parseInt(value);
-      }
-    }
   }
 }
 </script>
 
 <style scoped lang="scss">
 .help-text {
-  color: #666;
-  font-size: 0.8em;
   margin-top: 4px;
 }
-.v-expansion-panel-header {
+.v-expansion-panel-title {
   min-height: 48px;
 }
-.v-expansion-panel-content__wrap {
+.v-expansion-panel-text__wrap {
   padding: 16px;
 }
 .hardware-spec-section {

@@ -1,0 +1,10 @@
+{
+  "name": "containers-on-the-fly-api-tests",
+  "private": true,
+  "scripts": {
+    "test": "bru run --env localhost -r"
+  },
+  "devDependencies": {
+    "@usebruno/cli": "^3.2.0"
+  }
+}

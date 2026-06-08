@@ -1,11 +1,27 @@
 <template>
   <v-dialog v-model="isOpen" persistent max-width="500px">
     <v-card>
-      <v-card-title>
+      <v-card-title class="pt-6">
         <span class="headline">{{ modalTitle }}</span>
       </v-card-title>
       <v-card-text>
         <v-container>
+          <v-alert
+            v-if="isCreatingNew"
+            variant="outlined"
+            color="info"
+            class="mb-4"
+          >
+            <div class="text-body-2">
+              Roles define what users can do when reserving containers. After creating a role, you can configure:
+              <ul class="mt-1" style="padding-left: 20px;">
+                <li><strong>Hardware Limits</strong> — maximum GPUs, CPUs, and other resources users can request</li>
+                <li><strong>Reservation Limits</strong> — minimum/maximum duration and how many active reservations are allowed</li>
+                <li><strong>Mounts</strong> — host folders automatically mounted into user containers</li>
+              </ul>
+              <div class="mt-1">Users can have multiple roles and will inherit the most permissive limits across all their assigned roles.</div>
+            </div>
+          </v-alert>
           <v-form ref="form" v-model="isValid">
             <v-row>
               <v-col cols="12">
@@ -22,19 +38,34 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="blue darken-1" text @click="close">Cancel</v-btn>
-        <v-btn color="blue darken-1" text @click="save" :loading="isSubmitting">Save</v-btn>
+        <v-btn color="blue darken-1" variant="text" @click="close">Cancel</v-btn>
+        <v-btn color="blue darken-1" variant="text" @click="save" :loading="isSubmitting">Save</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>
 </template>
 
 <script>
-// Add axios back
-const axios = require('axios').default;
+/**
+ * Modal dialog for creating or editing a role.
+ * Provides a name input and informational guidance about what can be configured
+ * on the role after creation (hardware limits, reservation limits, mounts).
+ *
+ * Props:
+ *   propData - Role object ({ roleId, name }) for editing, or null when creating a new role.
+ *
+ * Emits:
+ *   emitModalClose - When the modal is closed; passes true on successful save.
+ */
+import axios from 'axios';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: "AdminManageRoleModal",
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
   props: {
     propData: {
       type: Object,
@@ -105,11 +136,11 @@ export default {
       
       this.isSubmitting = true;
       try {
-        const currentUser = this.$store.getters.user;  // Get user the same way as other components
+        const currentUser = this.store.user;  // Get user the same way as other components
         
         const response = await axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_role,
+          url: this.$appSettings.APIServer.admin.save_role,
           params: { 
             roleId: this.isCreatingNew ? null : this.item,
             name: this.data.name
@@ -125,14 +156,14 @@ export default {
         if (response.data.status === true) {
           this.$emit('emitModalClose', true);
         } else {
-          this.$store.commit('showMessage', { text: response.data.message, color: "red" });
+          this.store.showMessage({ text: response.data.message, color: "red" });
         }
       } catch (error) {
         console.error('Role save error:', error);
         if (error.response && (error.response.status === 400 || error.response.status === 401)) {
-          this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          this.store.showMessage({ text: error.response.data.detail, color: "red" });
         } else {
-          this.$store.commit('showMessage', { text: "Unknown error while trying to save role", color: "red" });
+          this.store.showMessage({ text: "Unknown error while trying to save role", color: "red" });
         }
       } finally {
         this.isSubmitting = false;
@@ -147,8 +178,6 @@ export default {
   
   <style scoped lang="scss">
   .help-text {
-    color: #666;
-    font-size: 0.8em;
     margin-top: 4px;
   }
   .built-in-notice {

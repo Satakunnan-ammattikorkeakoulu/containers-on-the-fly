@@ -9,6 +9,9 @@
 </template>
 
 <script>
+  /**
+   * View wrapper for the admin containers management page. Renders PageAdminContainers inside LayoutApp.
+   */
   import LayoutApp from '/src/layouts/LayoutApp'
   import PageAdminContainers from '/src/pages/admin/PageAdminContainers'
 

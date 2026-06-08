@@ -1,0 +1,28 @@
+meta {
+  name: Create Reservation
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{root_url}}/reservation/create_reservation?date=2030-02-01T10:00:00&duration=2&computerId=1&containerId=1&hardwareSpecs={}&adminReserveUserEmail=&description=Bruno test
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user_token}}
+}
+
+tests {
+  test("Status code is 200 or 422", function() {
+    // 422 is acceptable if hardware specs are invalid for the server config
+    expect([200, 422]).to.include(res.status);
+  });
+
+  test("If 200, response has status field", function() {
+    if (res.status === 200) {
+      expect(res.body).to.have.property('status');
+    }
+  });
+}

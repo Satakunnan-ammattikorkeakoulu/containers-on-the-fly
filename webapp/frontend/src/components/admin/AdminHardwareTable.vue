@@ -1,17 +1,21 @@
 <template>
   <div>
-    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
+    <a v-if="hasLongItems" class="read-all-toggle" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
     <v-data-table
       :headers="table.headers"
       :items="data"
-      :sort-by="'hardwareSpecId'"
-      :sort-desc="true"
+      :sort-by="[{key: 'hardwareSpecId', order: 'desc'}]"
       class="elevation-1">
     </v-data-table>
   </div>
 </template>
 
 <script>
+  /**
+   * Displays a read-only data table of hardware specifications across all computers.
+   * Shows CPU, RAM, and GPU details including min/max amounts and user-facing defaults.
+   * Used in the admin computers page to inspect hardware configuration per computer.
+   */
   import { DisplayTime } from '/src/helpers/time.js'
 
   export default {
@@ -28,15 +32,15 @@
       hasLongItems: false,
       table: {
         headers: [
-          { text: 'Hardware ID', value: 'hardwareSpecId' },
-          { text: 'Computer ID', value: 'computerId' },
-          { text: 'Type', value: 'type' },
-          { text: 'Format', value: 'format' },
-          { text: 'GPU ID (Internal ID)', value: 'internalId' },
-          { text: 'Max', value: 'maximumAmount' },
-          { text: 'Min', value: 'minimumAmount' },
-          { text: 'Max for Users', value: 'maximumAmountForUser' },
-          { text: 'Default for Users', value: 'defaultAmountForUser' },
+          { title: 'Hardware ID', key: 'hardwareSpecId' },
+          { title: 'Computer ID', key: 'computerId' },
+          { title: 'Type', key: 'type' },
+          { title: 'Format', key: 'format' },
+          { title: 'GPU ID (Internal ID)', key: 'internalId' },
+          { title: 'Max', key: 'maximumAmount' },
+          { title: 'Min', key: 'minimumAmount' },
+          { title: 'Max for Users', key: 'maximumAmountForUser' },
+          { title: 'Default for Users', key: 'defaultAmountForUser' },
         ],
       }
     }),
@@ -70,13 +74,7 @@
 </script>
 
 <style scoped lang="scss">
-  .link-action {
-    display: block;
-    min-width: 150px;
-    margin: 10px 0px;
-  }
-
-  .link-toggle-read-all {
+  .read-all-toggle {
     margin-bottom: 20px;
     font-size: 14px;
     display: inline-block;

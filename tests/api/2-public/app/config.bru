@@ -1,0 +1,39 @@
+meta {
+  name: Get Public Config
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{root_url}}/app/config
+  body: none
+  auth: none
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal(true);
+  });
+
+  test("Response has data object", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.be.an('object');
+  });
+
+  test("Config has app settings", function() {
+    const data = res.body.data;
+    expect(data).to.have.property('app');
+    expect(data.app).to.have.property('name');
+    expect(data.app).to.have.property('timezone');
+  });
+
+  test("Config has instructions", function() {
+    const data = res.body.data;
+    expect(data).to.have.property('instructions');
+  });
+}

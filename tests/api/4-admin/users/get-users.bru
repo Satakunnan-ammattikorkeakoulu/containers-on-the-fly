@@ -1,0 +1,61 @@
+meta {
+  name: Get All Users
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{root_url}}/admin/users
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+body:json {
+  {
+    "page": 1,
+    "itemsPerPage": 10,
+    "sortBy": [],
+    "filters": {}
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal(true);
+  });
+
+  test("Response has users array, totalItems, and available roles", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('users');
+    expect(res.body.data.users).to.be.an('array');
+    expect(res.body.data.users.length).to.be.greaterThan(0);
+    expect(res.body.data).to.have.property('totalItems');
+    expect(res.body.data.totalItems).to.be.a('number');
+    expect(res.body.data).to.have.property('availableRoles');
+    expect(res.body.data.availableRoles).to.be.an('array');
+  });
+
+  test("User items have required fields", function() {
+    const user = res.body.data.users[0];
+    expect(user).to.have.property('userId');
+    expect(user).to.have.property('email');
+    expect(user).to.have.property('roles');
+    expect(user).to.have.property('createdAt');
+    expect(user).to.have.property('hasPassword');
+  });
+
+  test("Default users exist", function() {
+    const emails = res.body.data.users.map(u => u.email);
+    expect(emails).to.include('admin@foo.com');
+    expect(emails).to.include('user@foo.com');
+  });
+}

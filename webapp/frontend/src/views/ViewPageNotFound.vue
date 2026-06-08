@@ -7,6 +7,9 @@
 </template>
 
 <script>
+  /**
+   * 404 page displayed for unmatched routes.
+   */
   export default {
     name: 'ViewPageNotFound',
 

@@ -8,7 +8,7 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 RESET='\033[0m'
 CURRENT_DIR=$(pwd)
-CURRENT_USER=$(whoami)
+CURRENT_USER=${SUDO_USER:-$(logname 2>/dev/null || whoami)}
 
 # Load settings
 source "$CURRENT_DIR/user_config/settings"
@@ -21,11 +21,16 @@ fi
 
 echo "Running with sudo privileges."
 
+# Always refresh Caddy GPG key and repository source to prevent expired key errors
+echo "Refreshing Caddy repository GPG key..."
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --yes --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+
 # Update and install initial packages
 sudo apt update -qq
 
 # Install required libraries
-sudo apt --assume-yes -qq install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev acl
+sudo apt --assume-yes -qq install python3 python3-pip libldap2-dev libsasl2-dev libssl-dev acl debian-keyring debian-archive-keyring apt-transport-https
 sudo apt --assume-yes -qq install python3-ldap
 
 # Create containerfly group if it doesn't exist
@@ -37,25 +42,11 @@ else
     echo -e "${GREEN}Group 'containerfly' already exists.${RESET}"
 fi
 
-# Function to check if Caddy is installed
-check_caddy_installed() {
-    if command -v caddy >/dev/null 2>&1; then
-        echo -e "${GREEN}Caddy is already installed.${RESET}"
-        return 0
-    else
-        echo "Caddy is not installed."
-        return 1
-    fi
-}
-
-# Function to install Caddy
-install_caddy() {
+# Install Caddy if not already installed
+if command -v caddy >/dev/null 2>&1; then
+    echo -e "${GREEN}Caddy is already installed.${RESET}"
+else
     echo "Installing Caddy..."
-    
-    # Install Caddy from official repository
-    sudo apt install -y -qq debian-keyring debian-archive-keyring apt-transport-https
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | sudo tee /etc/apt/sources.list.d/caddy-stable.list
     sudo apt update -qq
     sudo apt install -y -qq caddy
 
@@ -65,12 +56,6 @@ install_caddy() {
         echo -e "${RED}Failed to install Caddy.${RESET}"
         exit 1
     fi
-}
-
-# Check if Caddy is installed
-check_caddy_installed
-if [ $? -ne 0 ]; then
-    install_caddy
 fi
 
 CADDYFILE_PATH="$CURRENT_DIR/user_config/Caddyfile"
@@ -87,6 +72,9 @@ fi
 # Set proper permissions for Caddyfile
 sudo chown root:root /etc/caddy/Caddyfile
 sudo chmod 644 /etc/caddy/Caddyfile
+
+# Auto-format Caddyfile to avoid formatting warnings during validation
+sudo caddy fmt --overwrite /etc/caddy/Caddyfile
 
 # Test Caddy configuration
 sudo caddy validate --config /etc/caddy/Caddyfile
@@ -150,10 +138,8 @@ if [ $? -ne 0 ]; then
     install_mariadb
 fi
 
-# Allow MariaDB to listen on all interfaces to allow remote connections
-# Don't worry, we have disabled by default all incoming connections to ports with iptables before this.
-# We just need to do this to in the future allow remote connections from possible container servers.
-sudo sed -i 's/^bind-address\s*=.*$/bind-address = 0.0.0.0/' "/etc/mysql/mariadb.conf.d/50-server.cnf"
+# MariaDB only needs to listen on localhost -- container servers communicate
+# through the backend REST API, not direct database connections.
 
 # Ensure MariaDB starts on boot and start the service
 sudo systemctl enable mariadb
@@ -175,6 +161,22 @@ else
   echo -e "${GREEN}Database ${MARIADB_DB_NAME} was created successfully.${RESET}"
 fi
 
+# Migrate existing user from @'%' to @'localhost' if needed (legacy cleanup).
+# Container servers now communicate via REST API, so remote DB access is no longer needed.
+REMOTE_USER_EXISTS=$(mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$MARIADB_DB_USER' AND host = '%');" 2>/dev/null)
+if [ "$REMOTE_USER_EXISTS" = "1" ]; then
+    LOCALHOST_USER_EXISTS=$(mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$MARIADB_DB_USER' AND host = 'localhost');" 2>/dev/null)
+    if [ "$LOCALHOST_USER_EXISTS" = "1" ]; then
+        # Both exist -- drop the remote one, keep localhost
+        mysql -e "DROP USER '$MARIADB_DB_USER'@'%';"
+    else
+        # Only remote exists -- rename to localhost
+        mysql -e "RENAME USER '$MARIADB_DB_USER'@'%' TO '$MARIADB_DB_USER'@'localhost';"
+    fi
+    mysql -e "FLUSH PRIVILEGES;"
+    echo -e "${GREEN}Migrated database user from @'%' to @'localhost' (remote DB access no longer needed).${RESET}"
+fi
+
 # Check if user exists
 RESULT=$(mysql -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user = '$MARIADB_DB_USER');")
 
@@ -194,7 +196,7 @@ if [ "$RESULT" -eq 1 ]; then
       DB_PASSWORD=$(openssl rand -base64 15 | tr -d "=+/" | cut -c1-15)
       DB_PASSWORD_ESCAPED=$(printf '%s\n' "$DB_PASSWORD" | sed 's/[\/&]/\\&/g')
       sed -i "s/^MARIADB_DB_USER_PASSWORD=.*/MARIADB_DB_USER_PASSWORD=\"$DB_PASSWORD_ESCAPED\"/" user_config/settings
-      mysql -e "ALTER USER '$MARIADB_DB_USER'@'%' IDENTIFIED BY '$DB_PASSWORD';"
+      mysql -e "ALTER USER '$MARIADB_DB_USER'@'localhost' IDENTIFIED BY '$DB_PASSWORD';"
       mysql -e "FLUSH PRIVILEGES;"
       echo -e "${GREEN}Password has been reset successfully.${RESET}"
       echo "New password has been saved to user_config/settings"
@@ -207,13 +209,13 @@ if [ "$RESULT" -eq 1 ]; then
   fi
   echo -e "${GREEN}Password verification successful.${RESET}"
   # Ensure user has privileges on the current database
-  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'%';"
+  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'localhost';"
   mysql -e "FLUSH PRIVILEGES;"
   echo -e "${GREEN}Granted privileges on database $MARIADB_DB_NAME to user $MARIADB_DB_USER.${RESET}"
 else
   echo "User '$MARIADB_DB_USER' does not exist."
-  mysql -e "CREATE USER IF NOT EXISTS '$MARIADB_DB_USER'@'%' IDENTIFIED BY '$MARIADB_DB_USER_PASSWORD';"
-  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'%';"
+  mysql -e "CREATE USER IF NOT EXISTS '$MARIADB_DB_USER'@'localhost' IDENTIFIED BY '$MARIADB_DB_USER_PASSWORD';"
+  mysql -e "GRANT ALL PRIVILEGES ON $MARIADB_DB_NAME.* TO '$MARIADB_DB_USER'@'localhost';"
   mysql -e "FLUSH PRIVILEGES;"
   echo -e "${GREEN}In mariadb/mysql, created the user ${MARIADB_DB_USER} and granted the user full access to the database ${MARIADB_DB_NAME}."
 fi
@@ -230,7 +232,7 @@ if [ ! -f "$MYSQL_CONF_FILE" ]; then
     NEEDS_CONFIG=true
 else
     # Check if our specific configurations are already present
-    if ! grep -q "wait_timeout=240" "$MYSQL_CONF_FILE" || ! grep -q "max_connections=2000" "$MYSQL_CONF_FILE"; then
+    if ! grep -q "bind-address=127.0.0.1" "$MYSQL_CONF_FILE" || ! grep -q "wait_timeout=240" "$MYSQL_CONF_FILE" || ! grep -q "max_connections=2000" "$MYSQL_CONF_FILE"; then
         echo "MySQL configuration file exists but missing required settings. Updating..."
         NEEDS_CONFIG=true
     else
@@ -242,6 +244,7 @@ if [ "$NEEDS_CONFIG" = true ]; then
     # Create or update the configuration file with proper permissions
     sudo tee "$MYSQL_CONF_FILE" > /dev/null <<EOF
 [mysqld]
+bind-address=127.0.0.1
 wait_timeout=240
 max_connections=2000
 EOF
@@ -295,3 +298,33 @@ if ! command -v pm2 > /dev/null; then
     sudo npm install pm2 -g
     pm2 startup
 fi
+
+# Ensure PM2_LOG_RETAIN_DAYS exists in settings file
+if ! grep -q "^PM2_LOG_RETAIN_DAYS=" "$CURRENT_DIR/user_config/settings"; then
+    echo '' >> "$CURRENT_DIR/user_config/settings"
+    echo '' >> "$CURRENT_DIR/user_config/settings"
+    echo '# Number of rotated pm2 log files to retain (with daily rotation, this equals days)' >> "$CURRENT_DIR/user_config/settings"
+    echo '# Default: 90' >> "$CURRENT_DIR/user_config/settings"
+    echo 'PM2_LOG_RETAIN_DAYS=90' >> "$CURRENT_DIR/user_config/settings"
+    source "$CURRENT_DIR/user_config/settings"
+fi
+
+# Install and configure pm2-logrotate for log retention management
+if ! pm2 describe pm2-logrotate > /dev/null 2>&1; then
+    echo "Installing pm2-logrotate..."
+    pm2 install pm2-logrotate
+fi
+
+# Configure pm2-logrotate settings (suppress verbose output)
+pm2 set pm2-logrotate:max_size 500M > /dev/null 2>&1
+pm2 set pm2-logrotate:retain ${PM2_LOG_RETAIN_DAYS:-90} > /dev/null 2>&1
+pm2 set pm2-logrotate:compress true > /dev/null 2>&1
+pm2 set pm2-logrotate:workerInterval 60 > /dev/null 2>&1
+pm2 set pm2-logrotate:rotateInterval '0 0 * * *' > /dev/null 2>&1
+pm2 set pm2-logrotate:rotateModule true > /dev/null 2>&1
+echo -e "${GREEN}pm2-logrotate configured (retention: ${PM2_LOG_RETAIN_DAYS:-90} days).${RESET}"
+
+# Install Python dependencies
+echo "Installing Python dependencies..."
+sudo -u "$CURRENT_USER" pip3 install -r "$CURRENT_DIR/webapp/backend/requirements.txt" --break-system-packages --ignore-installed --no-warn-script-location -qq
+echo -e "${GREEN}Python dependencies installed.${RESET}"

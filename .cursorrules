@@ -123,9 +123,9 @@
 
 ### Development Commands
 # Common development workflows:
-- `make start-dev-frontend` - Start frontend development server
-- `make start-dev-backend` - Start backend development server  
-- `make start-dev-docker-utility` - Start Docker utility for testing
+- `make start-main-server` - Build frontend + start all main server services
+- `make start-main-server DEV=1` - Same but with Vite dev server (hot reload)
+- `make start-container-server` - Start container server daemon
 - `make apply-settings` - Apply configuration changes
 - `make logs` - View server logs
 - `make status` - Check server status

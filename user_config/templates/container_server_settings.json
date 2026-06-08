@@ -1,0 +1,20 @@
+{
+    "app": {
+      "webHost": "{{MAIN_SERVER_WEB_HOST}}",
+      "webHttps": {{MAIN_SERVER_WEB_HTTPS}},
+      "logLevel": "{{LOG_LEVEL}}"
+    },
+    "docker": {
+      "registryAddress": "{{DOCKER_REGISTRY_ADDRESS}}:{{DOCKER_REGISTRY_PORT}}",
+      "serverName": "{{DOCKER_SERVER_NAME}}",
+      "port_range_start": {{DOCKER_RESERVATION_PORT_RANGE_START}},
+      "port_range_end": {{DOCKER_RESERVATION_PORT_RANGE_END}},
+      "enabled": true,
+      "shm_size": "{{DOCKER_SHM_SIZE}}",
+      "debugSkipGpuDedication": {{DEBUG_SKIP_GPU_DEDICATION}},
+      "sshHostKeysPath": "data/ssh_host_keys"
+    },
+    "daemon": {
+      "apiKey": "{{DAEMON_API_KEY}}"
+    }
+  }

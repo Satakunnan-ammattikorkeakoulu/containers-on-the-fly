@@ -1,0 +1,29 @@
+meta {
+  name: Edit Reservation (Admin)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{root_url}}/admin/edit_reservation?reservationId=1&endDate=2030-01-01T14:00:00
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{admin_token}}
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response has status field", function() {
+    expect(res.body).to.have.property('status');
+  });
+
+  test("Response has message", function() {
+    expect(res.body).to.have.property('message');
+  });
+}

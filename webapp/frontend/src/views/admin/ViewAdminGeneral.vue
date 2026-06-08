@@ -9,6 +9,9 @@
 </template>
 
 <script>
+  /**
+   * View wrapper for the admin general settings page. Renders PageAdminGeneral inside LayoutApp.
+   */
   import LayoutApp from '/src/layouts/LayoutApp'
   import PageAdminGeneral from '/src/pages/admin/PageAdminGeneral'
 

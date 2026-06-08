@@ -1,22 +1,31 @@
 <template>
-  <v-form ref="form">
+  <v-form ref="form" v-model="formValid">
     <v-dialog v-model="isOpen" persistent max-width="900px">
       <v-card>
         <v-card-text v-if="item">
           <v-container>
             <v-row>
               <v-col cols="12" style="margin-bottom: 15px;">
-                <h2 class="title" v-if="isCreatingNew">Create new User</h2>
-                <h2 class="title" v-else>Edit User</h2>
+                <h2 v-if="isCreatingNew">Create new User</h2>
+                <h2 v-else>Edit User</h2>
+              </v-col>
+
+              <!-- NAME -->
+              <v-col cols="12">
+                <v-text-field
+                  type="text"
+                  v-model="data.name"
+                  label="Name">
+                </v-text-field>
               </v-col>
 
               <!-- EMAIL -->
               <v-col cols="12">
-                <v-text-field 
-                  type="text" 
-                  id="email" 
-                  :rules="[rules.required, rules.email]" 
-                  v-model="data.email" 
+                <v-text-field
+                  type="text"
+                  id="email"
+                  :rules="[rules.required, rules.email]"
+                  v-model="data.email"
                   label="Email*">
                 </v-text-field>
               </v-col>
@@ -41,7 +50,7 @@
                   @change="onClearPasswordChange"
                 ></v-checkbox>
                 <p class="text-caption mt-2 mb-0">
-                  <v-icon small class="mr-1">mdi-alert</v-icon>
+                  <v-icon size="small" class="mr-1">mdi-alert</v-icon>
                   Warning: If password is cleared, the user can only login when LDAP authentication is enabled.
                 </p>
               </v-col>
@@ -68,8 +77,8 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="red" text @click="closeDialog">Cancel</v-btn>
-          <v-btn color="blue" text @click="submit" :disabled="isSubmitting">
+          <v-btn color="red" variant="text" @click="closeDialog">Cancel</v-btn>
+          <v-btn color="blue" variant="text" @click="submit" :disabled="isSubmitting || !formValid">
             <span v-if="isCreatingNew">Add User</span>
             <span v-else>Save User</span>
           </v-btn>
@@ -80,10 +89,27 @@
 </template>
 
 <script>
-const axios = require('axios').default;
+/**
+ * Modal dialog for creating or editing a user account.
+ * Provides fields for email, password, and role assignment. When editing,
+ * admins can also clear the user's password (useful when LDAP auth is enabled).
+ * Fetches available roles from the backend and filters out the built-in "everyone" role.
+ *
+ * Props:
+ *   propData - The user ID to edit, or "new" to create a new user.
+ *
+ * Emits:
+ *   emitModalClose - When the modal is closed (after save or cancel).
+ */
+import axios from 'axios';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: "AdminManageUserModal",
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
   props: {
     propData: [Number, String], // Contains the ID of the user to edit, or "new" if creating new
   },
@@ -92,6 +118,7 @@ export default {
       item: this.propData,
       data: { roles: [] },
       availableRoles: [],
+      formValid: false,
       isCreatingNew: false,
       isOpen: true,
       isFetching: true,
@@ -140,7 +167,7 @@ export default {
       let userId = this.item === "new" ? -1 : this.item;
 
       let _this = this;
-      let currentUser = this.$store.getters.user;
+      let currentUser = this.store.user;
 
       // Add clearPassword flag to the data if checkbox is checked
       const submitData = { ...this.data };
@@ -150,36 +177,36 @@ export default {
 
       axios({
         method: "post",
-        url: this.AppSettings.APIServer.admin.save_user,
+        url: this.$appSettings.APIServer.admin.save_user,
         data: { userId: userId, data: submitData },
         headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
       })
       .then(function(response) {
         if (response.data.status === true) {
           _this.closeDialog();
-          _this.$store.commit('showMessage', { text: "User saved successfully", color: "green" });
+          _this.store.showMessage({ text: "User saved successfully", color: "green" });
         } else {
-          _this.$store.commit('showMessage', { text: response.data.message, color: "red" });
+          _this.store.showMessage({ text: response.data.message, color: "red" });
         }
         _this.isSubmitting = false;
       })
       .catch(function(error) {
         if (error.response && (error.response.status === 400 || error.response.status === 401)) {
-          _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          _this.store.showMessage({ text: error.response.data.detail, color: "red" });
         } else {
           console.log(error);
-          _this.$store.commit('showMessage', { text: "Unknown error while trying to save user", color: "red" });
+          _this.store.showMessage({ text: "Unknown error while trying to save user", color: "red" });
         }
         _this.isSubmitting = false;
       });
     },
     fetchData() {
       let _this = this;
-      let currentUser = this.$store.getters.user;
+      let currentUser = this.store.user;
 
       axios({
         method: "get",
-        url: this.AppSettings.APIServer.admin.get_user,
+        url: this.$appSettings.APIServer.admin.get_user,
         params: { userId: this.item },
         headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
       })
@@ -192,16 +219,16 @@ export default {
           }
         } else {
           console.log("Failed getting user...");
-          _this.$store.commit('showMessage', { text: "There was an error getting user information", color: "red" });
+          _this.store.showMessage({ text: "There was an error getting user information", color: "red" });
         }
         _this.isFetching = false;
       })
       .catch(function(error) {
         if (error.response && (error.response.status === 400 || error.response.status === 401)) {
-          _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+          _this.store.showMessage({ text: error.response.data.detail, color: "red" });
         } else {
           console.log(error);
-          _this.$store.commit('showMessage', { text: "Unknown error while trying to get user information", color: "red" });
+          _this.store.showMessage({ text: "Unknown error while trying to get user information", color: "red" });
         }
         _this.isFetching = false;
       });
@@ -213,12 +240,13 @@ export default {
       return name;
     },
 
+    /** Fetches all roles from the backend and filters out the "everyone" built-in role. */
     fetchRoles() {
-      let currentUser = this.$store.getters.user;
-      
+      let currentUser = this.store.user;
+
       axios({
         method: "get",
-        url: this.AppSettings.APIServer.admin.get_roles,
+        url: this.$appSettings.APIServer.admin.get_roles,
         headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
       })
       .then(response => {
@@ -226,12 +254,12 @@ export default {
           // Filter out the "everyone" role since all users belong to it automatically
           this.availableRoles = response.data.data.roles.filter(role => role.name !== "everyone");
         } else {
-          this.$store.commit('showMessage', { text: "Failed to fetch roles", color: "red" });
+          this.store.showMessage({ text: "Failed to fetch roles", color: "red" });
         }
       })
       .catch(error => {
         console.error(error);
-        this.$store.commit('showMessage', { text: "Error fetching roles", color: "red" });
+        this.store.showMessage({ text: "Error fetching roles", color: "red" });
       });
     }
   },
@@ -248,10 +276,6 @@ export default {
 <style scoped lang="scss">
 .title {
   margin-top: 40px;
-}
-
-.help-text {
-  margin-top: -7px;
 }
 
 .roles-container {

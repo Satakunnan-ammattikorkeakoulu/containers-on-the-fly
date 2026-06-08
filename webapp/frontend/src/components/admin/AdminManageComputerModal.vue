@@ -1,6 +1,6 @@
 <template>
   <v-form ref="form">
-    <v-dialog v-model="isOpen" persistent max-width="900px">
+    <v-dialog v-model="isOpen" persistent max-width="1100px">
       <v-card>
         <v-card-text v-if="item">
           <v-container>
@@ -12,46 +12,186 @@
 
               <!-- PUBLIC? -->
               <v-col cols="12">
-                <v-checkbox type="text" v-model="data.public" label="Public"></v-checkbox>
+                <v-switch v-model="data.public" :label="data.public ? 'Public' : 'Not Public'" :color="data.public ? 'success' : 'error'" :base-color="data.public ? '' : 'error'" hide-details></v-switch>
+                <p class="help-text" style="margin-top: 8px;">When public, all users can see and reserve from this computer. When not public, only administrators can use it for testing.</p>
               </v-col>
               <!-- NAME -->
               <v-col cols="12">
-                <v-text-field type="text" id="name" :rules="[rules.required]" v-model="data.name" label="Name*"></v-text-field>
-                <p class="help-text">Visible in the reservation computer dropdown listing.</p>
+                <v-text-field type="text" id="name" :rules="[rules.required, rules.computerName]" v-model="data.name" label="Name*"></v-text-field>
+                <p class="help-text">Visible in the reservation dropdown. Must exactly match the DOCKER_SERVER_NAME setting in the container server's <code>user_config/settings</code> file. Only letters, numbers, dots, underscores, and hyphens allowed.</p>
               </v-col>
               <!-- IP -->
               <v-col cols="12">
-                <v-text-field type="text" :rules="[rules.required]" v-model="data.ip" label="IP address / Address*"></v-text-field>
-                <p class="help-text">IP address / address of the computer. This will be used to instruct users to access the server using this address. For example: aiserver1.samk.fi</p>
+                <v-text-field type="text" :rules="[rules.required]" v-model="data.ip" label="IP Address / Domain*"></v-text-field>
+                <p class="help-text">IP address or domain of the computer. This will be used to instruct users to access the server using this address. For example: 192.168.1.100 or aiserver1.samk.fi</p>
               </v-col>
               <!-- vCPUs -->
               <v-col cols="12">
                 <h2 style="margin-bottom: 20px; margin-top: 40px;">vCPUs</h2>
-                <p class="help-text">Write the minimum amount of reservable vCPUs, maximum and the default selected for the user. This should be just an integer number for each, like: 3.</p>
+                <p class="help-text">Configure vCPU limits for this server. Integer values, e.g. 3. Hover the field icons for details.</p>
                 <v-row>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.minimumAmount" label="minimum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmount" label="maximum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.defaultAmountForUser" label="default*"></v-text-field></v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmount" label="Total on server*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The total vCPUs physically available on this server. Hard ceiling — no user or role can exceed it.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.minimumAmount" label="Minimum per reservation*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The smallest number of vCPUs a user can request in one reservation. Prevents wasteful tiny slices.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.defaultAmountForUser" label="Default for user*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The vCPU amount pre-selected on the reserve page when a user opens it. A reasonable starting point for most reservations.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                </v-row>
+                <v-row class="mt-n3">
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmountForUser" label="Maximum per user (normal)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest number of vCPUs one user can request in a single normal reservation. Role-level overrides can raise this further.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.cpu.maximumAmountForUserLowPriority" label="Maximum per user (low-priority)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest number of vCPUs one user can request in a single low-priority reservation. Usually set higher than the normal cap since low-priority reservations may be paused when resources are needed by others.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
                 </v-row>
               </v-col>
               <!-- RAM -->
               <v-col cols="12">
                 <h2 style="margin-bottom: 20px; margin-top: 40px;">Ram Memory</h2>
-                <p class="help-text">Write the minimum amount of reservable RAM memory amount (in GBs), maximum and the default selected for the user. This should be just an integer number for each, like: 256.</p>
+                <p class="help-text">Configure RAM limits (in GB) for this server. Integer values, e.g. 256. Hover the field icons for details.</p>
                 <v-row>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.minimumAmount" label="minimum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmount" label="maximum*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.defaultAmountForUser" label="default for user*"></v-text-field></v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmount" label="Total on server*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The total RAM (in GB) physically available on this server. Hard ceiling — no user or role can exceed it.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.minimumAmount" label="Minimum per reservation*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The smallest amount of RAM (in GB) a user can request in one reservation. Prevents wasteful tiny slices.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="4">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.defaultAmountForUser" label="Default for user*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The RAM amount (in GB) pre-selected on the reserve page when a user opens it. A reasonable starting point for most reservations.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                </v-row>
+                <v-row class="mt-n3">
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmountForUser" label="Maximum per user (normal)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest amount of RAM (in GB) one user can request in a single normal reservation. Role-level overrides can raise this further.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.ram.maximumAmountForUserLowPriority" label="Maximum per user (low-priority)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest amount of RAM (in GB) one user can request in a single low-priority reservation. Usually set higher than the normal cap since low-priority reservations may be paused when resources are needed by others.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
                 </v-row>
               </v-col>
               <!-- GPU Max -->
               <v-col cols="12">
                 <h2 style="margin-bottom: 20px; margin-top: 40px;">GPU</h2>
-                <p class="help-text">Write the maximum amount of GPUs that user can reserve in integer. For example: 2</p>
+                <p class="help-text">Configure per-user GPU caps for this server. Integer values, e.g. 2. Hover the field icons for details.</p>
                 <v-row>
-                  <v-col cols="3"><v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.gpu.maximumAmountForUser" label="maximum for user*"></v-text-field></v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.gpu.maximumAmountForUser" label="Maximum per user (normal)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest number of GPUs one user can request in a single normal reservation.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field type="text" :rules="[rules.requiredNumber]" v-model="data.hardware.gpu.maximumAmountForUserLowPriority" label="Maximum per user (low-priority)*">
+                      <template v-slot:append-inner>
+                        <v-tooltip location="bottom">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                          </template>
+                          <span>The largest number of GPUs one user can request in a single low-priority reservation. Usually set higher than the normal cap since low-priority reservations may be paused when the GPUs are needed.</span>
+                        </v-tooltip>
+                      </template>
+                    </v-text-field>
+                  </v-col>
                 </v-row>
               </v-col>
               <!-- GPUs -->
@@ -70,7 +210,7 @@
                         <v-text-field type="text" v-model="gpu.format" :rules="[rules.required]" label="Name"></v-text-field>
                       </v-col>
                       <v-col cols="12" md="4">
-                        <v-btn color="red" text @click="removeGPU(index)">Remove</v-btn>
+                        <v-btn color="red" variant="text" @click="removeGPU(index)">Remove</v-btn>
                       </v-col>
                     </v-row>
                   </v-col>
@@ -84,8 +224,8 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="red" text @click="closeDialog">Cancel</v-btn>
-          <v-btn color="blue" text @click="submit"><span v-if="isCreatingNew">Add Computer</span><span v-else>Save Computer</span></v-btn>
+          <v-btn color="red" variant="text" @click="closeDialog">Cancel</v-btn>
+          <v-btn color="blue" variant="text" @click="submit"><span v-if="isCreatingNew">Add Computer</span><span v-else>Save Computer</span></v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -93,11 +233,27 @@
 </template>
 
 <script>
-  const axios = require('axios').default;
+  /**
+   * Modal dialog for creating or editing a container server (computer).
+   * Allows admins to configure the server's name, IP address, public visibility,
+   * and hardware specs (vCPUs, RAM, GPU count, and individual GPU entries with CUDA IDs).
+   *
+   * Props:
+   *   propData - The computer ID to edit, or "new" to create a new computer.
+   *
+   * Emits:
+   *   emitModalClose - When the modal is closed (after save or cancel).
+   */
+  import axios from 'axios';
+  import { useMainStore } from '@/store/store'
   //import Loading from '/src/components/global/Loading.vue';
 
   export default {
     name: "AdminManageComputerModal",
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     props: {
       propData: [ Number, String ], // Contains the ID of the computer to edit, or "new" if creating new
     },
@@ -114,6 +270,7 @@
         dataName: "computer",
         rules: {
           required: value => !!value || "Required",
+          computerName: value => !value || /^[a-zA-Z0-9._-]+$/.test(value) || "Only letters, numbers, dots, underscores, and hyphens allowed.",
           requiredNumber: value => value !== '' && value !== null && value !== undefined || "Required",
           newPassword: value => {
             if (!value || value == "" || value.trim() == "") return "Password cannot be empty.";
@@ -147,8 +304,8 @@
       addGPU() {
         this.data.hardware.gpus.push({ format: "", internalId: "" });
       },
+      /** Removes a GPU entry and tracks its ID for backend deletion if it was already persisted. */
       removeGPU(index) {
-        // Mark the gpu for removal if it also contained hardwareSpecId, thus it was already in the database
         if (this.data.hardware.gpus[index].hardwareSpecId) {
           this.removedGPUs.push(this.data.hardware.gpus[index].hardwareSpecId);
         }
@@ -165,11 +322,11 @@
         data.removedGPUs = this.removedGPUs;
 
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_computer,
+          url: this.$appSettings.APIServer.admin.save_computer,
           data: { computerId: computerId, data: data },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -183,29 +340,29 @@
             // Fail
             else {
               console.log("Failed saving "+_this.dataName+" information...")
-              _this.$store.commit('showMessage', { text: "There was an error saving "+_this.dataName+" information.", color: "red" })
+              _this.store.showMessage({ text: "There was an error saving "+_this.dataName+" information.", color: "red" })
             }
             _this.isSubmitting = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to save "+_this.dataName+" information.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to save "+_this.dataName+" information.", color: "red" })
             }
             _this.isSubmitting = false
         });
       },
       fetchData() {
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_computer,
+          url: this.$appSettings.APIServer.admin.get_computer,
           params: { computerId: this.item },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -218,18 +375,18 @@
             // Fail
             else {
               console.log("Failed getting "+_this.dataName+"...")
-              _this.$store.commit('showMessage', { text: "There was an error getting "+_this.dataName+".", color: "red" })
+              _this.store.showMessage({ text: "There was an error getting "+_this.dataName+".", color: "red" })
             }
             _this.isFetching = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to get "+_this.dataName+".", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to get "+_this.dataName+".", color: "red" })
             }
             _this.isFetching = false
         });
@@ -252,8 +409,5 @@
     margin-top: 40px;
   }
 
-  .help-text {
-    margin-top: -7px;
-  }
 
 </style>

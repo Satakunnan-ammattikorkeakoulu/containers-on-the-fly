@@ -1,14 +1,13 @@
 <!--
-  Global snackbar component. Hooked to vuex store.
-  Use with: this.$store.commit("showMessage", { text: "", color: "" });
+  Global snackbar component. Hooked to Pinia store.
+  Use with: store.showMessage({ text: "", color: "" });
 -->
 <template>
   <v-snackbar
     v-model="snackbar.visible"
     :timeout="snackbar.timeout"
     :color="snackbar.color"
-    :bottom="true"
-    :right="true"
+    location="bottom end"
     :multi-line="snackbar.multiline === true">
       {{ snackbar.text }}  
       <v-btn v-if="snackbar.close" dark @click="closeMessage">Close</v-btn>
@@ -16,15 +15,24 @@
 </template>
 
 <script>
-  import { mapMutations } from "vuex"
+  /**
+   * Global snackbar notification driven by the Pinia store's snackbar state.
+   */
+  import { useMainStore } from '@/store/store'
   export default {
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     computed: {
       snackbar() {
-        return this.$store.state.snackbar
+        return this.store.snackbar
       }
     },
     methods: {
-      ...mapMutations(["closeMessage"])
+      closeMessage() {
+        this.store.closeMessage()
+      }
     }
   }
 </script>

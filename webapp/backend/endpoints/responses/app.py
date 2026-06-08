@@ -1,30 +1,50 @@
-from helpers.server import Response
+"""Response handlers for public application endpoints.
 
-def getPublicConfig() -> object:
-    '''
-    Returns public app configuration that doesn't require authentication.
-    This includes app info, reservation limits, instruction messages, etc.
-    
+Provides configuration data that is accessible without authentication,
+such as application name, timezone, login instructions, and contact info.
+"""
+
+from helpers.server import api_response
+from helpers.logger import log
+
+def get_public_config() -> object:
+    """Return public app configuration that does not require authentication.
+
+    Retrieves application name, timezone, instruction messages, and contact
+    information from database settings and returns them in a structured format
+    for the frontend login and reservation pages.
+
     Returns:
-        object: Response object with public configuration data.
-    '''
+        Response object with public configuration data including app info,
+        instruction texts, and login field labels.
+    """
     try:
-        from settings_handler import getMultipleSettings
+        from helpers.settings_handler import get_multiple_settings
         
         # Define public settings keys that don't require admin access
         setting_keys = [
             'general.applicationName',
             'general.timezone',
             'instructions.login',
-            'instructions.reservation', 
+            'instructions.reservation',
             'instructions.email',
             'instructions.usernameFieldLabel',
             'instructions.passwordFieldLabel',
-            'email.contactEmail'
+            'email.sendEmail',
+            'email.contactEmail',
+            'analytics.rybbitUrl',
+            'analytics.rybbitSiteId',
+            'analytics.googleAnalyticsId',
+            'legal.enabled',
+            'features.startScriptsEnabled',
+            'features.stopScriptsEnabled',
+            'features.sshKeysEnabled',
+            'features.startScriptTimeoutSeconds',
+            'features.stopScriptTimeoutSeconds'
         ]
         
         # Get settings from database
-        settings_dict = getMultipleSettings(setting_keys)
+        settings_dict = get_multiple_settings(setting_keys)
         
         # Build response with public configuration
         config_data = {
@@ -42,13 +62,31 @@ def getPublicConfig() -> object:
             },
             "login": {
                 "loginText": "Login with your credentials.",
-                "usernameField": "Username", 
+                "usernameField": "Username",
                 "passwordField": "Password"
+            },
+            "email": {
+                "enabled": settings_dict.get('email.sendEmail', False)
+            },
+            "analytics": {
+                "rybbitUrl": settings_dict.get('analytics.rybbitUrl', ''),
+                "rybbitSiteId": settings_dict.get('analytics.rybbitSiteId', ''),
+                "googleAnalyticsId": settings_dict.get('analytics.googleAnalyticsId', '')
+            },
+            "legal": {
+                "enabled": settings_dict.get('legal.enabled', False)
+            },
+            "features": {
+                "startScriptsEnabled": settings_dict.get('features.startScriptsEnabled', True),
+                "stopScriptsEnabled": settings_dict.get('features.stopScriptsEnabled', True),
+                "sshKeysEnabled": settings_dict.get('features.sshKeysEnabled', True),
+                "startScriptTimeoutSeconds": settings_dict.get('features.startScriptTimeoutSeconds', 40),
+                "stopScriptTimeoutSeconds": settings_dict.get('features.stopScriptTimeoutSeconds', 40),
             }
         }
         
-        return Response(True, "Public configuration retrieved successfully", config_data)
+        return api_response(True, "Public configuration retrieved successfully", config_data)
         
     except Exception as e:
-        print(f"Error retrieving application settings: {str(e)}")
-        return Response(False, f"Error retrieving public configurations")
+        log.error(f"Error retrieving application settings: {str(e)}")
+        return api_response(False, f"Error retrieving public configurations")

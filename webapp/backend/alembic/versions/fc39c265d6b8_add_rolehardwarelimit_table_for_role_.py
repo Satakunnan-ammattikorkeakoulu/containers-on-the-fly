@@ -1,4 +1,11 @@
-"""Add RoleHardwareLimit table for role-based hardware limits
+"""Add RoleHardwareLimit table for role-based hardware limits.
+
+Create the RoleHardwareLimit table to cap the amount of a specific hardware
+resource (e.g. GPUs, CPU cores) that users of a given role may request. Each
+row pairs a Role with a HardwareSpec and an optional maximumAmountForRole
+value. A unique constraint on (roleId, hardwareSpecId) prevents duplicate
+entries. Cascade deletes are configured on both foreign keys so that
+removing a role or hardware spec automatically cleans up related limits.
 
 Revision ID: fc39c265d6b8
 Revises: f3664bf56eff
@@ -19,7 +26,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Upgrade schema."""
+    """Create the RoleHardwareLimit table with foreign keys to Role and HardwareSpec."""
     # Create RoleHardwareLimit table
     op.create_table(
         'RoleHardwareLimit',
@@ -39,6 +46,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Downgrade schema."""
+    """Drop the RoleHardwareLimit table and its indexes and foreign keys."""
     # Drop table (this will also drop all indexes and foreign keys)
     op.drop_table('RoleHardwareLimit')

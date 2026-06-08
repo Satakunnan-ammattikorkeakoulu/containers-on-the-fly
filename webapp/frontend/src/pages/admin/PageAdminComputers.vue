@@ -3,8 +3,8 @@
 
     <v-row class="text-center">
       <v-col cols="12">
-        <h4>Admin</h4>
-        <h2>All Computers (Container Servers)</h2>
+        <h4 class="m-0">Admin</h4>
+        <h2 class="m-0">All Computers (Container Servers)</h2>
       </v-col>
     </v-row>
 
@@ -25,6 +25,7 @@
             v-bind:propMonitoringData="monitoringData"
             v-bind:propActiveServers="activeServers"
             v-bind:propLastUpdateTime="lastUpdateTime"
+            v-bind:propOnlineThresholdMinutes="onlineThresholdMinutes"
           />
         </div>
         <p v-else class="dim text-center">No computers.</p>
@@ -40,13 +41,25 @@
 </template>
 
 <script>
-  const axios = require('axios').default;
+  /**
+   * Admin page for managing container servers (computers).
+   * Lists all registered servers with their status, provides CRUD operations
+   * via a modal dialog, and polls server monitoring data (metrics, logs, version)
+   * to display health status and last-update timestamps.
+   */
+  import axios from 'axios';
   import Loading from '/src/components/global/Loading.vue';
   import AdminComputersTable from '/src/components/admin/AdminComputersTable.vue';
   import AdminManageComputerModal from '/src/components/admin/AdminManageComputerModal.vue';
-  
+  import { useMainStore } from '@/store/store'
+
   export default {
     name: 'PageAdminComputers',
+
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
 
     components: {
     Loading,
@@ -66,6 +79,7 @@
       monitoringData: {},
       activeServers: {},
       lastUpdateTime: {},
+      onlineThresholdMinutes: 7,
     }),
     mounted () {
       this.isFetching = true
@@ -88,19 +102,24 @@
         this.selectedItem = computerId;
         this.dialog = true;
       },
-      removeComputer(computerId) {
-        let result = window.confirm("Do you really want to remove the computer? It will be marked as removed in the database and as not public anymore.")
+      async removeComputer(computerId) {
+        let result = await this.store.showConfirmDialog({
+          title: 'Remove Computer',
+          message: 'Do you really want to remove the computer? It will be marked as removed in the database and as not public anymore.',
+          confirmText: 'Remove',
+          confirmColor: 'red',
+        })
         if (!result) return
         let params = {
           "computerId": computerId,
         }
 
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.remove_computer,
+          url: this.$appSettings.APIServer.admin.remove_computer,
           params: params,
           headers: {
             "Authorization" : `Bearer ${currentUser.loginToken}`
@@ -110,7 +129,7 @@
           //console.log(response)
             // Success
             if (response.data.status == true) {
-              _this.$store.commit('showMessage', { text: "Computer removed.", color: "green" })
+              _this.store.showMessage({ text: "Computer removed.", color: "green" })
               _this.fetch()
             }
             // Fail
@@ -118,17 +137,17 @@
               console.log("Failed removing computer...")
               console.log(response)
               let msg = response && response.data && response.data.message ? response.data.message : "There was an error removing the container."
-              _this.$store.commit('showMessage', { text: msg, color: "red" })
+              _this.store.showMessage({ text: msg, color: "red" })
             }
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
         });
       },
@@ -138,11 +157,11 @@
       },
       fetch() {
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_computers,
+          url: this.$appSettings.APIServer.admin.get_computers,
           //params: { }
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
@@ -151,24 +170,27 @@
             // Success
             if (response.data.status == true) {
               _this.data = response.data.data[_this.tableName]
+              if (typeof response.data.data.onlineThresholdMinutes === "number") {
+                _this.onlineThresholdMinutes = response.data.data.onlineThresholdMinutes
+              }
               // Check server status after data is loaded
               _this.checkServerStatus()
             }
             // Fail
             else {
               console.log("Failed getting "+_this.tableName+"...")
-              _this.$store.commit('showMessage', { text: "There was an error getting "+_this.tableName+".", color: "red" })
+              _this.store.showMessage({ text: "There was an error getting "+_this.tableName+".", color: "red" })
             }
             _this.isFetching = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to get "+_this.tableName+".", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to get "+_this.tableName+".", color: "red" })
             }
             _this.isFetching = false
         });
@@ -176,12 +198,17 @@
         this.isFetching = false
       },
       
+      /**
+       * Polls each server's monitoring endpoint to determine active/inactive status.
+       * A server is considered active if its last data update was within the
+       * ``docker.serverOnlineThresholdMinutes`` setting returned by get_computers.
+       */
       async checkServerStatus() {
         // Get monitoring data for all servers to check their status
         if (!this.data || this.data.length === 0) return;
         
         let _this = this;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
         
         // Clear previous active status but don't clear lastUpdateTime
         this.activeServers = {};
@@ -191,7 +218,7 @@
           try {
             const response = await axios({
               method: "get",
-              url: `${this.AppSettings.APIServer.admin.get_server_monitoring}/${server.computerId}/monitoring`,
+              url: `${this.$appSettings.APIServer.admin.get_server_monitoring}/${server.computerId}/monitoring`,
               headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
             });
             
@@ -227,41 +254,46 @@
               
               // Store the last update time
               if (lastUpdated) {
-                _this.$set(_this.lastUpdateTime, server.computerId, lastUpdated);
-                
-                // Consider active if data is less than 7 minutes old
+                _this.lastUpdateTime[server.computerId] = lastUpdated;
+
+                // Consider active if data is within the configured threshold
                 const timeDiff = Date.now() - lastUpdated;
-                
-                if (timeDiff < 7 * 60 * 1000) {
-                  _this.$set(_this.activeServers, server.computerId, true);
+
+                if (timeDiff < _this.onlineThresholdMinutes * 60 * 1000) {
+                  _this.activeServers[server.computerId] = true;
                 }
               }
               
               // Even if no timestamp, if we got data, the server responded
               // So we can consider it active
               if (!lastUpdated && response.data.data.metrics) {
-                _this.$set(_this.activeServers, server.computerId, true);
-                _this.$set(_this.lastUpdateTime, server.computerId, Date.now());
+                _this.activeServers[server.computerId] = true;
+                _this.lastUpdateTime[server.computerId] = Date.now();
               }
             }
-          } catch (error) {
+          } catch {
             // Server is not responding or has no monitoring data
             // Don't update lastUpdateTime if the request failed
           }
         }
       },
       
+      /**
+       * Fetches detailed monitoring data (metrics, logs, version) for a single server.
+       * Called on-demand when an admin expands a server's monitoring panel.
+       * @param {number} computerId - The server to fetch monitoring data for
+       */
       async fetchMonitoringData(computerId) {
         let _this = this;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
         
         // Set loading state for this server
-        this.$set(this.monitoringData, computerId, { loading: true });
+        this.monitoringData[computerId] = { loading: true };
         
         try {
           const response = await axios({
             method: "get",
-            url: `${this.AppSettings.APIServer.admin.get_server_monitoring}/${computerId}/monitoring`,
+            url: `${this.$appSettings.APIServer.admin.get_server_monitoring}/${computerId}/monitoring`,
             headers: {"Authorization": `Bearer ${currentUser.loginToken}`}
           });
           
@@ -269,7 +301,7 @@
             const data = response.data.data;
             
             // Update monitoring data for this server
-            _this.$set(_this.monitoringData, computerId, {
+            _this.monitoringData[computerId] = {
               loading: false,
               metrics: data.metrics || {
                 cpu: { usage: null, cores: null },
@@ -286,7 +318,7 @@
               },
               version: data.version || { software: null, updated: null },
               lastUpdated: data.metrics?.lastUpdated ? new Date(data.metrics.lastUpdated + 'Z') : null
-            });
+            };
             
             // Update active status and last update time
             let lastUpdated = null;
@@ -316,39 +348,39 @@
             }
             
             if (lastUpdated) {
-              _this.$set(_this.lastUpdateTime, computerId, lastUpdated);
+              _this.lastUpdateTime[computerId] = lastUpdated;
               const timeDiff = Date.now() - lastUpdated;
-              if (timeDiff < 7 * 60 * 1000) {
-                _this.$set(_this.activeServers, computerId, true);
+              if (timeDiff < _this.onlineThresholdMinutes * 60 * 1000) {
+                _this.activeServers[computerId] = true;
               }
             } else if (data.metrics) {
               // Even if no timestamp, if we got data, the server responded
-              _this.$set(_this.activeServers, computerId, true);
-              _this.$set(_this.lastUpdateTime, computerId, Date.now());
+              _this.activeServers[computerId] = true;
+              _this.lastUpdateTime[computerId] = Date.now();
             }
           } else {
             // No data available
-            _this.$set(_this.monitoringData, computerId, {
+            _this.monitoringData[computerId] = {
               loading: false,
               metrics: null,
               logs: null,
               version: null,
               lastUpdated: null
-            });
+            };
           }
-        } catch (error) {
+        } catch {
           // Failed to fetch monitoring data
-          _this.$set(_this.monitoringData, computerId, {
+          _this.monitoringData[computerId] = {
             loading: false,
             metrics: null,
             logs: null,
             version: null,
             lastUpdated: null
-          });
+          };
         }
       }
     },
-    beforeDestroy() {
+    beforeUnmount() {
       clearInterval(this.intervalFetch)
       clearInterval(this.intervalMonitoring)
     },

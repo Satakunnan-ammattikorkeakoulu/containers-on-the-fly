@@ -1,7 +1,7 @@
 <template>
   <v-dialog v-model="isOpen" persistent max-width="800px">
     <v-card>
-      <v-card-title>
+      <v-card-title class="pt-6">
         <span class="headline">Reservation Limits - {{ roleName }}</span>
       </v-card-title>
       
@@ -15,7 +15,7 @@
           <div class="text-body-2">
             <strong>Reservation Limits</strong> allow you to customize reservation duration and count limits for users with this role.
           </div>
-          <div class="mt-2 text-caption grey--text">
+          <div class="mt-2 text-caption" style="color: rgba(255, 255, 255, 0.75);">
             Note: Users will inherit the highest limits from all their assigned roles.
           </div>
         </v-alert>
@@ -55,8 +55,8 @@
                 >
                   <template v-slot:append>
                     <v-tooltip bottom>
-                      <template v-slot:activator="{ on }">
-                        <v-icon v-on="on" small>mdi-information-outline</v-icon>
+                      <template v-slot:activator="{ props }">
+                        <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
                       </template>
                       <span>Minimum hours a user can reserve a container</span>
                     </v-tooltip>
@@ -70,7 +70,6 @@
                   type="number"
                   label="Maximum Duration (hours)"
                   :min="reservationLimits.minDuration || 1"
-                  :max="1440"
                   outlined
                   dense
                   required
@@ -78,13 +77,50 @@
                 >
                   <template v-slot:append>
                     <v-tooltip bottom>
-                      <template v-slot:activator="{ on }">
-                        <v-icon v-on="on" small>mdi-information-outline</v-icon>
+                      <template v-slot:activator="{ props }">
+                        <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
                       </template>
-                      <span>Maximum hours a user can reserve a container (up to 60 days)</span>
+                      <span>Maximum hours a user can reserve a container. No upper bound — set a large value for persistent workloads (e.g. web servers).</span>
                     </v-tooltip>
                   </template>
                 </v-text-field>
+              </v-col>
+
+              <v-col cols="12" md="6">
+                <v-text-field
+                  v-model.number="reservationLimits.lowPriorityMaxDuration"
+                  type="number"
+                  label="Low-priority Maximum Duration (hours)"
+                  :min="1"
+                  outlined
+                  dense
+                  clearable
+                  placeholder="Inherits Maximum Duration when blank"
+                  :rules="lowPriorityMaxDurationRules"
+                  :disabled="!reservationLimits.allowLowPriority"
+                >
+                  <template v-slot:append>
+                    <v-tooltip bottom>
+                      <template v-slot:activator="{ props }">
+                        <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
+                      </template>
+                      <span>Maximum hours a user can reserve a low-priority container. Leave blank to inherit the normal Maximum Duration.</span>
+                    </v-tooltip>
+                  </template>
+                </v-text-field>
+              </v-col>
+
+              <v-col cols="12">
+                <v-switch
+                  v-model="reservationLimits.allowLowPriority"
+                  color="success"
+                  density="compact"
+                  hide-details
+                  label="Allow low-priority reservations for users in this role"
+                ></v-switch>
+                <p class="text-caption text-medium-emphasis mt-1" style="line-height: 1.3;">
+                  When disabled, users whose only roles all have this off cannot create low-priority reservations. Disable on the built-in "everyone" role to restrict the feature to specific roles only. Users inherit the most permissive setting across all their roles.
+                </p>
               </v-col>
             </v-row>
 
@@ -113,8 +149,8 @@
                 >
                   <template v-slot:append>
                     <v-tooltip bottom>
-                      <template v-slot:activator="{ on }">
-                        <v-icon v-on="on" small>mdi-information-outline</v-icon>
+                      <template v-slot:activator="{ props }">
+                        <v-icon v-bind="props" size="small">mdi-information-outline</v-icon>
                       </template>
                       <span>Maximum number of active (reserved or started) reservations a user can have</span>
                     </v-tooltip>
@@ -129,10 +165,10 @@
 
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn color="blue darken-1" text @click="close">Cancel</v-btn>
-        <v-btn 
-          color="blue darken-1" 
-          text 
+        <v-btn color="blue darken-1" variant="text" @click="close">Cancel</v-btn>
+        <v-btn
+          color="blue darken-1"
+          variant="text"
           @click="save" 
           :loading="isSubmitting"
           :disabled="!isValid"
@@ -145,11 +181,28 @@
 </template>
 
 <script>
-const axios = require('axios').default;
+/**
+ * Modal dialog for configuring per-role reservation limits.
+ * Allows admins to set minimum/maximum reservation duration (in hours)
+ * and the maximum number of concurrent active reservations for users in this role.
+ *
+ * Props:
+ *   roleId   - The ID of the role being configured.
+ *   roleName - The display name of the role (shown in the header).
+ *
+ * Emits:
+ *   emitModalClose - When the modal is closed; passes true on successful save.
+ */
+import axios from 'axios';
 import Loading from '../global/Loading.vue';
+import { useMainStore } from '@/store/store'
 
 export default {
   name: "AdminRoleReservationLimitsModal",
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
   components: {
     Loading
   },
@@ -171,13 +224,15 @@ export default {
       reservationLimits: {
         minDuration: null,
         maxDuration: null,
+        lowPriorityMaxDuration: null,
+        allowLowPriority: true,
         maxActiveReservations: null
       }
     }
   },
   computed: {
+    /** Returns false if minDuration exceeds maxDuration, preventing invalid saves. */
     isValid() {
-      // Check if min/max duration relationship is valid
       if (this.reservationLimits.minDuration !== null && this.reservationLimits.maxDuration !== null) {
         if (this.reservationLimits.minDuration > this.reservationLimits.maxDuration) {
           return false;
@@ -185,6 +240,7 @@ export default {
       }
       return true;
     },
+    /** Validation rules for minimum duration: required, 1-720 hours, must not exceed max. */
     minDurationRules() {
       return [
         v => !!v || v === 0 || 'This field is required',
@@ -197,10 +253,11 @@ export default {
         }
       ];
     },
+    /** Validation rules for maximum duration: required, at least 1 hour, must not be below min. No upper bound so persistent workloads are possible. */
     maxDurationRules() {
       return [
         v => !!v || v === 0 || 'This field is required',
-        v => (v >= 1 && v <= 1440) || 'Must be between 1 and 1440 hours (60 days)',
+        v => v >= 1 || 'Must be at least 1 hour',
         v => {
           if (this.reservationLimits.minDuration !== null && this.reservationLimits.minDuration !== '') {
             return v >= this.reservationLimits.minDuration || 'Must be greater than or equal to min duration';
@@ -214,6 +271,15 @@ export default {
         v => v !== null && v !== '' && v !== undefined || 'This field is required',
         v => (v >= 0 && v <= 99) || 'Must be between 0 and 99'
       ];
+    },
+    /** Validation rules for low-priority max duration: optional (null inherits), at least 1 hour. No upper bound. */
+    lowPriorityMaxDurationRules() {
+      return [
+        v => {
+          if (v === null || v === undefined || v === '') return true;
+          return v >= 1 || 'Must be at least 1 hour';
+        }
+      ];
     }
   },
   mounted() {
@@ -223,12 +289,12 @@ export default {
     async fetchData() {
       this.isFetching = true;
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         
         // Fetch existing role reservation limits from backend
         const response = await axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_role_reservation_limits,
+          url: this.$appSettings.APIServer.admin.get_role_reservation_limits,
           params: { roleId: this.roleId },
           headers: {
             'Authorization': `Bearer ${currentUser.loginToken}`
@@ -240,12 +306,14 @@ export default {
           this.reservationLimits = {
             minDuration: limits.minDuration,
             maxDuration: limits.maxDuration,
+            lowPriorityMaxDuration: limits.lowPriorityMaxDuration,
+            allowLowPriority: limits.allowLowPriority !== false,
             maxActiveReservations: limits.maxActiveReservations
           };
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error loading reservation limits", 
           color: "red" 
         });
@@ -258,11 +326,11 @@ export default {
       
       this.isSubmitting = true;
       try {
-        const currentUser = this.$store.getters.user;
+        const currentUser = this.store.user;
         
         const response = await axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_role_reservation_limits,
+          url: this.$appSettings.APIServer.admin.save_role_reservation_limits,
           data: { 
             roleId: this.roleId,
             reservationLimits: this.reservationLimits
@@ -274,20 +342,20 @@ export default {
         });
 
         if (response.data.status === true) {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: "Reservation limits saved successfully", 
             color: "green" 
           });
           this.$emit('emitModalClose', true);
         } else {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({
             text: response.data.message, 
             color: "red" 
           });
         }
       } catch (error) {
         console.error('Error saving reservation limits:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({
           text: "Error saving reservation limits", 
           color: "red" 
         });

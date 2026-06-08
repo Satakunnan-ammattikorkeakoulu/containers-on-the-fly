@@ -1,0 +1,20 @@
+{
+    "app": {
+      "webHost": "localhost",
+      "webHttps": false,
+      "logLevel": "DEBUG"
+    },
+    "docker": {
+      "registryAddress": "localhost:5000",
+      "serverName": "test-server",
+      "port_range_start": 20000,
+      "port_range_end": 20100,
+      "enabled": true,
+      "shm_size": "1g",
+      "debugSkipGpuDedication": true,
+      "sshHostKeysPath": "data/ssh_host_keys"
+    },
+    "daemon": {
+      "apiKey": "test-api-key-for-testing"
+    }
+  }

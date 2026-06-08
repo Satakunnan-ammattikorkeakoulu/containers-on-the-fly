@@ -1,41 +1,39 @@
 <template>
   <div>
-    <a v-if="hasLongItems" class="link-toggle-read-all" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
+    <a v-if="hasLongItems" class="read-all-toggle" @click="toggleReadAll">{{ !readAll ? "Read all" : "Read less" }}</a>
     <v-data-table
       :headers="table.headers"
       :items="data"
-      :sort-by="'computerId'"
-      :sort-desc="true"
-      :expanded.sync="expanded"
-      single-expand
-      item-key="computerId"
+      :sort-by="[{key: 'computerId', order: 'desc'}]"
+      v-model:expanded="expanded"
+      item-value="computerId"
       class="elevation-1">
 
       <!-- Status Badge -->
       <template v-slot:item.status="{item}">
         <div class="text-center">
           <v-tooltip bottom>
-            <template v-slot:activator="{ on, attrs }">
-              <div v-bind="attrs" v-on="on">
+            <template v-slot:activator="{ props }">
+              <div v-bind="props">
                 <v-chip
-                  small
+                  size="small"
                   :color="getStatusColor(item)"
                   text-color="white"
                 >
                   {{ getStatusText(item) }}
                 </v-chip>
-                <div class="caption grey--text mt-1" v-if="lastUpdateTime[item.computerId]">
+                <div class="caption text-grey mt-1" v-if="lastUpdateTime[item.computerId]">
                   {{ formatLastUpdate(lastUpdateTime[item.computerId]) }}
                 </div>
-                <div class="caption grey--text mt-1" v-else>
+                <div class="caption text-grey mt-1" v-else>
                   No data
                 </div>
               </div>
             </template>
             <span v-if="lastUpdateTime[item.computerId]">
-              Last update: {{ formatDirectTimestamp(lastUpdateTime[item.computerId]) }} ({{ $store.getters.appTimezone || 'UTC' }})
+              Last update: {{ formatDirectTimestamp(lastUpdateTime[item.computerId]) }} ({{ store.appTimezone || 'UTC' }})
               <br>
-              Status: {{ getStatusColor(item) === 'green' ? 'Online (< 7 min ago)' : 'Offline (> 7 min ago)' }}
+              Status: {{ getStatusColor(item) === 'green' ? `Online (< ${propOnlineThresholdMinutes} min ago)` : `Offline (> ${propOnlineThresholdMinutes} min ago)` }}
             </span>
             <span v-else>
               No monitoring data received
@@ -44,16 +42,60 @@
         </div>
       </template>
 
+      <!-- Public -->
+      <template v-slot:item.public="{item}">
+        <v-chip size="small" :color="item.public ? 'green' : 'red'" text-color="white">
+          {{ item.public ? 'Public' : 'Not Public' }}
+        </v-chip>
+      </template>
+
+      <!-- Created -->
+      <template v-slot:item.createdAt="{item}">
+        <v-tooltip v-if="item.createdAt" location="bottom" :text="parseTime(item.createdAt)">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.createdAt) }}</span>
+          </template>
+        </v-tooltip>
+      </template>
+
+      <!-- Updated -->
+      <template v-slot:item.updatedAt="{item}">
+        <v-tooltip v-if="item.updatedAt" location="bottom" :text="parseTime(item.updatedAt)">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.updatedAt) }}</span>
+          </template>
+        </v-tooltip>
+      </template>
+
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
-        <a class="link-action" @click="toggleExpand(item)">{{ isExpanded(item) ? 'Hide' : 'Show' }} Monitoring</a>
-        <a class="link-action" @click="emitEditComputer(item.computerId)">Edit Computer</a>
-        <a class="link-action" @click="emitRemoveComputer(item.computerId)">Remove Computer</a>
+        <v-menu>
+          <template v-slot:activator="{ props }">
+            <a v-bind="props">
+              Actions <v-icon size="small">mdi-chevron-down</v-icon>
+            </a>
+          </template>
+          <v-list density="compact">
+            <v-list-item @click="toggleExpand(item)">
+              <template v-slot:prepend><v-icon size="small">mdi-chart-line</v-icon></template>
+              <v-list-item-title>{{ isExpanded(item) ? 'Hide' : 'Show' }} Monitoring</v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="emitEditComputer(item.computerId)">
+              <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
+              <v-list-item-title>Edit Computer</v-list-item-title>
+            </v-list-item>
+            <v-divider class="my-1" />
+            <v-list-item @click="emitRemoveComputer(item.computerId)" class="destructive-action">
+              <template v-slot:prepend><v-icon size="small">mdi-delete-outline</v-icon></template>
+              <v-list-item-title>Remove Computer</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
       </template>
 
       <!-- Expanded content -->
-      <template v-slot:expanded-item="{ headers, item }">
-        <td :colspan="headers.length" class="pa-0">
+      <template v-slot:expanded-row="{ columns, item }">
+        <td :colspan="columns.length" class="pa-0">
           <v-card flat class="ma-4">
             <v-card-title class="headline">
               <v-icon class="mr-2">mdi-monitor-eye</v-icon>
@@ -83,7 +125,7 @@
                   <v-row>
                     <!-- CPU Usage -->
                     <v-col cols="12" md="3">
-                      <v-card outlined class="pa-3">
+                      <v-card variant="outlined" class="pa-3">
                         <div class="d-flex align-center mb-2">
                           <v-icon class="mr-2" color="blue">mdi-chip</v-icon>
                           <span class="font-weight-medium">CPU Usage</span>
@@ -99,10 +141,10 @@
                           >
                             <span class="text-h6">{{ Math.round(monitoringData[item.computerId].metrics.cpu.usage || 0) }}%</span>
                           </v-progress-circular>
-                          <div v-else class="text-h6 mb-2 grey--text">
+                          <div v-else class="text-h6 mb-2 text-grey">
                             No data
                           </div>
-                          <div class="caption grey--text">
+                          <div class="caption text-grey">
                             {{ monitoringData[item.computerId].metrics.cpu.cores !== null ? `${monitoringData[item.computerId].metrics.cpu.cores} cores` : 'No data' }}
                           </div>
                         </div>
@@ -111,7 +153,7 @@
                     
                     <!-- Memory Usage -->
                     <v-col cols="12" md="3">
-                      <v-card outlined class="pa-3">
+                      <v-card variant="outlined" class="pa-3">
                         <div class="d-flex align-center mb-2">
                           <v-icon class="mr-2" color="green">mdi-memory</v-icon>
                           <span class="font-weight-medium">Memory</span>
@@ -127,10 +169,10 @@
                           >
                             <span class="text-h6">{{ Math.round(monitoringData[item.computerId].metrics.memory.percentage || 0) }}%</span>
                           </v-progress-circular>
-                          <div v-else class="text-h6 mb-2 grey--text">
+                          <div v-else class="text-h6 mb-2 text-grey">
                             No data
                           </div>
-                          <div class="caption grey--text">
+                          <div class="caption text-grey">
                             {{ monitoringData[item.computerId].metrics.memory.used !== null && monitoringData[item.computerId].metrics.memory.total !== null ? 
                                `${formatBytes(monitoringData[item.computerId].metrics.memory.used)} / ${formatBytes(monitoringData[item.computerId].metrics.memory.total)}` : 
                                'No data' }}
@@ -141,7 +183,7 @@
                     
                     <!-- Disk Usage -->
                     <v-col cols="12" md="3">
-                      <v-card outlined class="pa-3">
+                      <v-card variant="outlined" class="pa-3">
                         <div class="d-flex align-center mb-2">
                           <v-icon class="mr-2" color="teal">mdi-harddisk</v-icon>
                           <span class="font-weight-medium">Disk (/)</span>
@@ -157,10 +199,10 @@
                           >
                             <span class="text-h6">{{ Math.round(monitoringData[item.computerId].metrics.disk.percentage || 0) }}%</span>
                           </v-progress-circular>
-                          <div v-else class="text-h6 mb-2 grey--text">
+                          <div v-else class="text-h6 mb-2 text-grey">
                             No data
                           </div>
-                          <div class="caption grey--text">
+                          <div class="caption text-grey">
                             {{ monitoringData[item.computerId].metrics.disk.used !== null && monitoringData[item.computerId].metrics.disk.total !== null ? 
                                `${formatBytes(monitoringData[item.computerId].metrics.disk.used)} / ${formatBytes(monitoringData[item.computerId].metrics.disk.total)}` : 
                                'No data' }}
@@ -171,18 +213,18 @@
                     
                     <!-- Docker Status -->
                     <v-col cols="12" md="3">
-                      <v-card outlined class="pa-3">
+                      <v-card variant="outlined" class="pa-3">
                         <div class="d-flex align-center mb-2">
                           <v-icon class="mr-2" color="cyan">mdi-docker</v-icon>
                           <span class="font-weight-medium">Docker</span>
                         </div>
                         <div class="d-flex justify-space-between">
                           <div class="text-center">
-                            <div class="caption grey--text">Running</div>
+                            <div class="caption text-grey">Running</div>
                             <div class="text-subtitle-2">{{ monitoringData[item.computerId].metrics.docker.running !== null ? monitoringData[item.computerId].metrics.docker.running : '-' }}</div>
                           </div>
                           <div class="text-center">
-                            <div class="caption grey--text">Total</div>
+                            <div class="caption text-grey">Total</div>
                             <div class="text-subtitle-2">{{ monitoringData[item.computerId].metrics.docker.total !== null ? monitoringData[item.computerId].metrics.docker.total : '-' }}</div>
                           </div>
                         </div>
@@ -194,7 +236,7 @@
                   <v-row class="mt-4">
                     <!-- System Load -->
                     <v-col cols="12" md="4">
-                      <v-card outlined class="pa-3">
+                      <v-card variant="outlined" class="pa-3">
                         <div class="d-flex align-center mb-2">
                           <v-icon class="mr-2" color="orange">mdi-gauge</v-icon>
                           <span class="font-weight-medium">System Load</span>
@@ -203,7 +245,7 @@
                           <div class="text-h6 mb-1">
                             {{ monitoringData[item.computerId].metrics.load.avg1 !== null ? monitoringData[item.computerId].metrics.load.avg1 : 'No data' }}
                           </div>
-                          <div class="caption grey--text">
+                          <div class="caption text-grey">
                             1m: {{ monitoringData[item.computerId].metrics.load.avg1 !== null ? monitoringData[item.computerId].metrics.load.avg1 : '-' }}<br>
                             5m: {{ monitoringData[item.computerId].metrics.load.avg5 !== null ? monitoringData[item.computerId].metrics.load.avg5 : '-' }}<br>
                             15m: {{ monitoringData[item.computerId].metrics.load.avg15 !== null ? monitoringData[item.computerId].metrics.load.avg15 : '-' }}
@@ -214,7 +256,7 @@
                     
                     <!-- Uptime -->
                     <v-col cols="12" md="4">
-                      <v-card outlined class="pa-3">
+                      <v-card variant="outlined" class="pa-3">
                         <div class="d-flex align-center mb-2">
                           <v-icon class="mr-2" color="purple">mdi-clock-outline</v-icon>
                           <span class="font-weight-medium">Uptime</span>
@@ -223,7 +265,7 @@
                           <div class="text-h6 mb-1">
                             {{ monitoringData[item.computerId].metrics.uptime.days !== null ? `${monitoringData[item.computerId].metrics.uptime.days}d` : 'No data' }}
                           </div>
-                          <div class="caption grey--text">
+                          <div class="caption text-grey">
                             {{ monitoringData[item.computerId].metrics.uptime.hours !== null && monitoringData[item.computerId].metrics.uptime.minutes !== null ? 
                                `${monitoringData[item.computerId].metrics.uptime.hours}h ${monitoringData[item.computerId].metrics.uptime.minutes}m` : 
                                'No data' }}
@@ -234,7 +276,7 @@
                     
                     <!-- Software Version -->
                     <v-col cols="12" md="4">
-                      <v-card outlined class="pa-3">
+                      <v-card variant="outlined" class="pa-3">
                         <div class="d-flex align-center mb-2">
                           <v-icon class="mr-2" color="indigo">mdi-tag</v-icon>
                           <span class="font-weight-medium">Software Version</span>
@@ -243,7 +285,7 @@
                           <div class="text-h6 mb-1">
                             {{ monitoringData[item.computerId].version?.software || 'Unknown' }}
                           </div>
-                          <div class="caption grey--text">
+                          <div class="caption text-grey">
                             {{ monitoringData[item.computerId].version?.updated ? `Updated: ${formatTimestamp(new Date(monitoringData[item.computerId].version.updated))}` : 'No data' }}
                           </div>
                         </div>
@@ -257,7 +299,7 @@
                 <!-- PM2 Logs Section -->
                 <div class="mb-4">
                   <h6 class="text-h6 mb-4">PM2 Application Logs</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <p class="body-2 text-grey mb-4">
                     Logs from PM2 processes. Latest logs are at the top.
                   </p>
                 </div>
@@ -268,8 +310,8 @@
                     <v-icon class="mr-2" color="blue">mdi-server</v-icon>
                     <h6 class="text-subtitle-1 font-weight-medium">Backend Application</h6>
                     <v-spacer></v-spacer>
-                    <v-chip 
-                      small 
+                    <v-chip
+                      size="small"
                       :color="monitoringData[item.computerId].logs.backend ? 'green' : 'grey'"
                       text-color="white"
                     >
@@ -292,8 +334,8 @@
                     <v-icon class="mr-2" color="green">mdi-web</v-icon>
                     <h6 class="text-subtitle-1 font-weight-medium">Frontend Application</h6>
                     <v-spacer></v-spacer>
-                    <v-chip 
-                      small 
+                    <v-chip
+                      size="small"
                       :color="monitoringData[item.computerId].logs.frontend ? 'green' : 'grey'"
                       text-color="white"
                     >
@@ -310,14 +352,14 @@
                   ></v-textarea>
                 </div>
                 
-                <!-- Docker Utility Logs -->
+                <!-- Container Server Daemon Logs -->
                 <div class="mb-6">
                   <div class="d-flex align-center mb-2">
                     <v-icon class="mr-2" color="orange">mdi-docker</v-icon>
-                    <h6 class="text-subtitle-1 font-weight-medium">Backend Docker Utility</h6>
+                    <h6 class="text-subtitle-1 font-weight-medium">Container Server Daemon</h6>
                     <v-spacer></v-spacer>
-                    <v-chip 
-                      small 
+                    <v-chip
+                      size="small"
                       :color="monitoringData[item.computerId].logs.backendDockerUtil ? 'green' : 'grey'"
                       text-color="white"
                     >
@@ -329,7 +371,7 @@
                     readonly
                     outlined
                     rows="10"
-                    placeholder="Backend Docker Utility logs will appear here..."
+                    placeholder="Container server daemon logs will appear here..."
                     class="logs-textarea"
                   ></v-textarea>
                 </div>
@@ -351,7 +393,7 @@
             
             <v-card-actions>
               <v-spacer></v-spacer>
-              <v-btn text @click="toggleExpand(item)">Close</v-btn>
+              <v-btn variant="text" @click="toggleExpand(item)">Close</v-btn>
             </v-card-actions>
           </v-card>
         </td>
@@ -361,10 +403,23 @@
 </template>
 
 <script>
-  import { DisplayTime } from '/src/helpers/time.js'
+  /**
+   * Displays a sortable data table of all container servers (computers) with online/offline
+   * status indicators based on monitoring heartbeat data. Each row is expandable to show
+   * detailed server monitoring: CPU, memory, disk usage, Docker container counts, system
+   * load, uptime, software version, and PM2 application logs.
+   * Actions menu allows editing the computer, viewing monitoring, or removing the computer.
+   * Used in PageAdminComputers.
+   */
+  import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
+  import { useMainStore } from '@/store/store'
 
   export default {
     name: 'AdminComputersTable',
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     props: {
       propItems: {
         type: Array,
@@ -381,6 +436,10 @@
       propLastUpdateTime: {
         type: Object,
         default: () => ({})
+      },
+      propOnlineThresholdMinutes: {
+        type: Number,
+        default: 7,
       }
     },
     data: () => ({
@@ -393,14 +452,14 @@
       lastUpdateTime: {},
       table: {
         headers: [
-          { text: 'Computer ID', value: 'computerId' },
-          { text: 'Status', value: 'status', align: 'center' },
-          { text: 'Public', value: 'public' },
-          { text: 'Name', value: 'name' },
-          { text: 'IP', value: 'ip' },
-          { text: 'Created At', value: 'createdAt' },
-          { text: 'Updated At', value: 'updatedAt' },
-          { text: 'Actions', value: 'actions' },
+          { title: 'Computer ID', key: 'computerId' },
+          { title: 'Status', key: 'status', align: 'center' },
+          { title: 'Public', key: 'public' },
+          { title: 'Name', key: 'name' },
+          { title: 'IP', key: 'ip' },
+          { title: 'Created', key: 'createdAt' },
+          { title: 'Updated', key: 'updatedAt' },
+          { title: '', key: 'actions', sortable: false },
         ],
       }
     }),
@@ -429,21 +488,27 @@
       parseTime(timestamp) {
         return DisplayTime(timestamp)
       },
+      parseRelativeTime(timestamp) {
+        if (!timestamp) return '-'
+        return RelativeTime(timestamp)
+      },
+      /** Toggles the expanded monitoring panel for a computer row (single-expand mode). */
       toggleExpand(item) {
-        const index = this.expanded.findIndex(i => i.computerId === item.computerId);
+        const index = this.expanded.indexOf(item.computerId);
         if (index >= 0) {
           this.expanded.splice(index, 1);
         } else {
-          this.expanded = [item]; // Single expand mode
+          this.expanded = [item.computerId]; // Single expand mode
           this.fetchMonitoringData(item.computerId);
         }
       },
       isExpanded(item) {
-        return this.expanded.some(i => i.computerId === item.computerId);
+        return this.expanded.includes(item.computerId);
       },
       fetchMonitoringData(computerId) {
         this.$emit('emitFetchMonitoring', computerId);
       },
+      /** Returns 'green' if the server reported a heartbeat within the threshold, 'grey' otherwise. */
       getStatusColor(item) {
         return this.propActiveServers[item.computerId] ? 'green' : 'grey';
       },
@@ -478,6 +543,7 @@
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
       },
+      /** Reverses log line order so the most recent entries appear at the top. */
       reverseLogOrder(logContent) {
         if (!logContent || logContent.trim() === '') return logContent;
         
@@ -500,6 +566,7 @@
         const isoString = date.toISOString().replace('Z', '');
         return DisplayTime(isoString);
       },
+      /** Converts a UTC millisecond timestamp into a human-readable relative time string (e.g. "5m ago"). */
       formatLastUpdate(timestamp) {
         if (!timestamp) return 'No data';
         const now = Date.now();
@@ -539,13 +606,12 @@
 </script>
 
 <style scoped lang="scss">
-  .link-action {
-    display: block;
-    min-width: 150px;
-    margin: 10px 0px;
+  .destructive-action .v-list-item-title,
+  .destructive-action .v-icon {
+    color: #ef5350;
   }
 
-  .link-toggle-read-all {
+  .read-all-toggle {
     margin-bottom: 20px;
     font-size: 14px;
     display: inline-block;
@@ -560,7 +626,7 @@
     line-height: 1.4 !important;
   }
 
-  ::v-deep .logs-textarea textarea {
+  :deep(.logs-textarea textarea) {
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
     font-size: 12px !important;
     line-height: 1.4 !important;
@@ -568,7 +634,7 @@
     background-color: #1e1e1e !important;
   }
 
-  ::v-deep .logs-textarea .v-text-field__details {
+  :deep(.logs-textarea .v-text-field__details) {
     display: none !important;
   }
 

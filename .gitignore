@@ -1,5 +1,6 @@
 .DS_STORE
 __pycache__
+node_modules/
 venv/
 webapp/backend/aiserver.db
 webapp/frontend/src/AppSettings.js
@@ -13,6 +14,38 @@ mounts/
 user_config/Caddyfile
 user_config/settings
 webapp/backend/docker/local_overrides.py
+webapp/backend/data/ssh_host_keys/
+webapp/container_server/data/ssh_host_keys/
+webapp/container_server/settings.json
 .vscode
 .settings_just_created
 .server_type
+
+# Custom container templates (user-created, excluded from repo)
+container_templates/custom/*
+!container_templates/custom/.gitkeep
+
+# Test artifacts — generated credentials and environments
+tests/.test_credentials.json
+tests/api/environments/test.bru
+
+tests/api/node_modules/
+tests/api/package-lock.json
+tests/e2e/node_modules/
+tests/e2e/package-lock.json
+tests/e2e/test-results/
+tests/e2e/playwright-report/
+tests/e2e/.auth/
+tests/backend/.pytest_cache/
+tests/backend/htmlcov/
+tests/backend/**/__pycache__/
+tests/container_server/.pytest_cache/
+tests/container_server/htmlcov/
+tests/container_server/**/__pycache__/
+
+# Coverage artifacts
+webapp/backend/.coverage
+webapp/backend/htmlcov/
+webapp/container_server/.coverage
+webapp/container_server/htmlcov/
+webapp/frontend/coverage/

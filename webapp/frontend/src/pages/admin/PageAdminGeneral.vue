@@ -2,29 +2,30 @@
   <v-container>
     <v-row class="text-center">
       <v-col cols="12">
-        <h4>Admin</h4>
-        <h2>General Settings</h2>
-        <p class="subtitle-1 grey--text">Configure system-wide settings and preferences</p>
+        <h4 class="m-0">Admin</h4>
+        <h2 class="m-0">General Settings</h2>
+        <p class="subtitle-1 text-grey m-0 mb-40">Configure system-wide settings and preferences</p>
       </v-col>
     </v-row>
 
     <v-row>
       <v-col cols="12">
-        <v-expansion-panels multiple v-model="expandedPanels">
-          
+        <h2 class="settings-group-header settings-group-header--first">General</h2>
+        <v-expansion-panels v-model="openPanel">
+
           <!-- General Information & Instructions Section -->
-          <v-expansion-panel>
-            <v-expansion-panel-header>
+          <v-expansion-panel id="panel-general" value="general">
+            <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-information-outline</v-icon>
-              <span class="font-weight-medium">General Information & Instructions</span>
-            </v-expansion-panel-header>
-            <v-expansion-panel-content>
+              <span class="font-weight-bold">General Information & Instructions</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
               <v-form ref="generalForm" v-model="forms.general.valid">
                 
                 <!-- Application Configuration ---->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Application Configuration</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <h3 class="text-h3 mb-2">Application Configuration</h3>
+                  <p class="body-2 text-grey mb-4">
                     Configure the basic application settings displayed throughout the system.
                   </p>
                   <v-row>
@@ -40,7 +41,7 @@
                       ></v-text-field>
                     </v-col>
                     <v-col cols="12" md="6">
-                      <v-select
+                      <v-autocomplete
                         v-model="settings.general.timezone"
                         :items="timezoneOptions"
                         label="System Timezone"
@@ -48,26 +49,22 @@
                         required
                         :rules="[rules.required]"
                         hide-details
-                        :search-input.sync="timezoneSearch"
-                        item-text="label"
+                        item-title="label"
                         item-value="value"
-                        filterable
                       >
-                        <template v-slot:item="{ item }">
-                          <div>
-                            <div class="font-weight-medium">{{ item.value }}</div>
-                            <div class="caption grey--text">{{ item.description }}</div>
-                          </div>
+                        <template v-slot:item="{ item, props }">
+                          <v-list-item v-bind="props" :subtitle="item.raw?.description || ''">
+                          </v-list-item>
                         </template>
-                      </v-select>
+                      </v-autocomplete>
                     </v-col>
                   </v-row>
                 </div>
                 
                 <!-- Login Page Information -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Login Page Instructions</h6>
-                  <p class="body-2 grey--text mb-3">
+                  <h3 class="text-h3 mb-2">Login Page Instructions</h3>
+                  <p class="body-2 text-grey mb-3">
                     Information text displayed on the login page to provide context or instructions to users.
                   </p>
                   <v-textarea
@@ -81,8 +78,8 @@
                 
                 <!-- Reservation Page Instructions -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Reservation Page Instructions</h6>
-                  <p class="body-2 grey--text mb-3">
+                  <h3 class="text-h3 mb-2">Reservation Page Instructions</h3>
+                  <p class="body-2 text-grey mb-3">
                     Instructions displayed to users on top of the reservation page about server usage guidelines and restrictions.
                   </p>
                   <v-textarea
@@ -96,8 +93,8 @@
                 
                 <!-- Email Template Instructions -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Container Reserved Instructions</h6>
-                  <p class="body-2 grey--text mb-3">
+                  <h3 class="text-h3 mb-2">Container Reserved Instructions</h3>
+                  <p class="body-2 text-grey mb-3">
                     Guidelines and instructions included in reservation confirmation emails sent to users (at the end of the email) and displayed when clicking "Show Details" on reservations.
                   </p>
                   <v-textarea
@@ -111,8 +108,8 @@
                 
                 <!-- Login Form Field Labels -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Login Form Field Labels</h6>
-                  <p class="body-2 grey--text mb-3">
+                  <h3 class="text-h3 mb-2">Login Form Field Labels</h3>
+                  <p class="body-2 text-grey mb-3">
                     Customize the labels for username and password fields on the login page.
                   </p>
                   <v-row>
@@ -139,8 +136,8 @@
                 
                 <v-row>
                   <v-col cols="12">
-                    <v-btn 
-                      color="primary" 
+                    <v-btn
+                      color="primary"
                       :loading="saving.general"
                       @click="saveSection('general')"
                     >
@@ -150,22 +147,256 @@
                   </v-col>
                 </v-row>
               </v-form>
-            </v-expansion-panel-content>
+            </v-expansion-panel-text>
           </v-expansion-panel>
-          
+
+          <!-- Legal Documents Section -->
+          <v-expansion-panel id="panel-legal" value="legal">
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-file-document-outline</v-icon>
+              <span class="font-weight-bold">Legal Documents</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-form ref="legalForm" v-model="forms.legal.valid">
+
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Privacy Policy & Terms of Service</h3>
+                  <p class="body-2 text-grey mb-4">
+                    Configure legal documents displayed to users. When enabled, links appear on the login page and in the application footer.
+                    Content supports Markdown formatting.
+                  </p>
+
+                  <v-switch
+                    v-model="settings.legal.enabled"
+                    label="Enable privacy policy and terms of service pages"
+                    color="primary"
+                    class="mt-0 mb-4"
+                  ></v-switch>
+                </div>
+
+                <div v-if="settings.legal.enabled">
+                  <!-- Organization Info -->
+                  <div class="mb-6">
+                    <h3 class="text-h3 mb-2">Organization Information</h3>
+                    <p class="body-2 text-grey mb-3">
+                      Organization name and data protection contact email used in the legal documents.
+                    </p>
+                    <v-row>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="settings.legal.organizationName"
+                          label="Organization Name"
+                          placeholder="e.g. University of Example"
+                          outlined
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="settings.legal.contactEmail"
+                          label="Data Protection Contact Email"
+                          placeholder="dpo@example.com"
+                          outlined
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                    </v-row>
+                  </div>
+
+                  <!-- Privacy Policy -->
+                  <div class="mb-6">
+                    <h3 class="text-h3 mb-2">Privacy Policy</h3>
+                    <p class="body-2 text-grey mb-3">
+                      Content displayed on the public privacy policy page. Supports Markdown formatting.<br>
+                      Available variables: <code v-pre>{{ORGANIZATION_NAME}}</code>, <code v-pre>{{CONTACT_EMAIL}}</code>, <code v-pre>{{DATE}}</code> (last saved date).
+                    </p>
+                    <div class="d-flex mb-3">
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                        prepend-icon="mdi-file-document-edit-outline"
+                        @click="confirmLoadTemplate('privacyPolicy')"
+                      >Load Template</v-btn>
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        :color="legalPreview.privacyPolicy ? 'grey' : 'primary'"
+                        :prepend-icon="legalPreview.privacyPolicy ? 'mdi-pencil' : 'mdi-eye'"
+                        class="ml-2"
+                        @click="legalPreview.privacyPolicy = !legalPreview.privacyPolicy"
+                      >{{ legalPreview.privacyPolicy ? 'Edit' : 'Preview' }}</v-btn>
+                    </div>
+                    <div v-if="legalPreview.privacyPolicy" class="legal-preview pa-4 rounded" v-html="renderedPrivacyPolicy"></div>
+                    <v-textarea
+                      v-else
+                      v-model="settings.legal.privacyPolicyContent"
+                      placeholder="Enter privacy policy content in Markdown format..."
+                      rows="12"
+                      outlined
+                      hide-details
+                    ></v-textarea>
+                  </div>
+
+                  <!-- Terms of Service -->
+                  <div class="mb-6">
+                    <h3 class="text-h3 mb-2">Terms of Service</h3>
+                    <p class="body-2 text-grey mb-3">
+                      Content displayed on the public terms of service page. Supports Markdown formatting.<br>
+                      Available variables: <code v-pre>{{ORGANIZATION_NAME}}</code>, <code v-pre>{{CONTACT_EMAIL}}</code>, <code v-pre>{{DATE}}</code> (last saved date).
+                    </p>
+                    <div class="d-flex mb-3">
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                        prepend-icon="mdi-file-document-edit-outline"
+                        @click="confirmLoadTemplate('termsOfService')"
+                      >Load Template</v-btn>
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        :color="legalPreview.termsOfService ? 'grey' : 'primary'"
+                        :prepend-icon="legalPreview.termsOfService ? 'mdi-pencil' : 'mdi-eye'"
+                        class="ml-2"
+                        @click="legalPreview.termsOfService = !legalPreview.termsOfService"
+                      >{{ legalPreview.termsOfService ? 'Edit' : 'Preview' }}</v-btn>
+                    </div>
+                    <div v-if="legalPreview.termsOfService" class="legal-preview pa-4 rounded" v-html="renderedTermsOfService"></div>
+                    <v-textarea
+                      v-else
+                      v-model="settings.legal.termsOfServiceContent"
+                      placeholder="Enter terms of service content in Markdown format..."
+                      rows="12"
+                      outlined
+                      hide-details
+                    ></v-textarea>
+                  </div>
+
+                  <!-- Load Template Confirmation Dialog -->
+                  <v-dialog v-model="legalTemplateDialog.visible" max-width="450">
+                    <v-card>
+                      <v-card-title>Load Template</v-card-title>
+                      <v-card-text>
+                        This will replace the current {{ legalTemplateDialog.type === 'privacyPolicy' ? 'privacy policy' : 'terms of service' }} content with the default template. Are you sure?
+                      </v-card-text>
+                      <v-card-actions>
+                        <v-spacer></v-spacer>
+                        <v-btn variant="text" @click="legalTemplateDialog.visible = false">Cancel</v-btn>
+                        <v-btn color="primary" variant="flat" @click="loadTemplate(legalTemplateDialog.type)">Replace</v-btn>
+                      </v-card-actions>
+                    </v-card>
+                  </v-dialog>
+                </div>
+
+                <v-row>
+                  <v-col cols="12">
+                    <v-btn
+                      color="primary"
+                      :loading="saving.legal"
+                      @click="saveSection('legal')"
+                    >
+                      <v-icon left>mdi-content-save</v-icon>
+                      Save Legal Settings
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-form>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
+          <!-- Feature Toggles Section -->
+          <v-expansion-panel id="panel-features" value="features">
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-toggle-switch-outline</v-icon>
+              <span class="font-weight-bold">Feature Toggles</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+
+              <div class="mb-6">
+                <p class="body-2 text-grey mb-4">
+                  Enable or disable optional features system-wide.
+                  Disabled features are hidden from all users and ignored by the backend.
+                </p>
+                <v-switch
+                  v-model="settings.features.startScriptsEnabled"
+                  label="Start Scripts — Allow users to configure a script that runs when their container starts. Configured in Profile and Reservation Advanced Settings."
+                  color="primary"
+                  hide-details
+                  class="mb-2"
+                />
+                <v-text-field
+                  v-if="settings.features.startScriptsEnabled"
+                  v-model.number="settings.features.startScriptTimeoutSeconds"
+                  label="Start Script Timeout (seconds)"
+                  type="number"
+                  :min="5"
+                  :max="300"
+                  :rules="[rules.scriptTimeout]"
+                  density="compact"
+                  style="max-width: 280px; margin-left: 52px;"
+                  class="mb-2"
+                />
+                <v-switch
+                  v-model="settings.features.stopScriptsEnabled"
+                  label="Stop Scripts — Allow users to configure a script that runs before their container stops. Configured in Profile and Reservation Advanced Settings."
+                  color="primary"
+                  hide-details
+                  class="mb-2"
+                />
+                <v-text-field
+                  v-if="settings.features.stopScriptsEnabled"
+                  v-model.number="settings.features.stopScriptTimeoutSeconds"
+                  label="Stop Script Timeout (seconds)"
+                  type="number"
+                  :min="5"
+                  :max="300"
+                  :rules="[rules.scriptTimeout]"
+                  density="compact"
+                  style="max-width: 280px; margin-left: 52px;"
+                  class="mb-2"
+                />
+                <v-switch
+                  v-model="settings.features.sshKeysEnabled"
+                  label="SSH Key Authentication — Allow users to add SSH public keys for passwordless container access. Configured in Profile."
+                  color="primary"
+                  hide-details
+                  class="mb-2"
+                />
+
+                <v-btn
+                  v-if="settings.features.startScriptsEnabled || settings.features.stopScriptsEnabled"
+                  color="primary"
+                  :loading="saving.features"
+                  class="mt-4"
+                  @click="saveSection('features')"
+                >
+                  <v-icon left>mdi-content-save</v-icon>
+                  Save Features
+                </v-btn>
+              </div>
+
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
+        </v-expansion-panels>
+
+        <h2 class="settings-group-header">Access &amp; Security</h2>
+        <v-expansion-panels v-model="openPanel">
+
           <!-- Authentication Section -->
-          <v-expansion-panel>
-            <v-expansion-panel-header>
+          <v-expansion-panel id="panel-auth" value="auth">
+            <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-account-key</v-icon>
-              <span class="font-weight-medium">Authentication</span>
-            </v-expansion-panel-header>
-            <v-expansion-panel-content>
+              <span class="font-weight-bold">Authentication</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
               <v-form ref="authForm" v-model="forms.auth.valid">
                 
                 <!-- Login Type Settings -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Login Method</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <h3 class="text-h3 mb-2">Login Method</h3>
+                  <p class="body-2 text-grey mb-4">
                     Choose how users authenticate with the system.
                   </p>
                   <v-radio-group
@@ -188,10 +419,9 @@
                   <!-- Password + LDAP explanation -->
                   <v-alert
                     v-if="settings.auth.loginType === 'hybrid'"
-                    text
+                    variant="outlined"
                     type="info"
                     class="mt-2 mb-4"
-                    outlined
                   >
                     <p class="body-2 mb-0">
                       <strong>Password + LDAP Mode</strong>: If a user has a password set, it will try password authentication first. 
@@ -202,8 +432,8 @@
                 
                 <!-- Session Timeout -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Session Settings</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <h3 class="text-h3 mb-2">Session Settings</h3>
+                  <p class="body-2 text-grey mb-4">
                     Configure how long user sessions remain active before requiring re-login.
                   </p>
                   <v-row>
@@ -225,8 +455,8 @@
                 
                 <!-- LDAP Configuration -->
                 <div class="mb-6" v-if="settings.auth.loginType === 'hybrid'">
-                  <h6 class="text-h6 mb-2">LDAP Server Configuration</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <h3 class="text-h3 mb-2">LDAP Server Configuration</h3>
+                  <p class="body-2 text-grey mb-4">
                     Configure connection to your LDAP directory server for user authentication.
                   </p>
                   
@@ -307,6 +537,15 @@
                         :rules="[rules.required]"
                       ></v-text-field>
                     </v-col>
+
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.auth.ldap.nameField"
+                        label="LDAP Name Field (optional)"
+                        placeholder="displayName"
+                        outlined
+                      ></v-text-field>
+                    </v-col>
                   </v-row>
                 </div>
                 
@@ -323,26 +562,83 @@
                   </v-col>
                 </v-row>
               </v-form>
-            </v-expansion-panel-content>
+
+              <!-- Test AD/LDAP Connection Section -->
+              <div class="mb-6" v-if="settings.auth.loginType === 'hybrid'">
+                <v-divider class="my-4"></v-divider>
+                <h3 class="text-h3 mb-2">Test AD/LDAP Connection</h3>
+                <p class="body-2 text-grey mb-4">
+                  Test your LDAP configuration by authenticating with a real username and password.
+                  The full LDAP server response (all attributes) will be displayed below.
+                </p>
+
+                <v-row>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="testAdUsername"
+                      label="LDAP Username"
+                      placeholder="jdoe"
+                      outlined
+                    ></v-text-field>
+                  </v-col>
+                  <v-col cols="12" md="6">
+                    <v-text-field
+                      v-model="testAdPassword"
+                      label="LDAP Password"
+                      type="password"
+                      outlined
+                      @keyup.enter="testAdConnection"
+                    ></v-text-field>
+                  </v-col>
+                </v-row>
+
+                <v-row>
+                  <v-col cols="12">
+                    <v-btn
+                      color="primary"
+                      :loading="testingAd"
+                      :disabled="!testAdUsername || !testAdPassword"
+                      @click="testAdConnection"
+                    >
+                      Test AD Connection
+                    </v-btn>
+                  </v-col>
+                </v-row>
+
+                <v-row v-if="testAdResult">
+                  <v-col cols="12">
+                    <v-textarea
+                      v-model="testAdResult"
+                      label="LDAP Server Response"
+                      readonly
+                      outlined
+                      auto-grow
+                      rows="10"
+                    ></v-textarea>
+                  </v-col>
+                </v-row>
+              </div>
+
+            </v-expansion-panel-text>
           </v-expansion-panel>
 
           <!-- User Access Control Section -->
-          <v-expansion-panel>
-            <v-expansion-panel-header>
+          <v-expansion-panel id="panel-access" value="access">
+            <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-shield-account</v-icon>
-              <span class="font-weight-medium">User Access Control</span>
-            </v-expansion-panel-header>
-            <v-expansion-panel-content>
+              <span class="font-weight-bold">User Access Control</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
               <v-form ref="accessForm" v-model="forms.access.valid">
                 <v-row>
                   <v-col cols="12" md="6">
-                    <v-card outlined class="pa-4">
+                    <v-card variant="outlined" class="pa-4">
                       <div class="mb-4">
-                        <h6 class="text-h6 mb-2 d-flex align-center">
+                        <h3 class="text-h3 mb-2 d-flex align-center">
                           <v-icon left color="red">mdi-account-cancel</v-icon>
                           Email Blacklist
-                        </h6>
-                        <p class="body-2 grey--text mb-3">
+                        </h3>
+                        <p class="body-2 text-grey mb-3">
                           Prevent specific email addresses from logging into the system. Users on this list will be denied access.
                         </p>
                       </div>
@@ -381,7 +677,7 @@
                       
                       <!-- Existing blacklisted emails -->
                       <div v-if="settings.access.blacklistEnabled && blacklistedEmailsList.length > 0">
-                        <p class="caption grey--text mb-2">Blacklisted emails:</p>
+                        <p class="caption text-grey mb-2">Blacklisted emails:</p>
                         <v-chip
                           v-for="(email, index) in blacklistedEmailsList"
                           :key="`blacklist-${index}`"
@@ -395,20 +691,20 @@
                         </v-chip>
                       </div>
                       
-                      <div v-else-if="settings.access.blacklistEnabled" class="text-center grey--text">
+                      <div v-else-if="settings.access.blacklistEnabled" class="text-center text-grey">
                         <p class="body-2">No emails blacklisted</p>
                       </div>
                     </v-card>
                   </v-col>
                   
                   <v-col cols="12" md="6">
-                    <v-card outlined class="pa-4">
+                    <v-card variant="outlined" class="pa-4">
                       <div class="mb-4">
-                        <h6 class="text-h6 mb-2 d-flex align-center">
+                        <h3 class="text-h3 mb-2 d-flex align-center">
                           <v-icon left color="green">mdi-account-check</v-icon>
                           Email Whitelist
-                        </h6>
-                        <p class="body-2 grey--text mb-3">
+                        </h3>
+                        <p class="body-2 text-grey mb-3">
                           Allow only specific email addresses to log into the system. When enabled, only users on this list can access the system.
                         </p>
                       </div>
@@ -447,7 +743,7 @@
                       
                       <!-- Existing whitelisted emails -->
                       <div v-if="settings.access.whitelistEnabled && whitelistedEmailsList.length > 0">
-                        <p class="caption grey--text mb-2">Whitelisted emails:</p>
+                        <p class="caption text-grey mb-2">Whitelisted emails:</p>
                         <v-chip
                           v-for="(email, index) in whitelistedEmailsList"
                           :key="`whitelist-${index}`"
@@ -461,7 +757,7 @@
                         </v-chip>
                       </div>
                       
-                      <div v-else-if="settings.access.whitelistEnabled" class="text-center grey--text">
+                      <div v-else-if="settings.access.whitelistEnabled" class="text-center text-grey">
                         <p class="body-2">No emails whitelisted</p>
                       </div>
                     </v-card>
@@ -480,22 +776,27 @@
                   </v-col>
                 </v-row>
               </v-form>
-            </v-expansion-panel-content>
+            </v-expansion-panel-text>
           </v-expansion-panel>
 
+        </v-expansion-panels>
+
+        <h2 class="settings-group-header">Email &amp; Notifications</h2>
+        <v-expansion-panels v-model="openPanel">
+
           <!-- Email Configuration Section -->
-          <v-expansion-panel>
-            <v-expansion-panel-header>
+          <v-expansion-panel id="panel-email" value="email">
+            <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-email-outline</v-icon>
-              <span class="font-weight-medium">Email Configuration</span>
-            </v-expansion-panel-header>
-            <v-expansion-panel-content>
+              <span class="font-weight-bold">Email Configuration</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
               
               <!-- Contact Information Section with its own separate form -->
               <v-form ref="contactForm" v-model="forms.contact.valid">
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Contact Email</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <h3 class="text-h3 mb-2">Contact Email</h3>
+                  <p class="body-2 text-grey mb-4">
                     Configure the admin contact email address displayed to users throughout the system.
                   </p>
                   
@@ -531,8 +832,8 @@
               <!-- Master Email Enable Section with its own form -->
               <v-form ref="emailEnableForm" v-model="forms.emailEnable.valid">
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Email System</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <h3 class="text-h3 mb-2">Email System</h3>
+                  <p class="body-2 text-grey mb-4">
                     Enable or disable email sending from the system. When disabled, no emails will be sent for reservations or notifications.
                   </p>
                   
@@ -548,8 +849,8 @@
               <!-- SMTP Settings Section with its own form -->
               <v-form ref="emailForm" v-model="forms.email.valid">
                 <div class="mb-6" v-if="settings.emailEnable.sendEmail">
-                  <h6 class="text-h6 mb-2">SMTP Server Configuration</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <h3 class="text-h3 mb-2">SMTP Server Configuration</h3>
+                  <p class="body-2 text-grey mb-4">
                     Configure the SMTP server settings for sending system emails like reservation confirmations and notifications.
                   </p>
                   
@@ -630,8 +931,8 @@
               
               <!-- Test Email Delivery Section (no form needed, just uses validation) -->
               <div class="mb-6" v-if="settings.emailEnable.sendEmail">
-                <h6 class="text-h6 mb-2">Test Email Delivery</h6>
-                <p class="body-2 grey--text mb-4">
+                <h3 class="text-h3 mb-2">Test Email Delivery</h3>
+                <p class="body-2 text-grey mb-4">
                   Send a test email to verify that your SMTP configuration is working correctly.
                 </p>
                 
@@ -663,22 +964,249 @@
                 </v-row>
               </div>
               
-            </v-expansion-panel-content>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
+          <!-- Email Templates Section -->
+          <v-expansion-panel id="panel-emailTemplates" value="emailTemplates">
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-email-edit-outline</v-icon>
+              <span class="font-weight-bold">Email Templates</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-form ref="emailTemplatesForm" v-model="forms.emailTemplates.valid">
+                <p class="body-2 text-grey mb-4">
+                  Customize the subject lines and introductory text for emails sent to users
+                  during container lifecycle events. Leave body intro fields empty to use the default text.
+                </p>
+
+                <!-- Container Started Email -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Container Started</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Sent when a user's container reservation starts successfully.
+                  </p>
+                  <v-checkbox
+                    v-model="settings.emailTemplates.enableContainerStarted"
+                    label="Enable this email"
+                    color="primary"
+                    class="mt-0 mb-2"
+                    hide-details
+                  ></v-checkbox>
+                  <v-text-field
+                    v-model="settings.emailTemplates.subjectContainerStarted"
+                    label="Subject Line"
+                    placeholder="Server is ready to use!"
+                    :rules="[rules.required]"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerStarted"
+                    class="mb-3"
+                  ></v-text-field>
+                  <v-textarea
+                    v-model="settings.emailTemplates.bodyIntroContainerStarted"
+                    label="Optional Body Intro Text"
+                    placeholder=""
+                    rows="2"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerStarted"
+                  ></v-textarea>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <!-- Container Error Email -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Container Error</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Sent when a user's container fails to start.
+                  </p>
+                  <v-checkbox
+                    v-model="settings.emailTemplates.enableContainerError"
+                    label="Enable this email"
+                    color="primary"
+                    class="mt-0 mb-2"
+                    hide-details
+                  ></v-checkbox>
+                  <v-text-field
+                    v-model="settings.emailTemplates.subjectContainerError"
+                    label="Subject Line"
+                    placeholder="Server did not start"
+                    :rules="[rules.required]"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerError"
+                    class="mb-3"
+                  ></v-text-field>
+                  <v-textarea
+                    v-model="settings.emailTemplates.bodyIntroContainerError"
+                    label="Optional Body Intro Text"
+                    placeholder=""
+                    rows="2"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerError"
+                  ></v-textarea>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <!-- Container Paused Email -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Container Paused</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Sent when a low-priority container is paused for a higher-priority reservation.
+                  </p>
+                  <v-checkbox
+                    v-model="settings.emailTemplates.enableContainerPaused"
+                    label="Enable this email"
+                    color="primary"
+                    class="mt-0 mb-2"
+                    hide-details
+                  ></v-checkbox>
+                  <v-text-field
+                    v-model="settings.emailTemplates.subjectContainerPaused"
+                    label="Subject Line"
+                    placeholder="Low-priority container paused"
+                    :rules="[rules.required]"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerPaused"
+                    class="mb-3"
+                  ></v-text-field>
+                  <v-textarea
+                    v-model="settings.emailTemplates.bodyIntroContainerPaused"
+                    label="Optional Body Intro Text"
+                    placeholder=""
+                    rows="2"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerPaused"
+                  ></v-textarea>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <!-- Container Resumed Email -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Container Resumed</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Sent when a paused low-priority container is resumed.
+                  </p>
+                  <v-checkbox
+                    v-model="settings.emailTemplates.enableContainerResumed"
+                    label="Enable this email"
+                    color="primary"
+                    class="mt-0 mb-2"
+                    hide-details
+                  ></v-checkbox>
+                  <v-text-field
+                    v-model="settings.emailTemplates.subjectContainerResumed"
+                    label="Subject Line"
+                    placeholder="Low-priority container resumed"
+                    :rules="[rules.required]"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerResumed"
+                    class="mb-3"
+                  ></v-text-field>
+                  <v-textarea
+                    v-model="settings.emailTemplates.bodyIntroContainerResumed"
+                    label="Optional Body Intro Text"
+                    placeholder=""
+                    rows="2"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerResumed"
+                  ></v-textarea>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <!-- Container Resume Failed Email -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Container Resume Failed</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Sent when a paused low-priority container fails to resume. The reservation reaches a terminal error state and the user must create a new reservation to recover their work.
+                  </p>
+                  <v-checkbox
+                    v-model="settings.emailTemplates.enableContainerResumeFailed"
+                    label="Enable this email"
+                    color="primary"
+                    class="mt-0 mb-2"
+                    hide-details
+                  ></v-checkbox>
+                  <v-text-field
+                    v-model="settings.emailTemplates.subjectContainerResumeFailed"
+                    label="Subject Line"
+                    placeholder="Low-priority container failed to resume"
+                    :rules="[rules.required]"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerResumeFailed"
+                    class="mb-3"
+                  ></v-text-field>
+                  <v-textarea
+                    v-model="settings.emailTemplates.bodyIntroContainerResumeFailed"
+                    label="Optional Body Intro Text"
+                    placeholder=""
+                    rows="2"
+                    variant="outlined"
+                    hide-details="auto"
+                    :disabled="!settings.emailTemplates.enableContainerResumeFailed"
+                  ></v-textarea>
+                </div>
+
+                <v-divider class="mb-6"></v-divider>
+
+                <!-- Low-Priority Notice -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Low-Priority Reservation Notice</h3>
+                  <p class="body-2 text-grey mb-3">
+                    Notice text added to the container started and resumed emails when the user's reservation is low-priority.
+                    Warns the user that their container may be paused if a higher-priority reservation needs the resources.
+                  </p>
+                  <v-textarea
+                    v-model="settings.emailTemplates.lowPriorityNotice"
+                    label="Low-Priority Notice Text"
+                    placeholder=""
+                    rows="3"
+                    variant="outlined"
+                    hide-details="auto"
+                  ></v-textarea>
+                </div>
+
+                <!-- Save Button -->
+                <v-row>
+                  <v-col cols="12">
+                    <v-btn
+                      color="primary"
+                      :loading="saving.emailTemplates"
+                      @click="saveSection('emailTemplates')"
+                    >
+                      <v-icon start>mdi-content-save</v-icon>
+                      Save Email Templates
+                    </v-btn>
+                  </v-col>
+                </v-row>
+              </v-form>
+            </v-expansion-panel-text>
           </v-expansion-panel>
 
           <!-- System Notifications Section -->
-          <v-expansion-panel>
-            <v-expansion-panel-header>
+          <v-expansion-panel id="panel-notifications" value="notifications">
+            <v-expansion-panel-title>
               <v-icon class="mr-3">mdi-bell-alert</v-icon>
-              <span class="font-weight-medium">System Notifications</span>
-            </v-expansion-panel-header>
-            <v-expansion-panel-content>
+              <span class="font-weight-bold">System Notifications</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
               <v-form ref="notificationsForm" v-model="forms.notifications.valid">
                 
                 <!-- Container Failure Alerts -->
                 <div class="mb-6">
-                  <h6 class="text-h6 mb-2">Container Failure Alerts</h6>
-                  <p class="body-2 grey--text mb-4">
+                  <h3 class="text-h3 mb-2">Container Failure Alerts</h3>
+                  <p class="body-2 text-grey mb-4">
                     Configure email notifications when Docker containers fail to start or stop unexpectedly. This helps administrators quickly respond to system issues.
                   </p>
                   
@@ -716,7 +1244,7 @@
                   
                   <!-- Existing alert emails -->
                   <div v-if="settings.notifications.containerAlertsEnabled && alertEmailsList.length > 0">
-                    <p class="caption grey--text mb-2">Alert recipients:</p>
+                    <p class="caption text-grey mb-2">Alert recipients:</p>
                     <v-chip
                       v-for="(email, index) in alertEmailsList"
                       :key="`alert-${index}`"
@@ -730,14 +1258,215 @@
                     </v-chip>
                   </div>
                   
-                  <div v-else-if="settings.notifications.containerAlertsEnabled" class="text-center grey--text">
+                  <div v-else-if="settings.notifications.containerAlertsEnabled" class="text-center text-grey">
                     <p class="body-2">No alert recipients configured</p>
                   </div>
                 </div>
                 
 
               </v-form>
-            </v-expansion-panel-content>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
+        </v-expansion-panels>
+
+        <h2 class="settings-group-header">Integrations &amp; Connections</h2>
+        <v-expansion-panels v-model="openPanel">
+
+          <!-- Connection Methods Section -->
+          <v-expansion-panel id="panel-connection" value="connection">
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-connection</v-icon>
+              <span class="font-weight-bold">SSH Connection Methods</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-form ref="connectionForm" v-model="forms.connection.valid">
+
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">SSH Connection Methods</h3>
+                  <p class="body-2 text-grey mb-4">
+                    Define which connection methods are shown to users when connecting to containers via SSH.
+                    These appear as toggle options in the connection details modal.
+                    Icons use Material Design Icons — <a href="https://pictogrammers.com/library/mdi/" target="_blank" rel="noopener noreferrer">browse available icons</a>.
+                    <a href="#" @click.prevent="confirmResetSshMethods">Reset to defaults</a>
+                  </p>
+
+                  <v-card
+                    v-for="(method, index) in settings.connection.sshMethods"
+                    :key="index"
+                    variant="outlined"
+                    class="pa-4 mb-3"
+                  >
+                    <v-row dense>
+                      <v-col cols="12" md="5" class="d-flex align-center">
+                        <v-icon size="large" class="mr-2">{{ method.icon || 'mdi-help-circle-outline' }}</v-icon>
+                        <v-text-field
+                          v-model="method.icon"
+                          label="Icon"
+                          placeholder="mdi-console"
+                          density="compact"
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="5">
+                        <v-text-field
+                          v-model="method.name"
+                          label="Name"
+                          placeholder="Terminal"
+                          :rules="[rules.required]"
+                          density="compact"
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="2" class="d-flex align-center justify-end" style="gap: 12px;">
+                        <v-tooltip v-if="index !== 0" location="top" text="Move up">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small" style="cursor: pointer;" @click="moveSshMethod(index, -1)">mdi-arrow-up</v-icon>
+                          </template>
+                        </v-tooltip>
+                        <v-icon v-else size="small" style="opacity: 0.3;">mdi-arrow-up</v-icon>
+
+                        <v-tooltip v-if="index !== settings.connection.sshMethods.length - 1" location="top" text="Move down">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small" style="cursor: pointer;" @click="moveSshMethod(index, 1)">mdi-arrow-down</v-icon>
+                          </template>
+                        </v-tooltip>
+                        <v-icon v-else size="small" style="opacity: 0.3;">mdi-arrow-down</v-icon>
+
+                        <v-tooltip v-if="settings.connection.sshMethods.length > 1" location="top" text="Remove this method">
+                          <template v-slot:activator="{ props }">
+                            <v-icon v-bind="props" size="small" color="red" style="cursor: pointer;" @click="removeSshMethod(index)">mdi-close</v-icon>
+                          </template>
+                        </v-tooltip>
+                        <v-icon v-else size="small" color="red" style="opacity: 0.3;">mdi-close</v-icon>
+                      </v-col>
+                    </v-row>
+                    <v-row dense class="mt-2">
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="method.template"
+                          label="Connection string template"
+                          placeholder="ssh {username}@{ip} -p {port}"
+                          :rules="[rules.required]"
+                          density="compact"
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                      <v-col cols="12" md="6">
+                        <v-text-field
+                          v-model="method.helpText"
+                          label="Help text shown above connection string"
+                          placeholder="Run this command in your terminal"
+                          density="compact"
+                          hide-details
+                        ></v-text-field>
+                      </v-col>
+                    </v-row>
+                  </v-card>
+
+                  <v-btn color="primary" variant="text" class="mt-2" @click="addSshMethod">
+                    <v-icon start>mdi-plus</v-icon>
+                    Add Method
+                  </v-btn>
+
+                  <p class="text-medium-emphasis mt-4" style="font-size: 12px;">
+                    Available template variables: <code>{username}</code>, <code>{ip}</code>, <code>{port}</code>
+                  </p>
+                </div>
+
+                <div class="mt-4">
+                  <v-btn
+                    color="primary"
+                    :loading="saving.connection"
+                    @click="saveSection('connection')"
+                  >
+                    <v-icon left>mdi-content-save</v-icon>
+                    Save Connection Settings
+                  </v-btn>
+                </div>
+
+              </v-form>
+            </v-expansion-panel-text>
+          </v-expansion-panel>
+
+          <!-- Analytics Section -->
+          <v-expansion-panel id="panel-analytics" value="analytics">
+            <v-expansion-panel-title>
+              <v-icon class="mr-3">mdi-chart-line</v-icon>
+              <span class="font-weight-bold">Analytics</span>
+            </v-expansion-panel-title>
+            <v-expansion-panel-text>
+              <v-form ref="analyticsForm" v-model="forms.analytics.valid">
+
+                <p class="body-2 text-grey mb-6">
+                  Configure optional web analytics to track page views and user activity. Both services are independent and can be enabled separately.
+                </p>
+
+                <!-- Rybbit Analytics -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Rybbit Analytics</h3>
+                  <p class="body-2 text-grey mb-4">
+                    Privacy-friendly, open-source analytics. Provide your Rybbit instance URL and site ID to enable tracking.
+                  </p>
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.analytics.rybbitUrl"
+                        label="Rybbit Instance URL"
+                        placeholder="https://app.rybbit.io"
+                        hint="Your Rybbit instance URL (e.g. https://app.rybbit.io or self-hosted)"
+                        persistent-hint
+                        outlined
+                        hide-details="auto"
+                      ></v-text-field>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.analytics.rybbitSiteId"
+                        label="Rybbit Site ID"
+                        placeholder="1"
+                        hint="Your site ID from the Rybbit dashboard"
+                        persistent-hint
+                        outlined
+                        hide-details="auto"
+                      ></v-text-field>
+                    </v-col>
+                  </v-row>
+                </div>
+
+                <!-- Google Analytics -->
+                <div class="mb-6">
+                  <h3 class="text-h3 mb-2">Google Analytics</h3>
+                  <p class="body-2 text-grey mb-4">
+                    Google Analytics 4 integration. Provide your measurement ID to enable tracking.
+                  </p>
+                  <v-row>
+                    <v-col cols="12" md="6">
+                      <v-text-field
+                        v-model="settings.analytics.googleAnalyticsId"
+                        label="GA4 Measurement ID"
+                        placeholder="G-XXXXXXXXXX"
+                        hint="Your Google Analytics 4 measurement ID"
+                        persistent-hint
+                        outlined
+                        hide-details="auto"
+                      ></v-text-field>
+                    </v-col>
+                  </v-row>
+                </div>
+
+                <v-btn
+                  color="primary"
+                  @click="saveSection('analytics')"
+                  :loading="saving.analytics"
+                  class="mt-2"
+                >
+                  <v-icon left>mdi-content-save</v-icon>
+                  Save Analytics Settings
+                </v-btn>
+
+              </v-form>
+            </v-expansion-panel-text>
           </v-expansion-panel>
 
         </v-expansion-panels>
@@ -747,12 +1476,36 @@
 </template>
 
 <script>
-const axios = require('axios').default;
+/**
+ * Admin page for managing system-wide settings.
+ * Sections are clustered under four group headers:
+ *   - General: general info/instructions, legal documents (privacy policy, terms of service).
+ *   - Access & Security: authentication (password/LDAP), user access control (blacklist/whitelist).
+ *   - Email & Notifications: email configuration (SMTP, contact, test delivery), email templates,
+ *     system notifications (container failure alerts).
+ *   - Integrations & Connections: SSH connection methods, analytics.
+ * Toggle-type settings (checkboxes, radio buttons) auto-save via watchers;
+ * text fields require explicit save button clicks per section.
+ */
+import axios from 'axios';
+import { useMainStore } from '@/store/store'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import { privacyPolicyTemplate, termsOfServiceTemplate, fillTemplate } from '/src/helpers/legalTemplates'
 
 export default {
   name: 'PageAdminGeneral',
+
+  setup() {
+    const store = useMainStore()
+    return { store }
+  },
+
   data: () => ({
-    expandedPanels: [], // All panels collapsed by default
+    // Currently expanded panel id, shared across all four group containers so
+    // that opening a panel in one group automatically collapses any panel open
+    // in another group (single-open accordion behavior).
+    openPanel: null,
     initialLoadComplete: false, // Flag to prevent auto-save during initial load
     isLoading: false, // Flag to indicate we're currently loading data
     settingsInitialized: {
@@ -760,10 +1513,26 @@ export default {
       whitelistEnabled: false,
       containerAlertsEnabled: false,
       sendEmail: false,
-      loginType: false
+      loginType: false,
+      legalEnabled: false,
+      featuresStartScriptsEnabled: false,
+      featuresStopScriptsEnabled: false,
+      featuresSshKeysEnabled: false
     }, // Track which settings have been initialized from backend
+    legalPreview: {
+      privacyPolicy: false,
+      termsOfService: false
+    },
+    legalTemplateDialog: {
+      visible: false,
+      type: ''
+    },
     testEmail: '',
     sendingTest: false,
+    testAdUsername: '',
+    testAdPassword: '',
+    testingAd: false,
+    testAdResult: '',
     
     // New email inputs
     newBlacklistEmail: '',
@@ -781,9 +1550,13 @@ export default {
       emailEnable: { valid: true },  // Add emailEnable form state
       contact: { valid: true },  // Add contact form state
       notifications: { valid: true },
-      auth: { valid: true }
+      auth: { valid: true },
+      analytics: { valid: true },
+      legal: { valid: true },
+      connection: { valid: true },
+      emailTemplates: { valid: true }
     },
-    
+
     // Saving states for each section
     saving: {
       general: false,
@@ -792,7 +1565,12 @@ export default {
       emailEnable: false,  // Added emailEnable saving state
       contact: false,  // Added contact saving state
       notifications: false,
-      auth: false
+      auth: false,
+      analytics: false,
+      legal: false,
+      connection: false,
+      emailTemplates: false,
+      features: false
     },
     
     // Form validation rules
@@ -807,6 +1585,13 @@ export default {
         if (!value) return 'This field is required'
         const num = parseInt(value)
         return (num > 0) || 'Must be a positive number'
+      },
+      scriptTimeout: value => {
+        const num = parseInt(value)
+        if (isNaN(num)) return 'Must be a number'
+        if (num < 5) return 'Minimum 5 seconds'
+        if (num > 300) return 'Maximum 300 seconds'
+        return true
       }
     },
     
@@ -954,8 +1739,53 @@ export default {
           domain: '',
           searchMethod: '',
           accountField: '',
-          emailField: ''
+          emailField: '',
+          nameField: ''
         }
+      },
+      analytics: {
+        rybbitUrl: '',
+        rybbitSiteId: '',
+        googleAnalyticsId: ''
+      },
+      legal: {
+        enabled: false,
+        organizationName: '',
+        contactEmail: '',
+        privacyPolicyContent: '',
+        termsOfServiceContent: '',
+        lastUpdated: ''
+      },
+      connection: {
+        sshMethods: [
+          { id: "vscode", name: "VS Code", icon: "mdi-microsoft-visual-studio-code", template: "{username}@{ip}:{port}", helpText: "Open the Remote SSH extension and connect to" },
+          { id: "terminal", name: "Terminal", icon: "mdi-console", template: "ssh {username}@{ip} -p {port}", helpText: "Run this command in your terminal" }
+        ]
+      },
+      emailTemplates: {
+        enableContainerStarted: true,
+        enableContainerError: true,
+        enableContainerPaused: true,
+        enableContainerResumed: true,
+        enableContainerResumeFailed: true,
+        subjectContainerStarted: '',
+        subjectContainerError: '',
+        subjectContainerPaused: '',
+        subjectContainerResumed: '',
+        subjectContainerResumeFailed: '',
+        bodyIntroContainerStarted: '',
+        bodyIntroContainerError: '',
+        bodyIntroContainerPaused: '',
+        bodyIntroContainerResumed: '',
+        bodyIntroContainerResumeFailed: '',
+        lowPriorityNotice: ''
+      },
+      features: {
+        startScriptsEnabled: true,
+        stopScriptsEnabled: true,
+        sshKeysEnabled: true,
+        startScriptTimeoutSeconds: 40,
+        stopScriptTimeoutSeconds: 40
       }
     }
   }),
@@ -1004,18 +1834,57 @@ export default {
       this.alertEmailsList.splice(index, 1);
       this.saveAlertEmails(); // Auto-save to backend
     },
-    
+
+    /** Reset SSH connection methods to defaults after user confirmation. */
+    confirmResetSshMethods() {
+      if (confirm('Reset SSH connection methods to defaults (VS Code and Terminal)? This will discard your current configuration.')) {
+        this.settings.connection.sshMethods = [
+          { id: "vscode", name: "VS Code", icon: "mdi-microsoft-visual-studio-code", template: "{username}@{ip}:{port}", helpText: "Open the Remote SSH extension and connect to" },
+          { id: "terminal", name: "Terminal", icon: "mdi-console", template: "ssh {username}@{ip} -p {port}", helpText: "Run this command in your terminal" }
+        ];
+      }
+    },
+
+    /** Add a new empty SSH connection method to the list. */
+    addSshMethod() {
+      const id = 'method-' + Date.now();
+      this.settings.connection.sshMethods.push({
+        id: id, name: '', icon: 'mdi-application', template: '', helpText: ''
+      });
+    },
+
+    /** Remove an SSH connection method by index. */
+    removeSshMethod(index) {
+      if (this.settings.connection.sshMethods.length > 1) {
+        this.settings.connection.sshMethods.splice(index, 1);
+      }
+    },
+
+    /** Move an SSH connection method up or down in the list. */
+    moveSshMethod(index, direction) {
+      const methods = this.settings.connection.sshMethods;
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= methods.length) return;
+      const item = methods.splice(index, 1)[0];
+      methods.splice(newIndex, 0, item);
+    },
+
+    /**
+     * Loads all settings sections from the backend and populates local state.
+     * Uses settingsInitialized flags and isLoading to prevent watchers from
+     * triggering auto-save during the initial hydration.
+     */
     async loadSettings() {
       try {
         //console.log('Loading settings from backend...');
         this.isLoading = true; // Set loading flag
         
         let _this = this;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_general_settings,
+          url: this.$appSettings.APIServer.admin.get_general_settings,
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
@@ -1046,7 +1915,8 @@ export default {
                 domain: data.auth?.ldap?.domain || '',
                 searchMethod: data.auth?.ldap?.searchMethod || '',
                 accountField: data.auth?.ldap?.accountField || '',
-                emailField: data.auth?.ldap?.emailField || ''
+                emailField: data.auth?.ldap?.emailField || '',
+                nameField: data.auth?.ldap?.nameField || ''
               }
             };
             
@@ -1068,7 +1938,58 @@ export default {
             _this.settings.emailEnable = {
               sendEmail: data.emailEnable?.sendEmail || false
             };
-            
+
+            // Update analytics settings
+            _this.settings.analytics = {
+              rybbitUrl: data.analytics?.rybbitUrl || '',
+              rybbitSiteId: data.analytics?.rybbitSiteId || '',
+              googleAnalyticsId: data.analytics?.googleAnalyticsId || ''
+            };
+
+            // Update legal settings
+            _this.settings.legal = {
+              enabled: data.legal?.enabled || false,
+              organizationName: data.legal?.organizationName || '',
+              contactEmail: data.legal?.contactEmail || '',
+              privacyPolicyContent: data.legal?.privacyPolicyContent || '',
+              termsOfServiceContent: data.legal?.termsOfServiceContent || '',
+              lastUpdated: data.legal?.lastUpdated || ''
+            };
+
+            // Update connection settings
+            if (data.connection?.sshMethods && Array.isArray(data.connection.sshMethods) && data.connection.sshMethods.length > 0) {
+              _this.settings.connection.sshMethods = data.connection.sshMethods;
+            }
+
+            // Update email template settings
+            _this.settings.emailTemplates = {
+              enableContainerStarted: data.emailTemplates?.enableContainerStarted !== false,
+              enableContainerError: data.emailTemplates?.enableContainerError !== false,
+              enableContainerPaused: data.emailTemplates?.enableContainerPaused !== false,
+              enableContainerResumed: data.emailTemplates?.enableContainerResumed !== false,
+              enableContainerResumeFailed: data.emailTemplates?.enableContainerResumeFailed !== false,
+              subjectContainerStarted: data.emailTemplates?.subjectContainerStarted || '',
+              subjectContainerError: data.emailTemplates?.subjectContainerError || '',
+              subjectContainerPaused: data.emailTemplates?.subjectContainerPaused || '',
+              subjectContainerResumed: data.emailTemplates?.subjectContainerResumed || '',
+              subjectContainerResumeFailed: data.emailTemplates?.subjectContainerResumeFailed || '',
+              bodyIntroContainerStarted: data.emailTemplates?.bodyIntroContainerStarted || '',
+              bodyIntroContainerError: data.emailTemplates?.bodyIntroContainerError || '',
+              bodyIntroContainerPaused: data.emailTemplates?.bodyIntroContainerPaused || '',
+              bodyIntroContainerResumed: data.emailTemplates?.bodyIntroContainerResumed || '',
+              bodyIntroContainerResumeFailed: data.emailTemplates?.bodyIntroContainerResumeFailed || '',
+              lowPriorityNotice: data.emailTemplates?.lowPriorityNotice || ''
+            };
+
+            // Update feature toggle settings
+            _this.settings.features = {
+              startScriptsEnabled: data.features?.startScriptsEnabled !== false,
+              stopScriptsEnabled: data.features?.stopScriptsEnabled !== false,
+              sshKeysEnabled: data.features?.sshKeysEnabled !== false,
+              startScriptTimeoutSeconds: data.features?.startScriptTimeoutSeconds || 40,
+              stopScriptTimeoutSeconds: data.features?.stopScriptTimeoutSeconds || 40
+            };
+
             // Mark settings as initialized after a small delay to ensure watchers don't fire during load
             setTimeout(() => {
               _this.settingsInitialized.blacklistEnabled = true;
@@ -1076,6 +1997,10 @@ export default {
               _this.settingsInitialized.containerAlertsEnabled = true;
               _this.settingsInitialized.sendEmail = true;
               _this.settingsInitialized.loginType = true;
+              _this.settingsInitialized.legalEnabled = true;
+              _this.settingsInitialized.featuresStartScriptsEnabled = true;
+              _this.settingsInitialized.featuresStopScriptsEnabled = true;
+              _this.settingsInitialized.featuresSshKeysEnabled = true;
             }, 200);
             
             // Update email lists
@@ -1091,7 +2016,7 @@ export default {
             
           } else {
             console.log("Failed to load settings...");
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: "There was an error loading settings.", 
               color: "red" 
             });
@@ -1103,9 +2028,9 @@ export default {
         .catch(function (error) {
           console.error('Failed to load settings:', error);
           if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+            _this.store.showMessage({ text: error.response.data.detail, color: "red" });
           } else {
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: 'Failed to load settings', 
               color: 'red' 
             });
@@ -1117,7 +2042,7 @@ export default {
         
       } catch (error) {
         console.error('Failed to load settings:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: 'Failed to load settings', 
           color: 'red' 
         });
@@ -1127,12 +2052,17 @@ export default {
       }
     },
     
+    /**
+     * Validates and saves a single settings section to the backend.
+     * Reloads app config after saving sections that affect public settings (general, contact).
+     * @param {string} sectionName - One of: general, access, email, emailEnable, contact, notifications, auth
+     */
     async saveSection(sectionName) {
       try {
         // Validate the form first
         const formRef = `${sectionName}Form`;
         if (this.$refs[formRef] && !this.$refs[formRef].validate()) {
-          this.$store.commit('showMessage', { 
+          this.store.showMessage({ 
             text: 'Please fix validation errors before saving', 
             color: 'red' 
           });
@@ -1156,11 +2086,11 @@ export default {
         }
         
         let _this = this;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_general_settings,
+          url: this.$appSettings.APIServer.admin.save_general_settings,
           data: {
             section: sectionName,
             settings: settingsData
@@ -1170,15 +2100,15 @@ export default {
         .then(async function (response) {
           if (response.data.status == true) {
             // Show success notification
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: `${_this.getSectionDisplayName(sectionName)} settings saved successfully!`, 
               color: 'green' 
             });
             
             // Reload app config for sections that affect public settings
-            if (sectionName === 'general' || sectionName === 'contact') {
+            if (sectionName === 'general' || sectionName === 'contact' || sectionName === 'legal' || sectionName === 'analytics' || sectionName === 'features') {
               try {
-                await _this.$store.dispatch('loadAppConfig');
+                await _this.store.loadAppConfig();
                 //console.log('App configuration reloaded after saving', sectionName, 'settings');
               } catch (error) {
                 console.error('Failed to reload app config:', error);
@@ -1188,7 +2118,7 @@ export default {
             
           } else {
             console.log(`Failed to save ${sectionName} settings...`);
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: response.data.message || `There was an error saving ${_this.getSectionDisplayName(sectionName)} settings.`, 
               color: "red" 
             });
@@ -1198,9 +2128,9 @@ export default {
         .catch(function (error) {
           console.error(`Failed to save ${sectionName} settings:`, error);
           if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+            _this.store.showMessage({ text: error.response.data.detail, color: "red" });
           } else {
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: `Failed to save ${_this.getSectionDisplayName(sectionName)} settings`, 
               color: 'red' 
             });
@@ -1210,7 +2140,7 @@ export default {
         
       } catch (error) {
         console.error(`Failed to save ${sectionName} settings:`, error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: `Failed to save ${this.getSectionDisplayName(sectionName)} settings`, 
           color: 'red' 
         });
@@ -1220,7 +2150,7 @@ export default {
     
     async sendTestEmail() {
       if (!this.isValidEmail(this.testEmail)) {
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: 'Please enter a valid email address', 
           color: 'red' 
         });
@@ -1233,11 +2163,11 @@ export default {
         console.log(`Sending test email to: ${this.testEmail}`);
         
         let _this = this;
-        let currentUser = this.$store.getters.user;
+        let currentUser = this.store.user;
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.test_email,
+          url: this.$appSettings.APIServer.admin.test_email,
           data: {
             email: this.testEmail
           },
@@ -1245,13 +2175,13 @@ export default {
         })
         .then(function (response) {
           if (response.data.status == true) {
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: `Test email sent successfully to ${_this.testEmail}`, 
               color: 'green' 
             });
           } else {
             console.log("Failed to send test email...");
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: response.data.message || 'Failed to send test email', 
               color: "red" 
             });
@@ -1261,9 +2191,9 @@ export default {
         .catch(function (error) {
           console.error('Failed to send test email:', error);
           if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-            _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" });
+            _this.store.showMessage({ text: error.response.data.detail, color: "red" });
           } else {
-            _this.$store.commit('showMessage', { 
+            _this.store.showMessage({ 
               text: 'Failed to send test email', 
               color: 'red' 
             });
@@ -1273,14 +2203,79 @@ export default {
         
       } catch (error) {
         console.error('Failed to send test email:', error);
-        this.$store.commit('showMessage', { 
+        this.store.showMessage({ 
           text: 'Failed to send test email', 
           color: 'red' 
         });
         this.sendingTest = false;
       }
     },
-    
+
+    async testAdConnection() {
+      if (!this.testAdUsername || !this.testAdPassword) {
+        this.store.showMessage({
+          text: 'Please enter both username and password',
+          color: 'red'
+        });
+        return;
+      }
+
+      try {
+        this.testingAd = true;
+        this.testAdResult = '';
+
+        let _this = this;
+        let currentUser = this.store.user;
+
+        axios({
+          method: "post",
+          url: this.$appSettings.APIServer.admin.test_ad,
+          data: {
+            username: this.testAdUsername,
+            password: this.testAdPassword
+          },
+          headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            _this.store.showMessage({
+              text: 'LDAP connection test successful',
+              color: 'green'
+            });
+            _this.testAdResult = JSON.stringify(response.data.data, null, 2);
+          } else {
+            _this.store.showMessage({
+              text: response.data.message || 'LDAP connection test failed',
+              color: "red"
+            });
+            _this.testAdResult = 'Error: ' + (response.data.message || 'LDAP connection test failed');
+          }
+          _this.testingAd = false;
+        })
+        .catch(function (error) {
+          console.error('Failed to test AD connection:', error);
+          let errorMessage = 'Failed to test AD connection';
+          if (error.response && error.response.data) {
+            errorMessage = error.response.data.detail || error.response.data.message || errorMessage;
+          } else if (error.message) {
+            errorMessage = error.message;
+          }
+          _this.store.showMessage({ text: errorMessage, color: "red" });
+          _this.testAdResult = 'Error: ' + errorMessage;
+          _this.testingAd = false;
+        });
+
+      } catch (error) {
+        console.error('Failed to test AD connection:', error);
+        this.store.showMessage({
+          text: 'Failed to test AD connection',
+          color: 'red'
+        });
+        this.testAdResult = 'Error: ' + error.message;
+        this.testingAd = false;
+      }
+    },
+
     isValidEmail(email) {
       if (!email) return false;
       const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -1292,12 +2287,49 @@ export default {
         general: 'General Information',
         access: 'Access Control',
         email: 'Email Configuration',
-        emailEnable: 'Email System',  // Added emailEnable
-        contact: 'Contact Information',  // Added contact
+        emailEnable: 'Email System',
+        contact: 'Contact Information',
         notifications: 'System Notifications',
-        auth: 'Authentication'
+        auth: 'Authentication',
+        analytics: 'Analytics',
+        legal: 'Legal Documents',
+        connection: 'Connection Methods',
+        emailTemplates: 'Email Templates',
+        features: 'Feature Toggles'
       };
       return names[sectionName] || sectionName;
+    },
+
+    /**
+     * Show confirmation dialog before loading a template, or load directly if the field is empty.
+     * @param {string} type - Either 'privacyPolicy' or 'termsOfService'.
+     */
+    confirmLoadTemplate(type) {
+      const hasContent = type === 'privacyPolicy'
+        ? this.settings.legal.privacyPolicyContent
+        : this.settings.legal.termsOfServiceContent
+
+      if (hasContent) {
+        this.legalTemplateDialog.type = type
+        this.legalTemplateDialog.visible = true
+      } else {
+        this.loadTemplate(type)
+      }
+    },
+
+    /**
+     * Load a default template into the privacy policy or terms of service textarea.
+     * Replaces {{ORGANIZATION_NAME}} and {{CONTACT_EMAIL}} placeholders with
+     * values from the organization info fields.
+     * @param {string} type - Either 'privacyPolicy' or 'termsOfService'.
+     */
+    loadTemplate(type) {
+      if (type === 'privacyPolicy') {
+        this.settings.legal.privacyPolicyContent = privacyPolicyTemplate
+      } else if (type === 'termsOfService') {
+        this.settings.legal.termsOfServiceContent = termsOfServiceTemplate
+      }
+      this.legalTemplateDialog.visible = false
     },
 
     // Updated email list management methods to auto-save
@@ -1317,6 +2349,21 @@ export default {
       }
       // Save notification settings including alert emails
       await this.saveSection('notifications');
+    }
+  },
+
+  computed: {
+    /** @returns {string} Rendered HTML of the privacy policy Markdown content with placeholders filled. */
+    renderedPrivacyPolicy() {
+      if (!this.settings.legal.privacyPolicyContent) return ''
+      const filled = fillTemplate(this.settings.legal.privacyPolicyContent, this.settings.legal.organizationName, this.settings.legal.contactEmail, this.settings.legal.lastUpdated)
+      return DOMPurify.sanitize(marked.parse(filled))
+    },
+    /** @returns {string} Rendered HTML of the terms of service Markdown content with placeholders filled. */
+    renderedTermsOfService() {
+      if (!this.settings.legal.termsOfServiceContent) return ''
+      const filled = fillTemplate(this.settings.legal.termsOfServiceContent, this.settings.legal.organizationName, this.settings.legal.contactEmail, this.settings.legal.lastUpdated)
+      return DOMPurify.sanitize(marked.parse(filled))
     }
   },
 
@@ -1353,14 +2400,72 @@ export default {
       if (this.settingsInitialized.loginType && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
         this.saveSection('auth');
       }
+    },
+
+    // Auto-save when legal enabled toggle is changed
+    'settings.legal.enabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.legalEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveSection('legal');
+      }
+    },
+
+    // Auto-save when feature toggles are changed
+    'settings.features.startScriptsEnabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.featuresStartScriptsEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveSection('features');
+      }
+    },
+
+    'settings.features.stopScriptsEnabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.featuresStopScriptsEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveSection('features');
+      }
+    },
+
+    'settings.features.sshKeysEnabled': function(newValue, oldValue) {
+      if (this.settingsInitialized.featuresSshKeysEnabled && !this.isLoading && oldValue !== undefined && newValue !== oldValue) {
+        this.saveSection('features');
+      }
+    },
+
+    // Smooth-scroll the newly opened panel into position right under the
+    // 48px sticky top nav. The 300ms delay lets Vuetify's expand/collapse
+    // transitions finish so we measure the panel's final resting position
+    // (otherwise closing the previously open panel would shift the target).
+    openPanel(newValue) {
+      if (!newValue) return;
+      setTimeout(() => {
+        const el = document.getElementById(`panel-${newValue}`);
+        if (!el) return;
+        const STICKY_NAV_OFFSET = 48 + 16;
+        const top = el.getBoundingClientRect().top + window.scrollY - STICKY_NAV_OFFSET;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }, 300);
     }
   }
 }
 </script>
 
 <style scoped lang="scss">
+// Group headers that label clusters of related expansion panels
+.settings-group-header {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.65);
+  text-align: left;
+  margin: 32px 4px 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+
+  &--first {
+    margin-top: 8px;
+  }
+}
+
 // Override Vuetify's expansion panel header styles
-::v-deep .v-expansion-panel-header {
+:deep(.v-expansion-panel-title) {
   justify-content: space-between !important;
   text-align: left !important;
   padding: 20px 24px !important;
@@ -1372,32 +2477,36 @@ export default {
 }
 
 // Create a flex container for icon + text on the left
-::v-deep .v-expansion-panel-header > div:first-child {
+:deep(.v-expansion-panel-title > div:first-child) {
   display: flex !important;
   align-items: center !important;
   justify-content: flex-start !important;
   flex-grow: 0 !important;
 }
 
-::v-deep .v-expansion-panel-header .v-icon:first-child {
+:deep(.v-expansion-panel-title .v-icon:first-child) {
   margin-right: 8px !important;
   margin-left: 0 !important;
   flex-shrink: 0 !important;
 }
 
-::v-deep .v-expansion-panel-header .font-weight-medium {
+:deep(.v-expansion-panel-title .font-weight-bold) {
   margin: 0 !important;
   white-space: nowrap !important;
 }
 
+:deep(.v-expansion-panel-text__wrapper) {
+  padding-left: 50px !important;
+}
+
 // Keep the expand/collapse icon on the right
-::v-deep .v-expansion-panel-header__icon {
+:deep(.v-expansion-panel-title__icon) {
   margin-left: auto !important;
   flex-shrink: 0 !important;
 }
 
-.font-weight-medium {
-  font-weight: 500 !important;
+.font-weight-bold {
+  font-weight: 700 !important;
   font-size: 18px !important;
 }
 
@@ -1406,7 +2515,7 @@ export default {
   font-weight: 500;
 }
 
-.v-expansion-panel-content {
+.v-expansion-panel-text {
   padding-top: 16px;
 }
 
@@ -1441,7 +2550,7 @@ export default {
   margin: 2px !important;
 }
 
-.v-expansion-panel-header>:not(.v-expansion-panel-header__icon) {
+.v-expansion-panel-title>:not(.v-expansion-panel-title__icon) {
     flex: 0;
 }
 
@@ -1449,4 +2558,23 @@ export default {
 .v-chip {
   margin: 2px !important;
 }
-</style> 
+
+// Legal document Markdown preview
+.legal-preview {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  max-height: 500px;
+  overflow-y: auto;
+  text-align: left;
+  line-height: 1.7;
+
+  :deep(h1) { font-size: 1.5rem; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+  :deep(h2) { font-size: 1.25rem; margin-top: 1.25rem; margin-bottom: 0.5rem; }
+  :deep(h3) { font-size: 1.1rem; margin-top: 1rem; margin-bottom: 0.5rem; }
+  :deep(p) { margin-bottom: 0.75rem; }
+  :deep(ul), :deep(ol) { margin-bottom: 0.75rem; padding-left: 1.5rem; }
+  :deep(li) { margin-bottom: 0.25rem; }
+  :deep(table) { border-collapse: collapse; margin-bottom: 1rem; width: 100%; }
+  :deep(th), :deep(td) { border: 1px solid rgba(255, 255, 255, 0.15); padding: 8px 12px; text-align: left; }
+  :deep(th) { font-weight: 600; }
+}
+</style>

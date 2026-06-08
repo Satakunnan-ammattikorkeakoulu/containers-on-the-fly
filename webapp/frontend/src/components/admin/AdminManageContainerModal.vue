@@ -6,60 +6,488 @@
           <v-container>
             <v-row>
               <v-col cols="12" style="margin-bottom: 15px;">
-                <h2 class="title" v-if="isCreatingNew">Create new Container</h2>
-                <h2 class="title" v-else>Edit Container</h2>
+                <h1 class="text-h4" style="margin-bottom: 0px; margin-top: 5px;" v-if="isCreatingNew">Create new Container</h1>
+                <h1 class="text-h4" v-else>Edit Container</h1>
+                <p class="text-body-2 mt-2 text-muted">
+                  <span v-if="isCreatingNew">Create a new container image that users can reserve.</span>
+                  <span v-else>Edit the container image configuration.</span>
+                  You can either build the image automatically using the built-in Image Builder,
+                  or use a pre-built image that you manage and push to the Docker registry yourself.
+                </p>
               </v-col>
 
-              <!-- PUBLIC? -->
+              <!-- BASIC INFORMATION -->
               <v-col cols="12">
-                <v-checkbox type="text" v-model="data.public" label="Public"></v-checkbox>
+                <h2 style="margin-top: 20px; margin-bottom: 0px;">Basic Information</h2>
               </v-col>
-              <!-- NAME -->
+
               <v-col cols="12">
-                <v-text-field type="text" id="name" :rules="[rules.required]" v-model="data.name" label="Name*"></v-text-field>
-                <p class="help-text">Visible in the reservation container dropdown listing.</p>
+                <!-- PUBLIC? -->
+                <v-switch
+                  v-model="data.public"
+                  :label="data.public ? 'Public' : 'Private'"
+                  color="primary"
+                  hint="Public containers are available to all users. Private containers are only visible to admins when creating a reservation."
+                  class="mb-10"
+                ></v-switch>
+
+                <!-- NAME -->
+                <v-text-field type="text" id="name" :rules="[rules.required]" v-model="data.name" label="Name*" placeholder="For example: Ubuntu 24 Base" hint="Visible in the reservation container dropdown listing." class="mb-10"></v-text-field>
+
+                <!-- IMAGE NAME -->
+                <v-tooltip location="top" :disabled="!imageNameLocked" text="Image name is locked after the image has been built. Delete and recreate this container to use a different name.">
+                  <template v-slot:activator="{ props }">
+                    <div v-bind="imageNameLocked ? props : {}">
+                      <v-text-field
+                        type="text"
+                        :rules="[rules.required, rules.imageName]"
+                        v-model="data.imageName"
+                        label="Image name*"
+                        placeholder="For example: ubuntu-24-base"
+                        :disabled="imageNameLocked"
+                        :hint="imageNameLocked
+                          ? 'Image name is locked after the image has been built. Delete and recreate this container to use a different name.'
+                          : 'Only lowercase letters, digits, dots, hyphens, underscores, and forward slashes. Used as the image tag in the registry.'"
+                        persistent-hint
+                        class="mb-10"
+                      ></v-text-field>
+                    </div>
+                  </template>
+                </v-tooltip>
+
+                <!-- DESCRIPTION -->
+                <v-textarea
+                  v-model="data.description"
+                  label="Description"
+                  counter="130"
+                  persistent-hint
+                  hint="Visible in the reservation page after selecting the container. Text over 130 characters is truncated on the card with a 'Read more' link showing the full text on hover."
+                  class="mb-5"
+                ></v-textarea>
               </v-col>
-              <!-- IMAGE NAME -->
-              <v-col cols="12">
-                <v-text-field type="text" :rules="[rules.required]" v-model="data.imageName" label="Image name*"></v-text-field>
-                <p class="help-text">Name of the Docker image. Case sensitive. The image should be available in the system running the backend docker script.</p>
+
+              <!-- CONTAINER CARD PREVIEW -->
+              <v-col cols="12" v-if="data.name">
+                <h2 style="margin-top: 20px; margin-bottom: 3px;">Preview</h2>
+                <p class="text-muted" style="margin-bottom: 12px; margin-top: 0px;">How this container appears on the reservation page.</p>
+                <v-card
+                  style="min-height: 200px; max-width: 320px;"
+                  variant="outlined"
+                >
+                  <v-card-text style="height: 100%;">
+                    <div class="d-flex flex-column h-100" style="padding: 10px;">
+                      <div class="text-center mb-3">
+                        <v-icon size="32" class="mb-2" color="primary">mdi-docker</v-icon>
+                        <div class="font-weight-medium text-h6">
+                          {{ data.name || 'Container Name' }}
+                        </div>
+                        <div
+                          class="text-body-2 mt-1"
+                          style="color: rgba(255,255,255,0.7); font-size: 12px;"
+                        >
+                          <span style="font-family: monospace;">
+                            {{ data.imageName || 'image-name' }}
+                          </span>
+                          <template v-if="(data.ports || []).length > 0">
+                            &nbsp;
+                            <v-tooltip location="top" max-width="320">
+                              <template v-slot:activator="{ props }">
+                                <v-chip
+                                  v-bind="props"
+                                  size="x-small"
+                                  variant="tonal"
+                                  style="cursor: help;"
+                                >
+                                  {{ data.ports.length }} service{{ data.ports.length === 1 ? '' : 's' }}
+                                </v-chip>
+                              </template>
+                              <div>
+                                <div style="font-weight: bold; margin-bottom: 6px;">Services exposed</div>
+                                <div
+                                  v-for="(port, idx) in portsPreview"
+                                  :key="idx"
+                                  class="d-flex align-center"
+                                  style="gap: 6px; margin: 3px 0;"
+                                >
+                                  <v-icon size="small">{{ getPortIcon(port.portType) }}</v-icon>
+                                  <span>
+                                    <strong>{{ port.serviceName || '(unnamed)' }}</strong>
+                                    &mdash; port {{ port.port || '?' }}<span v-if="port.portType"> ({{ port.portType }})</span>
+                                  </span>
+                                </div>
+                                <div style="margin-top: 8px; font-size: 12px; opacity: 0.8;">
+                                  These are the container's internal ports &mdash; an external port is assigned to each when your container starts.
+                                </div>
+                              </div>
+                            </v-tooltip>
+                          </template>
+                          <template v-if="!data.public">
+                            &nbsp;
+                            <v-tooltip location="top" max-width="280">
+                              <template v-slot:activator="{ props }">
+                                <v-chip
+                                  v-bind="props"
+                                  size="x-small"
+                                  color="warning"
+                                  variant="tonal"
+                                  style="cursor: help;"
+                                >Private</v-chip>
+                              </template>
+                              Only admins can see and select this container. Regular users won't see it on the reservation page.
+                            </v-tooltip>
+                          </template>
+                        </div>
+                      </div>
+                      <div class="flex-grow-1 text-center">
+                        <div
+                          v-if="data.description"
+                          class="text-body-2"
+                          style="color: rgba(255,255,255,0.8); font-size: 13px; line-height: 1.3;"
+                        >
+                          {{ descriptionPreview.text }}
+                          <template v-if="descriptionPreview.isTruncated">
+                            &nbsp;<v-tooltip location="top" max-width="400">
+                              <template v-slot:activator="{ props }">
+                                <span
+                                  v-bind="props"
+                                  class="admin-read-more-hint"
+                                >Read more</span>
+                              </template>
+                              <div style="white-space: pre-wrap;">{{ descriptionPreview.full }}</div>
+                            </v-tooltip>
+                          </template>
+                        </div>
+                      </div>
+                    </div>
+                  </v-card-text>
+                </v-card>
               </v-col>
-              <!-- DESCRIPTION -->
-              <v-col cols="12">
-                <v-textarea v-model="data.description" label="Description"></v-textarea>
-                <p class="help-text">Visible in the reservation page after selecting the container.</p>
-              </v-col>
+
               <!-- PORTS -->
               <v-col cols="12">
-                <h2 style="margin-top: 40px; margin-bottom: 10px;">Ports</h2>
-                <p style="margin-bottom: 20px;">Local ports of the container that will be bound to random outside ports.</p>
-                <v-row>
-                  <!-- Loop through all ports and add them here one by one -->
-                  <v-col cols="12" v-for="(port, index) in data.ports" :key="index">
-                    <v-row>
-                      <v-col cols="12" md="4">
+                <h2 style="margin-top: 20px; margin-bottom: 3px;">Ports</h2>
+                <p class="text-muted" style="margin-bottom: 20px; margin-top: 0px;">Define which container ports are exposed to users. Each local port gets a random external port assigned when a reservation starts. Set the port type to control how connection details are displayed.</p>
+                <v-row style="--v-col-gap-y: 0px;">
+                  <!-- Loop through all ports -->
+                  <v-col cols="12" v-for="(port, index) in data.ports" :key="index" style="padding-top: 0; padding-bottom: 0;">
+                    <v-row align="center" style="--v-col-gap-y: 0px;">
+                      <v-col cols="auto" class="d-flex align-center" style="padding-right: 0; margin-bottom: 12px;">
+                        <v-tooltip location="top" :text="isPrimaryPort(index) ? 'Primary connection method — shown prominently in connection details' : 'Set as primary connection method'">
+                          <template v-slot:activator="{ props }">
+                            <v-icon
+                              v-bind="props"
+                              :color="isPrimaryPort(index) ? 'amber-darken-2' : 'grey'"
+                              style="cursor: pointer;"
+                              @click="setPrimaryPort(index)"
+                            >{{ isPrimaryPort(index) ? 'mdi-star' : 'mdi-star-outline' }}</v-icon>
+                          </template>
+                        </v-tooltip>
+                      </v-col>
+                      <v-col cols="12" md="3">
                         <v-text-field type="text" v-model="port.serviceName" :rules="[rules.required]" label="Service name"></v-text-field>
                       </v-col>
-                      <v-col cols="12" md="4">
-                        <v-text-field type="text" v-model="port.port" :rules="[rules.required]" label="Port"></v-text-field>
+                      <v-col cols="12" md="2">
+                        <v-text-field type="number" v-model="port.port" :rules="[rules.required, rules.port, v => duplicatePortRule(v, index)]" label="Local port"></v-text-field>
                       </v-col>
-                      <v-col cols="12" md="4">
-                        <v-btn color="red" text @click="removePort(index)">Remove</v-btn>
+                      <v-col cols="12" md="3">
+                        <v-select
+                          v-model="port.portType"
+                          :items="portTypeOptions"
+                          item-title="title"
+                          item-value="value"
+                          label="Type"
+                          density="default"
+                        ></v-select>
+                      </v-col>
+                      <v-col cols="auto" class="d-flex align-center" style="margin-bottom: 12px;">
+                        <v-tooltip location="top" text="Remove this port">
+                          <template v-slot:activator="{ props }">
+                            <v-icon
+                              v-bind="props"
+                              color="red"
+                              style="cursor: pointer;"
+                              @click="removePort(index)"
+                            >mdi-close</v-icon>
+                          </template>
+                        </v-tooltip>
                       </v-col>
                     </v-row>
                   </v-col>
                 </v-row>
                 <v-btn color="primary" style="margin-top: 20px;" @click="addPort">Add port</v-btn>
-
               </v-col>
+
+              <!-- IMAGE MANAGEMENT MODE -->
+              <v-col cols="12">
+                <h2 style="margin-top: 40px; margin-bottom: 3px;">Image Management</h2>
+                <p class="text-body text-muted" style="margin-bottom: 20px; margin-top: 0px;">
+                  Choose how this container image is managed.
+                </p>
+
+                <v-radio-group v-model="data.managedExternally" inline class="mb-6">
+                  <v-radio :value="false" label="Build with Image Builder (recommended)"></v-radio>
+                  <v-radio :value="true" label="Use pre-built image (managed externally)"></v-radio>
+                </v-radio-group>
+
+                <!-- EXTERNALLY MANAGED INFO -->
+                <v-alert
+                  v-if="isExternallyManaged"
+                  type="info"
+                  variant="tonal"
+                  density="compact"
+                  class="mb-4"
+                >
+                  This image is managed outside the system. Push the image to the Docker registry manually.
+                  Refer to the project README for instructions on building and pushing images externally.
+                </v-alert>
+              </v-col>
+
+              <!-- IMAGE BUILDER SECTION (only shown when NOT externally managed) -->
+              <v-col cols="12" v-if="!isExternallyManaged">
+                <h2 style="margin-top: 10px; margin-bottom: 3px;">Image Builder</h2>
+                <p class="text-muted" style="margin-bottom: 10px; margin-top: 0px;">
+                  Define the Dockerfile to build this image automatically.
+                  <v-btn v-if="templates.length" variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="showTemplates = !showTemplates">
+                    {{ showTemplates ? 'Hide Pre-Made Templates' : 'Show Pre-Made Templates' }}
+                  </v-btn>
+                </p>
+                <div v-if="showTemplates && templates.length" class="mt-3 mb-6">
+                  <v-row>
+                    <v-col cols="12" md="4" v-for="template in templates" :key="template.id">
+                      <v-tooltip location="bottom" text="Click to populate all fields below with this template">
+                        <template v-slot:activator="{ props }">
+                          <v-card
+                            v-bind="props"
+                            variant="outlined"
+                            :color="selectedTemplateId === template.id ? 'primary' : undefined"
+                            class="template-card"
+                            @click="applyTemplate(template)"
+                            hover
+                          >
+                            <v-card-text class="text-center pa-4">
+                              <v-icon size="28" class="mb-2" :color="selectedTemplateId === template.id ? 'primary' : 'grey'">
+                                {{ template.icon }}
+                              </v-icon>
+                              <div class="font-weight-medium text-body-1">{{ template.name }}</div>
+                              <div class="text-body-2 text-medium-emphasis mt-1">{{ template.description }}</div>
+                            </v-card-text>
+                          </v-card>
+                        </template>
+                      </v-tooltip>
+                    </v-col>
+                  </v-row>
+                </div>
+                <div style="margin-bottom: 20px;"></div>
+
+                <!-- Build Status -->
+                <div v-if="!isCreatingNew && data.buildStatus" class="mb-4 d-flex align-center">
+                  <span class="mr-2">Build Status:</span>
+                  <v-chip
+                    :color="buildStatusColor"
+                    text-color="white"
+                    size="small"
+                  >
+                    <v-progress-circular
+                      v-if="data.buildStatus === 'building' || data.buildStatus === 'pending'"
+                      indeterminate size="14" width="2" class="mr-1"
+                    ></v-progress-circular>
+                    {{ buildStatusLabel }}
+                  </v-chip>
+                  <v-btn
+                    v-if="data.buildLog"
+                    variant="text"
+                    size="small"
+                    color="primary"
+                    class="ml-2"
+                    @click="showBuildLogDialog = true"
+                  >
+                    View Build Log
+                  </v-btn>
+                </div>
+
+                <!-- Container Username -->
+                <v-text-field
+                  v-model="data.containerUsername"
+                  label="Container Username*"
+                  :rules="[rules.required, rules.username]"
+                  class="mb-10"
+                  hint=" "
+                >
+                  <template v-slot:message>
+                    <span>Linux username inside the container that users will SSH into. Default is: user.
+                      <v-btn variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetUsernameToDefault">Reset</v-btn>
+                    </span>
+                  </template>
+                </v-text-field>
+
+                <!-- Base Image -->
+                <v-text-field
+                  v-model="data.baseImage"
+                  label="Base Image*"
+                  placeholder="ubuntu:24.04"
+                  :rules="[rules.required]"
+                  class="mb-10"
+                  hint=" "
+                >
+                  <template v-slot:message>
+                    <span>Docker image for the FROM line (e.g. ubuntu:24.04).
+                      <v-btn variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetBaseImageToDefault">Reset</v-btn>
+                    </span>
+                  </template>
+                </v-text-field>
+
+                <!-- Dockerfile Body -->
+                <v-textarea
+                  v-model="data.dockerfileCommands"
+                  label="Dockerfile Body*"
+                  placeholder="Dockerfile instructions between FROM and CMD"
+                  rows="15"
+                  :rules="[rules.required]"
+                  class="dockerfile-textarea mb-10"
+                  hint=" "
+                >
+                  <template v-slot:message>
+                    <span>Full Dockerfile instructions between FROM and CMD. Edit freely to customize packages, user setup, SSH config, etc.
+                      <v-btn v-if="data.dockerfileCommands" variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetDockerfileToDefaults">Reset</v-btn>
+                    </span>
+                  </template>
+                </v-textarea>
+
+                <!-- CMD -->
+                <v-text-field
+                  v-model="data.containerCmd"
+                  label="CMD (start command)*"
+                  :rules="[rules.required]"
+                  class="dockerfile-textarea mb-10"
+                  hint=" "
+                >
+                  <template v-slot:message>
+                    <span>The container start command (last Dockerfile line). Default starts SSH daemon.
+                      <v-btn variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetCmdToDefaults">Reset</v-btn>
+                    </span>
+                  </template>
+                </v-text-field>
+              </v-col>
+
+              <!-- RUNTIME POST-START COMMANDS (only shown when NOT externally managed) -->
+              <v-col cols="12" v-if="!isExternallyManaged">
+                <v-expansion-panels class="mt-2">
+                  <v-expansion-panel>
+                    <v-expansion-panel-title>
+                      <v-icon class="mr-2" size="small">mdi-console</v-icon>
+                      Runtime Post-Start Commands
+                    </v-expansion-panel-title>
+                    <v-expansion-panel-text>
+                      <p class="text-body-2 mb-4 text-muted">
+                        These commands run as root inside the container after every start.
+                        Template variables <code>{username}</code>, <code>{password}</code>, and <code>{ssh_key}</code> are replaced with actual values at runtime.
+                      </p>
+
+                      <!-- Password Command -->
+                      <v-text-field
+                        v-model="data.passwordCommand"
+                        label="Password Command"
+                        class="dockerfile-textarea mb-10"
+                        hint=" "
+                      >
+                        <template v-slot:message>
+                          <span>Executed to set the SSH password. Variables: {username}, {password}.
+                            <v-btn variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetPasswordCommandToDefaults">Reset</v-btn>
+                          </span>
+                        </template>
+                      </v-text-field>
+
+                      <!-- SSH Key Deploy Commands -->
+                      <v-textarea
+                        v-model="data.sshKeyDeployCommands"
+                        label="SSH Key Deploy Commands"
+                        rows="5"
+                        class="dockerfile-textarea mb-4"
+                        hint=" "
+                      >
+                        <template v-slot:message>
+                          <span>Executed if user has an SSH public key. Variables: {username}, {ssh_key}.
+                            <v-btn variant="text" color="warning" size="x-small" class="inline-action-btn" @click.stop.prevent="resetSshKeyCommandsToDefaults">Reset</v-btn>
+                          </span>
+                        </template>
+                      </v-textarea>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+
+                  <!-- EXPORT TEMPLATE -->
+                  <v-expansion-panel v-if="data.dockerfileCommands && data.baseImage">
+                    <v-expansion-panel-title>
+                      <v-icon class="mr-2" size="small">mdi-download</v-icon>
+                      Export as Template
+                    </v-expansion-panel-title>
+                    <v-expansion-panel-text>
+                      <v-btn
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                        prepend-icon="mdi-download"
+                        @click="exportTemplate"
+                      >
+                        Download Template JSON
+                      </v-btn>
+                      <p class="text-medium-emphasis mt-2" style="font-size: 12px;">
+                        Download the current Image Builder config as a JSON file you can share or drop into the container_templates/custom/ folder on the main server. The custom/ folder is excluded from the repository so your templates won't be overwritten on updates. New templates are available immediately — no restart required. The template will appear under Show Pre-Made Templates for every new and editable container. In most cases this is not necessary — only useful if you are building many containers from the same base settings.
+                      </p>
+                    </v-expansion-panel-text>
+                  </v-expansion-panel>
+                </v-expansion-panels>
+              </v-col>
+
             </v-row>
           </v-container>
         </v-card-text>
 
-        <v-card-actions>
+        <v-card-actions class="mx-6 mb-6 mt-2" style="align-items: center; flex-wrap: wrap; gap: 8px;">
+          <!-- SAVE INFO -->
+          <v-alert
+            v-if="hasRequiredFields"
+            :type="saveInfoType"
+            variant="tonal"
+            density="compact"
+            style="flex: 1 1 0; min-width: 0;"
+          >
+            {{ saveInfoMessage }}
+          </v-alert>
+          <v-btn color="red" variant="text" @click="closeDialog">Cancel</v-btn>
+          <v-btn color="blue" variant="text" @click="submit" :loading="isSubmitting">
+            <span v-if="isCreatingNew">Add container</span><span v-else>Save Container</span>
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Build Log Dialog -->
+    <AdminBuildLogDialog
+      v-if="showBuildLogDialog && data.containerId"
+      :containerId="data.containerId"
+      :isOpen="showBuildLogDialog"
+      @emitClose="onBuildLogClose"
+      @emitEditContainer="onBuildLogEditContainer"
+    />
+
+    <!-- Overwrite Confirmation Dialog -->
+    <v-dialog v-model="showOverwriteDialog" persistent max-width="560px">
+      <v-card>
+        <v-card-title class="text-h6">Image already exists in registry</v-card-title>
+        <v-card-text>
+          <p>
+            An image with the name
+            <strong>{{ overwriteDialogImageName }}</strong>
+            already exists in the Docker registry. Building this container will overwrite it.
+          </p>
+          <p class="mt-3 text-body-2 text-muted">
+            This can happen if the image was pushed manually or if a previously removed container left an orphan in the registry.
+          </p>
+        </v-card-text>
+        <v-card-actions class="mx-4 mb-3">
           <v-spacer></v-spacer>
-          <v-btn color="red" text @click="closeDialog">Cancel</v-btn>
-          <v-btn color="blue" text @click="submit"><span v-if="isCreatingNew">Add container</span><span v-else>Save Container</span></v-btn>
+          <v-btn color="grey" variant="text" @click="cancelOverwrite">Cancel</v-btn>
+          <v-btn color="warning" variant="flat" @click="confirmOverwriteAndSave">Overwrite</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -67,47 +495,192 @@
 </template>
 
 <script>
-  const axios = require('axios').default;
-  //import Loading from '/src/components/global/Loading.vue';
+  /**
+   * Modal dialog for creating or editing a container image definition.
+   * Supports two modes: Image Builder (managed internally) and pre-built (managed externally).
+   *
+   * Image Builder mode allows admins to configure the Dockerfile body, CMD, container username,
+   * and runtime post-start commands. Pre-built mode hides these fields and expects the admin
+   * to manage the image outside the system.
+   *
+   * Props:
+   *   propData - The container ID to edit, or "new" to create a new container.
+   *
+   * Emits:
+   *   emitModalClose - When the modal is closed (after save or cancel).
+   */
+  import axios from 'axios';
+  import { useMainStore } from '@/store/store'
+  import AdminBuildLogDialog from '/src/components/admin/AdminBuildLogDialog.vue';
 
   export default {
     name: "AdminManageContainerModal",
+    components: {
+      AdminBuildLogDialog,
+    },
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     props: {
-      propData: [ Number, String ], // Contains the ID of the container to edit, or "new" if creating new
+      propData: [ Number, String ],
     },
     data() {
       return {
-        item: this.propData, // Contains the ID of the container to edit, or "new" if creating new
-        data: { ports: [] }, // Contains the data of the container, for ex: { containerId: 2, public: true, name: "Ubuntu 20.04", ports: [ { id: 1, serviceName: "SSH", port: 22 } ] ...... }
-        isCreatingNew: false, // Set to true if creating new container
-        isOpen: true, // Set to true to open the modal
-        isFetching: true, // Set to true when fetching data from server
-        isSubmitting: false, // Set to true when submitting data to server
-        modalKey: new Date().toString(), // Used to force re-rendering of the modal
-        removedPorts: [], // IDs of ports that were removed
+        item: this.propData,
+        data: {
+          ports: [],
+          primaryConnectionPortId: null,
+          managedExternally: false,
+          baseImage: '',
+          dockerfileCommands: '',
+          containerCmd: '',
+          buildStatus: null,
+          buildLog: '',
+          containerUsername: '',
+          passwordCommand: '',
+          sshKeyDeployCommands: '',
+        },
+        portTypeOptions: [
+          { title: "SSH", value: "SSH" },
+          { title: "HTTP", value: "HTTP" },
+          { title: "HTTPS", value: "HTTPS" },
+          { title: "VNC", value: "VNC" },
+          { title: "Other (TCP)", value: null },
+        ],
+        defaults: null,
+        originalImageFields: null,
+        templates: [],
+        selectedTemplateId: null,
+        showTemplates: false,
+        isCreatingNew: false,
+        isOpen: true,
+        isFetching: true,
+        isSubmitting: false,
+        modalKey: new Date().toString(),
+        primaryPortIndex: 0,
+        removedPorts: [],
         dataName: "container",
+        showBuildLogDialog: false,
+        showOverwriteDialog: false,
+        overwriteDialogImageName: "",
         rules: {
           required: value => !!value || "Required",
-          newPassword: value => {
-            if (!value || value == "" || value.trim() == "") return "Password cannot be empty.";
-            if (value.length < 5) return "Password has to be over 4 characters long.";
+          imageName: value => {
+            if (!value || value.trim() === '') return true;
+            if (!/^[a-z0-9][a-z0-9._/-]{0,127}$/.test(value)) return 'Only lowercase letters, digits, dots, hyphens, underscores, and forward slashes.';
+            return true;
+          },
+          username: value => {
+            if (!value || value.trim() === '') return true;
+            if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(value)) return 'Must be 1-32 lowercase letters, digits, hyphens, or underscores.';
+            if (['root', 'daemon', 'bin', 'sys', 'nobody', 'www-data', 'mail', 'sshd'].includes(value)) return 'This username is reserved.';
+            return true;
+          },
+          port: value => {
+            if (!value) return true;
+            let num = Number(value);
+            if (!Number.isInteger(num) || num < 1 || num > 65535) return 'Must be an integer between 1 and 65535.';
             return true;
           },
           number: value => !isNaN(parseFloat(value)),
-          email: value => {
-            const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
-            return pattern.test(value) || 'Type in working email address.'
-          },
         }
       }
     },
     computed: {
+      /** Truncated description preview matching the reservation card behavior. */
+      descriptionPreview() {
+        const full = this.data.description || ''
+        const maxLen = 130
+        if (full.length <= maxLen) return { text: full, isTruncated: false, full }
+        let cutAt = full.lastIndexOf(' ', maxLen)
+        if (cutAt < maxLen * 0.7) cutAt = maxLen
+        return { text: full.slice(0, cutAt).trimEnd() + '…', isTruncated: true, full }
+      },
+      /**
+       * Ports ordered for the preview tooltip: primary-selected port first,
+       * falling back to the first SSH port, matching the reservation page.
+       */
+      portsPreview() {
+        const ports = this.data.ports || []
+        if (ports.length <= 1) return ports
+        let primaryIndex = this.primaryPortIndex
+        if (primaryIndex == null || primaryIndex < 0 || primaryIndex >= ports.length) {
+          primaryIndex = ports.findIndex(p => p.portType === 'SSH')
+        }
+        if (primaryIndex <= 0) return ports
+        return [ports[primaryIndex], ...ports.slice(0, primaryIndex), ...ports.slice(primaryIndex + 1)]
+      },
+      isExternallyManaged() {
+        // null = legacy container, treat as externally managed
+        return this.data.managedExternally === true || this.data.managedExternally === null;
+      },
+      /** Whether saving will trigger an image rebuild. */
+      willRebuild() {
+        if (this.isExternallyManaged) return false;
+        if (!this.data.dockerfileCommands || !this.data.dockerfileCommands.trim()) return false;
+        if (this.isCreatingNew) return true;
+        if (!this.originalImageFields) return false;
+        return (
+          this.data.imageName !== this.originalImageFields.imageName ||
+          this.data.dockerfileCommands !== this.originalImageFields.dockerfileCommands ||
+          this.data.baseImage !== this.originalImageFields.baseImage ||
+          this.data.containerUsername !== this.originalImageFields.containerUsername ||
+          this.data.containerCmd !== this.originalImageFields.containerCmd
+        );
+      },
+      /** Context-sensitive save info message. */
+      /** Whether all required basic fields are filled. */
+      hasRequiredFields() {
+        return this.data.name && this.data.name.trim() && this.data.imageName && this.data.imageName.trim();
+      },
+      saveInfoMessage() {
+        let imageName = this.data.imageName || 'your-image';
+        if (this.isExternallyManaged) {
+          if (this.isCreatingNew) {
+            return `The container will be registered but no image will be built. You need to manually build and push the image "${imageName}" to the Docker registry before users can reserve it.`;
+          }
+          return `No image will be built. The image "${imageName}" is managed externally — make sure it is available in the Docker registry.`;
+        }
+        if (this.isCreatingNew) {
+          return `The image "${imageName}" will be built and pushed to the Docker registry automatically. After saving, the build log will open so you can follow the progress. Once built, the image will be available on the container server (visible via "docker images" command).`;
+        }
+        if (this.willRebuild) {
+          return `Image builder settings were changed. The image "${imageName}" will be rebuilt and pushed to the Docker registry. The build log will open after saving.`;
+        }
+        return `No image rebuild needed — the image builder settings were not changed. Only container configuration will be updated.`;
+      },
+      saveInfoType() {
+        if (this.isExternallyManaged) return 'warning';
+        if (this.isCreatingNew || this.willRebuild) return 'info';
+        return 'success';
+      },
+      buildStatusColor() {
+        const colors = { pending: 'yellow', building: 'orange', success: 'green', failed: 'red' };
+        return colors[this.data.buildStatus] || 'grey';
+      },
+      buildStatusLabel() {
+        const labels = { pending: 'Build Queued', building: 'Building...', success: 'Built', failed: 'Build Failed' };
+        return labels[this.data.buildStatus] || this.data.buildStatus;
+      },
+      /** Whether the image name field is locked (built or currently building).
+       *  When switching to externally-managed, the user takes ownership of
+       *  the image so the lock no longer applies. */
+      imageNameLocked() {
+        if (this.isCreatingNew) return false;
+        if (this.isExternallyManaged) return false;
+        return !!this.data.lastBuiltAt || this.data.buildStatus === 'building';
+      },
     },
     created() {
       if (this.item === "new") {
         this.isCreatingNew = true;
         this.isFetching = false;
-        //this.item = Object.assign({}, this.item, { services: [], members: [], hasOpeningHours: false, hasSpecialPrices: false, branding: {} });
+        this.data.managedExternally = false;
+        // Pre-fill with default SSH port for new containers
+        this.data.ports = [{ serviceName: "SSH", port: "22", portType: "SSH" }];
+        this.fetchDefaults();
+        this.fetchTemplates();
       }
       else {
         this.isFetching = true;
@@ -117,18 +690,177 @@
     mounted() {
     },
     methods: {
-      addPort() {
-        this.data.ports.push({ serviceName: "", port: "" });
+      /** Maps a ContainerPort type to its corresponding mdi icon name. */
+      getPortIcon(portType) {
+        const icons = {
+          SSH: 'mdi-console',
+          HTTP: 'mdi-web',
+          HTTPS: 'mdi-lock',
+          VNC: 'mdi-monitor',
+        }
+        return icons[portType] || 'mdi-lan'
       },
+      /** Check if a port at the given index is the primary connection method. */
+      isPrimaryPort(index) {
+        return this.primaryPortIndex === index;
+      },
+      /** Set the port at the given index as the primary connection method. */
+      setPrimaryPort(index) {
+        this.primaryPortIndex = index;
+      },
+      /** Validates that a port number is not used by another entry. */
+      duplicatePortRule(value, currentIndex) {
+        if (!value) return true;
+        let port = String(value).trim();
+        let duplicates = this.data.ports.filter((p, i) => i !== currentIndex && String(p.port).trim() === port);
+        if (duplicates.length > 0) return 'This port is already in use.';
+        return true;
+      },
+      addPort() {
+        this.data.ports.push({ serviceName: "", port: "", portType: null });
+      },
+      /** Removes a port entry and tracks its ID for backend deletion if it was already persisted. */
       removePort(index) {
-        // Mark the port for removal if it also contained containerPortId, thus it was already in the database
-        if (this.data.ports[index].containerPortId) {
-          this.removedPorts.push(this.data.ports[index].containerPortId);
+        const port = this.data.ports[index];
+        if (port.containerPortId) {
+          this.removedPorts.push(port.containerPortId);
         }
         this.data.ports.splice(index, 1);
+        // Adjust primary index after removal
+        if (this.primaryPortIndex === index) {
+          this.primaryPortIndex = 0;
+        } else if (this.primaryPortIndex > index) {
+          this.primaryPortIndex--;
+        }
       },
       closeDialog() {
         this.isOpen = false;
+      },
+      /** Fetch default values from backend for new container creation. */
+      fetchDefaults(username) {
+        let _this = this;
+        let currentUser = this.store.user;
+        let params = {};
+        if (username) params.username = username;
+
+        axios({
+          method: "get",
+          url: this.$appSettings.APIServer.admin.container_defaults,
+          params: params,
+          headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            _this.defaults = response.data.data;
+          }
+        })
+        .catch(function (error) {
+          console.log("Error fetching container defaults:", error);
+        });
+      },
+      /** Fetch pre-made templates from the backend. */
+      fetchTemplates() {
+        let _this = this;
+        let currentUser = this.store.user;
+
+        axios({
+          method: "get",
+          url: this.$appSettings.APIServer.admin.container_templates,
+          params: { username: this.data.containerUsername || 'user' },
+          headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            _this.templates = response.data.data.templates || [];
+          }
+        })
+        .catch(function (error) {
+          console.log("Error fetching container templates:", error);
+        });
+      },
+      /** Apply a pre-made template to all Image Builder fields. */
+      applyTemplate(template) {
+        this.selectedTemplateId = template.id;
+        this.data.baseImage = template.baseImage;
+        this.data.containerUsername = template.containerUsername || 'user';
+        this.data.dockerfileCommands = template.dockerfileBody;
+        this.data.containerCmd = template.containerCmd;
+        this.data.passwordCommand = template.passwordCommand;
+        this.data.sshKeyDeployCommands = template.sshKeyDeployCommands;
+        // Update defaults so Reset links use this template's values
+        this.defaults = {
+          dockerfileBody: template.dockerfileBody,
+          containerCmd: template.containerCmd,
+          passwordCommand: template.passwordCommand,
+          sshKeyDeployCommands: template.sshKeyDeployCommands,
+        };
+      },
+      /** Export the current Image Builder config as a downloadable JSON template file. */
+      exportTemplate() {
+        let template = {
+          name: this.data.name || "Exported Template",
+          description: this.data.description || "",
+          icon: "mdi-docker",
+          baseImage: this.data.baseImage,
+          dockerfileBody: this.data.dockerfileCommands,
+          containerCmd: this.data.containerCmd,
+          passwordCommand: this.data.passwordCommand,
+          sshKeyDeployCommands: this.data.sshKeyDeployCommands,
+        };
+        let blob = new Blob([JSON.stringify(template, null, 2)], { type: "application/json" });
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement("a");
+        a.href = url;
+        a.download = (this.data.imageName || "template").replace(/\//g, "-") + ".json";
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      /** Reset the Dockerfile body to defaults for the current username. */
+      resetDockerfileToDefaults() {
+        let _this = this;
+        let currentUser = this.store.user;
+        let username = this.data.containerUsername || 'user';
+
+        axios({
+          method: "get",
+          url: this.$appSettings.APIServer.admin.container_defaults,
+          params: { username: username },
+          headers: { "Authorization": `Bearer ${currentUser.loginToken}` }
+        })
+        .then(function (response) {
+          if (response.data.status == true) {
+            _this.data.dockerfileCommands = response.data.data.dockerfileBody;
+            _this.data.containerCmd = response.data.data.containerCmd;
+          }
+        });
+      },
+      /** Reset username to default value (or selected template's value). */
+      resetUsernameToDefault() {
+        let selected = this.templates.find(t => t.id === this.selectedTemplateId);
+        this.data.containerUsername = selected ? selected.containerUsername || 'user' : 'user';
+      },
+      /** Reset base image to default value (or selected template's value). */
+      resetBaseImageToDefault() {
+        let selected = this.templates.find(t => t.id === this.selectedTemplateId);
+        this.data.baseImage = selected ? selected.baseImage : 'ubuntu:24.04';
+      },
+      /** Reset CMD to default value. */
+      resetCmdToDefaults() {
+        if (this.defaults) {
+          this.data.containerCmd = this.defaults.containerCmd;
+        }
+      },
+      /** Reset password command to default value. */
+      resetPasswordCommandToDefaults() {
+        if (this.defaults) {
+          this.data.passwordCommand = this.defaults.passwordCommand;
+        }
+      },
+      /** Reset SSH key deploy commands to default value. */
+      resetSshKeyCommandsToDefaults() {
+        if (this.defaults) {
+          this.data.sshKeyDeployCommands = this.defaults.sshKeyDeployCommands;
+        }
       },
       submit() {
         if (!this.$refs.form.validate()) return;
@@ -136,84 +868,160 @@
         let containerId = this.item == "new" ? -1 : this.item;
         let data = this.data;
         data.removedPorts = this.removedPorts;
+        // Resolve primary port index to containerPortId for the backend
+        const primaryPort = this.data.ports[this.primaryPortIndex];
+        data.primaryConnectionPortId = (primaryPort && primaryPort.containerPortId && this.primaryPortIndex !== 0)
+          ? primaryPort.containerPortId : null;
 
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.admin.save_container,
+          url: this.$appSettings.APIServer.admin.save_container,
           data: { containerId: containerId, data: data },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
-          //console.log(response)
             // Success
             if (response.data.status == true) {
+              let savedId = response.data.data ? response.data.data.containerId : null;
+              if (_this.willRebuild && savedId) {
+                _this.store.showMessage({ text: "Container saved. Image build queued.", color: "green" })
+                _this.data.containerId = savedId;
+                _this.showBuildLogDialog = true;
+                _this.isOpen = false;
+                _this.isSubmitting = false;
+                return;
+              } else {
+                _this.store.showMessage({ text: "Container saved.", color: "green" })
+              }
               _this.closeDialog();
               _this.isSubmitting = false
+            }
+            // Registry collision — ask for confirmation before silently overwriting
+            else if (response.data.data && response.data.data.needsOverwriteConfirmation) {
+              _this.overwriteDialogImageName = response.data.data.imageName || _this.data.imageName;
+              _this.showOverwriteDialog = true;
+              _this.isSubmitting = false;
             }
             // Fail
             else {
               console.log("Failed saving "+_this.dataName+" information...")
-              _this.$store.commit('showMessage', { text: "There was an error saving "+_this.dataName+" information.", color: "red" })
+              _this.store.showMessage({ text: response.data.message || "There was an error saving "+_this.dataName+" information.", color: "red" })
+              _this.isSubmitting = false
             }
-            _this.isSubmitting = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to save "+_this.dataName+" information.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to save "+_this.dataName+" information.", color: "red" })
             }
             _this.isSubmitting = false
         });
       },
+      /** User confirmed the registry overwrite — resubmit with the confirmOverwrite flag. */
+      confirmOverwriteAndSave() {
+        this.showOverwriteDialog = false;
+        this.data.confirmOverwrite = true;
+        this.submit();
+      },
+      /** User cancelled the registry overwrite dialog — keep the form open untouched. */
+      cancelOverwrite() {
+        this.showOverwriteDialog = false;
+        this.data.confirmOverwrite = false;
+      },
       fetchData() {
         let _this = this
-        let currentUser = this.$store.getters.user
+        let currentUser = this.store.user
 
         axios({
           method: "get",
-          url: this.AppSettings.APIServer.admin.get_container,
+          url: this.$appSettings.APIServer.admin.get_container,
           params: { containerId: this.item },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
-          //console.log(response)
             // Success
             if (response.data.status == true) {
               _this.data = response.data.data.data
+              // Ensure defaults for fields
+              if (!_this.data.baseImage) _this.data.baseImage = 'ubuntu:24.04'
+              if (!_this.data.containerUsername) _this.data.containerUsername = 'user'
+              if (!_this.data.ports) _this.data.ports = []
+              // Resolve primaryConnectionPortId to an index
+              if (_this.data.primaryConnectionPortId != null) {
+                const idx = _this.data.ports.findIndex(p => p.containerPortId === _this.data.primaryConnectionPortId);
+                _this.primaryPortIndex = idx !== -1 ? idx : 0;
+              } else {
+                _this.primaryPortIndex = 0;
+              }
+              // Legacy containers (managedExternally is null) — treat as externally managed
+              if (_this.data.managedExternally === null || _this.data.managedExternally === undefined) {
+                _this.data.managedExternally = true;
+              }
+              // Store original image-related fields for rebuild detection
+              _this.originalImageFields = {
+                imageName: _this.data.imageName,
+                dockerfileCommands: _this.data.dockerfileCommands,
+                baseImage: _this.data.baseImage,
+                containerUsername: _this.data.containerUsername,
+                containerCmd: _this.data.containerCmd,
+              };
+              // Fetch defaults and templates for reset buttons (only if using Image Builder)
+              if (!_this.data.managedExternally) {
+                _this.fetchDefaults(_this.data.containerUsername);
+                _this.fetchTemplates();
+              }
             }
             // Fail
             else {
               console.log("Failed getting "+_this.dataName+"...")
-              _this.$store.commit('showMessage', { text: "There was an error getting "+_this.dataName+".", color: "red" })
+              _this.store.showMessage({ text: "There was an error getting "+_this.dataName+".", color: "red" })
             }
             _this.isFetching = false
         })
         .catch(function (error) {
             // Error
             if (error.response && (error.response.status == 400 || error.response.status == 401)) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error while trying to get "+_this.dataName+".", color: "red" })
+              _this.store.showMessage({ text: "Unknown error while trying to get "+_this.dataName+".", color: "red" })
             }
             _this.isFetching = false
         });
 
         this.isFetching = false
-      }
+      },
+      onBuildLogClose() {
+        this.showBuildLogDialog = false;
+        this.$emit("emitModalClose");
+      },
+      onBuildLogEditContainer(containerId) {
+        this.showBuildLogDialog = false;
+        this.item = containerId;
+        this.isCreatingNew = false;
+        this.isOpen = true;
+        this.fetchData();
+      },
     },
     watch: {
       isOpen: function(newVal) {
         if (newVal === false) {
           this.$emit("emitModalClose");
+        }
+      },
+      /** When switching from external to Image Builder, fetch defaults and templates. */
+      'data.managedExternally': function(newVal) {
+        if (newVal === false) {
+          if (!this.defaults) this.fetchDefaults(this.data.containerUsername);
+          if (!this.templates.length) this.fetchTemplates();
         }
       },
     }
@@ -225,8 +1033,37 @@
     margin-top: 40px;
   }
 
-  .help-text {
-    margin-top: -7px;
+  .admin-read-more-hint {
+    cursor: help;
+    text-decoration: underline;
+    font-size: 12px;
   }
 
+  .dockerfile-textarea :deep(textarea),
+  .dockerfile-textarea :deep(input) {
+    font-family: monospace;
+    font-size: 15px;
+  }
+
+  .template-card {
+    cursor: pointer;
+    transition: border-color 0.2s;
+    min-height: 180px;
+    display: flex;
+    align-items: center;
+  }
+
+  // Compact text button used inline within field hint messages
+  // (Reset / Show Templates). Strips Vuetify's default min-width and
+  // global .v-btn padding/margin so the button sits naturally in the text flow.
+  .inline-action-btn {
+    min-width: 0 !important;
+    padding: 0 4px !important;
+    height: auto !important;
+    margin: 0 0 0 4px !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+  }
 </style>

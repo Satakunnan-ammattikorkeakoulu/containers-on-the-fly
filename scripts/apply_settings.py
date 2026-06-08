@@ -34,8 +34,6 @@ class SettingsApplier:
             print("Please copy user_config/settings_example to user_config/settings and configure it.")
             sys.exit(1)
             
-        #print(f"Loading settings from {self.settings_file}")
-        
         # Read the bash settings file
         with open(self.settings_file, 'r') as f:
             content = f.read()
@@ -64,8 +62,6 @@ class SettingsApplier:
         # Process derived settings
         self._process_derived_settings()
         self._process_caddy_settings()
-        #print(f"Loaded {len(self.settings)} settings")
-        
     def _process_derived_settings(self):
         """Process derived settings that depend on other settings."""
         # Build web address from MAIN_SERVER_WEB_HOST and MAIN_SERVER_WEB_HTTPS
@@ -92,7 +88,7 @@ class SettingsApplier:
             
         # Convert boolean strings to proper JSON boolean values
         bool_settings = [
-            'DATABASE_DEBUG', 'ADD_TEST_DATA', 
+            'DATABASE_DEBUG',
             'MAIN_SERVER_WEB_HTTPS', 'DEBUG_SKIP_GPU_DEDICATION'
         ]
         
@@ -123,12 +119,15 @@ class SettingsApplier:
                 except ValueError:
                     print(f"Warning: {setting} should be numeric, got: {self.settings[setting]}")
         
+        # Default log level if not specified
+        if 'LOG_LEVEL' not in self.settings or not self.settings['LOG_LEVEL']:
+            self.settings['LOG_LEVEL'] = 'DEBUG'
+
         # Handle DOCKER_REGISTRY_ADDRESS - use SERVER_IP_ADDRESS if empty
         docker_registry_addr = self.settings.get('DOCKER_REGISTRY_ADDRESS', '').strip()
         if not docker_registry_addr:
             # Use SERVER_IP_ADDRESS if DOCKER_REGISTRY_ADDRESS is empty
             self.settings['DOCKER_REGISTRY_ADDRESS'] = self.settings.get('SERVER_IP_ADDRESS', '')
-            #print(f"DOCKER_REGISTRY_ADDRESS was empty, using SERVER_IP_ADDRESS: {self.settings['DOCKER_REGISTRY_ADDRESS']}")
         
         # Process DOCKER_EXTRA_MOUNTS JSON string
         docker_extra_mounts = self.settings.get('DOCKER_EXTRA_MOUNTS', '')
@@ -156,11 +155,12 @@ class SettingsApplier:
         is_main_server_context = os.environ.get('CONTAINERFLY_CONTEXT') == 'main-server'
         
         if enable_https:
+            self.settings['CADDY_GLOBAL_OPTIONS'] = ""
             if custom_ssl:
                 # HTTPS mode with custom certificates
                 cert_path = self.settings.get('CUSTOM_SSL_CERT_PATH', '')
                 key_path = self.settings.get('CUSTOM_SSL_KEY_PATH', '')
-                
+
                 if cert_path and key_path:
                     self.settings['CADDY_SITE_BLOCK'] = f"{domain}"
                     self.settings['CADDY_TLS_CONFIG'] = f"\n\ttls {cert_path} {key_path}"
@@ -186,7 +186,8 @@ class SettingsApplier:
                 if is_main_server_context:
                     print(f"Caddy mode: HTTPS enabled for domain '{domain}' (automatic Let's Encrypt)")
         else:
-            # HTTP mode - no SSL certificates
+            # HTTP mode - no SSL certificates, disable auto_https to suppress warning
+            self.settings['CADDY_GLOBAL_OPTIONS'] = "{\n\tauto_https off\n}\n\n"
             self.settings['CADDY_SITE_BLOCK'] = f"http://{domain}"
             self.settings['CADDY_TLS_CONFIG'] = ""
             self.settings['CADDY_SECURITY_HEADERS'] = " (HTTP mode)"
@@ -207,6 +208,7 @@ class SettingsApplier:
         template_mappings = {
             'backend_settings.json': self.base_dir / "webapp" / "backend" / "settings.json",
             'frontend_settings.js': self.base_dir / "webapp" / "frontend" / "src" / "AppSettings.js",
+            'container_server_settings.json': self.base_dir / "webapp" / "container_server" / "settings.json",
         }
         
         # Only include Caddyfile for main server context
@@ -225,8 +227,6 @@ class SettingsApplier:
                 
     def _apply_template(self, template_path, output_path):
         """Apply settings to a single template file."""
-        #print(f"Processing template: {template_path} -> {output_path}")
-        
         with open(template_path, 'r') as f:
             content = f.read()
             
@@ -237,15 +237,10 @@ class SettingsApplier:
             
         # Check for unreplaced placeholders
         unreplaced = re.findall(r'\{\{([^}]+)\}\}', content)
-        #if unreplaced:
-        #    print(f"Info: Unreplaced placeholders in {template_path}: {unreplaced}")
-            
         # Write output file
         try:
             with open(output_path, 'w') as f:
                 f.write(content)
-            #print(f"Generated: {output_path}")
-            
             # If running as root, fix ownership to the original user
             self._fix_file_ownership(output_path)
             
@@ -283,10 +278,6 @@ class SettingsApplier:
         except (KeyError, OSError) as e:
             print(f"Warning: Could not fix ownership of {file_path}: {e}")
     
-    def copy_to_webapp(self):
-        """This method is no longer needed since files are written directly to their final locations."""
-        pass
-            
     def run(self):
         """Run the complete settings application process."""
         print("=== Containers on the Fly - Settings Application ===")
@@ -298,7 +289,8 @@ class SettingsApplier:
             print("\n✅ Settings applied successfully!")
             print(f"Generated files:")
             print(f"  - Backend settings: webapp/backend/settings.json")
-            
+            print(f"  - Container server settings: webapp/container_server/settings.json")
+
             # Only show frontend settings if the template exists
             frontend_template = self.templates_dir / 'frontend_settings.js'
             if frontend_template.exists():

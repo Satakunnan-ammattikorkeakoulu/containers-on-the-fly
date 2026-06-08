@@ -9,6 +9,9 @@
 </template>
 
 <script>
+  /**
+   * View wrapper for the user reservations page. Renders PageUserReservations inside LayoutApp.
+   */
   import LayoutApp from '/src/layouts/LayoutApp'
   import PageUserReservations from '/src/pages/user/PageUserReservations'
 

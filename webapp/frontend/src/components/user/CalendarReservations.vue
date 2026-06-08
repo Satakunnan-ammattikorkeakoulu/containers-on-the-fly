@@ -3,16 +3,16 @@
     <v-col>
       <v-sheet height="64">
         <v-toolbar flat>
-          <v-btn outlined class="mr-4" color="grey darken-2" @click="setToday">
+          <v-btn variant="flat" class="mr-4" color="#424242" @click="setToday">
             Today
           </v-btn>
-          <v-btn fab text small color="grey darken-2" @click="prev">
-            <v-icon small>
+          <v-btn fab variant="text" size="small" color="grey darken-2" @click="prev">
+            <v-icon size="small">
               mdi-chevron-left
             </v-icon>
           </v-btn>
-          <v-btn fab text small color="grey darken-2" @click="next">
-            <v-icon small>
+          <v-btn fab variant="text" size="small" color="grey darken-2" @click="next">
+            <v-icon size="small">
               mdi-chevron-right
             </v-icon>
           </v-btn>
@@ -30,23 +30,25 @@
             mandatory
             dense
             class="ma-2 availability-toggle"
+            color="primary"
           >
-            <v-btn small value="reservations">
-              <v-icon small>mdi-calendar-clock</v-icon>
+            <v-btn size="small" value="reservations" variant="flat" :color="viewMode === 'reservations' ? 'primary' : '#424242'">
+              <v-icon size="small">mdi-calendar-clock</v-icon>
               Reservations
             </v-btn>
-            <v-btn small value="availability">
-              <v-icon small>mdi-server</v-icon>
+            <v-btn size="small" value="availability" variant="flat" :color="viewMode === 'availability' ? 'primary' : '#424242'">
+              <v-icon size="small">mdi-server</v-icon>
               Availability
             </v-btn>
           </v-btn-toggle>
           <v-btn
-            small
-            outlined
+            size="small"
+            variant="flat"
+            color="#424242"
             class="ma-2"
             @click="refreshCalendarData"
           >
-            <v-icon small left>mdi-refresh</v-icon>
+            <v-icon size="small" left>mdi-refresh</v-icon>
             Refresh
           </v-btn>
           <v-spacer></v-spacer>
@@ -55,7 +57,7 @@
           </v-toolbar-title>
         </v-toolbar>
       </v-sheet>
-      <v-sheet height="600">
+      <v-sheet height="600" class="calendar-sheet">
         <v-calendar
           ref="calendar"
           v-model="focus"
@@ -64,6 +66,7 @@
           :event-color="getEventColor"
           :type="type"
           :weekdays="weekdays"
+          :first-day-of-week="1"
           @click:time="selectSlot"
           event-overlap-mode="column"
           first-interval="0"
@@ -72,16 +75,37 @@
           :interval-format="intervalFormat"
         >
           <template #event="event">
-            <div v-if="event.eventParsed.input.type === 'availability'" class="availability-event-content">
-              <div class="server-header">
-                <strong>{{event.eventParsed.input.computerName}}</strong>
+            <v-tooltip location="top" open-delay="150" max-width="320" content-class="calendar-event-tooltip">
+              <template v-slot:activator="{ props }">
+                <div
+                  v-bind="props"
+                  :class="event.eventParsed.input.type === 'availability' ? 'availability-event-content' : 'reservation-event-content'"
+                  style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden;"
+                >
+                  <template v-if="event.eventParsed.input.type === 'availability'">
+                    <div class="server-header">
+                      <strong>{{event.eventParsed.input.computerName}}</strong>
+                    </div>
+                    <div class="resource-list" v-html="formatResourcesWithIndicators(event.eventParsed.input)" />
+                  </template>
+                  <template v-else>
+                    <p v-if="event.eventParsed.input.isLowPriority" class="low-priority-label">Low-Priority</p>
+                    <p v-html="getReservationSpecs(event.eventParsed.input.reservationId)" />
+                  </template>
+                </div>
+              </template>
+              <div class="calendar-tooltip-content">
+                <template v-if="event.eventParsed.input.type === 'availability'">
+                  <div style="font-weight: bold; margin-bottom: 4px;">{{event.eventParsed.input.computerName}}</div>
+                  <div v-html="formatResourcesWithIndicators(event.eventParsed.input)" />
+                </template>
+                <template v-else>
+                  <div style="font-weight: bold; margin-bottom: 4px;">Reservation {{event.eventParsed.input.name}}</div>
+                  <div v-if="event.eventParsed.input.isLowPriority" class="low-priority-label" style="margin-bottom: 4px;">Low-Priority</div>
+                  <div v-html="getReservationSpecs(event.eventParsed.input.reservationId)" />
+                </template>
               </div>
-              <div class="resource-list" v-html="formatResourcesWithIndicators(event.eventParsed.input)" />
-            </div>
-            <div v-else class="reservation-event-content">
-              <p><b>{{event.eventParsed.input.name}}</b></p>
-              <p v-html="getReservationSpecs(event.eventParsed.input.reservationId)" />
-            </div>
+            </v-tooltip>
           </template>
         </v-calendar>
         <v-menu v-model="selectedOpen" :close-on-content-click="false" :activator="selectedElement" offset-x>
@@ -90,7 +114,7 @@
               <v-btn icon>
                 <v-icon>mdi-pencil</v-icon>
               </v-btn>
-              <v-toolbar-title v-html="selectedEvent.name"></v-toolbar-title>
+              <v-toolbar-title><span v-html="selectedEvent.name"></span></v-toolbar-title>
               <v-spacer></v-spacer>
               <v-btn icon>
                 <v-icon>mdi-heart</v-icon>
@@ -103,7 +127,7 @@
               <span v-html="selectedEvent.details"></span>
             </v-card-text>
             <v-card-actions>
-              <v-btn text color="secondary" @click="selectedOpen = false">
+              <v-btn variant="text" color="secondary" @click="selectedOpen = false">
                 Cancel
               </v-btn>
             </v-card-actions>
@@ -115,20 +139,31 @@
 </template>
 
 <script>
+  /**
+   * Interactive calendar displaying reservations and server resource availability.
+   * Supports month/week/day/4-day views and toggles between a reservation timeline
+   * and a per-server availability heatmap with color-coded resource indicators.
+   * Emits "slotSelected" when a user clicks a future time slot to start a new reservation.
+   */
   import { TimestampToLocalTimeZone } from '/src/helpers/time.js'
   import dayjs from "dayjs";
-  const axios = require('axios').default;
-  var utc = require('dayjs/plugin/utc')
-  var timezone = require('dayjs/plugin/timezone')
-  var isoWeek = require('dayjs/plugin/isoWeek')
+  import axios from 'axios';
+  import utc from 'dayjs/plugin/utc'
+  import timezone from 'dayjs/plugin/timezone'
+  import isoWeek from 'dayjs/plugin/isoWeek'
   dayjs.extend(utc)
-  var customParseFormat = require('dayjs/plugin/customParseFormat')
+  import customParseFormat from 'dayjs/plugin/customParseFormat'
   dayjs.extend(timezone)
   dayjs.extend(customParseFormat)
   dayjs.extend(isoWeek)
+  import { useMainStore } from '@/store/store'
 
   export default {
     name: 'CalendarReservations',
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
     props: {
       propReservations: {
         type: Array,
@@ -156,45 +191,78 @@
       viewMode: 'reservations',
       availabilityEvents: [],
       colors: ['red', 'pink', 'purple', 'deep-purple', 'indigo', 'blue',
-               'light-blue', 'cyan', 'teal', 'green', 'light-green darken-1',
-               'lime darken-2', 'yellow darken-3', 'amber darken-2', 'orange darken-3', 'deep-orange', 'brown', 'grey', 'blue-grey'],
+               'teal', 'green', 'orange darken-3', 'deep-orange', 'brown', 'grey', 'blue-grey'],
       reservationColorMap: {},
+      nowIndicatorInterval: null,
     }),
+    computed: {
+      /** Only draw the "now" line on time-grid views (not month). */
+      showNowLine() {
+        return this.type !== 'month'
+      },
+    },
     mounted () {
       if (this.$refs.calendar) {
         this.$refs.calendar.checkChange()
+      }
+      this.$nextTick(() => {
+        this.updateNowLine()
+        this.scrollToNow()
+      })
+      // Refresh displayed events and the "now" indicator line each minute.
+      this.nowIndicatorInterval = setInterval(() => {
+        this.updateDisplayedEvents()
+        this.updateNowLine()
+      }, 60000)
+    },
+    beforeUnmount() {
+      if (this.nowIndicatorInterval) {
+        clearInterval(this.nowIndicatorInterval)
       }
     },
     methods: {
       intervalFormat(interval) {
         return interval.time
       },
-      selectSlot( event ) {
+      /**
+       * Handles calendar time-slot clicks. Rounds the selected time down to the
+       * nearest 30-minute boundary and emits "slotSelected" if the time is in the future.
+       */
+      selectSlot( nativeEvent, data ) {
         // If calendar is in read-only mode, don't allow slot selection
         if (this.readOnly) {
           return
         }
-        
+
         // Only allow time selection in day, week, or 4day views (not month view)
         if (this.type === 'month') {
-          this.$store.commit('showMessage', { text: "Switch to week, day, or 4-day view to select a specific time.", color: "info" })
+          this.store.showMessage({ text: "Switch to week, day, or 4-day view to select a specific time.", color: "info" })
           return
         }
-        
+
         let now = dayjs()
-        let selectedTime = dayjs(event.date + " " + event.time)
+        // Vuetify 4: @click:time passes (nativeEvent, timestampData)
+        // timestampData has { date: "YYYY-MM-DD", time: "HH:mm", year, month, day, hour, minute, ... }
+        let selectedTime
+        if (data && data.date && data.time) {
+          selectedTime = dayjs(data.date + " " + data.time)
+        } else if (data && data.date) {
+          selectedTime = dayjs(data.date)
+        } else {
+          return
+        }
         // Round to nearest 30 minutes (down)
         if (selectedTime.get("minutes") < 30)
           selectedTime = selectedTime.set("minute", 0)
         else
           selectedTime = selectedTime.set("minute", 30)
-        
+
         // Check that reservation is not made into past
         if (selectedTime < now) {
-          this.$store.commit('showMessage', { text: "Can only make reservations into future.", color: "red" })
+          this.store.showMessage({ text: "Can only make reservations into future.", color: "red" })
           return
         }
-        
+
         this.$emit("slotSelected", selectedTime)
       },
       getReservationSpecs( reservationId ) {
@@ -209,6 +277,10 @@
         })
         return returnData
       },
+      /**
+       * Builds HTML for per-resource availability indicators (green/yellow/red dots)
+       * based on the ratio of available vs. maximum for each hardware spec.
+       */
       formatResourcesWithIndicators(availabilityEvent) {
         if (!availabilityEvent.availableSpecs) {
           return availabilityEvent.resourceText
@@ -227,7 +299,7 @@
           if (ratio > 0.75) indicatorClass = 'resource-high'
           else if (ratio > 0.25) indicatorClass = 'resource-medium'
           
-          let displayText = ''
+          let displayText
           if (spec.type.toLowerCase() === 'gpu' || spec.type.toLowerCase() === 'gpus') {
             displayText = `GPU: ${Math.round(spec.available)}/${Math.round(spec.maximum)}`
           } else if (spec.type.toLowerCase() === 'cpu' || spec.type.toLowerCase() === 'cpus') {
@@ -265,6 +337,7 @@
       rnd (a, b) {
         return Math.floor((b - a + 1) * Math.random()) + a
       },
+      /** Fetches server availability data for the currently visible calendar date range. */
       async fetchAvailabilityData() {
         if (this.viewMode !== 'availability') {
           return
@@ -304,7 +377,7 @@
           const response = await axios({
             method: "get",
             url: "/api/reservation/get_availability_timeline",
-            headers: {"Authorization" : `Bearer ${this.$store.state.user.loginToken}`},
+            headers: {"Authorization" : `Bearer ${this.store.user.loginToken}`},
             params: {
               startDate: calendarStart.format('YYYY-MM-DD HH:mm:ss'),
               endDate: calendarEnd.format('YYYY-MM-DD HH:mm:ss')
@@ -330,9 +403,10 @@
           }
         } catch (error) {
           console.error('Error fetching availability data:', error)
-          this.$store.commit('showMessage', { text: "Error loading availability data.", color: "red" })
+          this.store.showMessage({ text: "Error loading availability data.", color: "red" })
         }
       },
+      /** Fetches all reservations for the visible date range and emits them to the parent. */
       async fetchAllReservationsForCalendar() {
         // Calculate date range for current calendar view based on type
         let calendarStart, calendarEnd;
@@ -366,7 +440,7 @@
           const response = await axios({
             method: "get",
             url: "/api/reservation/get_all_reservations_for_calendar",
-            headers: {"Authorization" : `Bearer ${this.$store.state.user.loginToken}`},
+            headers: {"Authorization" : `Bearer ${this.store.user.loginToken}`},
             params: {
               startDate: calendarStart.format('YYYY-MM-DD HH:mm:ss'),
               endDate: calendarEnd.format('YYYY-MM-DD HH:mm:ss')
@@ -383,13 +457,76 @@
           }
         } catch (error) {
           console.error('Error fetching all reservations:', error)
-          this.$store.commit('showMessage', { text: "Error refreshing reservations.", color: "red" })
+          this.store.showMessage({ text: "Error refreshing reservations.", color: "red" })
         }
       },
+      /**
+       * Inserts or repositions a "now" indicator line inside the calendar's
+       * scrollable pane so it scrolls together with the time grid. Called on
+       * mount, on each minute tick, and when the view type/focus changes.
+       */
+      updateNowLine() {
+        this.$nextTick(() => {
+          const calEl = this.$refs.calendar?.$el
+          if (!calEl) return
+          const pane = calEl.querySelector('.v-calendar-daily__pane, [class*="__pane"]')
+
+          // Clean up when switching to month view or any state that hides the line.
+          if (!this.showNowLine || !pane) {
+            const existing = calEl.querySelector('.now-line')
+            if (existing) existing.remove()
+            return
+          }
+
+          // Ensure the pane can host an absolutely-positioned child.
+          const paneStyle = window.getComputedStyle(pane)
+          if (paneStyle.position === 'static') pane.style.position = 'relative'
+
+          let line = pane.querySelector('.now-line')
+          if (!line) {
+            line = document.createElement('div')
+            line.className = 'now-line'
+            pane.insertBefore(line, pane.firstChild)
+          }
+
+          const now = new Date()
+          const minutesFromMidnight = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60
+          const fraction = minutesFromMidnight / 1440
+          line.style.top = (pane.offsetHeight * fraction) + 'px'
+          line.style.zIndex = '0'
+        })
+      },
+      /** Scrolls the calendar so the previous 30-min mark is near the top on open. */
+      scrollToNow() {
+        if (!this.showNowLine) return
+        this.$nextTick(() => {
+          const cal = this.$refs.calendar
+          if (!cal) return
+          const now = new Date()
+          const alignedMinute = now.getMinutes() - (now.getMinutes() % 30)
+          const hh = String(now.getHours()).padStart(2, '0')
+          const mm = String(alignedMinute).padStart(2, '0')
+          if (typeof cal.scrollToTime === 'function') {
+            cal.scrollToTime(`${hh}:${mm}`)
+          }
+          // Nudge upward so the aligned mark has a little breathing room above.
+          // scrollAreaRef is the scrollable pane; Vuetify may expose it as a ref object.
+          requestAnimationFrame(() => {
+            const rawRef = cal.scrollAreaRef
+            const pane = rawRef && rawRef.value !== undefined ? rawRef.value : rawRef
+            const target = pane && pane.scrollTop !== undefined
+              ? pane
+              : cal.$el.querySelector('.v-calendar-daily__scroll-area, [class*="scroll-area"]')
+            if (target && target.scrollTop >= 10) {
+              target.scrollTop -= 10
+            }
+          })
+        })
+      },
+      /** Switches the calendar events array between reservation and availability data based on viewMode. */
       updateDisplayedEvents() {
-        
         if (this.viewMode === 'availability') {
-          this.events = this.availabilityEvents
+          this.events = [...this.availabilityEvents]
         } else {
           // Show reservation events
           let events = []
@@ -399,18 +536,19 @@
               this.reservationColorMap[res.reservationId] = this.colors[res.reservationId % this.colors.length]
             }
             let color = this.reservationColorMap[res.reservationId]
-            
+
             const startDate = dayjs(TimestampToLocalTimeZone(res.startDate))
             const endDate = dayjs(TimestampToLocalTimeZone(res.endDate))
-            
-            
+
+
             const eventData = {
               id: `reservation-${res.reservationId}`,
-              name: "Reservation #" + res.reservationId,
+              name: "#" + res.reservationId,
               reservationId: res.reservationId,
+              isLowPriority: res.isLowPriority,
               start: startDate.toDate(),
               end: endDate.toDate(),
-              color: color,
+              color: res.isLowPriority ? 'orange darken-3' : color,
               timed: true,
             }
             events.push(eventData)
@@ -451,6 +589,7 @@
             if (this.viewMode === 'availability') {
               this.fetchAvailabilityData()
             }
+            this.updateNowLine()
           })
         }
       },
@@ -461,6 +600,8 @@
             if (this.viewMode === 'availability') {
               this.fetchAvailabilityData()
             }
+            this.updateNowLine()
+            this.scrollToNow()
           })
         }
       },
@@ -481,8 +622,10 @@
 }
 
 .availability-toggle {
-  .v-btn--active {
-    background-color: primary !important;
+  border: none !important;
+  height: auto !important;
+  .v-btn {
+    height: 32px !important;
   }
 }
 
@@ -491,6 +634,9 @@
   padding: 2px 4px;
   font-size: 11px;
   line-height: 1.2;
+  overflow: hidden;
+  white-space: normal;
+  word-wrap: break-word;
   
   .server-header {
     margin-bottom: 3px;
@@ -539,19 +685,90 @@
   }
 }
 
+.calendar-sheet {
+  position: relative;
+}
+
 .reservation-event-content {
   padding: 2px 4px;
   font-size: 11px;
-  
+  overflow: hidden;
+  white-space: normal;
+  word-wrap: break-word;
+
   p {
     margin: 1px 0;
     color: rgba(255, 255, 255, 0.95);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    white-space: normal;
+    word-wrap: break-word;
   }
+}
+
+.low-priority-label {
+  font-size: 10px;
+  font-style: italic;
+  opacity: 0.85;
 }
 </style>
 
 <style lang="scss">
+// Clip event block content so text never floats outside the colored box.
+.v-event {
+  overflow: hidden !important;
+  position: relative !important;
+}
+
+// Pin the tooltip activator (and its content wrapper) to the event block's bounds.
+.v-event .reservation-event-content,
+.v-event .availability-event-content {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden !important;
+}
+
+// Calendar time slot interactivity
+.v-calendar-daily__day-interval {
+  cursor: pointer;
+
+  &:hover {
+    background-color: rgba(var(--v-theme-primary), 0.08);
+  }
+}
+
+// Calendar event tooltip — dark background so white indicators/specs stay readable.
+// Match Vuetify's own selector specificity (.v-tooltip > .v-overlay__content) and
+// add our content-class so we win against the layered component rule.
+.v-tooltip > .v-overlay__content.calendar-event-tooltip {
+  background: rgba(30, 30, 30, 0.95) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+// "Now" indicator line — injected via JS into the calendar pane, so CSS must
+// live in the non-scoped block to apply to a plain DOM element.
+.now-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #F44336;
+  pointer-events: none;
+}
+
+.now-line::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #F44336;
+}
+
 // Global styles for dynamically generated resource indicators
 .resource-item {
   display: flex;

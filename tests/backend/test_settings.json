@@ -1,0 +1,25 @@
+{
+  "app": {
+    "url": "http://localhost",
+    "serverIp": "127.0.0.1",
+    "clientUrl": "http://localhost:8080",
+    "port": 8000,
+    "production": false
+  },
+  "database": {
+    "engineUri": "sqlite:///:memory:",
+    "debugPrinting": false
+  },
+  "daemon": {
+    "apiKey": "test-daemon-api-key"
+  },
+  "docker": {
+    "registryAddress": "localhost:5000",
+    "serverName": "test-server",
+    "port_range_start": 20000,
+    "port_range_end": 20100,
+    "enabled": false,
+    "shm_size": "1g",
+    "debugSkipGpuDedication": true
+  }
+}

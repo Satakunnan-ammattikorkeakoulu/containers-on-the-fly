@@ -1,0 +1,47 @@
+meta {
+  name: Get Own Reservations
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{root_url}}/reservation/get_own_reservations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{user_token}}
+}
+
+body:json {
+  {
+    "page": 1,
+    "itemsPerPage": 10,
+    "sortBy": [],
+    "filters": {
+      "status": ""
+    }
+  }
+}
+
+tests {
+  test("Status code is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("Response is successful", function() {
+    expect(res.body).to.have.property('status');
+    expect(res.body.status).to.equal(true);
+  });
+
+  test("Response has reservations, totalItems, status counts, and active count", function() {
+    expect(res.body).to.have.property('data');
+    expect(res.body.data).to.have.property('reservations');
+    expect(res.body.data.reservations).to.be.an('array');
+    expect(res.body.data).to.have.property('totalItems');
+    expect(res.body.data.totalItems).to.be.a('number');
+    expect(res.body.data).to.have.property('statusCounts');
+    expect(res.body.data).to.have.property('activeReservationCount');
+  });
+}

@@ -3,8 +3,7 @@
     <v-data-table
       :headers="table.headers"
       :items="data"
-      :sort-by="'roleId'"
-      :sort-desc="false"
+      :sort-by="[{key: 'roleId', order: 'asc'}]"
       class="elevation-1">
 
       <!-- Name column with description for built-in roles -->
@@ -23,35 +22,61 @@
 
       <!-- Actions -->
       <template v-slot:item.actions="{item}">
-        <!-- Regular role management actions -->
-        <template v-if="!isBuiltInRole(item.name)">
-          <a class="link-action" @click="emitEditRole(item.roleId)">Edit Name</a>
-          <br>
-        </template>
-        <!-- Mounts action available for all roles -->
-        <a class="link-action" @click="emitManageMounts(item)">Mounts</a>
-        <br>
-        <!-- Reservation limits action available for all roles -->
-        <a class="link-action" @click="emitManageReservationLimits(item)">Reservation Limits</a>
-        <br v-if="!isBuiltInRole(item.name)">
-        <!-- Hardware limits action not available for built-in roles -->
-        <a v-if="!isBuiltInRole(item.name)" class="link-action" @click="emitManageHardwareLimits(item)">Hardware Limits</a>
-        <br>
-        <template v-if="!isBuiltInRole(item.name)">
-          <a class="link-action" @click="emitRemoveRole(item.roleId)">Remove Role</a>
-        </template>
+        <v-menu>
+          <template v-slot:activator="{ props }">
+            <a v-bind="props">
+              Actions <v-icon size="small">mdi-chevron-down</v-icon>
+            </a>
+          </template>
+          <v-list density="compact">
+            <v-list-item v-if="!isBuiltInRole(item.name)" @click="emitEditRole(item.roleId)">
+              <template v-slot:prepend><v-icon size="small">mdi-pencil-outline</v-icon></template>
+              <v-list-item-title>Edit Name</v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="emitManageMounts(item)">
+              <template v-slot:prepend><v-icon size="small">mdi-folder-outline</v-icon></template>
+              <v-list-item-title>Mounts</v-list-item-title>
+            </v-list-item>
+            <v-list-item @click="emitManageReservationLimits(item)">
+              <template v-slot:prepend><v-icon size="small">mdi-clock-outline</v-icon></template>
+              <v-list-item-title>Reservation Limits</v-list-item-title>
+            </v-list-item>
+            <v-list-item v-if="!isBuiltInRole(item.name)" @click="emitManageHardwareLimits(item)">
+              <template v-slot:prepend><v-icon size="small">mdi-memory</v-icon></template>
+              <v-list-item-title>Hardware Limits</v-list-item-title>
+            </v-list-item>
+            <v-divider v-if="!isBuiltInRole(item.name)" class="my-1" />
+            <v-list-item v-if="!isBuiltInRole(item.name)" @click="emitRemoveRole(item.roleId)" class="destructive-action">
+              <template v-slot:prepend><v-icon size="small">mdi-delete-outline</v-icon></template>
+              <v-list-item-title>Remove Role</v-list-item-title>
+            </v-list-item>
+          </v-list>
+        </v-menu>
       </template>
 
       <!-- Format the timestamps -->
       <template v-slot:item.createdAt="{item}">
-        {{ isBuiltInRole(item.name) ? '-' : parseTime(item.createdAt) }}
+        <v-tooltip v-if="!isBuiltInRole(item.name) && item.createdAt" location="bottom" :text="parseTime(item.createdAt)">
+          <template v-slot:activator="{ props }">
+            <span v-bind="props">{{ parseRelativeTime(item.createdAt) }}</span>
+          </template>
+        </v-tooltip>
+        <span v-else>-</span>
       </template>
     </v-data-table>
   </div>
 </template>
 
 <script>
-import { DisplayTime } from '/src/helpers/time.js'
+/**
+ * Displays a sortable data table of all roles in the system.
+ * Shows role ID, name, mount count, and creation date. Built-in roles ("everyone", "admin")
+ * display a description and have restricted actions (no edit name or delete).
+ * Actions menu allows editing the name, managing mounts, reservation limits,
+ * hardware limits, and deleting custom roles.
+ * Used in PageAdminRoles.
+ */
+import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
 
 export default {
   name: 'AdminRolesTable',
@@ -65,11 +90,11 @@ export default {
     data: [],
     table: {
       headers: [
-        { text: 'Role ID', value: 'roleId', sortable: true },
-        { text: 'Name', value: 'name', sortable: true },
-        { text: 'Mounts', value: 'mountCount', sortable: true },
-        { text: 'Created At', value: 'createdAt', sortable: true },
-        { text: 'Actions', value: 'actions', sortable: false },
+        { title: 'Role ID', key: 'roleId', sortable: true },
+        { title: 'Name', key: 'name', sortable: true },
+        { title: 'Mounts', key: 'mountCount', sortable: true },
+        { title: 'Created', key: 'createdAt', sortable: true },
+        { title: '', key: 'actions', sortable: false },
       ],
     }
   }),
@@ -85,6 +110,7 @@ export default {
     },
   },
   methods: {
+    /** Returns true for the "everyone" and "admin" roles which cannot be renamed or deleted. */
     isBuiltInRole(name) {
       return name === "everyone" || name === "admin";
     },
@@ -105,6 +131,10 @@ export default {
     parseTime(timestamp) {
       return DisplayTime(timestamp);
     },
+    parseRelativeTime(timestamp) {
+      if (!timestamp) return '-'
+      return RelativeTime(timestamp)
+    },
     emitManageMounts(role) {
       this.$emit('emitManageMounts', role);
     },
@@ -119,13 +149,9 @@ export default {
 </script>
 
 <style scoped lang="scss">
-.link-action {
-  margin-right: 10px;
-  cursor: pointer;
-  color: #1976d2;
-  &:hover {
-    text-decoration: underline;
-  }
+.destructive-action .v-list-item-title,
+.destructive-action .v-icon {
+  color: #ef5350;
 }
 .role-description {
   color: #666;

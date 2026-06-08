@@ -3,7 +3,7 @@
     <v-row class="text-center">
       <v-col cols="12">
         <v-img
-          :src="require('/src/assets/images/front_bg.png')"
+          :src="frontBgImg"
           class="my-3"
           contain
           height="350"
@@ -12,28 +12,46 @@
 
       <v-col class="mb-4">
         <h3 class="color-blue dim" style="font-size: 18px; letter-spacing: 0.8px; margin-bottom: -2px;">LOGIN TO</h3>
-        <h1 class="color-blue">{{appName}}</h1>
+        <h1 class="color-blue" style="margin-top: 0px;">{{appName}}</h1>
         <p class="color-blue dim" style="margin-top: 30px;" v-if="loginPageInfo && loginPageInfo.trim()" v-html="loginPageInfo.replace(/\n/g, '<br>')"></p>
       </v-col>
 
       <v-col class="mb-5" cols="12">
         <v-form ref="form" v-model="form['valid']" lazy-validation>
           <v-text-field v-on:keyup.enter="submitLoginForm" type="text" style="max-width: 300px; margin: 0 auto;" :label="usernameField" v-model="form['email']" :rules="validation['email']" required></v-text-field>
-          <v-text-field v-on:keyup.enter="submitLoginForm" type="password" style="max-width: 300px; margin: 0 auto;" :label="passwordField" v-model="form['password']" :rules="validation['password']" required></v-text-field>
+          <v-text-field v-on:keyup.enter="submitLoginForm" type="password" style="max-width: 300px; margin: 0 auto; margin-top: 15px;" :label="passwordField" v-model="form['password']" :rules="validation['password']" required></v-text-field>
           <v-btn :disabled="!form['valid'] || isLoggingIn" color="success" @click="submitLoginForm" label="Login" class="btn-login">Login</v-btn>
         </v-form>
+        <div v-if="legalEnabled" class="legal-links mt-4">
+          <router-link to="/privacy-policy">Privacy Policy</router-link>
+          <span class="mx-2">|</span>
+          <router-link to="/terms-of-service">Terms of Service</router-link>
+        </div>
       </v-col>
     </v-row>
   </v-container>
 </template>
 
 <script>
-  const axios = require('axios').default;
-  
+  /**
+   * Login page for user authentication.
+   * Handles credential submission via OAuth2 form data and redirects
+   * authenticated users to the reservations page.
+   */
+  import axios from 'axios';
+  import { useMainStore } from '@/store/store'
+  import frontBgImg from '/src/assets/images/front_bg.png'
+
   export default {
     name: 'PageLogin',
 
+    setup() {
+      const store = useMainStore()
+      return { store }
+    },
+
     data: () => ({
+      frontBgImg,
       snackbar: true,
       isLoggingIn: false,
       form: {
@@ -58,22 +76,22 @@
     },
     computed: {
       isLoggedIn() {
-        return this.$store.getters.isLoggedIn || false;
+        return this.store.isLoggedIn || false;
       },
       appName() {
-        return this.$store.getters.appName
-      },
-      loginText() {
-        return this.$store.getters.loginText
+        return this.store.appName
       },
       usernameField() {
-        return this.$store.getters.usernameField
+        return this.store.usernameField
       },
       passwordField() {
-        return this.$store.getters.passwordField
+        return this.store.passwordField
       },
       loginPageInfo() {
-        return this.$store.getters.loginPageInfo
+        return this.store.loginPageInfo
+      },
+      legalEnabled() {
+        return this.store.legalEnabled
       }
     },
     methods: {
@@ -87,7 +105,7 @@
 
         axios({
           method: "post",
-          url: this.AppSettings.APIServer.user.login,
+          url: this.$appSettings.APIServer.user.login,
           data: bodyFormData,
           headers: { "Content-Type": "multipart/form-data" },
         })
@@ -95,31 +113,31 @@
             // Success
             if (response.data && response.data.access_token) {
               // Set user data
-              _this.$store.commit("setUser", { loginToken: response.data.access_token, callback: (res) => {
+              _this.store.setUser({ loginToken: response.data.access_token, callback: (res) => {
                 //console.log(res)
                 // Token OK, redirect user to reservations page
                 if (res.success) {
                   _this.$router.push("/user/reservations");
                 }
                 else {
-                  _this.$store.commit('showMessage', { text: "Error logging in.", color: "red" })
+                  _this.store.showMessage({ text: "Error logging in.", color: "red" })
                 }
               }});
             }
             else {
               //console.log("Failed to login.")
-              _this.$store.commit('showMessage', { text: response.data.message, color: "red" })
+              _this.store.showMessage({ text: response.data.message, color: "red" })
             }
             _this.isLoggingIn = false
         })
         .catch(function (error) {
             // Error
             if (error.response && error.response.status == 400) {
-              _this.$store.commit('showMessage', { text: error.response.data.detail, color: "red" })
+              _this.store.showMessage({ text: error.response.data.detail, color: "red" })
             }
             else {
               console.log(error)
-              _this.$store.commit('showMessage', { text: "Unknown error.", color: "red" })
+              _this.store.showMessage({ text: "Unknown error.", color: "red" })
             }
             _this.isLoggingIn = false
         });
@@ -143,5 +161,22 @@
     width: 305px;
     margin-top: 20px;
     height: 45px !important;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .legal-links {
+    margin-top: 80px;
+    font-size: 13px;
+    opacity: 0.7;
+  }
+
+  .legal-links a {
+    color: #047093;
+    text-decoration: none;
+  }
+
+  .legal-links a:hover {
+    text-decoration: underline;
   }
 </style>

@@ -480,6 +480,16 @@ class TestStopOrphanContainerReservations:
 
     @patch("daemon.stop_container")
     @patch("python_on_whales.docker")
+    @patch("daemon.settings_handler")
+    @patch("daemon.api")
+    def test_skips_cleanup_when_docker_disabled(self, mock_api, mock_settings, mock_docker, mock_stop):
+        mock_settings.get_setting.return_value = False
+        stop_orphan_container_reservations()
+        mock_api.get_orphan_check.assert_not_called()
+        mock_stop.assert_not_called()
+
+    @patch("daemon.stop_container")
+    @patch("python_on_whales.docker")
     @patch("daemon.api")
     def test_skips_cleanup_when_orphan_check_fails(self, mock_api, mock_docker, mock_stop):
         mock_api.get_orphan_check.return_value = None

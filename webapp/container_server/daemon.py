@@ -646,6 +646,9 @@ def resume_paused_containers(tasks):
 
 def stop_orphan_container_reservations():
     """Clean up Docker containers that have no matching active reservation."""
+    if not settings_handler.get_setting("docker.enabled"):
+        return
+
     try:
         known_names = api.get_orphan_check()
         if known_names is None:

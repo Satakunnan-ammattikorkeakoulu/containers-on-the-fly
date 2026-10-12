@@ -6,6 +6,8 @@ and includes retry logic with exponential backoff for transient failures.
 """
 
 import time
+from typing import Optional
+
 import requests
 from helpers.logger import log
 
@@ -84,7 +86,7 @@ class DaemonApiClient:
             return resp.get("data", {})
         return None
 
-    def get_orphan_check(self) -> list:
+    def get_orphan_check(self) -> Optional[list]:
         """Fetch running reservation container names for orphan detection.
 
         Returns:

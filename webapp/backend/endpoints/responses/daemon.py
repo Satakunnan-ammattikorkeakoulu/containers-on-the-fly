@@ -301,7 +301,7 @@ def get_tasks(computer_id: int):
                     )
 
             # To stop: end date passed
-            if res.status in ("started", "reserved", "restart_error", "paused", "stopping") and res.endDate < now:
+            if res.status in ("started", "reserved", "restart", "restart_error", "paused", "stopping") and res.endDate < now:
                 reservations_to_stop.append(
                     _serialize_reservation(res, include_container=True,
                                            feature_flags=feature_flags)
@@ -1055,6 +1055,14 @@ def get_computer_id_by_name(server_name: str):
 def get_orphan_check_data(computer_id: int):
     """Get running reservation docker container names for orphan detection.
 
+    Includes every status where the reservation's Docker container may still
+    legitimately exist. Leaving out "restart" or "restart_error" would let the
+    daemon's orphan cleanup remove a container that is waiting to be restarted.
+
+    Deliberately not filtered by date: an expired or cancelled reservation
+    keeps its container listed until the normal stop flow (which runs the
+    user's stop script) reports it stopped.
+
     Args:
         computer_id: Database ID of the computer.
 
@@ -1066,10 +1074,8 @@ def get_orphan_check_data(computer_id: int):
             select(Reservation)
             .options(joinedload(Reservation.reservedContainer))
             .where(
-                Reservation.status.in_(["started", "stopping"]),
+                Reservation.status.in_(["started", "stopping", "restart", "restart_error"]),
                 Reservation.computerId == computer_id,
-                Reservation.startDate < _time_now(),
-                Reservation.endDate > _time_now(),
             )
         ).unique().scalars().all()
 

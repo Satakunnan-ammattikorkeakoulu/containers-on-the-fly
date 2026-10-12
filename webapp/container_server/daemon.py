@@ -648,6 +648,9 @@ def stop_orphan_container_reservations():
     """Clean up Docker containers that have no matching active reservation."""
     try:
         known_names = api.get_orphan_check()
+        if known_names is None:
+            log.warning("Could not fetch orphan check data from backend, skipping orphan cleanup")
+            return
 
         from python_on_whales import docker
         running_containers = docker.ps()
@@ -885,7 +888,7 @@ def stop_docker_container(res, stop_script_timeout=40):
     status = res.get("status")
 
     try:
-        if status in ("started", "restart_error", "stopping") and container_docker_name:
+        if status in ("started", "restart", "restart_error", "stopping") and container_docker_name:
             stop_script = rc.get("stopScriptPath")
             if stop_script:
                 container_data = res.get("container", {})

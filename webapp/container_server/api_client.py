@@ -88,12 +88,13 @@ class DaemonApiClient:
         """Fetch running reservation container names for orphan detection.
 
         Returns:
-            List of container docker names, or empty list on failure.
+            List of container docker names, or None on failure. Callers must
+            treat None as "unknown" rather than "no containers should exist".
         """
         resp = self._request("GET", "/orphan-check")
         if resp and resp.get("status"):
             return resp.get("data", {}).get("runningContainerNames", [])
-        return []
+        return None
 
     def get_computer_id(self, server_name: str) -> int:
         """Resolve a server name to its database computer ID.

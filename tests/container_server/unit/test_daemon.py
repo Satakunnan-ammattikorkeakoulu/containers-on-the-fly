@@ -1,5 +1,6 @@
 """Tests for the container server daemon's pure-logic functions."""
 
+from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock, call
 
 from daemon import (
@@ -7,6 +8,8 @@ from daemon import (
     pause_low_priority_for_normal_reservations,
     pause_overcommitted_low_priority,
     resume_paused_containers,
+    stop_docker_container,
+    stop_orphan_container_reservations,
 )
 
 
@@ -460,3 +463,81 @@ class TestResumePausedContainers:
         resume_paused_containers(tasks)
         # After resuming p1 (used goes from 2 to 5), p2 needs 3 more (5+3=8 <= 8)
         assert mock_api.report_resumed.call_count == 2
+
+
+# ---------------------------------------------------------------------------
+# stop_orphan_container_reservations
+# ---------------------------------------------------------------------------
+
+def _docker_container(name, running_for):
+    container = MagicMock()
+    container.name = name
+    container.state.started_at = datetime.now(timezone.utc) - running_for
+    return container
+
+
+class TestStopOrphanContainerReservations:
+
+    @patch("daemon.stop_container")
+    @patch("python_on_whales.docker")
+    @patch("daemon.api")
+    def test_skips_cleanup_when_orphan_check_fails(self, mock_api, mock_docker, mock_stop):
+        mock_api.get_orphan_check.return_value = None
+        mock_docker.ps.return_value = [_docker_container("reservation-1-img", timedelta(days=15))]
+        stop_orphan_container_reservations()
+        mock_stop.assert_not_called()
+        mock_docker.ps.assert_not_called()
+
+    @patch("daemon.stop_container")
+    @patch("python_on_whales.docker")
+    @patch("daemon.api")
+    def test_stops_unknown_long_running_container(self, mock_api, mock_docker, mock_stop):
+        mock_api.get_orphan_check.return_value = []
+        mock_docker.ps.return_value = [_docker_container("reservation-1-img", timedelta(hours=1))]
+        stop_orphan_container_reservations()
+        mock_stop.assert_called_once_with("reservation-1-img")
+
+    @patch("daemon.stop_container")
+    @patch("python_on_whales.docker")
+    @patch("daemon.api")
+    def test_keeps_known_container(self, mock_api, mock_docker, mock_stop):
+        mock_api.get_orphan_check.return_value = ["reservation-1-img"]
+        mock_docker.ps.return_value = [_docker_container("reservation-1-img", timedelta(days=15))]
+        stop_orphan_container_reservations()
+        mock_stop.assert_not_called()
+
+    @patch("daemon.stop_container")
+    @patch("python_on_whales.docker")
+    @patch("daemon.api")
+    def test_keeps_recently_started_container(self, mock_api, mock_docker, mock_stop):
+        mock_api.get_orphan_check.return_value = []
+        mock_docker.ps.return_value = [_docker_container("reservation-1-img", timedelta(minutes=5))]
+        stop_orphan_container_reservations()
+        mock_stop.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# stop_docker_container
+# ---------------------------------------------------------------------------
+
+class TestStopDockerContainer:
+
+    @patch("daemon.run_stop_script")
+    @patch("daemon.stop_container")
+    @patch("daemon.api")
+    def test_stops_container_for_expired_restart_reservation(self, mock_api, mock_stop, mock_script):
+        res = _reservation(1, [], container_name="reservation-1-img",
+                           stop_script="/home/user/stop.sh", status="restart")
+        stop_docker_container(res)
+        mock_script.assert_called_once_with("reservation-1-img", "/home/user/stop.sh", "user", 40)
+        mock_stop.assert_called_once_with("reservation-1-img")
+        mock_api.report_stopped.assert_called_once_with(1)
+
+    @patch("daemon.run_stop_script")
+    @patch("daemon.stop_container")
+    @patch("daemon.api")
+    def test_paused_reservation_only_reports_stopped(self, mock_api, mock_stop, mock_script):
+        res = _reservation(1, [], container_name="reservation-1-img", status="paused")
+        stop_docker_container(res)
+        mock_stop.assert_not_called()
+        mock_api.report_stopped.assert_called_once_with(1)

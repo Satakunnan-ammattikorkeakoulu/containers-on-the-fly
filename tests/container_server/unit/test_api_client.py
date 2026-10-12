@@ -179,8 +179,20 @@ class TestGetOrphanCheck:
         assert client.get_orphan_check() == ["cont1", "cont2"]
 
     @patch.object(DaemonApiClient, "_request")
-    def test_returns_empty_list_on_failure(self, mock_req):
+    def test_returns_none_on_failure(self, mock_req):
         mock_req.return_value = None
+        client = self._make_client()
+        assert client.get_orphan_check() is None
+
+    @patch.object(DaemonApiClient, "_request")
+    def test_returns_none_on_status_false(self, mock_req):
+        mock_req.return_value = {"status": False, "message": "error"}
+        client = self._make_client()
+        assert client.get_orphan_check() is None
+
+    @patch.object(DaemonApiClient, "_request")
+    def test_returns_empty_list_when_backend_reports_none_running(self, mock_req):
+        mock_req.return_value = {"status": True, "data": {"runningContainerNames": []}}
         client = self._make_client()
         assert client.get_orphan_check() == []
 

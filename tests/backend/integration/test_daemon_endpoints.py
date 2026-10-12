@@ -71,6 +71,68 @@ class TestOrphanCheck:
         assert "runningContainerNames" in data["data"]
         assert isinstance(data["data"]["runningContainerNames"], list)
 
+    def _create_reservation(self, status, docker_name, end_offset=timedelta(hours=4)):
+        """Create a reservation on server1 with a Docker container name."""
+        now = datetime.now(timezone.utc)
+        with db.Session() as session:
+            computer = session.execute(
+                select(db.Computer).where(db.Computer.name == "server1")
+            ).scalar_one()
+            user = session.execute(
+                select(db.User).where(db.User.email == "user@foo.com")
+            ).scalar_one()
+            container = session.execute(
+                select(db.Container).where(db.Container.imageName == "ubuntu-base")
+            ).scalar_one()
+            reserved_container = db.ReservedContainer(
+                containerId=container.containerId,
+                containerDockerName=docker_name,
+            )
+            session.add(reserved_container)
+            session.flush()
+            session.add(db.Reservation(
+                userId=user.userId,
+                computerId=computer.computerId,
+                reservedContainerId=reserved_container.reservedContainerId,
+                startDate=now - timedelta(days=15),
+                endDate=now + end_offset,
+                status=status,
+            ))
+            session.commit()
+
+    def _running_names(self, test_client):
+        resp = test_client.get("/api/daemon/orphan-check", headers=DAEMON_HEADERS)
+        return resp.json()["data"]["runningContainerNames"]
+
+    @pytest.mark.parametrize("status", ["started", "stopping", "restart", "restart_error"])
+    def test_includes_statuses_with_existing_container(self, test_client, status):
+        self._create_reservation(status, f"reservation-{status}")
+        assert f"reservation-{status}" in self._running_names(test_client)
+
+    @pytest.mark.parametrize("status", ["reserved", "stopped", "error", "paused"])
+    def test_excludes_statuses_without_running_container(self, test_client, status):
+        self._create_reservation(status, f"reservation-{status}")
+        assert f"reservation-{status}" not in self._running_names(test_client)
+
+    def test_includes_expired_reservation_until_stopped(self, test_client):
+        # Expired/cancelled containers must stay listed so the normal stop flow
+        # (which runs the user's stop script) handles them, not orphan cleanup.
+        self._create_reservation("started", "reservation-expired", end_offset=timedelta(hours=-1))
+        assert "reservation-expired" in self._running_names(test_client)
+
+    def test_includes_cancelled_reservation(self, test_client):
+        self._create_reservation("stopping", "reservation-cancelled", end_offset=timedelta(0))
+        assert "reservation-cancelled" in self._running_names(test_client)
+
+    def test_expired_restart_reservation_is_scheduled_for_stop(self, test_client):
+        self._create_reservation("restart", "reservation-restart-expired", end_offset=timedelta(hours=-1))
+        resp = test_client.get("/api/daemon/tasks", headers=DAEMON_HEADERS)
+        task_data = resp.json()["data"]
+        to_stop = [r["reservedContainer"]["containerDockerName"] for r in task_data["reservationsToStop"]]
+        to_restart = [r["reservedContainer"]["containerDockerName"] for r in task_data["reservationsToRestart"]]
+        assert "reservation-restart-expired" in to_stop
+        assert "reservation-restart-expired" not in to_restart
+
 
 class TestGetComputerId:
 

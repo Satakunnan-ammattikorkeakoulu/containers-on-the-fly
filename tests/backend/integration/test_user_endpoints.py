@@ -1,6 +1,7 @@
 """Integration tests for /api/user endpoints."""
 
 import pytest
+from unittest.mock import patch
 
 
 class TestLogin:
@@ -53,6 +54,64 @@ class TestLogin:
         )
         assert resp.status_code == 400
         assert "User not found" in resp.json()["detail"]
+
+
+class TestLdapLogin:
+    """LDAP login with get_ldap_user mocked out (no LDAP server in tests)."""
+
+    @pytest.fixture
+    def ldap_login_type(self):
+        import endpoints.responses.user as user_responses
+        real_get_setting = user_responses.get_setting
+
+        def fake_get_setting(key):
+            if key == "auth.loginType":
+                return "LDAP"
+            return real_get_setting(key)
+
+        with patch.object(user_responses, "get_setting", side_effect=fake_get_setting):
+            yield
+
+    def test_first_ldap_login_creates_user_in_shared_session(self, test_client, ldap_login_type):
+        import database as db
+
+        def fake_get_ldap_user(username, password, session=None):
+            # The login session must be shared, otherwise the new user is invisible
+            # to it on MariaDB (REPEATABLE READ snapshot) and the first login fails
+            assert session is not None
+            new_user = db.User(email="newldap@foo.com")
+            session.add(new_user)
+            session.commit()
+            return True, new_user.userId
+
+        with patch("endpoints.responses.user.get_ldap_user", side_effect=fake_get_ldap_user):
+            resp = test_client.post(
+                "/api/user/login",
+                data={"username": "newldap", "password": "secret"},
+            )
+        assert resp.status_code == 200
+        assert "access_token" in resp.json()
+
+    def test_ldap_user_missing_locally_returns_error(self, test_client, ldap_login_type):
+        with patch("endpoints.responses.user.get_ldap_user", return_value=(True, 999999)):
+            resp = test_client.post(
+                "/api/user/login",
+                data={"username": "ghost", "password": "secret"},
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["status"] is False
+        assert "access_token" not in body
+
+    def test_ldap_failure_returns_message(self, test_client, ldap_login_type):
+        with patch("endpoints.responses.user.get_ldap_user", return_value=(False, "Wrong username or password.")):
+            resp = test_client.post(
+                "/api/user/login",
+                data={"username": "someone", "password": "bad"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is False
+        assert resp.json()["message"] == "Wrong username or password."
 
 
 class TestCheckToken:

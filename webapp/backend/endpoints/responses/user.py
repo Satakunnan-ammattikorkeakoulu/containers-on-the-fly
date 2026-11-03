@@ -98,12 +98,15 @@ def login(username, password):
 
     # Try LDAP authentication
     def try_ldap_auth():
-      ldap_success, response = get_ldap_user(username, password)
+      # Share this session so a user created on first LDAP login is visible below
+      ldap_success, response = get_ldap_user(username, password, session)
       if ldap_success == False:
         return api_response(False, response)
 
-      # Get or create user
-      ldap_user = session.execute(select(User).where(User.userId == response)).scalar_one_or_none()
+      ldap_user = session.get(User, response)
+      if ldap_user is None:
+        log_action(None, "LOGIN_FAILED", "user", details={"email": username, "reason": "ldap user not found locally"})
+        return api_response(False, "Failed to load the user after LDAP login. Please try again.")
       return create_successful_login(ldap_user)
 
     # Handle different login types

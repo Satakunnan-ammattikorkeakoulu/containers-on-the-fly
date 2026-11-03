@@ -5,6 +5,7 @@ password hashing, role-based access control, and reservation limit calculation.
 """
 
 from typing import Tuple
+from contextlib import nullcontext
 import os
 import hashlib
 import hmac
@@ -345,7 +346,7 @@ def create_password(length = 40):
   random_password = "".join(secrets.choice(possible_chars) for _ in range(length))
   return random_password
 
-def get_ldap_user(username, password):
+def get_ldap_user(username, password, session=None):
   """Authenticate a user against the configured LDAP server.
 
   Attempts to bind to LDAP with the provided credentials, retrieves the
@@ -355,6 +356,11 @@ def get_ldap_user(username, password):
   Args:
       username: The LDAP username to authenticate.
       password: The LDAP password.
+      session: Optional SQLAlchemy session to use. Callers that look up the
+          returned user afterwards should pass their own session, so the
+          newly created user is visible to them (a separate session's commit
+          is invisible inside an already open REPEATABLE READ transaction).
+          If omitted, a new session is opened and closed here.
 
   Returns:
       A tuple of (success, result) where:
@@ -385,7 +391,7 @@ def get_ldap_user(username, password):
   l.set_option(ldap.OPT_TIMEOUT, 6)
   l.set_option(ldap.OPT_REFERRALS, ldap.OPT_OFF)
 
-  with Session() as session:
+  with (nullcontext(session) if session is not None else Session()) as session:
     try:
       # Escape username to prevent LDAP injection attacks
       escaped_username_dn = escape_dn_chars(username)

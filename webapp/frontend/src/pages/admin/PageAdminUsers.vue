@@ -284,7 +284,7 @@ export default {
       }, 300);
     },
     /** Fetch anonymization info and show the confirmation dialog. */
-    anonymizeUser({ userId, email }) {
+    anonymizeUser({ userId }) {
       let _this = this;
       let currentUser = this.store.user;
       axios({

@@ -24,19 +24,21 @@ router = APIRouter(
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/login")
 
 @router.get("/get_available_hardware")
-def get_available_hardware(date : str, duration: int, token: str = Depends(oauth2_scheme)):
+def get_available_hardware(date : str, duration: int, startNow: bool = False, token: str = Depends(oauth2_scheme)):
   """Retrieve hardware resources available for a given date and duration.
 
   Args:
       date: Desired start date/time string for the reservation.
       duration: Reservation duration in hours.
+      startNow: If True, ignore ``date`` and use the server's current time
+          as the start, so a wrong client clock cannot shift the slot.
       token: OAuth2 bearer token (injected by Depends).
 
   Returns:
       Available hardware specs per computer wrapped in an API response.
   """
   userId = get_authenticated_user_id(token)
-  return functionality.get_available_hardware(date, duration, None, is_admin(userId), None, userId)
+  return functionality.get_available_hardware(date, duration, None, is_admin(userId), None, userId, start_now=startNow)
 
 @router.get("/get_availability_timeline")
 def get_availability_timeline(startDate: str, endDate: str, token: str = Depends(oauth2_scheme)):
@@ -140,7 +142,7 @@ def get_own_reservation_details(reservationId: int, token: str = Depends(oauth2_
   return functionality.get_own_reservation_details(reservationId, userId)
 
 @router.post("/create_reservation")
-def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, lowPriorityLevel: int = 1, startScriptPath: str = "", stopScriptPath: str = "", token: str = Depends(oauth2_scheme)):
+def create_reservation(date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail, description: str = "", shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, lowPriorityLevel: int = 1, startScriptPath: str = "", stopScriptPath: str = "", startNow: bool = False, token: str = Depends(oauth2_scheme)):
   """Create a new container reservation after validating all inputs.
 
   Validates date, duration, IDs, email format, description length (max 40),
@@ -166,6 +168,8 @@ def create_reservation(date: str, duration: int, computerId: int, containerId: i
           (optional, overrides user profile default).
       stopScriptPath: Absolute path to a stop script inside the container
           (optional, overrides user profile default).
+      startNow: If True, ignore ``date`` and start the reservation at the
+          server's current time (used by "Start Immediately").
       token: OAuth2 bearer token (injected by Depends).
 
   Returns:
@@ -251,7 +255,7 @@ def create_reservation(date: str, duration: int, computerId: int, containerId: i
     return api_response(False, "Invalid hardware specs JSON format.")
 
   userId = get_authenticated_user_id(token)
-  return functionality.create_reservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description, shmSizePercent, ramDiskSizePercent, isLowPriority, lowPriorityLevel, startScriptPath, stopScriptPath)
+  return functionality.create_reservation(userId, date, duration, computerId, containerId, hardwareSpecs, adminReserveUserEmail, description, shmSizePercent, ramDiskSizePercent, isLowPriority, lowPriorityLevel, startScriptPath, stopScriptPath, startNow)
 
 @router.get("/get_current_reservations")
 def get_current_reservations(token: str = Depends(oauth2_scheme)):

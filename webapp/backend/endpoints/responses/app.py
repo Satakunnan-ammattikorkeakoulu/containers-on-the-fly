@@ -6,6 +6,7 @@ such as application name, timezone, login instructions, and contact info.
 
 from helpers.server import api_response
 from helpers.logger import log
+import datetime
 
 def get_public_config() -> object:
     """Return public app configuration that does not require authentication.
@@ -16,7 +17,9 @@ def get_public_config() -> object:
 
     Returns:
         Response object with public configuration data including app info,
-        instruction texts, and login field labels.
+        instruction texts, login field labels, and the current server time
+        (``serverTime``, UTC ISO 8601) so the frontend can detect a wrong
+        client clock.
     """
     try:
         from helpers.settings_handler import get_multiple_settings
@@ -48,6 +51,7 @@ def get_public_config() -> object:
         
         # Build response with public configuration
         config_data = {
+            "serverTime": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds"),
             "app": {
                 "name": settings_dict.get('general.applicationName', 'Containers on the Fly'),
                 "timezone": settings_dict.get('general.timezone', 'UTC'),

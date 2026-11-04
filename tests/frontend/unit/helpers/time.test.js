@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useMainStore } from '@/store/store.js'
-import { DisplayTime, TimestampToLocalTimeZone } from '@/helpers/time.js'
+import { DisplayTime, TimestampToLocalTimeZone, RelativeTime, ServerNow } from '@/helpers/time.js'
 
 describe('time helpers', () => {
   let store
@@ -41,6 +41,38 @@ describe('time helpers', () => {
       // Should not throw
       const result = TimestampToLocalTimeZone('2024-01-15T10:30:00')
       expect(typeof result).toBe('string')
+    })
+  })
+
+  describe('ServerNow and RelativeTime', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2024-01-15T10:00:00Z'))
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('ServerNow equals the client time when there is no offset', () => {
+      expect(ServerNow().toISOString()).toBe('2024-01-15T10:00:00.000Z')
+    })
+
+    it('ServerNow applies the measured clock offset', () => {
+      // Client clock is two hours ahead of the server
+      store.clockOffsetMs = -2 * 60 * 60 * 1000
+      expect(ServerNow().toISOString()).toBe('2024-01-15T08:00:00.000Z')
+    })
+
+    it('RelativeTime is relative to the client time when there is no offset', () => {
+      expect(RelativeTime('2024-01-15T09:57:00Z')).toBe('3 minutes ago')
+    })
+
+    it('RelativeTime is relative to the server time', () => {
+      // Client clock is two hours ahead, so 08:00 is "now" for the server
+      store.clockOffsetMs = -2 * 60 * 60 * 1000
+      expect(RelativeTime('2024-01-15T07:57:00Z')).toBe('3 minutes ago')
+      expect(RelativeTime('2024-01-15T10:00:00Z')).toBe('in 2 hours')
     })
   })
 })

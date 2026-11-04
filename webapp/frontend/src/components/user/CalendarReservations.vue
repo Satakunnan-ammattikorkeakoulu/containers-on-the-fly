@@ -61,6 +61,7 @@
         <v-calendar
           ref="calendar"
           v-model="focus"
+          :now="calendarNow"
           color="primary"
           :events="events"
           :event-color="getEventColor"
@@ -145,7 +146,7 @@
    * and a per-server availability heatmap with color-coded resource indicators.
    * Emits "slotSelected" when a user clicks a future time slot to start a new reservation.
    */
-  import { TimestampToLocalTimeZone } from '/src/helpers/time.js'
+  import { TimestampToLocalTimeZone, ServerNow } from '/src/helpers/time.js'
   import dayjs from "dayjs";
   import axios from 'axios';
   import utc from 'dayjs/plugin/utc'
@@ -175,7 +176,7 @@
       },
     },
     data: () => ({
-      focus: '',
+      focus: ServerNow().format('YYYY-MM-DD'),
       type: 'week',
       types: ['month', 'week', 'day', '4day'],
       weekdays: [1,2,3,4,5,6,0],
@@ -194,8 +195,15 @@
                'teal', 'green', 'orange darken-3', 'deep-orange', 'brown', 'grey', 'blue-grey'],
       reservationColorMap: {},
       nowIndicatorInterval: null,
+      timeTick: Date.now(),
     }),
     computed: {
+      /** Server's current time in the format VCalendar expects, used to highlight today. */
+      calendarNow() {
+        // Reference timeTick to force recomputation every 60 seconds
+        void this.timeTick
+        return ServerNow().format('YYYY-MM-DD HH:mm')
+      },
       /** Only draw the "now" line on time-grid views (not month). */
       showNowLine() {
         return this.type !== 'month'
@@ -211,6 +219,7 @@
       })
       // Refresh displayed events and the "now" indicator line each minute.
       this.nowIndicatorInterval = setInterval(() => {
+        this.timeTick = Date.now()
         this.updateDisplayedEvents()
         this.updateNowLine()
       }, 60000)
@@ -240,7 +249,7 @@
           return
         }
 
-        let now = dayjs()
+        let now = ServerNow()
         // Vuetify 4: @click:time passes (nativeEvent, timestampData)
         // timestampData has { date: "YYYY-MM-DD", time: "HH:mm", year, month, day, hour, minute, ... }
         let selectedTime
@@ -326,7 +335,7 @@
         return event.color
       },
       setToday () {
-        this.focus = ''
+        this.focus = ServerNow().format('YYYY-MM-DD')
       },
       prev () {
         this.$refs.calendar.prev()
@@ -347,7 +356,7 @@
         let calendarStart, calendarEnd;
         
         // Get the current focus date from the calendar
-        const focusDate = this.focus ? dayjs(this.focus) : dayjs();
+        const focusDate = this.focus ? dayjs(this.focus) : ServerNow();
         
         // Calculate range based on calendar type
         switch (this.type) {
@@ -412,7 +421,7 @@
         let calendarStart, calendarEnd;
         
         // Get the current focus date from the calendar
-        const focusDate = this.focus ? dayjs(this.focus) : dayjs();
+        const focusDate = this.focus ? dayjs(this.focus) : ServerNow();
         
         // Calculate range based on calendar type
         switch (this.type) {
@@ -489,8 +498,8 @@
             pane.insertBefore(line, pane.firstChild)
           }
 
-          const now = new Date()
-          const minutesFromMidnight = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60
+          const now = ServerNow()
+          const minutesFromMidnight = now.hour() * 60 + now.minute() + now.second() / 60
           const fraction = minutesFromMidnight / 1440
           line.style.top = (pane.offsetHeight * fraction) + 'px'
           line.style.zIndex = '0'
@@ -502,9 +511,9 @@
         this.$nextTick(() => {
           const cal = this.$refs.calendar
           if (!cal) return
-          const now = new Date()
-          const alignedMinute = now.getMinutes() - (now.getMinutes() % 30)
-          const hh = String(now.getHours()).padStart(2, '0')
+          const now = ServerNow()
+          const alignedMinute = now.minute() - (now.minute() % 30)
+          const hh = String(now.hour()).padStart(2, '0')
           const mm = String(alignedMinute).padStart(2, '0')
           if (typeof cal.scrollToTime === 'function') {
             cal.scrollToTime(`${hh}:${mm}`)

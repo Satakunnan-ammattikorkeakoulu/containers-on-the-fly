@@ -146,7 +146,7 @@
    * extend, restart, edit description, and cancel operations.
    * Emits pagination/sort changes and row actions to the parent.
    */
-  import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
+  import { DisplayTime, RelativeTime, ServerNow } from '/src/helpers/time.js'
   import { useMainStore } from '/src/store/store.js'
   import { copyToClipboard } from '/src/helpers/clipboard.js'
 
@@ -228,7 +228,7 @@
         return "No ports"
       },
       lessHoursThan(time, hours) {
-        let curDate = new Date()
+        let curDate = ServerNow().toDate()
         let afterUtc = new Date(time.getTime() - (time.getTimezoneOffset() * 60000))
 
         let diff = afterUtc.getTime() - curDate.getTime()

@@ -7,6 +7,7 @@
 
 import { defineStore } from 'pinia'
 import axios from 'axios'
+import dayjs from 'dayjs'
 import AppSettings from '/src/AppSettings.js'
 import { initAnalytics, identifyUser, clearUserIdentity } from '/src/plugins/analytics.js'
 
@@ -107,7 +108,9 @@ export const useMainStore = defineStore('main', {
     },
     configLoaded: false,
     configError: false,
-    configErrorMessage: ""
+    configErrorMessage: "",
+    // Server clock minus client clock in milliseconds, measured when the app config loads
+    clockOffsetMs: 0
   }),
 
   getters: {
@@ -212,6 +215,22 @@ export const useMainStore = defineStore('main', {
       this.configLoaded = true;
       this.configError = false;
       this.configErrorMessage = "";
+    },
+
+    /**
+     * Estimate how far the client clock is from the server clock.
+     * The server time is assumed to be taken halfway through the request,
+     * which cancels out most of the network latency.
+     * @param {string} serverTime - Server's UTC time (ISO 8601) from the `/app/config` response.
+     * @param {number} requestStartedAt - Client time (ms) when the request was sent.
+     * @param {number} responseReceivedAt - Client time (ms) when the response arrived.
+     */
+    setClockOffset(serverTime, requestStartedAt, responseReceivedAt) {
+      // Older backends do not send serverTime
+      if (!serverTime) return;
+      const serverMs = dayjs(serverTime).valueOf();
+      if (isNaN(serverMs)) return;
+      this.clockOffsetMs = serverMs - (requestStartedAt + responseReceivedAt) / 2;
     },
 
     /**
@@ -433,8 +452,10 @@ export const useMainStore = defineStore('main', {
      */
     async loadAppConfig() {
       try {
+        const requestStartedAt = dayjs().valueOf();
         const response = await axios.get(AppSettings.APIServer.app.get_config);
         if (response.data.status) {
+          this.setClockOffset(response.data.data.serverTime, requestStartedAt, dayjs().valueOf());
           this.setAppConfig(response.data.data);
           initAnalytics(response.data.data.analytics);
         } else {

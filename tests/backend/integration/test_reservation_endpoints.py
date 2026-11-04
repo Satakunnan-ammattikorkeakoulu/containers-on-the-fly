@@ -50,6 +50,8 @@ def _create_reservation_via_api(test_client, token, computer_id, container_id, h
         query += f"&shmSizePercent={kwargs['shmSizePercent']}"
     if "ramDiskSizePercent" in kwargs:
         query += f"&ramDiskSizePercent={kwargs['ramDiskSizePercent']}"
+    if "startNow" in kwargs:
+        query += f"&startNow={str(kwargs['startNow']).lower()}"
 
     return test_client.post(
         f"/api/reservation/create_reservation{query}",
@@ -313,6 +315,20 @@ class TestGetAvailableHardware:
         body = resp.json()
         assert body["status"] is False
 
+    def test_start_now_ignores_client_date(self, test_client, admin_token):
+        """With startNow, availability is checked from server time, not the given date."""
+        # server1 is free now but fully booked two days from now
+        _fully_book_computer("server1", hours_offset=48)
+
+        resp = test_client.get(
+            f"/api/reservation/get_available_hardware?date={_future_date(hours=48)}&duration=2&startNow=true",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        body = resp.json()
+        assert body["status"] is True, body["message"]
+        by_name = {c["name"]: c for c in body["data"]["computers"]}
+        assert by_name["server1"]["fullyBooked"] is False
+
 
 # =============================================================================
 # create_reservation
@@ -471,6 +487,57 @@ class TestCreateReservation:
         with db.Session() as session:
             reservation = session.execute(select(db.Reservation)).scalar_one()
             assert reservation.isLowPriority is True
+
+    def test_create_reservation_start_now_uses_server_time(self, test_client, admin_token):
+        """startNow starts the reservation at server time even if the client clock is ahead."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        before = datetime.now(timezone.utc).replace(tzinfo=None)
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+            hours_from_now=3, duration=2, startNow=True,
+        )
+        after = datetime.now(timezone.utc).replace(tzinfo=None)
+        assert resp.json()["status"] is True, resp.json()["message"]
+
+        with db.Session() as session:
+            reservation = session.execute(select(db.Reservation)).scalar_one()
+            start = reservation.startDate.replace(tzinfo=None)
+            end = reservation.endDate.replace(tzinfo=None)
+            assert before - timedelta(seconds=1) <= start <= after + timedelta(seconds=1)
+            assert end - start == timedelta(hours=2)
+
+    def test_create_reservation_without_start_now_uses_client_date(self, test_client, admin_token):
+        """Without startNow, the reservation starts at the date the client sent."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+            hours_from_now=3,
+        )
+        assert resp.json()["status"] is True, resp.json()["message"]
+
+        with db.Session() as session:
+            reservation = session.execute(select(db.Reservation)).scalar_one()
+            start = reservation.startDate.replace(tzinfo=None)
+            expected = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=3)
+            assert abs(start - expected) < timedelta(minutes=1)
+
+    def test_create_reservation_past_start_moves_to_now(self, test_client, admin_token):
+        """A start date that has already passed starts now and keeps the full duration."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        before = datetime.now(timezone.utc).replace(tzinfo=None)
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+            hours_from_now=-1, duration=2,
+        )
+        after = datetime.now(timezone.utc).replace(tzinfo=None)
+        assert resp.json()["status"] is True, resp.json()["message"]
+
+        with db.Session() as session:
+            reservation = session.execute(select(db.Reservation)).scalar_one()
+            start = reservation.startDate.replace(tzinfo=None)
+            end = reservation.endDate.replace(tzinfo=None)
+            assert before - timedelta(seconds=1) <= start <= after + timedelta(seconds=1)
+            assert end - start == timedelta(hours=2)
 
     def test_create_reservation_invalid_computer(self, test_client, admin_token):
         """Reject reservation for a non-existent computer."""

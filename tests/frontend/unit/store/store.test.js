@@ -239,6 +239,34 @@ describe('Main Store', () => {
     })
   })
 
+  describe('setClockOffset', () => {
+    it('defaults to zero', () => {
+      expect(store.clockOffsetMs).toBe(0)
+    })
+
+    it('uses the midpoint of the request as the client time', () => {
+      const requestStartedAt = Date.parse('2026-01-01T12:00:00.000Z')
+      const responseReceivedAt = requestStartedAt + 200
+      // Server is two hours ahead of the client midpoint
+      const serverTime = new Date(requestStartedAt + 100 + 2 * 60 * 60 * 1000).toISOString()
+      store.setClockOffset(serverTime, requestStartedAt, responseReceivedAt)
+      expect(store.clockOffsetMs).toBe(2 * 60 * 60 * 1000)
+    })
+
+    it('handles a client clock ahead of the server', () => {
+      const requestStartedAt = Date.parse('2026-01-01T12:10:00.000Z')
+      store.setClockOffset('2026-01-01T12:00:00.000+00:00', requestStartedAt, requestStartedAt)
+      expect(store.clockOffsetMs).toBe(-10 * 60 * 1000)
+    })
+
+    it('ignores a missing or invalid server time', () => {
+      store.setClockOffset(undefined, 0, 0)
+      expect(store.clockOffsetMs).toBe(0)
+      store.setClockOffset('not a date', 0, 0)
+      expect(store.clockOffsetMs).toBe(0)
+    })
+  })
+
   describe('setConfigError', () => {
     it('sets error state', () => {
       store.setConfigError('Connection failed')

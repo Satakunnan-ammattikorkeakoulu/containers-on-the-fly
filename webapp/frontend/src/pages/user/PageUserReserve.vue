@@ -17,6 +17,23 @@
       </v-col>
     </v-row>
 
+    <!-- Client clock skew warning -->
+    <v-row v-if="isClockSkewed">
+      <v-col cols="12" class="mb-4">
+        <v-alert
+          type="warning"
+          variant="tonal"
+          class="mx-auto text-left"
+          style="max-width: 800px;"
+        >
+          Your computer's clock is about <strong>{{ clockSkewText }}</strong> {{ store.clockOffsetMs < 0 ? 'ahead of' : 'behind' }} the server.
+          The current time is <strong>{{ serverNowText }}</strong> ({{ globalTimezone }}).
+          This page uses the server time, but if your computer's time zone is set wrong, calendar times may still be off.
+          Please check your computer's date, time and time zone settings and reload the page.
+        </v-alert>
+      </v-col>
+    </v-row>
+
     <v-expansion-panels v-model="activePanel" class="mb-6">
 
       <!-- PANEL 0: DURATION -->
@@ -743,7 +760,7 @@
   import relativeTime from 'dayjs/plugin/relativeTime'
   import CalendarReservations from '/src/components/user/CalendarReservations.vue';
   import Loading from '/src/components/global/Loading.vue';
-  import { RelativeTime, DisplayTime } from '/src/helpers/time.js';
+  import { RelativeTime, DisplayTime, ServerNow } from '/src/helpers/time.js';
 
   import { useMainStore } from '@/store/store'
 
@@ -751,6 +768,9 @@
   dayjs.extend(timezone)
   dayjs.extend(customParseFormat)
   dayjs.extend(relativeTime)
+
+  // Show the clock warning when the client clock differs from the server by more than this
+  const CLOCK_SKEW_WARNING_MS = 2 * 60 * 1000
 
   /**
    * Accordion-based reservation wizard for creating new container reservations.
@@ -1118,7 +1138,7 @@
        */
       reserveNow() {
         if (this.fetchingComputers) return
-        this.reserveDate = dayjs().toISOString()
+        this.reserveDate = ServerNow().toISOString()
         this.reserveType = "now"
         this.fetchAvailableHardware()
       },
@@ -1257,7 +1277,7 @@
         axios({
           method: "get",
           url: this.$appSettings.APIServer.reservation.get_available_hardware,
-          params: { "date": dayjs(this.reserveDate).tz("GMT+0").toISOString(), duration: duration },
+          params: { "date": dayjs(this.reserveDate).tz("GMT+0").toISOString(), duration: duration, startNow: this.reserveType === "now" },
           headers: {"Authorization" : `Bearer ${currentUser.loginToken}`}
         })
         .then(function (response) {
@@ -1463,7 +1483,8 @@
           "isLowPriority": this.isLowPriority,
           "lowPriorityLevel": this.isLowPriority ? this.lowPriorityLevel : 1,
           "startScriptPath": this.reservationStartScriptPath && this.reservationStartScriptPath.trim() ? this.reservationStartScriptPath.trim() : "",
-          "stopScriptPath": this.reservationStopScriptPath && this.reservationStopScriptPath.trim() ? this.reservationStopScriptPath.trim() : ""
+          "stopScriptPath": this.reservationStopScriptPath && this.reservationStopScriptPath.trim() ? this.reservationStopScriptPath.trim() : "",
+          "startNow": this.reserveType === "now"
         }
 
         axios({
@@ -1843,7 +1864,7 @@
         if (this.reserveType === 'now') return 'Immediately'
         // Reference timeTick to force recomputation every 60 seconds
         void this.timeTick
-        const relative = dayjs(this.reserveDate).fromNow()
+        const relative = dayjs(this.reserveDate).from(ServerNow())
         const full = dayjs(this.reserveDate).format("DD.MM.YYYY HH:mm")
         return `Starts ${relative} (${full})`
       },
@@ -1920,6 +1941,28 @@
       },
       reservationPageInstructions() {
         return this.store.reservationPageInstructions
+      },
+      /** Whether the client clock is far enough off from the server clock to warn the user. */
+      isClockSkewed() {
+        return Math.abs(this.store.clockOffsetMs) > CLOCK_SKEW_WARNING_MS
+      },
+      /** Size of the client clock offset in words, e.g. "2 hours 5 minutes". */
+      clockSkewText() {
+        const totalMinutes = Math.round(Math.abs(this.store.clockOffsetMs) / 60000)
+        const days = Math.floor(totalMinutes / 1440)
+        const hours = Math.floor((totalMinutes % 1440) / 60)
+        const minutes = totalMinutes % 60
+        let parts = []
+        if (days > 0) parts.push(`${days} day${days !== 1 ? 's' : ''}`)
+        if (hours > 0) parts.push(`${hours} hour${hours !== 1 ? 's' : ''}`)
+        if (minutes > 0 && days === 0) parts.push(`${minutes} minute${minutes !== 1 ? 's' : ''}`)
+        return parts.join(' ')
+      },
+      /** Current server time in the app timezone. */
+      serverNowText() {
+        // Reference timeTick to force recomputation every 60 seconds
+        void this.timeTick
+        return DisplayTime(ServerNow().toISOString())
       },
       /**
        * Whether the low-priority toggle is visible in the Duration panel.

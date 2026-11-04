@@ -46,13 +46,25 @@ function TimestampToLocalTimeZone(timestamp) {
 }
 
 /**
- * Format an ISO timestamp as a relative time string (e.g. "3 minutes ago").
+ * Current time according to the server, i.e. the client clock corrected by
+ * the offset measured when the app config was loaded. Use this instead of
+ * `dayjs()` whenever "now" matters, so a wrong client clock does not shift it.
+ * @returns {import('dayjs').Dayjs} Day.js object for the server's current time.
+ */
+function ServerNow() {
+  const store = useMainStore()
+  return dayjs().add(store.clockOffsetMs, 'ms')
+}
+
+/**
+ * Format an ISO timestamp as a relative time string (e.g. "3 minutes ago"),
+ * relative to the server's current time.
  * @param {string} timestamp - ISO 8601 timestamp (with or without trailing "Z").
  * @returns {string} Relative time string.
  */
 function RelativeTime(timestamp) {
   if (timestamp.slice(-1) !== "Z") timestamp = timestamp + "Z"
-  return dayjs(timestamp).fromNow()
+  return dayjs(timestamp).from(ServerNow())
 }
 
-export { DisplayTime, TimestampToLocalTimeZone, RelativeTime }
+export { DisplayTime, TimestampToLocalTimeZone, RelativeTime, ServerNow }

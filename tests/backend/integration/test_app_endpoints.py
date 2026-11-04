@@ -1,5 +1,7 @@
 """Integration tests for /api/app endpoints."""
 
+from datetime import datetime, timezone, timedelta
+
 
 class TestGetPublicConfig:
 
@@ -22,3 +24,10 @@ class TestGetPublicConfig:
         config = resp.json()["data"]
         # Default from settings_schema
         assert config["app"]["name"] == "Containers on the Fly"
+
+    def test_returns_server_time(self, test_client):
+        resp = test_client.get("/api/app/config")
+        config = resp.json()["data"]
+        server_time = datetime.fromisoformat(config["serverTime"])
+        assert server_time.tzinfo is not None
+        assert abs(datetime.now(timezone.utc) - server_time) < timedelta(seconds=10)

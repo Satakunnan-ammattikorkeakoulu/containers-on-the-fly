@@ -50,7 +50,7 @@ def get_public_computers(user_id: int = None) -> object:
 
 # TODO: Should be able to send a computer here and get the available hardware specs for it.
 # TODO: Should also be able to only fail there is not enough resources any computer. Right now it fails if any of the computers are out of resources for the given time period.
-def get_available_hardware(date : str, duration : int, reducable_specs : dict = None, is_admin = False, ignored_reservation_id : int = None, user_id : int = None, target_computer_id : int = None) -> object:
+def get_available_hardware(date : str, duration : int, reducable_specs : dict = None, is_admin = False, ignored_reservation_id : int = None, user_id : int = None, target_computer_id : int = None, start_now : bool = False) -> object:
   """Calculate available hardware resources for a given time slot.
 
   Fetches all public computers and their hardware specs, subtracts
@@ -81,6 +81,8 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
           Callers that know exactly which computer they intend to
           reserve against should pass this so that an unrelated
           computer being fully booked cannot fail their request.
+      start_now: If True, ``date`` is ignored and the server's current
+          UTC time is used as the start instead.
 
   Returns:
       Response with computers list (each with adjusted hardwareSpecs
@@ -88,7 +90,7 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
       error message if resources are insufficient for the requested
       time period.
   """
-  date = parser.parse(date)
+  date = datetime.datetime.now(timezone.utc) if start_now else parser.parse(date)
   end_date = date+relativedelta(hours=+duration)
 
   # Fetch all required data and process inside session scope
@@ -686,12 +688,14 @@ def get_current_reservations() -> object:
 
   return api_response(True, "Current reservations fetched.", { "reservations": reservations })
 
-def create_reservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, lowPriorityLevel: int = 1, startScriptPath: str = "", stopScriptPath: str = ""):
+def create_reservation(userId : int, date: str, duration: int, computerId: int, containerId: int, hardwareSpecs, adminReserveUserEmail: str = None, description: str = None, shmSizePercent: int = 50, ramDiskSizePercent: int = 0, isLowPriority: bool = False, lowPriorityLevel: int = 1, startScriptPath: str = "", stopScriptPath: str = "", startNow: bool = False):
   """Create a new container reservation with hardware resource allocation.
 
   Validates all inputs including duration limits, resource availability,
   user permissions, role-based hardware limits, and active reservation
   caps. Admins can reserve on behalf of other users via email address.
+  A start date that is already in the past is moved to the server's
+  current time, keeping the requested duration.
 
   Args:
       userId: The ID of the user creating the reservation.
@@ -718,6 +722,9 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
           container (overrides user profile default if set).
       stopScriptPath: Absolute path to a stop script inside the
           container (overrides user profile default if set).
+      startNow: If True, ``date`` is ignored and the reservation starts
+          at the server's current UTC time, so a wrong client clock
+          cannot push the start into the future or the past.
 
   Returns:
       Response indicating success with informByEmail flag, or an error
@@ -744,7 +751,16 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
   if ramDiskSizePercent > 60:
     return api_response(False, "RAM disk size cannot exceed 60% of allocated memory.")
 
-  date = parser.parse(date)
+  now_utc = datetime.datetime.now(timezone.utc)
+  if startNow:
+    date = now_utc
+  else:
+    date = parser.parse(date)
+    # A start that has already passed (slow form filling, wrong client clock)
+    # starts now instead, keeping the requested duration
+    aware_date = date if date.tzinfo is not None else date.replace(tzinfo=timezone.utc)
+    if aware_date < now_utc:
+      date = now_utc
   end_date = date+relativedelta(hours=+duration)
 
   # Phase 1: Validation session — resolve user, check limits, validate inputs
@@ -985,7 +1001,8 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
                 "containerImage": container.imageName, "duration": duration,
                 "description": description, "hardwareSpecs": reserved_specs_summary,
                 "shmSizePercent": shmSizePercent, "ramDiskSizePercent": ramDiskSizePercent,
-                "isLowPriority": isLowPriority, "lowPriorityLevel": lowPriorityLevel})
+                "isLowPriority": isLowPriority, "lowPriorityLevel": lowPriorityLevel,
+                "startNow": startNow})
     return api_response(True, "Reservation created succesfully!", { "informByEmail": inform_by_email })
 
 def cancel_reservation(userId : int, reservationId: int):

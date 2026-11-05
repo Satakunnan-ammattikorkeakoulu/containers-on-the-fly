@@ -720,7 +720,9 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
 
   Validates all inputs including duration limits, resource availability,
   user permissions, role-based hardware limits, and active reservation
-  caps. Admins can reserve on behalf of other users via email address.
+  caps. Only admins can reserve private computers and containers, and
+  every hardware spec must belong to the chosen computer. Admins can
+  reserve on behalf of other users via email address.
   A start date that is already in the past is moved to the server's
   current time, keeping the requested duration. If the full duration from
   now collides with a later booking, the reservation keeps the originally
@@ -733,7 +735,7 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
       computerId: The ID of the target computer/server.
       containerId: The ID of the container image to use.
       hardwareSpecs: Dict of {hardwareSpecId: amount} for requested
-          hardware resources (CPUs, RAM, GPUs).
+          hardware resources (CPUs, RAM, GPUs) of ``computerId``.
       adminReserveUserEmail: Optional email to reserve on behalf of
           another user (admin only).
       description: Optional short description (max 40 characters).
@@ -818,13 +820,15 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
 
     # Check that computer and container exists
     computer = session.execute(select(Computer).where( Computer.computerId == computerId )).scalar_one_or_none()
-    if (computer == None):
+    if (computer == None or computer.removed == True):
       return api_response(False, "Computer not found.")
     container = session.execute(select(Container).where( Container.containerId == containerId )).scalar_one_or_none()
-    if (container == None):
+    if (container == None or container.removed == True):
       return api_response(False, "Container not found.")
 
-    # Verify user can access this container
+    # Verify user can access this computer and container
+    if computer.public == False and not is_user_admin:
+      return api_response(False, "Access denied to private computer.")
     if container.public == False and not is_user_admin:
       return api_response(False, "Access denied to private container.")
 
@@ -989,9 +993,10 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     # Enhanced hardware specification validation
     reserved_specs_summary = []
     for key, val in hardwareSpecs.items():
-      # Validate hardware spec exists
+      # Validate hardware spec exists and belongs to the reserved computer;
+      # another computer's spec would skip this computer's capacity check
       hardware_spec = session.execute(select(HardwareSpec).where( HardwareSpec.hardwareSpecId == key )).scalar_one_or_none()
-      if not hardware_spec:
+      if not hardware_spec or hardware_spec.computerId != computerId:
         return api_response(False, f"Invalid hardware specification ID: {key}")
 
       # Validate amount bounds

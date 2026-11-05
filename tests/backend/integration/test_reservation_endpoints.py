@@ -699,6 +699,76 @@ class TestCreateReservation:
         assert resp.status_code == 200
         assert resp.json()["status"] is False
 
+    def test_create_reservation_private_computer_denied_for_user(self, test_client, user_token):
+        """A normal user cannot reserve a private computer."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, user_token)
+        with db.Session() as session:
+            session.get(db.Computer, computer_id).public = False
+            session.commit()
+        resp = _create_reservation_via_api(
+            test_client, user_token, computer_id, container_id, hw_specs,
+        )
+        assert resp.json()["status"] is False
+        assert resp.json()["message"] == "Access denied to private computer."
+
+        with db.Session() as session:
+            assert session.execute(select(db.Reservation)).first() is None
+
+    def test_create_reservation_private_computer_allowed_for_admin(self, test_client, admin_token):
+        """Admins can reserve a private computer, also on behalf of another user."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        with db.Session() as session:
+            session.get(db.Computer, computer_id).public = False
+            session.commit()
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+            adminReserveUserEmail="user@foo.com",
+        )
+        assert resp.json()["status"] is True, resp.json()["message"]
+
+    def test_create_reservation_removed_computer(self, test_client, admin_token):
+        """A removed computer cannot be reserved, even by an admin."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        with db.Session() as session:
+            session.get(db.Computer, computer_id).removed = True
+            session.commit()
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+        )
+        assert resp.json()["status"] is False
+        assert resp.json()["message"] == "Computer not found."
+
+    def test_create_reservation_removed_container(self, test_client, admin_token):
+        """A removed container cannot be reserved, even by an admin."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        with db.Session() as session:
+            session.get(db.Container, container_id).removed = True
+            session.commit()
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+        )
+        assert resp.json()["status"] is False
+        assert resp.json()["message"] == "Container not found."
+
+    def test_create_reservation_rejects_specs_from_another_computer(self, test_client, admin_token):
+        """Hardware specs of another computer are rejected, so its capacity check can't be skipped."""
+        computer_id, container_id, _ = _get_test_ids(test_client, admin_token)
+        with db.Session() as session:
+            other_cpu_id = session.execute(
+                select(db.HardwareSpec.hardwareSpecId).where(
+                    db.HardwareSpec.type == "cpus",
+                    db.HardwareSpec.computerId != computer_id,
+                )
+            ).scalars().first()
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, {str(other_cpu_id): 1},
+        )
+        assert resp.json()["status"] is False
+        assert resp.json()["message"] == f"Invalid hardware specification ID: {other_cpu_id}"
+
+        with db.Session() as session:
+            assert session.execute(select(db.Reservation)).first() is None
+
     def test_create_reservation_exceeds_user_hardware_limit(self, test_client, user_token):
         """Normal user cannot exceed the hardware maximumAmountForUser."""
         computer_id, container_id, _ = _get_test_ids(test_client, user_token)

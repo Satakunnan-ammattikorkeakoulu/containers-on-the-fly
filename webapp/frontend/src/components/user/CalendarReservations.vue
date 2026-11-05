@@ -572,6 +572,12 @@
       },
     },
     watch: {
+      // A new clock offset measurement moves "now"; redraw the line right away
+      'store.clockOffsetMs': {
+        handler () {
+          this.updateNowLine()
+        }
+      },
       propReservations: {
         immediate: true,
         handler () {

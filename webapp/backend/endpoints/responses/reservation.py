@@ -26,6 +26,27 @@ from sqlalchemy.orm import joinedload
 from helpers.pagination import apply_pagination, get_total_count
 from helpers.settings_handler import get_setting
 
+def _parse_utc_date(date_string: str) -> datetime.datetime:
+  """Parse a date string into a timezone-aware UTC datetime.
+
+  Naive dates are treated as UTC and dates with another offset are converted
+  to UTC, because the database stores UTC wall-clock times without an offset.
+
+  Args:
+      date_string: Date string in any format dateutil can parse.
+
+  Returns:
+      Timezone-aware datetime in UTC.
+
+  Raises:
+      ValueError: If the string cannot be parsed as a date.
+      OverflowError: If the date is out of range once converted to UTC.
+  """
+  date = parser.parse(date_string)
+  if date.tzinfo is None:
+    return date.replace(tzinfo=timezone.utc)
+  return date.astimezone(timezone.utc)
+
 def get_public_computers(user_id: int = None) -> object:
   """Return names and IP addresses of all non-removed computers visible to the user.
 
@@ -87,10 +108,16 @@ def get_available_hardware(date : str, duration : int, reducable_specs : dict = 
   Returns:
       Response with computers list (each with adjusted hardwareSpecs
       and a ``fullyBooked`` flag) and containers list on success, or an
-      error message if resources are insufficient for the requested
-      time period.
+      error message if the date is invalid or resources are insufficient
+      for the requested time period.
   """
-  date = datetime.datetime.now(timezone.utc) if start_now else parser.parse(date)
+  if start_now:
+    date = datetime.datetime.now(timezone.utc)
+  else:
+    try:
+      date = _parse_utc_date(date)
+    except (ValueError, OverflowError):
+      return api_response(False, "Invalid date parameter.")
   end_date = date+relativedelta(hours=+duration)
 
   # Fetch all required data and process inside session scope
@@ -695,7 +722,9 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
   user permissions, role-based hardware limits, and active reservation
   caps. Admins can reserve on behalf of other users via email address.
   A start date that is already in the past is moved to the server's
-  current time, keeping the requested duration.
+  current time, keeping the requested duration. If the full duration from
+  now collides with a later booking, the reservation keeps the originally
+  chosen end instead.
 
   Args:
       userId: The ID of the user creating the reservation.
@@ -722,9 +751,11 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
           container (overrides user profile default if set).
       stopScriptPath: Absolute path to a stop script inside the
           container (overrides user profile default if set).
-      startNow: If True, ``date`` is ignored and the reservation starts
-          at the server's current UTC time, so a wrong client clock
-          cannot push the start into the future or the past.
+      startNow: If True, the reservation starts at the server's current
+          UTC time, so a wrong client clock cannot push the start into the
+          future or the past. ``date`` is then only used as the originally
+          chosen start (the server-corrected time the user clicked) for the
+          end fallback, and may be unparseable.
 
   Returns:
       Response indicating success with informByEmail flag, or an error
@@ -752,15 +783,26 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
     return api_response(False, "RAM disk size cannot exceed 60% of allocated memory.")
 
   now_utc = datetime.datetime.now(timezone.utc)
-  if startNow:
+  try:
+    requested_date = _parse_utc_date(date)
+  except (ValueError, OverflowError):
+    # With startNow the date is only a hint for the end fallback
+    if not startNow:
+      return api_response(False, "Invalid date parameter.")
+    requested_date = None
+
+  # A reservation can't start in the past: "start now" and a start that has
+  # already passed (slow form filling, wrong client clock) begin at the server's
+  # current time. The full duration is tried first; if that collides with a
+  # later booking, the originally chosen end is used instead (see Phase 2).
+  date = requested_date
+  fallback_end_date = None
+  if startNow or requested_date < now_utc:
     date = now_utc
-  else:
-    date = parser.parse(date)
-    # A start that has already passed (slow form filling, wrong client clock)
-    # starts now instead, keeping the requested duration
-    aware_date = date if date.tzinfo is not None else date.replace(tzinfo=timezone.utc)
-    if aware_date < now_utc:
-      date = now_utc
+    if requested_date is not None and requested_date < now_utc:
+      original_end_date = requested_date + relativedelta(hours=+duration)
+      if original_end_date > now_utc:
+        fallback_end_date = original_end_date
   end_date = date+relativedelta(hours=+duration)
 
   # Phase 1: Validation session — resolve user, check limits, validate inputs
@@ -865,6 +907,13 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
   # Phase 2: Check hardware availability outside session to avoid nested sessions
   if not isLowPriority:
     available_hardware_response = get_available_hardware(date.isoformat(), duration, hardwareSpecs, is_user_admin, None, resolved_user_id, target_computer_id=computerId)
+    if available_hardware_response["status"] == False and fallback_end_date is not None:
+      # The full duration from now runs into a later booking: keep the originally
+      # chosen end, checking the same window the availability listing checked
+      fallback_response = get_available_hardware(requested_date.isoformat(), duration, hardwareSpecs, is_user_admin, None, resolved_user_id, target_computer_id=computerId)
+      if fallback_response["status"] == True:
+        available_hardware_response = fallback_response
+        end_date = fallback_end_date
     if (available_hardware_response["status"] == False):
       return api_response(False, available_hardware_response["message"])
 
@@ -1002,7 +1051,8 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
                 "description": description, "hardwareSpecs": reserved_specs_summary,
                 "shmSizePercent": shmSizePercent, "ramDiskSizePercent": ramDiskSizePercent,
                 "isLowPriority": isLowPriority, "lowPriorityLevel": lowPriorityLevel,
-                "startNow": startNow})
+                "startNow": startNow, "startDate": date.isoformat(),
+                "endDate": end_date.isoformat()})
     return api_response(True, "Reservation created succesfully!", { "informByEmail": inform_by_email })
 
 def cancel_reservation(userId : int, reservationId: int):

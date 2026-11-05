@@ -51,6 +51,7 @@
   import Loading from '/src/components/global/Loading.vue';
   import AdminComputersTable from '/src/components/admin/AdminComputersTable.vue';
   import AdminManageComputerModal from '/src/components/admin/AdminManageComputerModal.vue';
+  import { ServerNow } from '/src/helpers/time.js';
   import { useMainStore } from '@/store/store'
 
   export default {
@@ -257,7 +258,7 @@
                 _this.lastUpdateTime[server.computerId] = lastUpdated;
 
                 // Consider active if data is within the configured threshold
-                const timeDiff = Date.now() - lastUpdated;
+                const timeDiff = ServerNow().valueOf() - lastUpdated;
 
                 if (timeDiff < _this.onlineThresholdMinutes * 60 * 1000) {
                   _this.activeServers[server.computerId] = true;
@@ -268,7 +269,7 @@
               // So we can consider it active
               if (!lastUpdated && response.data.data.metrics) {
                 _this.activeServers[server.computerId] = true;
-                _this.lastUpdateTime[server.computerId] = Date.now();
+                _this.lastUpdateTime[server.computerId] = ServerNow().valueOf();
               }
             }
           } catch {
@@ -349,14 +350,14 @@
             
             if (lastUpdated) {
               _this.lastUpdateTime[computerId] = lastUpdated;
-              const timeDiff = Date.now() - lastUpdated;
+              const timeDiff = ServerNow().valueOf() - lastUpdated;
               if (timeDiff < _this.onlineThresholdMinutes * 60 * 1000) {
                 _this.activeServers[computerId] = true;
               }
             } else if (data.metrics) {
               // Even if no timestamp, if we got data, the server responded
               _this.activeServers[computerId] = true;
-              _this.lastUpdateTime[computerId] = Date.now();
+              _this.lastUpdateTime[computerId] = ServerNow().valueOf();
             }
           } else {
             // No data available

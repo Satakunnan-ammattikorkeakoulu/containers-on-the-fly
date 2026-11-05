@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import axios from 'axios'
 import { useMainStore } from '@/store/store.js'
 
 describe('Main Store', () => {
@@ -264,6 +265,48 @@ describe('Main Store', () => {
       expect(store.clockOffsetMs).toBe(0)
       store.setClockOffset('not a date', 0, 0)
       expect(store.clockOffsetMs).toBe(0)
+    })
+  })
+
+  describe('refreshClockOffset', () => {
+    let nowSpy
+
+    beforeEach(() => {
+      axios.get.mockClear()
+      nowSpy = vi.spyOn(performance, 'now').mockReturnValue(60000)
+    })
+
+    afterEach(() => {
+      nowSpy.mockRestore()
+    })
+
+    it('measures the offset again from the server time', async () => {
+      const serverTime = new Date(Date.now() + 60 * 60 * 1000).toISOString()
+      axios.get.mockResolvedValueOnce({ data: { status: true, data: { serverTime } } })
+      await store.refreshClockOffset()
+      expect(axios.get).toHaveBeenCalledTimes(1)
+      expect(Math.abs(store.clockOffsetMs - 60 * 60 * 1000)).toBeLessThan(1000)
+    })
+
+    it('skips a re-measurement within 2 seconds of the last one', async () => {
+      const response = { data: { status: true, data: { serverTime: new Date().toISOString() } } }
+      axios.get.mockResolvedValueOnce(response).mockResolvedValueOnce(response)
+      await store.refreshClockOffset()
+      nowSpy.mockReturnValue(61000)
+      await store.refreshClockOffset()
+      expect(axios.get).toHaveBeenCalledTimes(1)
+      nowSpy.mockReturnValue(63000)
+      await store.refreshClockOffset()
+      expect(axios.get).toHaveBeenCalledTimes(2)
+    })
+
+    it('keeps the previous offset when the request fails', async () => {
+      const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {})
+      store.clockOffsetMs = 1234
+      axios.get.mockRejectedValueOnce(new Error('Network Error'))
+      await store.refreshClockOffset()
+      expect(store.clockOffsetMs).toBe(1234)
+      debugSpy.mockRestore()
     })
   })
 

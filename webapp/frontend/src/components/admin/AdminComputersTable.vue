@@ -411,7 +411,7 @@
    * Actions menu allows editing the computer, viewing monitoring, or removing the computer.
    * Used in PageAdminComputers.
    */
-  import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
+  import { DisplayTime, RelativeTime, ServerNow } from '/src/helpers/time.js'
   import { useMainStore } from '@/store/store'
 
   export default {
@@ -569,7 +569,7 @@
       /** Converts a UTC millisecond timestamp into a human-readable relative time string (e.g. "5m ago"). */
       formatLastUpdate(timestamp) {
         if (!timestamp) return 'No data';
-        const now = Date.now();
+        const now = ServerNow().valueOf();
         const diff = now - timestamp;
         const seconds = Math.floor(diff / 1000);
         const minutes = Math.floor(seconds / 60);

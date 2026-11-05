@@ -51,4 +51,10 @@ axios.interceptors.response.use(
 // Initialize store on app creation
 store.initialiseStore()
 
+// Measure the clock offset again when the user returns to the tab, e.g. after fixing their computer's clock
+window.addEventListener('focus', () => store.refreshClockOffset())
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') store.refreshClockOffset()
+})
+
 app.mount('#app')

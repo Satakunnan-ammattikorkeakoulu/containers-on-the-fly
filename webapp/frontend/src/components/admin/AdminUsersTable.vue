@@ -84,7 +84,7 @@
  * Emits pagination/sort changes to the parent via @update:options.
  * Used in PageAdminUsers.
  */
-import { DisplayTime, RelativeTime } from '/src/helpers/time.js'
+import { DisplayTime, RelativeTime, ServerNow } from '/src/helpers/time.js'
 
 export default {
   name: 'AdminUsersTable',
@@ -153,7 +153,7 @@ export default {
     isOnline(item) {
       if (!item.lastSeenAt) return false
       const ts = item.lastSeenAt.endsWith('Z') || item.lastSeenAt.includes('+') ? item.lastSeenAt : item.lastSeenAt + 'Z'
-      return (Date.now() - new Date(ts).getTime()) < this.propOnlineThresholdMinutes * 60 * 1000
+      return (ServerNow().valueOf() - new Date(ts).getTime()) < this.propOnlineThresholdMinutes * 60 * 1000
     },
   },
 }

@@ -168,8 +168,9 @@ def create_reservation(date: str, duration: int, computerId: int, containerId: i
           (optional, overrides user profile default).
       stopScriptPath: Absolute path to a stop script inside the container
           (optional, overrides user profile default).
-      startNow: If True, ignore ``date`` and start the reservation at the
-          server's current time (used by "Start Immediately").
+      startNow: If True, start the reservation at the server's current time
+          (used by "Start Immediately"). ``date`` is then only the time the
+          user clicked, used if the full duration collides with a later booking.
       token: OAuth2 bearer token (injected by Depends).
 
   Returns:

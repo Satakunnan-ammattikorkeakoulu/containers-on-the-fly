@@ -11,6 +11,10 @@ import dayjs from 'dayjs'
 import AppSettings from '/src/AppSettings.js'
 import { initAnalytics, identifyUser, clearUserIdentity } from '/src/plugins/analytics.js'
 
+// Minimum time between clock offset re-measurements; coalesces the focus and visibilitychange
+// events that fire together when the user returns to the tab
+const CLOCK_RESYNC_MIN_INTERVAL_MS = 2 * 1000
+
 /**
  * Main application store.
  * @returns {Object} Pinia store instance with state, getters, and actions.
@@ -110,7 +114,9 @@ export const useMainStore = defineStore('main', {
     configError: false,
     configErrorMessage: "",
     // Server clock minus client clock in milliseconds, measured when the app config loads
-    clockOffsetMs: 0
+    clockOffsetMs: 0,
+    // performance.now() of the last offset re-measurement; monotonic, so clock changes can't affect the throttle
+    clockSyncedAt: 0
   }),
 
   getters: {
@@ -231,6 +237,26 @@ export const useMainStore = defineStore('main', {
       const serverMs = dayjs(serverTime).valueOf();
       if (isNaN(serverMs)) return;
       this.clockOffsetMs = serverMs - (requestStartedAt + responseReceivedAt) / 2;
+    },
+
+    /**
+     * Measure the clock offset again, e.g. after the user may have fixed their
+     * computer's clock. Skipped when the last re-measurement is under 2 seconds
+     * old. A failed request keeps the previous offset.
+     * @returns {Promise<void>}
+     */
+    async refreshClockOffset() {
+      if (performance.now() - this.clockSyncedAt < CLOCK_RESYNC_MIN_INTERVAL_MS) return;
+      this.clockSyncedAt = performance.now();
+      try {
+        const requestStartedAt = dayjs().valueOf();
+        const response = await axios.get(AppSettings.APIServer.app.get_config);
+        if (response.data.status) {
+          this.setClockOffset(response.data.data.serverTime, requestStartedAt, dayjs().valueOf());
+        }
+      } catch (error) {
+        console.debug('Clock offset refresh failed:', error);
+      }
     },
 
     /**

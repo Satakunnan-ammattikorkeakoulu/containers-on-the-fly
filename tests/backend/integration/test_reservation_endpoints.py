@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime, timezone, timedelta
+from urllib.parse import quote
 
 import database as db
 from sqlalchemy import select
@@ -35,7 +36,7 @@ def _get_test_ids(test_client, token):
 def _create_reservation_via_api(test_client, token, computer_id, container_id, hw_specs,
                                  hours_from_now=2, duration=2, **kwargs):
     """Create a reservation via the API and return the response."""
-    date = _future_date(hours=hours_from_now)
+    date = kwargs.get("date", _future_date(hours=hours_from_now))
     query = (
         f"?date={date}&duration={duration}"
         f"&computerId={computer_id}&containerId={container_id}"
@@ -143,6 +144,22 @@ def _fully_book_computer(computer_name, hours_offset=0, duration_hours=4, user_e
                     )
                 )
         session.commit()
+
+
+def _fully_book_computer_from(computer_id, minutes_from_now):
+    """Fully book the computer with the given ID, starting minutes_from_now from now."""
+    with db.Session() as session:
+        name = session.execute(
+            select(db.Computer.name).where(db.Computer.computerId == computer_id)
+        ).scalar_one()
+    _fully_book_computer(name, hours_offset=minutes_from_now / 60)
+
+
+def _latest_reservation(session):
+    """Return the most recently created reservation."""
+    return session.execute(
+        select(db.Reservation).order_by(db.Reservation.reservationId.desc()).limit(1)
+    ).scalar_one()
 
 
 # =============================================================================
@@ -328,6 +345,31 @@ class TestGetAvailableHardware:
         assert body["status"] is True, body["message"]
         by_name = {c["name"]: c for c in body["data"]["computers"]}
         assert by_name["server1"]["fullyBooked"] is False
+
+    def test_offset_date_is_converted_to_utc(self, test_client, admin_token):
+        """A date sent with a non-UTC offset is checked against the right UTC window."""
+        # server1 is fully booked from now+1h to now+2h
+        _fully_book_computer("server1", hours_offset=1, duration_hours=1)
+        start_utc = datetime.now(timezone.utc) + timedelta(minutes=30)
+        start_with_offset = start_utc.astimezone(timezone(timedelta(hours=2))).isoformat()
+
+        resp = test_client.get(
+            f"/api/reservation/get_available_hardware?date={quote(start_with_offset)}&duration=2",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        body = resp.json()
+        assert body["status"] is True, body["message"]
+        by_name = {c["name"]: c for c in body["data"]["computers"]}
+        assert by_name["server1"]["fullyBooked"] is True
+
+    def test_invalid_date_returns_error(self, test_client, admin_token):
+        """An unparseable date returns an error response instead of a server error."""
+        resp = test_client.get(
+            "/api/reservation/get_available_hardware?date=not-a-date&duration=2",
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] is False
 
 
 # =============================================================================
@@ -538,6 +580,106 @@ class TestCreateReservation:
             end = reservation.endDate.replace(tzinfo=None)
             assert before - timedelta(seconds=1) <= start <= after + timedelta(seconds=1)
             assert end - start == timedelta(hours=2)
+
+    def test_create_reservation_past_start_keeps_original_end_on_conflict(self, test_client, admin_token):
+        """If the full duration from now hits a later booking, the originally chosen end is kept."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        # The chosen window ends at now+1h50m; another booking takes the computer from now+1h55m
+        _fully_book_computer_from(computer_id, minutes_from_now=115)
+        before = datetime.now(timezone.utc).replace(tzinfo=None)
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+            hours_from_now=-10 / 60, duration=2,
+        )
+        after = datetime.now(timezone.utc).replace(tzinfo=None)
+        assert resp.json()["status"] is True, resp.json()["message"]
+
+        with db.Session() as session:
+            reservation = _latest_reservation(session)
+            start = reservation.startDate.replace(tzinfo=None)
+            end = reservation.endDate.replace(tzinfo=None)
+            assert before - timedelta(seconds=1) <= start <= after + timedelta(seconds=1)
+            assert abs(end - (before + timedelta(minutes=110))) < timedelta(seconds=5)
+
+    def test_create_reservation_past_start_rejected_when_original_window_taken(self, test_client, admin_token):
+        """The end fallback never allows a conflict inside the originally chosen window."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        # Another booking takes the computer from now+1h40m, before the chosen end (now+1h50m)
+        _fully_book_computer_from(computer_id, minutes_from_now=100)
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+            hours_from_now=-10 / 60, duration=2,
+        )
+        assert resp.json()["status"] is False
+
+    def test_create_reservation_start_now_keeps_click_time_end_on_conflict(self, test_client, admin_token):
+        """With startNow, the end fallback counts from the time the user clicked."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        _fully_book_computer_from(computer_id, minutes_from_now=115)
+        before = datetime.now(timezone.utc).replace(tzinfo=None)
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+            hours_from_now=-10 / 60, duration=2, startNow=True,
+        )
+        assert resp.json()["status"] is True, resp.json()["message"]
+
+        with db.Session() as session:
+            reservation = _latest_reservation(session)
+            end = reservation.endDate.replace(tzinfo=None)
+            assert abs(end - (before + timedelta(minutes=110))) < timedelta(seconds=5)
+
+    def test_create_reservation_start_now_ignores_unparseable_date(self, test_client, admin_token):
+        """With startNow, an unparseable date doesn't fail the request."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+            date="not-a-date", startNow=True,
+        )
+        assert resp.json()["status"] is True, resp.json()["message"]
+
+    def test_create_reservation_invalid_date_returns_error(self, test_client, admin_token):
+        """Unparseable or out-of-range dates return an error response instead of a server error."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        for bad_date in ("not-a-date", quote("0001-01-01T00:00:00+01:00")):
+            resp = _create_reservation_via_api(
+                test_client, admin_token, computer_id, container_id, hw_specs,
+                date=bad_date,
+            )
+            assert resp.status_code == 200
+            assert resp.json()["status"] is False
+            assert resp.json()["message"] == "Invalid date parameter."
+
+    def test_create_reservation_converts_offset_date_to_utc(self, test_client, admin_token):
+        """A start date sent with a non-UTC offset is stored as UTC."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        start_utc = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(hours=3)
+        start_with_offset = start_utc.astimezone(timezone(timedelta(hours=2))).isoformat()
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+            date=quote(start_with_offset),
+        )
+        assert resp.json()["status"] is True, resp.json()["message"]
+
+        with db.Session() as session:
+            reservation = session.execute(select(db.Reservation)).scalar_one()
+            assert reservation.startDate.replace(tzinfo=None) == start_utc.replace(tzinfo=None)
+
+    def test_create_reservation_audit_log_records_dates(self, test_client, admin_token):
+        """The RESERVATION_CREATE audit entry records the start and end actually used."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, hw_specs,
+            hours_from_now=-10 / 60, duration=2,
+        )
+
+        with db.Session() as session:
+            reservation = session.execute(select(db.Reservation)).scalar_one()
+            entry = session.execute(
+                select(db.AuditLog).where(db.AuditLog.action == "RESERVATION_CREATE")
+            ).scalar_one()
+            details = json.loads(entry.details)
+            assert datetime.fromisoformat(details["startDate"]).replace(tzinfo=None) == reservation.startDate.replace(tzinfo=None)
+            assert datetime.fromisoformat(details["endDate"]).replace(tzinfo=None) == reservation.endDate.replace(tzinfo=None)
 
     def test_create_reservation_invalid_computer(self, test_client, admin_token):
         """Reject reservation for a non-existent computer."""

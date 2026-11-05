@@ -13,6 +13,7 @@ from fastapi.security import OAuth2PasswordBearer
 from endpoints.responses import reservation as functionality
 from endpoints.models.reservation import ReservationFilters, UserReservationRequest, UserActivityRequest
 import json
+import math
 import re
 
 router = APIRouter(
@@ -248,11 +249,15 @@ def create_reservation(date: str, duration: int, computerId: int, containerId: i
 
     # Validate each hardware spec
     for key, val in hardwareSpecs.items():
-      if not isinstance(key, str) or not key.isdigit():
+      # Plain digits only: "05" would be a second entry for spec 5 and get
+      # around the per-spec limits
+      if not isinstance(key, str) or not key.isdigit() or key != str(int(key)):
         return api_response(False, "Invalid hardware spec ID format.")
-      if not isinstance(val, (int, float)) or val < 0:
+      # json.loads accepts NaN and Infinity; NaN compares false against every
+      # limit, which would skip the capacity check
+      if not isinstance(val, (int, float)) or not math.isfinite(val) or val < 0:
         return api_response(False, "Invalid hardware spec amount.")
-  except (json.JSONDecodeError, ValueError, TypeError):
+  except (json.JSONDecodeError, ValueError, TypeError, OverflowError):
     return api_response(False, "Invalid hardware specs JSON format.")
 
   userId = get_authenticated_user_id(token)

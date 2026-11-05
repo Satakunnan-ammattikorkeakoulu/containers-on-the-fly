@@ -769,6 +769,44 @@ class TestCreateReservation:
         with db.Session() as session:
             assert session.execute(select(db.Reservation)).first() is None
 
+    def test_create_reservation_rejects_non_finite_amounts(self, test_client, admin_token):
+        """NaN and Infinity amounts are rejected; NaN would compare false against every limit."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        spec_id = next(iter(hw_specs))
+        for amount in (float("nan"), float("inf"), float("-inf")):
+            resp = _create_reservation_via_api(
+                test_client, admin_token, computer_id, container_id, {**hw_specs, spec_id: amount},
+            )
+            assert resp.json()["status"] is False
+            assert resp.json()["message"] == "Invalid hardware spec amount."
+
+    def test_create_reservation_rejects_zero_padded_spec_ids(self, test_client, admin_token):
+        """Spec IDs must be plain digits; "05" would be a second entry for spec 5."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, admin_token)
+        padded_specs = {f"0{key}": val for key, val in hw_specs.items()}
+        resp = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, padded_specs,
+        )
+        assert resp.json()["status"] is False
+        assert resp.json()["message"] == "Invalid hardware spec ID format."
+
+    def test_create_reservation_nan_with_padded_duplicate_cannot_overbook(self, test_client, user_token):
+        """NaN plus a zero-padded duplicate ID can't book a computer that is already full."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, user_token)
+        _fully_book_computer_from(computer_id, minutes_from_now=60)
+        specs = {}
+        for key in hw_specs:
+            specs[key] = float("nan")
+            specs[f"0{key}"] = 1
+        resp = _create_reservation_via_api(
+            test_client, user_token, computer_id, container_id, specs,
+        )
+        assert resp.json()["status"] is False
+
+        with db.Session() as session:
+            # Only the full booking exists
+            assert len(session.execute(select(db.Reservation)).scalars().all()) == 1
+
     def test_create_reservation_exceeds_user_hardware_limit(self, test_client, user_token):
         """Normal user cannot exceed the hardware maximumAmountForUser."""
         computer_id, container_id, _ = _get_test_ids(test_client, user_token)

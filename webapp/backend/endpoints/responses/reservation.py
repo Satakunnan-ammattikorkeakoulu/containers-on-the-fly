@@ -1004,6 +1004,10 @@ def create_reservation(userId : int, date: str, duration: int, computerId: int, 
         return api_response(False, f"Invalid negative amount for {hardware_spec.type}")
       if val > hardware_spec.maximumAmount:
         return api_response(False, f"Requested amount exceeds available resources for {hardware_spec.type}: {val} > {hardware_spec.maximumAmount}")
+      # Each GPU is handed to the container as a whole device, while the limit and
+      # capacity checks add up amounts, so fractions would let users get past them
+      if hardware_spec.type == "gpu" and val not in (0, 1):
+        return api_response(False, "GPUs can only be reserved whole (amount 0 or 1).")
 
       # Check that the amount does not exceed user limits for the given hardware
       # Skipped for admins

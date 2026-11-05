@@ -162,6 +162,22 @@ def _latest_reservation(session):
     ).scalar_one()
 
 
+def _add_gpus(computer_id, count):
+    """Add count GPU specs (one per device, as the admin form does) to a computer and return their IDs."""
+    with db.Session() as session:
+        specs = [
+            db.HardwareSpec(
+                computerId=computer_id, type="gpu", format="NVIDIA", internalId=str(i),
+                maximumAmount=1, minimumAmount=0, defaultAmountForUser=0,
+                maximumAmountForUser=1, maximumAmountForUserLowPriority=1,
+            )
+            for i in range(count)
+        ]
+        session.add_all(specs)
+        session.commit()
+        return [spec.hardwareSpecId for spec in specs]
+
+
 # =============================================================================
 # get_available_hardware
 # =============================================================================
@@ -806,6 +822,34 @@ class TestCreateReservation:
         with db.Session() as session:
             # Only the full booking exists
             assert len(session.execute(select(db.Reservation)).scalars().all()) == 1
+
+    def test_create_reservation_rejects_fractional_gpu_amounts(self, test_client, user_token):
+        """GPUs are reserved whole: fractions add up under the limits while each one gets a full device."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, user_token)
+        gpu_ids = _add_gpus(computer_id, 4)
+        # Four quarter GPUs add up to the 1-GPU cap; a half GPU lets two users share one device
+        for gpu_specs in ({str(g): 0.25 for g in gpu_ids}, {str(gpu_ids[0]): 0.5}):
+            resp = _create_reservation_via_api(
+                test_client, user_token, computer_id, container_id, {**hw_specs, **gpu_specs},
+            )
+            assert resp.json()["status"] is False
+            assert resp.json()["message"] == "GPUs can only be reserved whole (amount 0 or 1)."
+
+        with db.Session() as session:
+            assert session.execute(select(db.Reservation)).first() is None
+
+    def test_create_reservation_whole_gpu_can_be_booked_once(self, test_client, admin_token, user_token):
+        """A whole GPU can be reserved, and a second booking of it in the same window is rejected."""
+        computer_id, container_id, hw_specs = _get_test_ids(test_client, user_token)
+        gpu_id = _add_gpus(computer_id, 1)[0]
+        first = _create_reservation_via_api(
+            test_client, admin_token, computer_id, container_id, {**hw_specs, str(gpu_id): 1},
+        )
+        assert first.json()["status"] is True, first.json()["message"]
+        second = _create_reservation_via_api(
+            test_client, user_token, computer_id, container_id, {**hw_specs, str(gpu_id): 1},
+        )
+        assert second.json()["status"] is False
 
     def test_create_reservation_exceeds_user_hardware_limit(self, test_client, user_token):
         """Normal user cannot exceed the hardware maximumAmountForUser."""
